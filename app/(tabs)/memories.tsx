@@ -1,0 +1,4913 @@
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ImageBackground,
+  Dimensions,
+  Pressable,
+  ScrollView,
+  Image,
+  Modal,
+  Animated,
+  PanResponder,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
+  Alert,
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
+import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
+import { ChevronDown, MapPin, Clock, X, Plus, ImageIcon, RefreshCw, BookHeart, MoreHorizontal, Edit2, Trash2, Check } from 'lucide-react-native';
+import { useFonts } from 'expo-font';
+import { Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
+import { PlayfairDisplay_400Regular, PlayfairDisplay_700Bold } from '@expo-google-fonts/playfair-display';
+import { DancingScript_400Regular, DancingScript_700Bold } from '@expo-google-fonts/dancing-script';
+import { Pacifico_400Regular } from '@expo-google-fonts/pacifico';
+import { Lobster_400Regular } from '@expo-google-fonts/lobster';
+import { Oswald_400Regular, Oswald_700Bold } from '@expo-google-fonts/oswald';
+import { Merriweather_400Regular, Merriweather_700Bold } from '@expo-google-fonts/merriweather';
+import { Lora_400Regular, Lora_700Bold } from '@expo-google-fonts/lora';
+import { PTSerif_400Regular, PTSerif_700Bold } from '@expo-google-fonts/pt-serif';
+import { Bitter_400Regular, Bitter_700Bold } from '@expo-google-fonts/bitter';
+import { Raleway_400Regular, Raleway_700Bold } from '@expo-google-fonts/raleway';
+import { RobotoSlab_400Regular, RobotoSlab_700Bold } from '@expo-google-fonts/roboto-slab';
+import { CrimsonText_400Regular, CrimsonText_700Bold } from '@expo-google-fonts/crimson-text';
+import { LibreBaskerville_400Regular, LibreBaskerville_700Bold } from '@expo-google-fonts/libre-baskerville';
+import { EBGaramond_400Regular, EBGaramond_700Bold } from '@expo-google-fonts/eb-garamond';
+import { Cormorant_400Regular, Cormorant_700Bold } from '@expo-google-fonts/cormorant';
+import { Spectral_400Regular, Spectral_700Bold } from '@expo-google-fonts/spectral';
+import { Vollkorn_400Regular, Vollkorn_700Bold } from '@expo-google-fonts/vollkorn';
+import { Arvo_400Regular, Arvo_700Bold } from '@expo-google-fonts/arvo';
+import { PermanentMarker_400Regular } from '@expo-google-fonts/permanent-marker';
+import { SpecialElite_400Regular } from '@expo-google-fonts/special-elite';
+import { RockSalt_400Regular } from '@expo-google-fonts/rock-salt';
+import { ShadowsIntoLight_400Regular } from '@expo-google-fonts/shadows-into-light';
+import { IndieFlower_400Regular } from '@expo-google-fonts/indie-flower';
+import { AmaticSC_400Regular, AmaticSC_700Bold } from '@expo-google-fonts/amatic-sc';
+import { CabinSketch_400Regular, CabinSketch_700Bold } from '@expo-google-fonts/cabin-sketch';
+import { Caveat_400Regular, Caveat_700Bold } from '@expo-google-fonts/caveat';
+import { Kalam_400Regular, Kalam_700Bold } from '@expo-google-fonts/kalam';
+import { PatrickHand_400Regular } from '@expo-google-fonts/patrick-hand';
+// Korean fonts for proper Korean text support
+import { NotoSansKR_400Regular, NotoSansKR_700Bold } from '@expo-google-fonts/noto-sans-kr';
+import { NanumGothic_400Regular, NanumGothic_700Bold } from '@expo-google-fonts/nanum-gothic';
+import { NanumMyeongjo_400Regular, NanumMyeongjo_700Bold } from '@expo-google-fonts/nanum-myeongjo';
+import { GothicA1_400Regular, GothicA1_700Bold } from '@expo-google-fonts/gothic-a1';
+import { DoHyeon_400Regular } from '@expo-google-fonts/do-hyeon';
+import { Jua_400Regular } from '@expo-google-fonts/jua';
+import { BlackHanSans_400Regular } from '@expo-google-fonts/black-han-sans';
+import { Sunflower_300Light, Sunflower_500Medium, Sunflower_700Bold } from '@expo-google-fonts/sunflower';
+import { GamjaFlower_400Regular } from '@expo-google-fonts/gamja-flower';
+import { PoorStory_400Regular } from '@expo-google-fonts/poor-story';
+import { SingleDay_400Regular } from '@expo-google-fonts/single-day';
+import { CuteFont_400Regular } from '@expo-google-fonts/cute-font';
+import { HiMelody_400Regular } from '@expo-google-fonts/hi-melody';
+import { Gaegu_300Light, Gaegu_400Regular, Gaegu_700Bold } from '@expo-google-fonts/gaegu';
+import { EastSeaDokdo_400Regular } from '@expo-google-fonts/east-sea-dokdo';
+
+import { COLORS, SPACING } from '@/constants/design';
+import { SAMPLE_MEMORIES } from '@/stores/memoryStore';
+import { useBackground } from '@/contexts';
+import type { CompletedMission } from '@/types';
+import { RansomText } from '@/components/ransom';
+
+// Font style type
+type FontStyleType = 'basic' | 'ransom' | null;
+
+// Album type
+interface Album {
+  id: string;
+  name: string;
+  coverPhoto: string | null;
+  createdAt: Date;
+  charStyles: CharStyle[]; // Legacy: kept for backward compatibility
+  namePosition: { x: number; y: number }; // Position for draggable text overlay
+  textScale: number; // Overall text scale (0.5 - 1.5)
+  fontStyle: FontStyleType; // 'basic' for Jua, 'ransom' for image-based ransom style
+  ransomSeed?: number; // Seed for consistent ransom text image selection
+}
+
+interface CharStyle {
+  fontFamily: string;
+  backgroundColor: string;
+  rotation: number;
+  paperStyle: number;
+  sizeScale: number; // Individual character size variation (0.85 - 1.15)
+  paddingVariant: number; // Padding variation index (0-4)
+  skewX: number; // Horizontal skew for torn effect (-3 to 3)
+  isCircle: boolean; // Whether to use circular shape
+  yOffset: number; // Vertical offset for organic baseline variation (-2 to 2)
+  shadowDepth: number; // Shadow intensity variation (0-3)
+  letterSpacing: number; // Individual letter spacing adjustment (-1 to 1)
+}
+
+// Seeded random number generator for consistent style generation
+const seededRandom = (seed: number): number => {
+  const x = Math.sin(seed * 9999) * 10000;
+  return x - Math.floor(x);
+};
+
+// Generate unique seed from character and index
+const getCharSeed = (char: string, index: number, baseSeed?: number): number => {
+  const charCode = char.charCodeAt(0);
+  return (baseSeed || Date.now()) + charCode * 100 + index * 13;
+};
+
+// Korean font families - decorative fonts for ransom style
+const KOREAN_FONT_FAMILIES = [
+  'DoHyeon_400Regular',
+  'Jua_400Regular',
+  'BlackHanSans_400Regular',
+  'GamjaFlower_400Regular',
+  'PoorStory_400Regular',
+  'SingleDay_400Regular',
+  'CuteFont_400Regular',
+  'HiMelody_400Regular',
+  'Gaegu_300Light',
+  'Gaegu_400Regular',
+  'Gaegu_700Bold',
+  'EastSeaDokdo_400Regular',
+  'NanumMyeongjo_700Bold',
+];
+
+// English/Latin font families - decorative fonts for ransom style
+const ENGLISH_FONT_FAMILIES = [
+  // Handwriting & Script
+  'DancingScript_400Regular',
+  'DancingScript_700Bold',
+  'Pacifico_400Regular',
+  'IndieFlower_400Regular',
+  'Kalam_400Regular',
+  'Kalam_700Bold',
+  'PatrickHand_400Regular',
+  'ShadowsIntoLight_400Regular',
+  'Caveat_400Regular',
+  'Caveat_700Bold',
+  // Bold & Display
+  'Lobster_400Regular',
+  'PermanentMarker_400Regular',
+  // Decorative & Unique
+  'SpecialElite_400Regular',
+  'RockSalt_400Regular',
+  'AmaticSC_400Regular',
+  'AmaticSC_700Bold',
+  'CabinSketch_400Regular',
+  'CabinSketch_700Bold',
+  // Elegant
+  'PlayfairDisplay_700Bold',
+  'Arvo_700Bold',
+];
+
+// Check if a character is Korean
+const isKorean = (char: string) => {
+  const code = char.charCodeAt(0);
+  return (code >= 0xAC00 && code <= 0xD7AF) || // Hangul Syllables
+    (code >= 0x1100 && code <= 0x11FF) || // Hangul Jamo
+    (code >= 0x3130 && code <= 0x318F);   // Hangul Compatibility Jamo
+};
+
+// Pastel background colors (forced theme)
+const PASTEL_COLORS = [
+  '#FFE4E1', '#FFB6C1', '#FFC0CB', // Pink pastel
+  '#E6E6FA', '#D8BFD8', '#DDA0DD', // Purple pastel
+  '#B0E0E6', '#ADD8E6', '#87CEEB', // Blue pastel
+  '#98FB98', '#90EE90', '#8FBC8F', // Green pastel
+  '#FFFACD', '#FAFAD2', '#FFFFE0', // Yellow pastel
+  '#FFDAB9', '#FFE4B5', '#FFEFD5', // Orange pastel
+  '#FFF8E7', '#F5F5DC', '#FFFEF0', // Cream
+];
+
+// Paper texture styles (0-9: torn paper, 10-14: circles)
+const PAPER_STYLES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
+
+// Shape types: 'rect' for torn paper, 'circle' for round badges
+const PAPER_SHAPES: ('rect' | 'circle')[] = [
+  'rect', 'rect', 'rect', 'rect', 'rect', // 0-4: rectangles
+  'rect', 'rect', 'rect', 'rect', 'rect', // 5-9: rectangles
+  'circle', 'circle', 'circle', 'circle', 'circle', // 10-14: circles
+];
+
+// Rotations optimized for authentic ransom note look (-7 to 7 degrees - more subtle)
+const RANSOM_ROTATIONS = [-7, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 7];
+
+// Individual character size variations for organic look
+const SIZE_SCALES = [0.88, 0.92, 0.96, 1.0, 1.04, 1.08, 1.12];
+
+// Padding variants for different paper sizes
+const PADDING_VARIANTS = [0, 1, 2, 3, 4];
+
+// Skew values for torn paper effect (more subtle)
+const SKEW_VALUES = [-2.5, -1.5, -0.5, 0, 0.5, 1.5, 2.5];
+
+// Vertical offset values for organic baseline variation
+const Y_OFFSETS = [-2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2];
+
+// Shadow depth variations (0 = none, 1 = subtle, 2 = medium, 3 = strong)
+const SHADOW_DEPTHS = [0, 1, 1, 2, 2, 2, 3];
+
+// Letter spacing adjustments for natural spacing
+const LETTER_SPACINGS = [-1, -0.5, 0, 0, 0.5, 1];
+
+const { width, height } = Dimensions.get('window');
+
+// Calculate scale ratio between modal preview and album card
+// Modal: maxWidth 360 - 48 padding = 312px modal content width (or device width - 48 if smaller)
+// Album card: 140px fixed width
+// Album detail: 180px fixed width
+const MODAL_PREVIEW_WIDTH = Math.min(width, 360) - 48;
+const ALBUM_CARD_WIDTH = 140; // Fixed width 140px
+const ALBUM_DETAIL_WIDTH = 180; // Fixed width for album detail modal
+const ALBUM_SCALE_RATIO = ALBUM_CARD_WIDTH / MODAL_PREVIEW_WIDTH;
+const ALBUM_DETAIL_SCALE_RATIO = ALBUM_DETAIL_WIDTH / MODAL_PREVIEW_WIDTH;
+
+type MemoryType = typeof SAMPLE_MEMORIES[0];
+
+interface MonthData {
+  year: string;
+  month: string;
+  monthName: string;
+  missions: MemoryType[];
+}
+
+export default function MemoriesScreen() {
+  const { backgroundImage } = useBackground();
+  const [selectedMonth, setSelectedMonth] = useState<MonthData | null>(null);
+  const [selectedPhoto, setSelectedPhoto] = useState<MemoryType | null>(null);
+  const [showYearPicker, setShowYearPicker] = useState<string | null>(null);
+
+  // Load all fonts (English + Korean)
+  const [fontsLoaded] = useFonts({
+    // English fonts
+    Inter_400Regular,
+    Inter_700Bold,
+    PlayfairDisplay_400Regular,
+    PlayfairDisplay_700Bold,
+    DancingScript_400Regular,
+    DancingScript_700Bold,
+    Pacifico_400Regular,
+    Lobster_400Regular,
+    Oswald_400Regular,
+    Oswald_700Bold,
+    Merriweather_400Regular,
+    Merriweather_700Bold,
+    Lora_400Regular,
+    Lora_700Bold,
+    PTSerif_400Regular,
+    PTSerif_700Bold,
+    Bitter_400Regular,
+    Bitter_700Bold,
+    Raleway_400Regular,
+    Raleway_700Bold,
+    RobotoSlab_400Regular,
+    RobotoSlab_700Bold,
+    CrimsonText_400Regular,
+    CrimsonText_700Bold,
+    LibreBaskerville_400Regular,
+    LibreBaskerville_700Bold,
+    EBGaramond_400Regular,
+    EBGaramond_700Bold,
+    Cormorant_400Regular,
+    Cormorant_700Bold,
+    Spectral_400Regular,
+    Spectral_700Bold,
+    Vollkorn_400Regular,
+    Vollkorn_700Bold,
+    Arvo_400Regular,
+    Arvo_700Bold,
+    PermanentMarker_400Regular,
+    SpecialElite_400Regular,
+    RockSalt_400Regular,
+    ShadowsIntoLight_400Regular,
+    IndieFlower_400Regular,
+    AmaticSC_400Regular,
+    AmaticSC_700Bold,
+    CabinSketch_400Regular,
+    CabinSketch_700Bold,
+    Caveat_400Regular,
+    Caveat_700Bold,
+    Kalam_400Regular,
+    Kalam_700Bold,
+    PatrickHand_400Regular,
+    // Korean fonts
+    NotoSansKR_400Regular,
+    NotoSansKR_700Bold,
+    NanumGothic_400Regular,
+    NanumGothic_700Bold,
+    NanumMyeongjo_400Regular,
+    NanumMyeongjo_700Bold,
+    GothicA1_400Regular,
+    GothicA1_700Bold,
+    DoHyeon_400Regular,
+    Jua_400Regular,
+    BlackHanSans_400Regular,
+    Sunflower_300Light,
+    Sunflower_500Medium,
+    Sunflower_700Bold,
+    GamjaFlower_400Regular,
+    PoorStory_400Regular,
+    SingleDay_400Regular,
+    CuteFont_400Regular,
+    HiMelody_400Regular,
+    Gaegu_300Light,
+    Gaegu_400Regular,
+    Gaegu_700Bold,
+    EastSeaDokdo_400Regular,
+  });
+
+  // Album creation states
+  const [showAlbumModal, setShowAlbumModal] = useState(false);
+  const [albumName, setAlbumName] = useState('');
+  const [albumCoverPhoto, setAlbumCoverPhoto] = useState<string | null>(null);
+  const [albums, setAlbums] = useState<Album[]>([]);
+  const [albumStep, setAlbumStep] = useState<'fontStyle' | 'name' | 'cover'>('fontStyle'); // Start with font selection
+  const [charStyles, setCharStyles] = useState<CharStyle[]>([]);
+  const [namePosition, setNamePosition] = useState({ x: 30, y: 16 }); // Default position (past 24px book spine)
+  const [textScale, setTextScale] = useState(1.0); // Overall text scale (0.5 - 1.5)
+  const [fontStyle, setFontStyle] = useState<FontStyleType>(null); // No style selected by default
+  const [textColor, setTextColor] = useState<'white' | 'black'>('white'); // Text color for basic font
+  const [ransomSeed, setRansomSeed] = useState<number>(() => Math.floor(Math.random() * 1000000)); // Seed for ransom text
+
+  // Album detail modal states
+  const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
+  const [showAlbumDetailModal, setShowAlbumDetailModal] = useState(false);
+  const [showAlbumMenu, setShowAlbumMenu] = useState(false);
+  const [albumPhotos, setAlbumPhotos] = useState<{ [albumId: string]: MemoryType[] }>({}); // Photos added to each album (full mission objects)
+
+  // Album photo selection states
+  const [isSelectingAlbumPhotos, setIsSelectingAlbumPhotos] = useState(false);
+  const [selectedAlbumPhotoIndices, setSelectedAlbumPhotoIndices] = useState<Set<number>>(new Set());
+  const [selectedAlbumPhoto, setSelectedAlbumPhoto] = useState<MemoryType | null>(null);
+  const [showMissionPhotosPicker, setShowMissionPhotosPicker] = useState(false);
+  const [showCoverPhotoPicker, setShowCoverPhotoPicker] = useState(false);
+  const [selectedMissionPhotos, setSelectedMissionPhotos] = useState<Set<string>>(new Set());
+
+  // Cover edit modal states
+  const [showCoverEditModal, setShowCoverEditModal] = useState(false);
+  const [editAlbumName, setEditAlbumName] = useState('');
+  const [editAlbumStep, setEditAlbumStep] = useState<'fontStyle' | 'name' | 'cover'>('fontStyle');
+  const [editFontStyle, setEditFontStyle] = useState<FontStyleType>(null);
+  const [editCharStyles, setEditCharStyles] = useState<CharStyle[]>([]);
+  const [editRansomSeed, setEditRansomSeed] = useState<number>(() => Math.floor(Math.random() * 1000000));
+  const [editCoverPhoto, setEditCoverPhoto] = useState<string | null>(null);
+  const [editTextPosition, setEditTextPosition] = useState({ x: 30, y: 16 });
+  const [editTextScale, setEditTextScale] = useState(1);
+
+  // Refs to keep state values fresh in PanResponder callbacks
+  const albumNameRef = useRef(albumName);
+  const fontStyleRef = useRef(fontStyle);
+  const textScaleRef = useRef(textScale);
+  const editAlbumNameRef = useRef(editAlbumName);
+  const editFontStyleRef = useRef(editFontStyle);
+  const editTextScaleRef = useRef(editTextScale);
+
+  // Keep refs in sync with state
+  useEffect(() => { albumNameRef.current = albumName; }, [albumName]);
+  useEffect(() => { fontStyleRef.current = fontStyle; }, [fontStyle]);
+  useEffect(() => { textScaleRef.current = textScale; }, [textScale]);
+  useEffect(() => { editAlbumNameRef.current = editAlbumName; }, [editAlbumName]);
+  useEffect(() => { editFontStyleRef.current = editFontStyle; }, [editFontStyle]);
+  useEffect(() => { editTextScaleRef.current = editTextScale; }, [editTextScale]);
+
+  // Animated values for picker modals
+  const missionPickerSlideAnim = useRef(new Animated.Value(height)).current;
+  const coverPickerSlideAnim = useRef(new Animated.Value(height)).current;
+
+  // Animated values for album creation modal
+  const albumModalScaleAnim = useRef(new Animated.Value(0.9)).current;
+  const albumModalOpacityAnim = useRef(new Animated.Value(0)).current;
+
+  // Animated values for step transitions (fade effect)
+  const stepOpacityAnim = useRef(new Animated.Value(1)).current;
+
+  // Animated position for dragging
+  const panPosition = useRef(new Animated.ValueXY({ x: 30, y: 16 })).current;
+  const panOffset = useRef({ x: 0, y: 0 });
+
+  // Actual container bounds measured via onLayout (ref to work with PanResponder)
+  const containerBounds = useRef({ width: MODAL_PREVIEW_WIDTH, height: MODAL_PREVIEW_WIDTH * 4 / 3 });
+
+  // Handler to measure actual container dimensions
+  const handleContainerLayout = (event: any) => {
+    const { width, height } = event.nativeEvent.layout;
+    containerBounds.current = { width, height };
+  };
+
+  // Calculate estimated text width based on character count and style
+  const getEstimatedTextWidth = (text: string, isRansom: boolean, scale: number = 1) => {
+    const charCount = text.replace(/\s/g, '').length;
+    const spaceCount = (text.match(/\s/g) || []).length;
+    if (charCount === 0) return 16;
+    // Ransom style: characters overlap due to negative spacing (-4px), so effective width is ~24px per char
+    // Basic style: each char ~16px
+    const charWidth = isRansom ? 24 : 16;
+    const spaceWidth = isRansom ? 8 : 6;
+    const baseWidth = (charCount * charWidth + spaceCount * spaceWidth) * scale;
+    return baseWidth + 12; // Small margin for safety
+  };
+
+  // PanResponder for dragging text position (constrained within photo bounds)
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        panOffset.current = {
+          x: (panPosition.x as any)._value,
+          y: (panPosition.y as any)._value,
+        };
+      },
+      onPanResponderMove: (_, gestureState) => {
+        // Calculate new position
+        let newX = panOffset.current.x + gestureState.dx;
+        let newY = panOffset.current.y + gestureState.dy;
+
+        // Use ACTUAL measured container dimensions
+        const actualWidth = containerBounds.current.width;
+        const actualHeight = containerBounds.current.height;
+
+        // Simple bounds - just use fixed margins, let text overflow naturally
+        const BOOK_SPINE_WIDTH = 24;
+        const SPINE_MARGIN = 4;
+        const RIGHT_MARGIN = 16;
+        const TEXT_HEIGHT_BUFFER = 32;
+        const TOP_PADDING = 8;
+
+        const minX = BOOK_SPINE_WIDTH + SPINE_MARGIN;
+        const maxX = actualWidth - RIGHT_MARGIN;
+        const minY = TOP_PADDING;
+        const maxY = actualHeight - TEXT_HEIGHT_BUFFER;
+
+        newX = Math.max(minX, Math.min(maxX, newX));
+        newY = Math.max(minY, Math.min(maxY, newY));
+
+        panPosition.setValue({ x: newX, y: newY });
+      },
+      onPanResponderRelease: () => {
+        // Update the position state
+        setNamePosition({
+          x: (panPosition.x as any)._value,
+          y: (panPosition.y as any)._value,
+        });
+      },
+    })
+  ).current;
+
+  // Animation for month modal
+  const slideAnim = useRef(new Animated.Value(height)).current;
+
+  useEffect(() => {
+    if (selectedMonth) {
+      // Slide up animation
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 65,
+        friction: 11,
+      }).start();
+    }
+  }, [selectedMonth]);
+
+  // Close month modal with slide down animation
+  const closeMonthModal = () => {
+    Animated.timing(slideAnim, {
+      toValue: height,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setSelectedMonth(null);
+      setSelectedPhoto(null);
+    });
+  };
+
+  // Animation for mission photos picker
+  useEffect(() => {
+    if (showMissionPhotosPicker) {
+      Animated.spring(missionPickerSlideAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 65,
+        friction: 11,
+      }).start();
+    }
+  }, [showMissionPhotosPicker]);
+
+  // Close mission picker with slide down animation
+  const closeMissionPicker = () => {
+    Animated.timing(missionPickerSlideAnim, {
+      toValue: height,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setShowMissionPhotosPicker(false);
+      setSelectedMissionPhotos(new Set());
+    });
+  };
+
+  // Animation for cover photo picker
+  useEffect(() => {
+    if (showCoverPhotoPicker) {
+      // Reset to bottom first, then animate up
+      coverPickerSlideAnim.setValue(height);
+      Animated.spring(coverPickerSlideAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 65,
+        friction: 11,
+      }).start();
+    }
+  }, [showCoverPhotoPicker]);
+
+  // Close cover photo picker with animation
+  const closeCoverPhotoPicker = () => {
+    Animated.timing(coverPickerSlideAnim, {
+      toValue: height,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setShowCoverPhotoPicker(false);
+    });
+  };
+
+  // Select cover photo and close picker
+  const handleSelectCoverPhoto = (photoUrl: string) => {
+    console.log('[DEBUG] Selected cover photo:', photoUrl);
+    setAlbumCoverPhoto(photoUrl);
+    closeCoverPhotoPicker();
+  };
+
+  // Animation for album detail modal (scale + fade)
+  const albumDetailScaleAnim = useRef(new Animated.Value(0.9)).current;
+  const albumDetailOpacityAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (showAlbumDetailModal) {
+      // Scale up + fade in animation
+      Animated.parallel([
+        Animated.spring(albumDetailScaleAnim, {
+          toValue: 1,
+          useNativeDriver: true,
+          tension: 100,
+          friction: 12,
+        }),
+        Animated.timing(albumDetailOpacityAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      // Reset animations
+      albumDetailScaleAnim.setValue(0.9);
+      albumDetailOpacityAnim.setValue(0);
+    }
+  }, [showAlbumDetailModal]);
+
+  // Group missions by year and month
+  const groupByYearMonth = (memories: MemoryType[]) => {
+    const grouped: {
+      [year: string]: { [month: string]: MemoryType[] };
+    } = {};
+
+    memories.forEach((memory) => {
+      const date = new Date(memory.completedAt);
+      const year = date.getFullYear().toString();
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+
+      if (!grouped[year]) grouped[year] = {};
+      if (!grouped[year][month]) grouped[year][month] = [];
+
+      grouped[year][month].push(memory);
+    });
+
+    return grouped;
+  };
+
+  // Filter only completed missions (both users have written messages)
+  const completedMemories = SAMPLE_MEMORIES.filter(
+    (memory) => memory.user1Message && memory.user2Message && memory.photoUrl
+  );
+
+  const groupedMissions = groupByYearMonth(completedMemories);
+  const years = Object.keys(groupedMissions).sort((a, b) => parseInt(b) - parseInt(a));
+
+  const getMonthName = (monthNumber: string) => {
+    const monthNames = [
+      '1월', '2월', '3월', '4월', '5월', '6월',
+      '7월', '8월', '9월', '10월', '11월', '12월'
+    ];
+    return monthNames[parseInt(monthNumber) - 1];
+  };
+
+  // Generate ransom note style for each character (picks Korean or English font based on char)
+  const generateCharStyle = (char: string): CharStyle => {
+    const fontFamilies = isKorean(char) ? KOREAN_FONT_FAMILIES : ENGLISH_FONT_FAMILIES;
+    const paperStyleIndex = Math.floor(Math.random() * PAPER_STYLES.length);
+    const isCircle = PAPER_SHAPES[paperStyleIndex] === 'circle';
+    return {
+      fontFamily: fontFamilies[Math.floor(Math.random() * fontFamilies.length)],
+      backgroundColor: PASTEL_COLORS[Math.floor(Math.random() * PASTEL_COLORS.length)],
+      rotation: isCircle ? 0 : RANSOM_ROTATIONS[Math.floor(Math.random() * RANSOM_ROTATIONS.length)],
+      paperStyle: paperStyleIndex,
+      sizeScale: SIZE_SCALES[Math.floor(Math.random() * SIZE_SCALES.length)],
+      paddingVariant: PADDING_VARIANTS[Math.floor(Math.random() * PADDING_VARIANTS.length)],
+      skewX: isCircle ? 0 : SKEW_VALUES[Math.floor(Math.random() * SKEW_VALUES.length)],
+      isCircle,
+    };
+  };
+
+  // Update char styles when album name changes
+  const handleAlbumNameChange = (text: string) => {
+    // Filter to only allow English letters, numbers, and spaces when ransom style is selected
+    const filteredText = fontStyle === 'ransom'
+      ? text.replace(/[^a-zA-Z0-9\s]/g, '')
+      : text;
+    setAlbumName(filteredText);
+    // Generate new styles for new characters, keeping existing styles for unchanged positions
+    const newStyles: CharStyle[] = [];
+    for (let i = 0; i < filteredText.length; i++) {
+      if (i < charStyles.length && filteredText[i] !== ' ') {
+        // Keep existing style if we have one and character isn't a space
+        newStyles.push(charStyles[i]);
+      } else if (filteredText[i] !== ' ') {
+        // Generate new style for new character
+        newStyles.push(generateCharStyle(filteredText[i]));
+      } else {
+        // For spaces, use a placeholder style
+        newStyles.push({
+          fontFamily: 'Inter_400Regular',
+          backgroundColor: 'transparent',
+          rotation: 0,
+          paperStyle: 0,
+          sizeScale: 1,
+          paddingVariant: 0,
+          skewX: 0,
+          isCircle: false,
+        });
+      }
+    }
+    setCharStyles(newStyles);
+  };
+
+  // Regenerate all character styles (refresh button)
+  const regenerateStyles = () => {
+    if (albumName.length > 0 && fontStyle === 'ransom') {
+      const newStyles: CharStyle[] = albumName.split('').map((char) => {
+        if (char === ' ') {
+          return {
+            fontFamily: 'Inter_400Regular',
+            backgroundColor: 'transparent',
+            rotation: 0,
+            paperStyle: 0,
+            sizeScale: 1,
+            paddingVariant: 0,
+            skewX: 0,
+            isCircle: false,
+          };
+        }
+        return generateCharStyle(char);
+      });
+      setCharStyles(newStyles);
+    }
+  };
+
+  // Auto-crop image to 3:4 aspect ratio (center crop)
+  const autoCropTo3x4 = async (uri: string, imgWidth: number, imgHeight: number): Promise<string> => {
+    const targetAspect = 3 / 4; // width / height
+    const currentAspect = imgWidth / imgHeight;
+
+    let cropWidth: number;
+    let cropHeight: number;
+    let originX: number;
+    let originY: number;
+
+    if (currentAspect > targetAspect) {
+      // Image is wider than 3:4, crop sides
+      cropHeight = imgHeight;
+      cropWidth = Math.round(imgHeight * targetAspect);
+      originX = Math.round((imgWidth - cropWidth) / 2);
+      originY = 0;
+    } else {
+      // Image is taller than 3:4, crop top/bottom
+      cropWidth = imgWidth;
+      cropHeight = Math.round(imgWidth / targetAspect);
+      originX = 0;
+      originY = Math.round((imgHeight - cropHeight) / 2);
+    }
+
+    const result = await ImageManipulator.manipulateAsync(
+      uri,
+      [{ crop: { originX, originY, width: cropWidth, height: cropHeight } }],
+      { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+    );
+
+    return result.uri;
+  };
+
+  // Pick cover photo from device photo library
+  const handlePickCoverPhoto = async () => {
+    // Request permission
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (permissionResult.granted === false) {
+      Alert.alert('권한 필요', '사진첩 접근 권한이 필요합니다.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: false,
+      quality: 1,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      try {
+        const croppedUri = await autoCropTo3x4(
+          asset.uri,
+          asset.width || 1000,
+          asset.height || 1000
+        );
+        setAlbumCoverPhoto(croppedUri);
+      } catch (error) {
+        console.error('Crop error:', error);
+        setAlbumCoverPhoto(asset.uri);
+      }
+    }
+  };
+
+  // Pick cover photo for edit modal
+  const handlePickEditCoverPhoto = async () => {
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (permissionResult.granted === false) {
+      Alert.alert('권한 필요', '사진첩 접근 권한이 필요합니다.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: false,
+      quality: 1,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      try {
+        const croppedUri = await autoCropTo3x4(
+          asset.uri,
+          asset.width || 1000,
+          asset.height || 1000
+        );
+        setEditCoverPhoto(croppedUri);
+      } catch (error) {
+        console.error('Crop error:', error);
+        setEditCoverPhoto(asset.uri);
+      }
+    }
+  };
+
+  // Create album with closing animation
+  const handleCreateAlbum = () => {
+    if (albumName.trim()) {
+      const newAlbum: Album = {
+        id: Date.now().toString(),
+        name: albumName.trim(),
+        coverPhoto: albumCoverPhoto,
+        createdAt: new Date(),
+        charStyles: [...charStyles],
+        namePosition: { ...namePosition },
+        textScale: textScale,
+        fontStyle: fontStyle,
+        ransomSeed: ransomSeed, // Save the ransom seed for consistent rendering
+      };
+      setAlbums([...albums, newAlbum]);
+
+      // Animate out then reset modal state
+      Animated.parallel([
+        Animated.timing(albumModalScaleAnim, {
+          toValue: 0.9,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(albumModalOpacityAnim, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setShowAlbumModal(false);
+        setAlbumName('');
+        setAlbumCoverPhoto(null);
+        setAlbumStep('fontStyle'); // Reset to font selection
+        setCharStyles([]);
+        setNamePosition({ x: 30, y: 16 }); // Reset position (past 24px book spine)
+        panPosition.setValue({ x: 30, y: 16 }); // Reset animated position
+        setTextScale(1.0); // Reset text scale
+        setFontStyle(null); // Reset font style - no selection
+        setRansomSeed(Math.floor(Math.random() * 1000000)); // Generate new seed for next album
+      });
+    }
+  };
+
+  // Smooth step transition with fade animation
+  const transitionToNextStep = (nextStep: 'fontStyle' | 'name' | 'cover') => {
+    // Fade out current content
+    Animated.timing(stepOpacityAnim, {
+      toValue: 0,
+      duration: 150,
+      useNativeDriver: true,
+    }).start(() => {
+      // Change step
+      setAlbumStep(nextStep);
+      // Fade in new content
+      Animated.timing(stepOpacityAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    });
+  };
+
+  // Open album creation modal with animation
+  const openAlbumModal = () => {
+    // Reset animation values
+    albumModalScaleAnim.setValue(0.9);
+    albumModalOpacityAnim.setValue(0);
+    stepOpacityAnim.setValue(1);
+
+    setShowAlbumModal(true);
+    setAlbumStep('fontStyle'); // Start with font selection
+    setAlbumName('');
+    setAlbumCoverPhoto(null);
+    setCharStyles([]);
+    setNamePosition({ x: 30, y: 16 }); // Reset position (past 24px book spine)
+    panPosition.setValue({ x: 30, y: 16 }); // Reset animated position
+    setTextScale(1.0); // Reset text scale
+    setFontStyle(null); // Reset font style - no selection
+    setRansomSeed(Math.floor(Math.random() * 1000000)); // Generate fresh seed
+
+    // Animate in
+    Animated.parallel([
+      Animated.spring(albumModalScaleAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 100,
+        friction: 12,
+      }),
+      Animated.timing(albumModalOpacityAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  // Close album creation modal with animation
+  const closeAlbumModal = () => {
+    Animated.parallel([
+      Animated.timing(albumModalScaleAnim, {
+        toValue: 0.9,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(albumModalOpacityAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setShowAlbumModal(false);
+      // Reset state after animation completes
+      setAlbumName('');
+      setAlbumCoverPhoto(null);
+      setAlbumStep('fontStyle');
+      setCharStyles([]);
+      setNamePosition({ x: 30, y: 16 });
+      panPosition.setValue({ x: 30, y: 16 });
+      setTextScale(1.0);
+      setFontStyle(null);
+    });
+  };
+
+  // Close album detail modal with fade-out animation
+  const closeAlbumDetailModal = () => {
+    Animated.parallel([
+      Animated.timing(albumDetailScaleAnim, {
+        toValue: 0.9,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(albumDetailOpacityAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setShowAlbumDetailModal(false);
+      setShowAlbumMenu(false);
+      setSelectedAlbum(null);
+      setIsSelectingAlbumPhotos(false);
+      setSelectedAlbumPhotoIndices(new Set());
+      setSelectedAlbumPhoto(null);
+      setShowMissionPhotosPicker(false);
+    });
+  };
+
+  // Split text into words for proper wrapping
+  const splitIntoWords = (text: string) => {
+    const words: { word: string; startIndex: number }[] = [];
+    let currentWord = '';
+    let startIndex = 0;
+
+    for (let i = 0; i < text.length; i++) {
+      if (text[i] === ' ') {
+        if (currentWord) {
+          words.push({ word: currentWord, startIndex });
+          currentWord = '';
+        }
+        words.push({ word: ' ', startIndex: i }); // Keep space as a separate "word"
+      } else {
+        if (!currentWord) {
+          startIndex = i;
+        }
+        currentWord += text[i];
+      }
+    }
+    if (currentWord) {
+      words.push({ word: currentWord, startIndex });
+    }
+    return words;
+  };
+
+  // Go to next step (cover selection) with slide animation
+  const goToNextStep = () => {
+    if (albumName.trim()) {
+      transitionToNextStep('cover');
+    }
+  };
+
+  // ====== Cover Edit Modal Functions ======
+
+  // Animated position for edit modal dragging
+  const editPanPosition = useRef(new Animated.ValueXY({ x: 30, y: 16 })).current;
+  const editPanOffset = useRef({ x: 0, y: 0 });
+  const editContainerBounds = useRef({ width: MODAL_PREVIEW_WIDTH, height: MODAL_PREVIEW_WIDTH * 4 / 3 });
+
+  // Handler to measure actual container dimensions for edit modal
+  const handleEditContainerLayout = (event: any) => {
+    const { width, height } = event.nativeEvent.layout;
+    editContainerBounds.current = { width, height };
+  };
+
+  // PanResponder for edit modal dragging
+  const editPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        editPanOffset.current = {
+          x: (editPanPosition.x as any)._value,
+          y: (editPanPosition.y as any)._value,
+        };
+      },
+      onPanResponderMove: (_, gestureState) => {
+        let newX = editPanOffset.current.x + gestureState.dx;
+        let newY = editPanOffset.current.y + gestureState.dy;
+
+        const actualWidth = editContainerBounds.current.width;
+        const actualHeight = editContainerBounds.current.height;
+
+        // Simple bounds - just use fixed margins, let text overflow naturally
+        const BOOK_SPINE_WIDTH = 24;
+        const SPINE_MARGIN = 4;
+        const RIGHT_MARGIN = 16;
+        const TEXT_HEIGHT_BUFFER = 32;
+
+        const minX = BOOK_SPINE_WIDTH + SPINE_MARGIN;
+        const maxX = actualWidth - RIGHT_MARGIN;
+        const minY = 0;
+        const maxY = actualHeight - TEXT_HEIGHT_BUFFER;
+
+        newX = Math.max(minX, Math.min(maxX, newX));
+        newY = Math.max(minY, Math.min(maxY, newY));
+
+        editPanPosition.setValue({ x: newX, y: newY });
+      },
+      onPanResponderRelease: () => {
+        setEditTextPosition({
+          x: (editPanPosition.x as any)._value,
+          y: (editPanPosition.y as any)._value,
+        });
+      },
+    })
+  ).current;
+
+  // Update edit char styles when album name changes
+  const handleEditAlbumNameChange = (text: string) => {
+    // Filter to only allow English letters, numbers, and spaces when ransom style is selected
+    const filteredText = editFontStyle === 'ransom'
+      ? text.replace(/[^a-zA-Z0-9\s]/g, '')
+      : text;
+    setEditAlbumName(filteredText);
+    const newStyles: CharStyle[] = [];
+    for (let i = 0; i < filteredText.length; i++) {
+      if (i < editCharStyles.length && filteredText[i] !== ' ') {
+        newStyles.push(editCharStyles[i]);
+      } else if (filteredText[i] !== ' ') {
+        newStyles.push(generateCharStyle(filteredText[i]));
+      } else {
+        newStyles.push({
+          fontFamily: 'Inter_400Regular',
+          backgroundColor: 'transparent',
+          rotation: 0,
+          paperStyle: 0,
+          sizeScale: 1,
+          paddingVariant: 0,
+          skewX: 0,
+          isCircle: false,
+        });
+      }
+    }
+    setEditCharStyles(newStyles);
+  };
+
+  // Regenerate edit char styles (refresh button)
+  const regenerateEditStyles = () => {
+    if (editAlbumName.length > 0 && editFontStyle === 'ransom') {
+      const newStyles: CharStyle[] = editAlbumName.split('').map((char) => {
+        if (char === ' ') {
+          return {
+            fontFamily: 'Inter_400Regular',
+            backgroundColor: 'transparent',
+            rotation: 0,
+            paperStyle: 0,
+            sizeScale: 1,
+            paddingVariant: 0,
+            skewX: 0,
+            isCircle: false,
+          };
+        }
+        return generateCharStyle(char);
+      });
+      setEditCharStyles(newStyles);
+    }
+  };
+
+  // Save edited album
+  const handleSaveEdit = () => {
+    if (selectedAlbum && editAlbumName.trim()) {
+      const updatedAlbum: Album = {
+        ...selectedAlbum,
+        name: editAlbumName.trim(),
+        coverPhoto: editCoverPhoto,
+        charStyles: [...editCharStyles],
+        namePosition: { ...editTextPosition },
+        textScale: editTextScale,
+        fontStyle: editFontStyle,
+        ransomSeed: editRansomSeed,
+      };
+      setAlbums(albums.map(album =>
+        album.id === selectedAlbum.id ? updatedAlbum : album
+      ));
+      setSelectedAlbum(updatedAlbum);
+      setShowCoverEditModal(false);
+    }
+  };
+
+  // Initialize edit pan position when modal opens
+  useEffect(() => {
+    if (showCoverEditModal && selectedAlbum) {
+      const pos = selectedAlbum.namePosition || { x: 30, y: 16 };
+      editPanPosition.setValue(pos);
+      editPanOffset.current = pos;
+    }
+  }, [showCoverEditModal]);
+
+  return (
+    <View style={styles.container}>
+      {/* Background Image */}
+      <ImageBackground
+        source={backgroundImage}
+        style={styles.backgroundImage}
+        blurRadius={40}
+      >
+        <View style={styles.backgroundScale} />
+      </ImageBackground>
+
+      {/* Header */}
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.headerTitle}>추억</Text>
+          <Text style={styles.headerSubtitle}>우리가 함께한 순간들</Text>
+        </View>
+      </View>
+
+      {/* Content */}
+      {completedMemories.length === 0 ? (
+        <View style={styles.emptyState}>
+          <View style={styles.emptyMissionCard}>
+            <Text style={styles.emptyMissionText}>완료된 미션이 없습니다</Text>
+            <Text style={styles.emptyMissionHint}>
+              미션을 완료하고 서로에게 한마디를 작성해주세요
+            </Text>
+          </View>
+        </View>
+      ) : (
+        <ScrollView
+          style={styles.mainContent}
+          contentContainerStyle={styles.mainContentContainer}
+          showsVerticalScrollIndicator={false}
+          bounces={true}
+          alwaysBounceVertical={true}
+        >
+          {/* Year Groups */}
+          {years.map((year) => {
+            const months = Object.keys(groupedMissions[year]).sort(
+              (a, b) => parseInt(b) - parseInt(a)
+            );
+
+            return (
+              <View key={year} style={styles.yearSection}>
+                {/* Year Header */}
+                <View style={styles.yearHeader}>
+                  <Text style={styles.yearTitle}>{year}년</Text>
+                  {years.length > 1 && (
+                    <Pressable
+                      onPress={() => setShowYearPicker(showYearPicker === year ? null : year)}
+                      style={styles.yearPickerButton}
+                    >
+                      <ChevronDown
+                        color={COLORS.white}
+                        size={16}
+                        style={{
+                          transform: [{ rotate: showYearPicker === year ? '180deg' : '0deg' }],
+                        }}
+                      />
+                    </Pressable>
+                  )}
+                </View>
+
+                {/* Year Picker Dropdown */}
+                {showYearPicker === year && (
+                  <View style={styles.yearPickerDropdown}>
+                    {years.map((y) => (
+                      <Pressable
+                        key={y}
+                        onPress={() => {
+                          setShowYearPicker(null);
+                        }}
+                        style={[
+                          styles.yearPickerItem,
+                          y === year && styles.yearPickerItemActive,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.yearPickerItemText,
+                            y === year && styles.yearPickerItemTextActive,
+                          ]}
+                        >
+                          {y}년
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
+
+                {/* Horizontal Month Cards */}
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.monthCardsContainer}
+                >
+                  {months.map((month) => {
+                    const missions = groupedMissions[year][month];
+                    const representativeMission = missions[0];
+                    const hasMultiple = missions.length > 1;
+
+                    return (
+                      <Pressable
+                        key={`${year}-${month}`}
+                        style={styles.monthCard}
+                        onPress={() => setSelectedMonth({
+                          year,
+                          month,
+                          monthName: getMonthName(month),
+                          missions,
+                        })}
+                      >
+                        <View style={styles.monthCardInner}>
+                          <Image
+                            source={{ uri: representativeMission.photoUrl }}
+                            style={styles.monthCardImage}
+                            resizeMode="cover"
+                          />
+
+                          {/* Month Badge */}
+                          <View style={styles.monthBadge}>
+                            <Text style={styles.monthBadgeText}>
+                              {getMonthName(month)}
+                            </Text>
+                          </View>
+
+                          {/* Multiple Photos Icon */}
+                          {hasMultiple && (
+                            <View style={styles.multipleIcon}>
+                              <View style={styles.stackIcon}>
+                                <View style={styles.stackBack} />
+                                <View style={styles.stackFront} />
+                              </View>
+                            </View>
+                          )}
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            );
+          })}
+
+          {/* Photo Collage Section */}
+          <View style={styles.collageSection}>
+            <View style={styles.collageSectionHeader}>
+              <Text style={styles.collageSectionTitle}>앨범</Text>
+              <Pressable style={styles.albumIconButton} onPress={openAlbumModal}>
+                <BookHeart color={COLORS.white} size={20} strokeWidth={1.5} />
+              </Pressable>
+            </View>
+            <Text style={styles.collageSectionSubtitle}>기억에 남는 순간을 앨범으로 만들어보세요</Text>
+
+            {/* Created Albums List */}
+            {albums.length > 0 && (
+              <View style={styles.albumsListContainer}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.albumsList}
+                >
+                  {albums.map((album) => (
+                    <Pressable
+                      key={album.id}
+                      style={styles.albumItem}
+                      onPress={() => {
+                        setSelectedAlbum(album);
+                        setShowAlbumDetailModal(true);
+                      }}
+                    >
+                      <View style={styles.hardcoverBook}>
+                        {/* Full Photo Background */}
+                        {album.coverPhoto ? (
+                          <Image source={{ uri: album.coverPhoto }} style={styles.bookFullPhoto} resizeMode="cover" />
+                        ) : (
+                          <View style={styles.bookPlaceholder}>
+                            <ImageIcon color="rgba(255,255,255,0.3)" size={24} />
+                          </View>
+                        )}
+
+                        {/* Book Spine - Inward Curve Effect */}
+                        <LinearGradient
+                          colors={['rgba(0, 0, 0, 0.65)', 'rgba(0, 0, 0, 0.35)', 'rgba(0, 0, 0, 0.12)', 'rgba(255, 255, 255, 0.08)', 'transparent']}
+                          locations={[0, 0.25, 0.55, 0.8, 1]}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 0 }}
+                          style={styles.bookSpineCurve}
+                        />
+
+                        {/* Main Cover Area */}
+                        <View style={styles.albumCoverWrapper}>
+                          {/* Cover Texture Overlay */}
+                          <View style={styles.coverTextureOverlay} pointerEvents="none" />
+
+                          {/* Cover Edge Highlight */}
+                          <View style={styles.coverEdgeHighlight} pointerEvents="none" />
+
+                          {/* Album Name - Basic or Ransom Style */}
+                          <View style={[
+                            styles.albumNameOverlay,
+                            {
+                              left: (album.namePosition?.x ?? 30) * ALBUM_SCALE_RATIO,
+                              top: (album.namePosition?.y ?? 16) * ALBUM_SCALE_RATIO,
+                            }
+                          ]}>
+                            {album.fontStyle === 'basic' ? (
+                              // Basic Jua Font Style
+                              <Text style={[styles.basicFontTiny, { fontSize: 16 * (album.textScale || 1) * ALBUM_SCALE_RATIO }]}>{album.name}</Text>
+                            ) : (
+                              // Ransom Style - Image-based
+                              <RansomText
+                                text={album.name}
+                                seed={album.ransomSeed || 12345}
+                                characterSize={18 * (album.textScale || 1) * ALBUM_SCALE_RATIO}
+                                spacing={-4 * ALBUM_SCALE_RATIO}
+                                enableRotation={true}
+                                enableYOffset={true}
+                              />
+                            )}
+                          </View>
+                        </View>
+                      </View>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+          </View>
+        </ScrollView>
+      )}
+
+      {/* Month Album Modal */}
+      <Modal
+        visible={!!selectedMonth}
+        transparent
+        animationType="none"
+        onRequestClose={() => {
+          if (selectedPhoto) {
+            setSelectedPhoto(null);
+          } else {
+            setSelectedMonth(null);
+          }
+        }}
+      >
+        <View style={styles.monthModalContainer}>
+          <Pressable
+            style={styles.monthModalBackdrop}
+            onPress={() => {
+              if (selectedPhoto) {
+                setSelectedPhoto(null);
+              } else {
+                closeMonthModal();
+              }
+            }}
+          >
+            <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
+          </Pressable>
+
+          {/* Album Grid View */}
+          {!selectedPhoto && (
+            <Animated.View
+              style={[
+                styles.monthModalContent,
+                { transform: [{ translateY: slideAnim }] }
+              ]}
+            >
+              <View style={styles.monthModalHeader}>
+                <View>
+                  <Text style={styles.monthModalTitle}>
+                    {selectedMonth?.year}년 {selectedMonth?.monthName}
+                  </Text>
+                  <Text style={styles.monthModalCount}>
+                    {selectedMonth?.missions.length}개의 항목
+                  </Text>
+                </View>
+                {/* Close Button */}
+                <Pressable
+                  style={styles.monthModalCloseButton}
+                  onPress={closeMonthModal}
+                >
+                  <X color="rgba(255,255,255,0.8)" size={20} />
+                </Pressable>
+              </View>
+
+              <ScrollView contentContainerStyle={styles.monthModalGrid}>
+                {selectedMonth?.missions.map((mission) => (
+                  <Pressable
+                    key={mission.id}
+                    style={styles.monthModalItem}
+                    onPress={() => setSelectedPhoto(mission)}
+                  >
+                    <View style={styles.monthModalItemInner}>
+                      <Image
+                        source={{ uri: mission.photoUrl }}
+                        style={styles.monthModalItemImage}
+                        resizeMode="cover"
+                      />
+                    </View>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </Animated.View>
+          )}
+
+          {/* Photo Detail View (Overlay) */}
+          {selectedPhoto && selectedMonth && (
+            <PhotoDetailView
+              missions={selectedMonth.missions}
+              initialPhoto={selectedPhoto}
+              onClose={() => setSelectedPhoto(null)}
+            />
+          )}
+        </View>
+      </Modal>
+
+      {/* Album Creation Modal */}
+      <Modal
+        visible={showAlbumModal}
+        transparent
+        animationType="none"
+        onRequestClose={closeAlbumModal}
+      >
+        <Animated.View style={[styles.albumModalFadeWrapper, { opacity: albumModalOpacityAnim }]}>
+          <BlurView intensity={80} tint="dark" style={styles.albumModalContainer}>
+              <TouchableWithoutFeedback onPress={closeAlbumModal}>
+                <View style={styles.albumModalBackdrop} />
+              </TouchableWithoutFeedback>
+              <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={styles.keyboardAvoidingView}
+              >
+                <Animated.View
+                  style={[
+                    styles.albumModalContent,
+                    {
+                      transform: [{ scale: albumModalScaleAnim }],
+                    },
+                  ]}
+                >
+              {/* Header */}
+              <View style={styles.albumModalHeader}>
+                <Text style={styles.albumModalTitle}>
+                  {albumStep === 'fontStyle' ? '폰트 스타일' : albumStep === 'name' ? '앨범 이름' : '대표 사진'}
+                </Text>
+                <Pressable
+                  style={styles.albumModalCloseButton}
+                  onPress={closeAlbumModal}
+                >
+                  <X color="rgba(255,255,255,0.8)" size={20} />
+                </Pressable>
+              </View>
+              <View style={styles.albumModalHeaderDivider} />
+
+              <Animated.View style={{ opacity: stepOpacityAnim }}>
+              {albumStep === 'fontStyle' ? (
+                <>
+                  {/* Step 0: Font Style Selection */}
+                  <Text style={styles.albumModalSubtitle}>
+                    앨범 제목에 사용할 폰트 스타일을 선택하세요
+                  </Text>
+
+                  <View style={styles.fontStyleOptions}>
+                    {/* Basic Font Option */}
+                    <Pressable
+                      style={[
+                        styles.fontStyleOption,
+                        fontStyle === 'basic' && styles.fontStyleOptionSelected,
+                      ]}
+                      onPress={() => setFontStyle('basic')}
+                    >
+                      <Text style={styles.fontStylePreviewBasic}>기본폰트</Text>
+                      <Text style={styles.fontStyleLabel}>깔끔한 스타일</Text>
+                    </Pressable>
+
+                    {/* Ransom Font Option */}
+                    <Pressable
+                      style={[
+                        styles.fontStyleOption,
+                        fontStyle === 'ransom' && styles.fontStyleOptionSelected,
+                      ]}
+                      onPress={() => {
+                        setFontStyle('ransom');
+                        // Clear text if it contains Korean characters (not supported in ransom style)
+                        if (/[가-힣ㄱ-ㅎㅏ-ㅣ]/.test(albumName)) {
+                          setAlbumName('');
+                        }
+                      }}
+                    >
+                      <View style={styles.fontStylePreviewRansom}>
+                        <RansomText
+                          text="FONT"
+                          seed={12345}
+                          characterSize={28}
+                          spacing={-4}
+                          enableRotation={true}
+                          enableYOffset={true}
+                        />
+                      </View>
+                      <Text style={styles.fontStyleLabel}>랜섬노트 스타일</Text>
+                    </Pressable>
+                  </View>
+
+                  <Pressable
+                    style={[
+                      styles.albumModalButton,
+                      { width: '100%' },
+                      !fontStyle && styles.albumModalButtonDisabled,
+                    ]}
+                    onPress={() => transitionToNextStep('name')}
+                    disabled={!fontStyle}
+                  >
+                    <Text style={styles.albumModalButtonText}>다음</Text>
+                  </Pressable>
+                </>
+              ) : albumStep === 'name' ? (
+                <>
+                  {/* Step 1: Album Name Input */}
+                  <Text style={styles.albumModalSubtitle}>
+                    {fontStyle === 'basic' ? '깔끔한 폰트가 적용됩니다' : '입력하는 글자마다 특별한 스타일이 적용됩니다'}
+                  </Text>
+
+                  {/* Text Preview - Basic or Ransom Style */}
+                  <View style={styles.ransomPreviewContainer}>
+                    {albumName.length > 0 ? (
+                      fontStyle === 'basic' ? (
+                        // Basic Jua Font Style - Clean text without paper backgrounds
+                        <Text style={styles.basicFontPreview}>{albumName}</Text>
+                      ) : (
+                        // Ransom Style - Image-based character rendering
+                        <RansomText
+                          text={albumName}
+                          seed={ransomSeed}
+                          characterSize={36}
+                          spacing={-4}
+                          enableRotation={true}
+                          enableYOffset={true}
+                        />
+                      )
+                    ) : (
+                      <Text style={[styles.ransomPlaceholder, fontStyle === 'basic' && { fontFamily: 'Jua_400Regular' }]}>앨범 이름</Text>
+                    )}
+                    {/* Refresh Button for Ransom Style */}
+                    {fontStyle === 'ransom' && albumName.length > 0 && (
+                      <Pressable
+                        style={styles.refreshButton}
+                        onPress={() => setRansomSeed(Math.floor(Math.random() * 1000000))}
+                      >
+                        <RefreshCw color="rgba(255, 255, 255, 0.6)" size={18} />
+                      </Pressable>
+                    )}
+                  </View>
+
+                  {/* Text Input */}
+                  <TextInput
+                    style={styles.albumNameInput}
+                    value={albumName}
+                    onChangeText={handleAlbumNameChange}
+                    placeholder={fontStyle === 'ransom' ? "영어만 입력 가능 (A-Z, 0-9)" : "앨범 이름 입력..."}
+                    placeholderTextColor="rgba(255,255,255,0.4)"
+                    maxLength={20}
+                    autoFocus
+                  />
+
+                  {/* Button Row */}
+                  <View style={styles.albumModalButtonRow}>
+                    <Pressable
+                      style={styles.albumModalButtonSecondary}
+                      onPress={() => transitionToNextStep('fontStyle')}
+                    >
+                      <Text style={styles.albumModalButtonSecondaryText}>이전</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[
+                        styles.albumModalButton,
+                        !albumName.trim() && styles.albumModalButtonDisabled,
+                      ]}
+                      onPress={goToNextStep}
+                      disabled={!albumName.trim()}
+                    >
+                      <Text style={styles.albumModalButtonText}>다음</Text>
+                    </Pressable>
+                  </View>
+                </>
+              ) : (
+                <>
+                  {/* Step 2: Cover Photo Selection with Draggable Text */}
+                  <Text style={styles.albumModalSubtitle}>
+                    사진을 선택하고 문구 위치를 드래그해서 조정하세요
+                  </Text>
+
+                  {/* Cover Photo Preview with Draggable Text */}
+                  <View style={styles.coverPhotoContainer}>
+                    <View style={styles.coverPhotoPickerContainer} onLayout={handleContainerLayout}>
+                      {/* Book Spine - Inward Curve Effect */}
+                      <LinearGradient
+                        colors={['rgba(0, 0, 0, 0.65)', 'rgba(0, 0, 0, 0.35)', 'rgba(0, 0, 0, 0.12)', 'rgba(255, 255, 255, 0.08)', 'transparent']}
+                        locations={[0, 0.25, 0.55, 0.8, 1]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.modalBookSpineCurve}
+                      />
+
+                      <Pressable
+                        style={styles.coverPhotoInner}
+                        onPress={handlePickCoverPhoto}
+                      >
+                        {albumCoverPhoto ? (
+                          <Image
+                            source={{ uri: albumCoverPhoto }}
+                            style={styles.coverPhotoPreview}
+                            resizeMode="cover"
+                          />
+                        ) : (
+                          <View style={styles.coverPhotoPlaceholder}>
+                            <Plus color="rgba(255,255,255,0.6)" size={40} />
+                            <Text style={styles.coverPhotoPlaceholderText}>사진 선택</Text>
+                          </View>
+                        )}
+                      </Pressable>
+
+                      {/* Draggable Album Name Overlay */}
+                      {albumCoverPhoto && (
+                        <Animated.View
+                          {...panResponder.panHandlers}
+                          style={[
+                            styles.draggableTextOverlay,
+                            {
+                              transform: [
+                                { translateX: panPosition.x },
+                                { translateY: panPosition.y },
+                              ],
+                            },
+                          ]}
+                        >
+                          {fontStyle === 'basic' ? (
+                            // Basic Jua Font Style
+                            <Text style={[
+                              styles.basicFontOverlay,
+                              {
+                                fontSize: 16 * textScale,
+                                color: textColor === 'black' ? '#000000' : COLORS.white,
+                              }
+                            ]}>{albumName}</Text>
+                          ) : (
+                            // Ransom Style - Image-based
+                            <RansomText
+                              text={albumName}
+                              seed={ransomSeed}
+                              characterSize={18 * textScale}
+                              spacing={-4}
+                              enableRotation={true}
+                              enableYOffset={true}
+                            />
+                          )}
+                        </Animated.View>
+                      )}
+                    </View>
+                  </View>
+
+                  {/* Drag instruction */}
+                  {albumCoverPhoto && (
+                    <Text style={styles.dragHintText}>문구를 드래그하여 위치를 조정하세요</Text>
+                  )}
+
+                  {/* Text Style Selection - Different UI based on font style */}
+                  {albumCoverPhoto && fontStyle === 'basic' && (
+                    <View style={styles.textStyleSelectionContainer}>
+                      {/* Color Selection (Left) */}
+                      <View style={styles.colorSelectionSection}>
+                        <Text style={styles.selectionLabel}>색상</Text>
+                        <View style={styles.colorButtonRow}>
+                          <Pressable
+                            style={[
+                              styles.colorButton,
+                              { backgroundColor: '#000000' },
+                              textColor === 'black' && styles.colorButtonSelected,
+                            ]}
+                            onPress={() => setTextColor('black')}
+                          />
+                          <Pressable
+                            style={[
+                              styles.colorButton,
+                              { backgroundColor: '#FFFFFF' },
+                              textColor === 'white' && styles.colorButtonSelected,
+                            ]}
+                            onPress={() => setTextColor('white')}
+                          />
+                        </View>
+                      </View>
+
+                      {/* Size Selection (Right) */}
+                      <View style={styles.sizeSelectionSection}>
+                        <Text style={styles.selectionLabel}>크기</Text>
+                        <View style={styles.sizeButtonRow}>
+                          {[1.5, 2.25, 3.0].map((scale, index) => (
+                            <Pressable
+                              key={index}
+                              style={[
+                                styles.sizeButton,
+                                textScale === scale && styles.sizeButtonSelected,
+                              ]}
+                              onPress={() => setTextScale(scale)}
+                            >
+                              <Text style={[
+                                styles.sizeButtonText,
+                                { fontSize: 10 + index * 7 },
+                                textScale === scale && styles.sizeButtonTextSelected,
+                              ]}>A</Text>
+                            </Pressable>
+                          ))}
+                        </View>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Ransom Style - Size Only */}
+                  {albumCoverPhoto && fontStyle === 'ransom' && (
+                    <View style={styles.sizeSelectionContainer}>
+                      <Text style={styles.sizeSelectionLabel}>문구 크기</Text>
+                      <View style={styles.sizeButtonRow}>
+                        {[1.0, 1.5, 2.0].map((scale, index) => (
+                          <Pressable
+                            key={index}
+                            style={[
+                              styles.sizeButton,
+                              textScale === scale && styles.sizeButtonSelected,
+                            ]}
+                            onPress={() => setTextScale(scale)}
+                          >
+                            <Text style={[
+                              styles.sizeButtonText,
+                              { fontSize: 10 + index * 7 },
+                              textScale === scale && styles.sizeButtonTextSelected,
+                            ]}>A</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Action Buttons */}
+                  <View style={styles.albumModalButtonRow}>
+                    <Pressable
+                      style={styles.albumModalButtonSecondary}
+                      onPress={() => transitionToNextStep('name')}
+                    >
+                      <Text style={styles.albumModalButtonSecondaryText}>이전</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[
+                        styles.albumModalButton,
+                        !albumCoverPhoto && styles.albumModalButtonDisabled
+                      ]}
+                      onPress={handleCreateAlbum}
+                      disabled={!albumCoverPhoto}
+                    >
+                      <Text style={[
+                        styles.albumModalButtonText,
+                        !albumCoverPhoto && styles.albumModalButtonTextDisabled
+                      ]}>완료</Text>
+                    </Pressable>
+                  </View>
+                </>
+              )}
+              </Animated.View>
+            </Animated.View>
+          </KeyboardAvoidingView>
+
+          {/* Cover Photo Picker Overlay */}
+          {showCoverPhotoPicker && (
+            <View style={styles.missionPickerOverlay}>
+              <Pressable
+                style={styles.monthModalBackdrop}
+                onPress={closeCoverPhotoPicker}
+              >
+                <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
+              </Pressable>
+              <Animated.View
+                style={[
+                  styles.monthModalContent,
+                  { transform: [{ translateY: coverPickerSlideAnim }] }
+                ]}
+              >
+                <View style={styles.monthModalHeader}>
+                  <Text style={styles.monthModalTitle}>사진 선택</Text>
+                  <Pressable
+                    style={styles.monthModalCloseButton}
+                    onPress={closeCoverPhotoPicker}
+                  >
+                    <X color="rgba(255,255,255,0.8)" size={20} />
+                  </Pressable>
+                </View>
+                <ScrollView contentContainerStyle={styles.monthModalGrid}>
+                  {completedMemories.length === 0 ? (
+                    <View style={styles.missionPickerEmpty}>
+                      <Text style={styles.missionPickerEmptyText}>완료된 미션이 없습니다</Text>
+                    </View>
+                  ) : (
+                    completedMemories.map((mission) => (
+                      <Pressable
+                        key={mission.id}
+                        style={styles.monthModalItem}
+                        onPress={() => handleSelectCoverPhoto(mission.photoUrl)}
+                      >
+                        <View style={styles.monthModalItemInner}>
+                          <Image source={{ uri: mission.photoUrl }} style={styles.monthModalItemImage} />
+                        </View>
+                      </Pressable>
+                    ))
+                  )}
+                </ScrollView>
+              </Animated.View>
+            </View>
+          )}
+          </BlurView>
+        </Animated.View>
+      </Modal>
+
+      {/* Album Detail Page (Full Screen) */}
+      <Modal
+        visible={showAlbumDetailModal}
+        transparent
+        animationType="none"
+        onRequestClose={closeAlbumDetailModal}
+      >
+        <Animated.View
+          style={[
+            styles.albumDetailFullScreen,
+            {
+              opacity: albumDetailOpacityAnim,
+              transform: [{ scale: albumDetailScaleAnim }],
+            },
+          ]}
+        >
+          <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
+          {/* Album Content (hidden when photo is selected) */}
+          {!selectedAlbumPhoto && (
+            <>
+              {/* Menu Overlay for closing menu */}
+              {showAlbumMenu && (
+                <Pressable
+                  style={styles.menuOverlay}
+                  onPress={() => setShowAlbumMenu(false)}
+                />
+              )}
+              {/* Header */}
+              <View style={styles.albumDetailHeader}>
+                <Pressable
+                  style={styles.albumDetailCloseButton}
+                  onPress={closeAlbumDetailModal}
+                >
+                  <X color={COLORS.white} size={24} />
+                </Pressable>
+                <Text
+                  style={[
+                    styles.albumDetailTitle,
+                    { fontSize: selectedAlbum?.name ? Math.max(12, Math.min(18, 20 - selectedAlbum.name.length * 0.5)) : 18 }
+                  ]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.6}
+                >
+                  {selectedAlbum?.name || '앨범'}
+                </Text>
+                <Pressable
+                  style={styles.albumDetailMenuButton}
+                  onPress={() => setShowAlbumMenu(!showAlbumMenu)}
+                >
+                  <MoreHorizontal color={COLORS.white} size={24} />
+                </Pressable>
+
+                {/* Dropdown Menu */}
+                {showAlbumMenu && (
+                  <BlurView intensity={50} tint="dark" style={styles.albumMenuDropdown}>
+                    <Pressable
+                      style={styles.albumMenuItem}
+                      onPress={() => {
+                        setShowAlbumMenu(false);
+                        setShowMissionPhotosPicker(true);
+                      }}
+                    >
+                      <Plus color={COLORS.white} size={18} />
+                      <Text style={styles.albumMenuItemText}>사진 추가</Text>
+                    </Pressable>
+                    <Pressable
+                      style={styles.albumMenuItem}
+                      onPress={() => {
+                        if (selectedAlbum) {
+                          // Initialize all edit states from existing album data
+                          setEditAlbumName(selectedAlbum.name);
+                          setEditFontStyle(selectedAlbum.fontStyle);
+                          setEditCharStyles(selectedAlbum.charStyles || []);
+                          setEditCoverPhoto(selectedAlbum.coverPhoto);
+                          setEditTextPosition(selectedAlbum.namePosition || { x: 30, y: 16 });
+                          setEditTextScale(selectedAlbum.textScale || 1);
+                          setEditRansomSeed(selectedAlbum.ransomSeed || Math.floor(Math.random() * 1000000));
+                          setEditAlbumStep('fontStyle');
+                          setShowCoverEditModal(true);
+                        }
+                        setShowAlbumMenu(false);
+                      }}
+                    >
+                      <Edit2 color={COLORS.white} size={18} />
+                      <Text style={styles.albumMenuItemText}>표지 편집</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.albumMenuItem, styles.albumMenuItemDanger]}
+                      onPress={() => {
+                        setShowAlbumMenu(false);
+                        Alert.alert(
+                          '앨범 삭제',
+                          '이 앨범을 삭제하시겠습니까?',
+                          [
+                            { text: '취소', style: 'cancel' },
+                            {
+                              text: '삭제',
+                              style: 'destructive',
+                              onPress: () => {
+                                if (selectedAlbum) {
+                                  const albumIdToDelete = selectedAlbum.id;
+                                  // Reset all modal states first
+                                  setShowAlbumDetailModal(false);
+                                  setShowAlbumMenu(false);
+                                  setSelectedAlbum(null);
+                                  setIsSelectingAlbumPhotos(false);
+                                  setSelectedAlbumPhotoIndices(new Set());
+                                  setSelectedAlbumPhoto(null);
+                                  setShowMissionPhotosPicker(false);
+                                  // Then delete the album
+                                  setAlbums(albums.filter(a => a.id !== albumIdToDelete));
+                                  // Also delete album photos
+                                  setAlbumPhotos(prev => {
+                                    const newPhotos = { ...prev };
+                                    delete newPhotos[albumIdToDelete];
+                                    return newPhotos;
+                                  });
+                                }
+                              }
+                            }
+                          ]
+                        );
+                      }}
+                    >
+                      <Trash2 color="#FF6B6B" size={18} />
+                      <Text style={[styles.albumMenuItemText, { color: '#FF6B6B' }]}>앨범 삭제</Text>
+                    </Pressable>
+                  </BlurView>
+                )}
+              </View>
+
+              {/* Album Cover Preview */}
+              {selectedAlbum && (
+                <View style={styles.albumDetailCoverContainer}>
+                  <View style={styles.albumDetailCoverWrapper}>
+                    {/* Book Spine Effect */}
+                    <LinearGradient
+                      colors={['rgba(0, 0, 0, 0.65)', 'rgba(0, 0, 0, 0.35)', 'rgba(0, 0, 0, 0.12)', 'rgba(255, 255, 255, 0.08)', 'transparent']}
+                      locations={[0, 0.25, 0.55, 0.8, 1]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.albumDetailSpine}
+                    />
+                    {selectedAlbum.coverPhoto ? (
+                      <Image source={{ uri: selectedAlbum.coverPhoto }} style={styles.albumDetailCoverImage} />
+                    ) : (
+                      <View style={styles.albumDetailCoverPlaceholder}>
+                        <ImageIcon color="rgba(255,255,255,0.3)" size={40} />
+                      </View>
+                    )}
+                    {/* Album Name Overlay */}
+                    <View style={[
+                      styles.albumDetailNameOverlay,
+                      {
+                        left: (selectedAlbum.namePosition?.x ?? 30) * ALBUM_DETAIL_SCALE_RATIO,
+                        top: (selectedAlbum.namePosition?.y ?? 16) * ALBUM_DETAIL_SCALE_RATIO,
+                      }
+                    ]}>
+                      {selectedAlbum.fontStyle === 'basic' ? (
+                        <Text style={[styles.basicFontOverlay, { fontSize: 16 * selectedAlbum.textScale * ALBUM_DETAIL_SCALE_RATIO }]}>
+                          {selectedAlbum.name}
+                        </Text>
+                      ) : (
+                        <RansomText
+                          text={selectedAlbum.name}
+                          seed={selectedAlbum.ransomSeed || 12345}
+                          characterSize={18 * (selectedAlbum.textScale || 1) * ALBUM_DETAIL_SCALE_RATIO}
+                          spacing={-4}
+                          enableRotation={true}
+                          enableYOffset={true}
+                        />
+                      )}
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {/* Photos Section */}
+              <View style={styles.albumPhotosSection}>
+                <View style={styles.albumPhotosSectionHeader}>
+                  <Text style={styles.albumPhotosSectionTitle}>
+                    {selectedAlbum ? `${(albumPhotos[selectedAlbum.id] || []).length}개의 항목` : '0개의 항목'}
+                  </Text>
+                  {/* Select/Delete/Cancel Buttons */}
+                  {selectedAlbum && (albumPhotos[selectedAlbum.id] || []).length > 0 && (
+                    <View style={styles.albumPhotoActionButtons}>
+                      {isSelectingAlbumPhotos ? (
+                        <>
+                          <Pressable
+                            style={styles.albumPhotoCancelButton}
+                            onPress={() => {
+                              setIsSelectingAlbumPhotos(false);
+                              setSelectedAlbumPhotoIndices(new Set());
+                            }}
+                          >
+                            <Text style={styles.albumPhotoCancelButtonText}>취소</Text>
+                          </Pressable>
+                          <Pressable
+                            style={[
+                              styles.albumPhotoDeleteButton,
+                              selectedAlbumPhotoIndices.size === 0 && styles.albumPhotoDeleteButtonDisabled
+                            ]}
+                            disabled={selectedAlbumPhotoIndices.size === 0}
+                            onPress={() => {
+                              if (selectedAlbumPhotoIndices.size > 0) {
+                                Alert.alert(
+                                  '사진 삭제',
+                                  `${selectedAlbumPhotoIndices.size}개의 사진을 삭제하시겠습니까?`,
+                                  [
+                                    { text: '취소', style: 'cancel' },
+                                    {
+                                      text: '삭제',
+                                      style: 'destructive',
+                                      onPress: () => {
+                                        if (selectedAlbum) {
+                                          const currentPhotos = albumPhotos[selectedAlbum.id] || [];
+                                          const newPhotos = currentPhotos.filter((_, idx) => !selectedAlbumPhotoIndices.has(idx));
+                                          setAlbumPhotos(prev => ({
+                                            ...prev,
+                                            [selectedAlbum.id]: newPhotos
+                                          }));
+                                          setSelectedAlbumPhotoIndices(new Set());
+                                          setIsSelectingAlbumPhotos(false);
+                                        }
+                                      }
+                                    }
+                                  ]
+                                );
+                              }
+                            }}
+                          >
+                            <Text style={[
+                              styles.albumPhotoDeleteButtonText,
+                              selectedAlbumPhotoIndices.size === 0 && styles.albumPhotoDeleteButtonTextDisabled
+                            ]}>삭제</Text>
+                          </Pressable>
+                        </>
+                      ) : (
+                        <Pressable
+                          style={styles.albumPhotoSelectButton}
+                          onPress={() => setIsSelectingAlbumPhotos(true)}
+                        >
+                          <Text style={styles.albumPhotoSelectButtonText}>선택</Text>
+                        </Pressable>
+                      )}
+                    </View>
+                  )}
+                </View>
+                <ScrollView
+                  style={styles.albumPhotosScrollView}
+                  contentContainerStyle={styles.albumPhotosGrid}
+                  showsVerticalScrollIndicator={false}
+                >
+                  {/* Empty state - Add Photo Button */}
+                  {selectedAlbum && (albumPhotos[selectedAlbum.id] || []).length === 0 && (
+                    <Pressable
+                      style={styles.emptyAddPhotoButton}
+                      onPress={() => setShowMissionPhotosPicker(true)}
+                    >
+                      <Plus color="rgba(255,255,255,0.6)" size={32} />
+                      <Text style={styles.emptyAddPhotoButtonText}>사진 추가</Text>
+                    </Pressable>
+                  )}
+
+                  {/* Album Photos - Grouped by Year/Month */}
+                  {selectedAlbum && (() => {
+                    const photos = albumPhotos[selectedAlbum.id] || [];
+                    if (photos.length === 0) return null;
+
+                    const groupedPhotos = groupByYearMonth(photos);
+                    const sortedYears = Object.keys(groupedPhotos).sort((a, b) => parseInt(b) - parseInt(a));
+
+                    // Create a map of photo to original index for selection tracking
+                    const photoIndexMap = new Map<CompletedMission, number>();
+                    photos.forEach((photo, index) => {
+                      photoIndexMap.set(photo, index);
+                    });
+
+                    // Flatten year/month into single sections with combined header
+                    const sections: { year: string; month: string; photos: typeof photos }[] = [];
+                    sortedYears.forEach((year) => {
+                      const months = groupedPhotos[year];
+                      const sortedMonths = Object.keys(months).sort((a, b) => parseInt(b) - parseInt(a));
+                      sortedMonths.forEach((month) => {
+                        sections.push({ year, month, photos: months[month] });
+                      });
+                    });
+
+                    return sections.map(({ year, month, photos: monthPhotos }) => (
+                      <View key={`section-${year}-${month}`} style={styles.albumMonthSection}>
+                        <Text style={styles.albumMonthHeader}>{getMonthName(month)} {year}</Text>
+                        <View style={styles.albumMonthPhotosGrid}>
+                          {monthPhotos.map((photo) => {
+                            const originalIndex = photoIndexMap.get(photo) ?? 0;
+                            return (
+                              <Pressable
+                                key={`album-photo-${photo.id}`}
+                                style={styles.missionPhotoItem}
+                                onPress={() => {
+                                  if (isSelectingAlbumPhotos) {
+                                    // Toggle selection
+                                    setSelectedAlbumPhotoIndices(prev => {
+                                      const newSet = new Set(prev);
+                                      if (newSet.has(originalIndex)) {
+                                        newSet.delete(originalIndex);
+                                      } else {
+                                        newSet.add(originalIndex);
+                                      }
+                                      return newSet;
+                                    });
+                                  } else {
+                                    // Open photo detail view
+                                    setSelectedAlbumPhoto(photo);
+                                  }
+                                }}
+                              >
+                                <Image source={{ uri: photo.photoUrl }} style={styles.missionPhotoImage} />
+                                {/* Selection Overlay */}
+                                {isSelectingAlbumPhotos && (
+                                  <View style={[
+                                    styles.photoSelectionOverlay,
+                                    selectedAlbumPhotoIndices.has(originalIndex) && styles.photoSelectionOverlaySelected
+                                  ]}>
+                                    {selectedAlbumPhotoIndices.has(originalIndex) && (
+                                      <View style={styles.photoSelectionCheck}>
+                                        <Check color={COLORS.white} size={16} />
+                                      </View>
+                                    )}
+                                  </View>
+                                )}
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    ));
+                  })()}
+                </ScrollView>
+              </View>
+            </>
+          )}
+
+          {/* Album Photo Detail View */}
+          {selectedAlbumPhoto && selectedAlbum && (
+            <PhotoDetailView
+              missions={albumPhotos[selectedAlbum.id] || []}
+              initialPhoto={selectedAlbumPhoto}
+              onClose={() => setSelectedAlbumPhoto(null)}
+            />
+          )}
+
+          {/* Mission Photos Picker Overlay (inside Album Detail Modal) */}
+          {showMissionPhotosPicker && (
+            <View style={styles.missionPickerOverlay}>
+              <Pressable
+                style={styles.monthModalBackdrop}
+                onPress={closeMissionPicker}
+              >
+                <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
+              </Pressable>
+              <Animated.View
+                style={[
+                  styles.monthModalContent,
+                  { transform: [{ translateY: missionPickerSlideAnim }] }
+                ]}
+              >
+                <View style={styles.missionPickerHeader}>
+                  <Pressable
+                    style={styles.missionPickerHeaderButton}
+                    onPress={closeMissionPicker}
+                  >
+                    <Text style={styles.missionPickerHeaderButtonText}>닫기</Text>
+                  </Pressable>
+                  <Text style={styles.missionPickerTitle}>사진 선택</Text>
+                  <Pressable
+                    style={styles.missionPickerHeaderButton}
+                    onPress={() => {
+                      if (selectedAlbum && selectedMissionPhotos.size > 0) {
+                        const photosToAdd = completedMemories.filter(m => selectedMissionPhotos.has(m.id));
+                        setAlbumPhotos(prev => ({
+                          ...prev,
+                          [selectedAlbum.id]: [...(prev[selectedAlbum.id] || []), ...photosToAdd]
+                        }));
+                      }
+                      closeMissionPicker();
+                    }}
+                  >
+                    <Text style={[
+                      styles.missionPickerHeaderButtonText,
+                      styles.missionPickerDoneButton,
+                      selectedMissionPhotos.size === 0 && styles.missionPickerDoneButtonDisabled
+                    ]}>
+                      추가
+                    </Text>
+                  </Pressable>
+                </View>
+                <ScrollView contentContainerStyle={styles.monthModalGrid}>
+                  {completedMemories.length === 0 ? (
+                    <View style={styles.missionPickerEmpty}>
+                      <Text style={styles.missionPickerEmptyText}>완료된 미션이 없습니다</Text>
+                    </View>
+                  ) : (
+                    completedMemories.map((mission) => {
+                      const isAlreadyInAlbum = selectedAlbum &&
+                        (albumPhotos[selectedAlbum.id] || []).some(p => p.id === mission.id);
+                      const isSelected = selectedMissionPhotos.has(mission.id);
+                      return (
+                        <Pressable
+                          key={mission.id}
+                          style={[
+                            styles.monthModalItem,
+                            isAlreadyInAlbum && styles.missionPickerItemDisabled
+                          ]}
+                          disabled={isAlreadyInAlbum}
+                          onPress={() => {
+                            if (!isAlreadyInAlbum) {
+                              setSelectedMissionPhotos(prev => {
+                                const newSet = new Set(prev);
+                                if (newSet.has(mission.id)) {
+                                  newSet.delete(mission.id);
+                                } else {
+                                  newSet.add(mission.id);
+                                }
+                                return newSet;
+                              });
+                            }
+                          }}
+                        >
+                          <View style={styles.monthModalItemInner}>
+                            <Image source={{ uri: mission.photoUrl }} style={styles.monthModalItemImage} />
+                            {isSelected && (
+                              <>
+                                <View style={styles.missionPickerSelectedOverlay} />
+                                <View style={styles.missionPickerCheckBadge}>
+                                  <Check color={COLORS.white} size={14} />
+                                </View>
+                              </>
+                            )}
+                            {isAlreadyInAlbum && !isSelected && (
+                              <View style={styles.missionPickerItemOverlay}>
+                                <Check color={COLORS.white} size={24} />
+                              </View>
+                            )}
+                          </View>
+                        </Pressable>
+                      );
+                    })
+                  )}
+                </ScrollView>
+              </Animated.View>
+            </View>
+          )}
+
+          {/* Cover Edit Modal - Same structure as Album Creation Modal */}
+          {showCoverEditModal && selectedAlbum && (
+            <Modal
+              visible={showCoverEditModal}
+              transparent
+              animationType="fade"
+              onRequestClose={() => setShowCoverEditModal(false)}
+            >
+              <BlurView intensity={80} tint="dark" style={styles.albumModalContainer}>
+                <TouchableWithoutFeedback onPress={() => setShowCoverEditModal(false)}>
+                  <View style={styles.albumModalBackdrop} />
+                </TouchableWithoutFeedback>
+                <KeyboardAvoidingView
+                  behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                  style={styles.keyboardAvoidingView}
+                >
+                  <View style={styles.albumModalContent}>
+                    {/* Header */}
+                    <View style={styles.albumModalHeader}>
+                      <Text style={styles.albumModalTitle}>
+                        {editAlbumStep === 'fontStyle' ? '폰트 스타일' : editAlbumStep === 'name' ? '앨범 이름' : '대표 사진'}
+                      </Text>
+                      <Pressable
+                        style={styles.albumModalCloseButton}
+                        onPress={() => setShowCoverEditModal(false)}
+                      >
+                        <X color="rgba(255,255,255,0.8)" size={20} />
+                      </Pressable>
+                    </View>
+                    <View style={styles.albumModalHeaderDivider} />
+
+                    {editAlbumStep === 'fontStyle' ? (
+                      <>
+                        {/* Step 0: Font Style Selection */}
+                        <Text style={styles.albumModalSubtitle}>
+                          앨범 제목에 사용할 폰트 스타일을 선택하세요
+                        </Text>
+
+                        <View style={styles.fontStyleOptions}>
+                          {/* Basic Font Option */}
+                          <Pressable
+                            style={[
+                              styles.fontStyleOption,
+                              editFontStyle === 'basic' && styles.fontStyleOptionSelected,
+                            ]}
+                            onPress={() => setEditFontStyle('basic')}
+                          >
+                            <Text style={styles.fontStylePreviewBasic}>기본폰트</Text>
+                            <Text style={styles.fontStyleLabel}>깔끔한 스타일</Text>
+                          </Pressable>
+
+                          {/* Ransom Font Option */}
+                          <Pressable
+                            style={[
+                              styles.fontStyleOption,
+                              editFontStyle === 'ransom' && styles.fontStyleOptionSelected,
+                            ]}
+                            onPress={() => {
+                              setEditFontStyle('ransom');
+                              // Clear text if it contains Korean characters (not supported in ransom style)
+                              if (/[가-힣ㄱ-ㅎㅏ-ㅣ]/.test(editAlbumName)) {
+                                setEditAlbumName('');
+                              }
+                            }}
+                          >
+                            <View style={styles.fontStylePreviewRansom}>
+                              <View style={[styles.ransomMiniBox, { backgroundColor: '#FFE4E1', transform: [{ rotate: '-5deg' }] }]}>
+                                <Text style={[styles.ransomMiniText, { fontFamily: 'PermanentMarker_400Regular' }]}>F</Text>
+                              </View>
+                              <View style={[styles.ransomMiniBox, { backgroundColor: '#E6F3FF', transform: [{ rotate: '3deg' }], borderRadius: 12 }]}>
+                                <Text style={[styles.ransomMiniText, { fontFamily: 'Pacifico_400Regular' }]}>O</Text>
+                              </View>
+                              <View style={[styles.ransomMiniBox, { backgroundColor: '#FFFACD', transform: [{ rotate: '-2deg' }] }]}>
+                                <Text style={[styles.ransomMiniText, { fontFamily: 'SpecialElite_400Regular' }]}>N</Text>
+                              </View>
+                              <View style={[styles.ransomMiniBox, { backgroundColor: '#E8F5E9', transform: [{ rotate: '4deg' }] }]}>
+                                <Text style={[styles.ransomMiniText, { fontFamily: 'RockSalt_400Regular' }]}>T</Text>
+                              </View>
+                            </View>
+                            <Text style={styles.fontStyleLabel}>랜섬노트 스타일</Text>
+                          </Pressable>
+                        </View>
+
+                        <Pressable
+                          style={[
+                            styles.albumModalButton,
+                            { width: '100%' },
+                            !editFontStyle && styles.albumModalButtonDisabled,
+                          ]}
+                          onPress={() => setEditAlbumStep('name')}
+                          disabled={!editFontStyle}
+                        >
+                          <Text style={styles.albumModalButtonText}>다음</Text>
+                        </Pressable>
+                      </>
+                    ) : editAlbumStep === 'name' ? (
+                      <>
+                        {/* Step 1: Album Name Input */}
+                        <Text style={styles.albumModalSubtitle}>
+                          {editFontStyle === 'basic' ? '깔끔한 폰트가 적용됩니다' : '입력하는 글자마다 특별한 스타일이 적용됩니다'}
+                        </Text>
+
+                        {/* Text Preview - Basic or Ransom Style */}
+                        <View style={styles.ransomPreviewContainer}>
+                          {editAlbumName.length > 0 ? (
+                            editFontStyle === 'basic' ? (
+                              <Text style={styles.basicFontPreview}>{editAlbumName}</Text>
+                            ) : (
+                              <RansomText
+                                text={editAlbumName}
+                                seed={editRansomSeed}
+                                characterSize={36}
+                                spacing={-4}
+                                enableRotation={true}
+                                enableYOffset={true}
+                              />
+                            )
+                          ) : (
+                            <Text style={[styles.ransomPlaceholder, editFontStyle === 'basic' && { fontFamily: 'Jua_400Regular' }]}>앨범 이름</Text>
+                          )}
+                          {/* Refresh Button for Ransom Style */}
+                          {editFontStyle === 'ransom' && editAlbumName.length > 0 && (
+                            <Pressable
+                              style={styles.refreshButton}
+                              onPress={() => setEditRansomSeed(Math.floor(Math.random() * 1000000))}
+                            >
+                              <RefreshCw color="rgba(255, 255, 255, 0.6)" size={18} />
+                            </Pressable>
+                          )}
+                        </View>
+
+                        {/* Text Input */}
+                        <TextInput
+                          style={styles.albumNameInput}
+                          value={editAlbumName}
+                          onChangeText={handleEditAlbumNameChange}
+                          placeholder={editFontStyle === 'ransom' ? "영어만 입력 가능 (A-Z, 0-9)" : "앨범 이름 입력..."}
+                          placeholderTextColor="rgba(255,255,255,0.4)"
+                          maxLength={20}
+                          autoFocus
+                        />
+
+                        {/* Button Row - Previous and Next */}
+                        <View style={styles.albumModalButtonRow}>
+                          <Pressable
+                            style={styles.albumModalButtonSecondary}
+                            onPress={() => setEditAlbumStep('fontStyle')}
+                          >
+                            <Text style={styles.albumModalButtonSecondaryText}>이전</Text>
+                          </Pressable>
+                          <Pressable
+                            style={[
+                              styles.albumModalButton,
+                              !editAlbumName.trim() && styles.albumModalButtonDisabled,
+                            ]}
+                            onPress={() => setEditAlbumStep('cover')}
+                            disabled={!editAlbumName.trim()}
+                          >
+                            <Text style={styles.albumModalButtonText}>다음</Text>
+                          </Pressable>
+                        </View>
+                      </>
+                    ) : (
+                      <>
+                        {/* Step 2: Cover Photo Selection with Draggable Text */}
+                        <Text style={styles.albumModalSubtitle}>
+                          사진을 선택하고 문구 위치를 드래그해서 조정하세요
+                        </Text>
+
+                        {/* Cover Photo Preview with Draggable Text */}
+                        <View style={styles.coverPhotoContainer}>
+                          <View style={styles.coverPhotoPickerContainer} onLayout={handleEditContainerLayout}>
+                            {/* Book Spine - Inward Curve Effect */}
+                            <LinearGradient
+                              colors={['rgba(0, 0, 0, 0.65)', 'rgba(0, 0, 0, 0.35)', 'rgba(0, 0, 0, 0.12)', 'rgba(255, 255, 255, 0.08)', 'transparent']}
+                              locations={[0, 0.25, 0.55, 0.8, 1]}
+                              start={{ x: 0, y: 0 }}
+                              end={{ x: 1, y: 0 }}
+                              style={styles.modalBookSpineCurve}
+                            />
+
+                            <Pressable
+                              style={styles.coverPhotoInner}
+                              onPress={handlePickEditCoverPhoto}
+                            >
+                              {editCoverPhoto ? (
+                                <Image
+                                  source={{ uri: editCoverPhoto }}
+                                  style={styles.coverPhotoPreview}
+                                  resizeMode="cover"
+                                />
+                              ) : (
+                                <View style={styles.coverPhotoPlaceholder}>
+                                  <Plus color="rgba(255,255,255,0.6)" size={40} />
+                                  <Text style={styles.coverPhotoPlaceholderText}>사진 선택</Text>
+                                </View>
+                              )}
+                            </Pressable>
+
+                            {/* Draggable Album Name Overlay */}
+                            {editCoverPhoto && (
+                              <Animated.View
+                                {...editPanResponder.panHandlers}
+                                style={[
+                                  styles.draggableTextOverlay,
+                                  {
+                                    transform: [
+                                      { translateX: editPanPosition.x },
+                                      { translateY: editPanPosition.y },
+                                    ],
+                                  },
+                                ]}
+                              >
+                                {editFontStyle === 'basic' ? (
+                                  <Text style={[
+                                    styles.basicFontOverlay,
+                                    {
+                                      fontSize: 16 * editTextScale,
+                                      color: textColor === 'black' ? '#000000' : COLORS.white,
+                                    }
+                                  ]}>{editAlbumName}</Text>
+                                ) : (
+                                  <RansomText
+                                    text={editAlbumName}
+                                    seed={editRansomSeed}
+                                    characterSize={18 * editTextScale}
+                                    spacing={-4}
+                                    enableRotation={true}
+                                    enableYOffset={true}
+                                  />
+                                )}
+                              </Animated.View>
+                            )}
+                          </View>
+                        </View>
+
+                        {/* Drag instruction */}
+                        {editCoverPhoto && (
+                          <Text style={styles.dragHintText}>문구를 드래그하여 위치를 조정하세요</Text>
+                        )}
+
+                        {/* Text Style Selection - Different UI based on font style */}
+                        {editCoverPhoto && editFontStyle === 'basic' && (
+                          <View style={styles.textStyleSelectionContainer}>
+                            {/* Color Selection (Left) */}
+                            <View style={styles.colorSelectionSection}>
+                              <Text style={styles.selectionLabel}>색상</Text>
+                              <View style={styles.colorButtonRow}>
+                                <Pressable
+                                  style={[
+                                    styles.colorButton,
+                                    { backgroundColor: '#000000' },
+                                    textColor === 'black' && styles.colorButtonSelected,
+                                  ]}
+                                  onPress={() => setTextColor('black')}
+                                />
+                                <Pressable
+                                  style={[
+                                    styles.colorButton,
+                                    { backgroundColor: '#FFFFFF' },
+                                    textColor === 'white' && styles.colorButtonSelected,
+                                  ]}
+                                  onPress={() => setTextColor('white')}
+                                />
+                              </View>
+                            </View>
+
+                            {/* Size Selection (Right) */}
+                            <View style={styles.sizeSelectionSection}>
+                              <Text style={styles.selectionLabel}>크기</Text>
+                              <View style={styles.sizeButtonRow}>
+                                {[1.5, 2.25, 3.0].map((scale, index) => (
+                                  <Pressable
+                                    key={index}
+                                    style={[
+                                      styles.sizeButton,
+                                      editTextScale === scale && styles.sizeButtonSelected,
+                                    ]}
+                                    onPress={() => setEditTextScale(scale)}
+                                  >
+                                    <Text style={[
+                                      styles.sizeButtonText,
+                                      { fontSize: 10 + index * 7 },
+                                      editTextScale === scale && styles.sizeButtonTextSelected,
+                                    ]}>A</Text>
+                                  </Pressable>
+                                ))}
+                              </View>
+                            </View>
+                          </View>
+                        )}
+
+                        {/* Ransom Style - Size Only */}
+                        {editCoverPhoto && editFontStyle === 'ransom' && (
+                          <View style={styles.sizeSelectionContainer}>
+                            <Text style={styles.sizeSelectionLabel}>문구 크기</Text>
+                            <View style={styles.sizeButtonRow}>
+                              {[1.0, 1.5, 2.0].map((scale, index) => (
+                                <Pressable
+                                  key={index}
+                                  style={[
+                                    styles.sizeButton,
+                                    editTextScale === scale && styles.sizeButtonSelected,
+                                  ]}
+                                  onPress={() => setEditTextScale(scale)}
+                                >
+                                  <Text style={[
+                                    styles.sizeButtonText,
+                                    { fontSize: 10 + index * 7 },
+                                    editTextScale === scale && styles.sizeButtonTextSelected,
+                                  ]}>A</Text>
+                                </Pressable>
+                              ))}
+                            </View>
+                          </View>
+                        )}
+
+                        {/* Action Buttons */}
+                        <View style={styles.albumModalButtonRow}>
+                          <Pressable
+                            style={styles.albumModalButtonSecondary}
+                            onPress={() => setEditAlbumStep('name')}
+                          >
+                            <Text style={styles.albumModalButtonSecondaryText}>이전</Text>
+                          </Pressable>
+                          <Pressable
+                            style={[
+                              styles.albumModalButton,
+                              !editCoverPhoto && styles.albumModalButtonDisabled
+                            ]}
+                            onPress={handleSaveEdit}
+                            disabled={!editCoverPhoto}
+                          >
+                            <Text style={[
+                              styles.albumModalButtonText,
+                              !editCoverPhoto && styles.albumModalButtonTextDisabled
+                            ]}>완료</Text>
+                          </Pressable>
+                        </View>
+                      </>
+                    )}
+                  </View>
+                </KeyboardAvoidingView>
+              </BlurView>
+            </Modal>
+          )}
+        </Animated.View>
+      </Modal>
+
+    </View>
+  );
+}
+
+// Photo Detail View Component with Flip Card (rendered inside modal, not as separate modal)
+function PhotoDetailView({
+  missions,
+  initialPhoto,
+  onClose,
+}: {
+  missions: MemoryType[];
+  initialPhoto: MemoryType;
+  onClose: () => void;
+}) {
+  const initialIndex = missions.findIndex((m) => m.id === initialPhoto.id);
+  const [currentIndex, setCurrentIndex] = useState(
+    initialIndex >= 0 ? initialIndex : 0
+  );
+  const [isFlipped, setIsFlipped] = useState(false);
+
+  // All hooks must be called at the top level
+  const flipAnim = useRef(new Animated.Value(0)).current;
+  const translateX = useRef(new Animated.Value(0)).current;
+  const cardOpacity = useRef(new Animated.Value(1)).current;
+  const currentIndexRef = useRef(currentIndex);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    currentIndexRef.current = currentIndex;
+  }, [currentIndex]);
+
+  const currentMission = missions[currentIndex];
+
+  // Format date (with fallback for safety)
+  const date = currentMission ? new Date(currentMission.completedAt) : new Date();
+  const formattedDate = `${date.getFullYear()}.${(date.getMonth() + 1)
+    .toString()
+    .padStart(2, '0')}.${date.getDate().toString().padStart(2, '0')}`;
+  const formattedTime = `${date.getHours().toString().padStart(2, '0')}:${date
+    .getMinutes()
+    .toString()
+    .padStart(2, '0')}`;
+
+  // Handle flip
+  const handleFlip = () => {
+    const toValue = isFlipped ? 0 : 1;
+    Animated.spring(flipAnim, {
+      toValue,
+      useNativeDriver: true,
+      friction: 8,
+      tension: 10,
+    }).start();
+    setIsFlipped(!isFlipped);
+  };
+
+  // Animate card change
+  const animateCardChange = (newIndex: number, direction: number) => {
+    Animated.parallel([
+      Animated.timing(translateX, {
+        toValue: direction > 0 ? width : -width,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(cardOpacity, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setCurrentIndex(newIndex);
+      setIsFlipped(false);
+      flipAnim.setValue(0);
+      translateX.setValue(direction > 0 ? -width : width);
+
+      Animated.parallel([
+        Animated.spring(translateX, {
+          toValue: 0,
+          useNativeDriver: true,
+          friction: 8,
+        }),
+        Animated.timing(cardOpacity, {
+          toValue: 1,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    });
+  };
+
+  // Pan responder for swipe - use ref to get current index
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dx) > 10 && Math.abs(gestureState.dy) < 30;
+      },
+      onPanResponderMove: (_, gestureState) => {
+        translateX.setValue(gestureState.dx);
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        const idx = currentIndexRef.current;
+        if (Math.abs(gestureState.dx) > 80) {
+          const direction = gestureState.dx > 0 ? 1 : -1;
+          if (direction > 0 && idx > 0) {
+            animateCardChange(idx - 1, direction);
+          } else if (direction < 0 && idx < missions.length - 1) {
+            animateCardChange(idx + 1, direction);
+          } else {
+            Animated.spring(translateX, {
+              toValue: 0,
+              useNativeDriver: true,
+            }).start();
+          }
+        } else {
+          Animated.spring(translateX, {
+            toValue: 0,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+    })
+  ).current;
+
+  // Interpolations for flip
+  const frontInterpolate = flipAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '180deg'],
+  });
+
+  const backInterpolate = flipAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['180deg', '360deg'],
+  });
+
+  const frontAnimatedStyle = {
+    transform: [{ rotateY: frontInterpolate }],
+  };
+
+  const backAnimatedStyle = {
+    transform: [{ rotateY: backInterpolate }],
+  };
+
+  // Safety check - if no mission, don't render content
+  if (!currentMission) {
+    return null;
+  }
+
+  return (
+    <View style={styles.photoDetailContainer}>
+      {/* Close Button */}
+      <Pressable
+        style={styles.photoDetailCloseButton}
+        onPress={onClose}
+      >
+        <X color={COLORS.white} size={20} />
+      </Pressable>
+
+      {/* Instruction Text */}
+      <View style={styles.flipInstructionContainer}>
+        <View style={styles.flipInstructionBadge}>
+          <Text style={styles.flipInstructionText}>
+            {isFlipped ? '탭하여 사진 보기' : '탭하여 뒷면 확인'}
+          </Text>
+        </View>
+      </View>
+
+      {/* Flip Card Container */}
+      <Animated.View
+        {...panResponder.panHandlers}
+        style={[
+          styles.flipCardContainer,
+          {
+            transform: [{ translateX }],
+            opacity: cardOpacity,
+          },
+        ]}
+      >
+        <Pressable onPress={handleFlip} style={styles.flipCardPressable}>
+          {/* Front - Photo */}
+          <Animated.View style={[styles.flipCardFace, frontAnimatedStyle]}>
+            <Image
+              source={{ uri: currentMission.photoUrl }}
+              style={styles.flipCardImage}
+              resizeMode="cover"
+            />
+          </Animated.View>
+
+          {/* Back - Info */}
+          <Animated.View style={[styles.flipCardFace, styles.flipCardBack, backAnimatedStyle]}>
+            <LinearGradient
+              colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.6)']}
+              style={styles.flipCardBackGradient}
+            >
+              {/* Mission Info */}
+              <View style={styles.flipCardBackContent}>
+                {/* Top Section */}
+                <View style={styles.flipCardBackTop}>
+                  {/* Mission Title */}
+                  <Text style={styles.flipCardTitle}>
+                    함께한 순간
+                  </Text>
+
+                  {/* Location and Time */}
+                  <View style={styles.flipCardInfoSection}>
+                    <View style={styles.flipCardInfoRow}>
+                      <MapPin color="rgba(255,255,255,0.9)" size={16} />
+                      <Text style={styles.flipCardInfoText}>
+                        {currentMission.location}
+                      </Text>
+                    </View>
+                    <View style={styles.flipCardInfoRow}>
+                      <Clock color="rgba(255,255,255,0.9)" size={16} />
+                      <Text style={styles.flipCardInfoText}>
+                        {formattedDate} {formattedTime}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Divider */}
+                  <View style={styles.flipCardDivider} />
+                </View>
+
+                {/* Messages Section */}
+                <View style={styles.flipCardMessages}>
+                  {currentMission.user1Message && (
+                    <View style={styles.flipCardMessageItem}>
+                      <Text style={styles.flipCardMessageLabel}>지민</Text>
+                      <Text style={styles.flipCardMessageText}>
+                        {currentMission.user1Message}
+                      </Text>
+                    </View>
+                  )}
+                  {currentMission.user2Message && (
+                    <View style={styles.flipCardMessageItem}>
+                      <Text style={styles.flipCardMessageLabel}>준호</Text>
+                      <Text style={styles.flipCardMessageText}>
+                        {currentMission.user2Message}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+            </LinearGradient>
+          </Animated.View>
+        </Pressable>
+      </Animated.View>
+
+      {/* Photo Counter */}
+      <View style={styles.photoCounterContainer}>
+        <View style={styles.photoCounterBadge}>
+          <Text style={styles.photoCounterText}>
+            {currentIndex + 1} / {missions.length}
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.black,
+  },
+  backgroundImage: {
+    position: 'absolute',
+    width: width,
+    height: height,
+  },
+  backgroundScale: {
+    flex: 1,
+    transform: [{ scale: 1.1 }],
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+  },
+  topFadeOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 50,
+    zIndex: 10,
+  },
+  header: {
+    paddingTop: 64,
+    paddingHorizontal: SPACING.lg,
+    paddingBottom: SPACING.lg,
+    zIndex: 20,
+  },
+  headerTitle: {
+    fontSize: 32,
+    color: COLORS.white,
+    fontWeight: '700',
+    lineHeight: 38,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontWeight: '400',
+    marginTop: 4,
+  },
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: SPACING.lg,
+  },
+  emptyText: {
+    fontSize: 15,
+    color: 'rgba(255, 255, 255, 0.6)',
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  emptyMissionCard: {
+    padding: 24,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    width: '100%',
+  },
+  emptyMissionText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.white,
+    marginBottom: 8,
+  },
+  emptyMissionHint: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.6)',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  mainContent: {
+    flex: 1,
+  },
+  mainContentContainer: {
+    paddingBottom: 120,
+  },
+  yearSection: {
+    marginTop: SPACING.md,
+    marginBottom: SPACING.xl,
+  },
+  yearHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.lg,
+    marginBottom: SPACING.md,
+  },
+  yearTitle: {
+    fontSize: 20,
+    color: COLORS.white,
+    fontWeight: '700',
+  },
+  yearPickerButton: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: SPACING.xs,
+  },
+  yearPickerDropdown: {
+    marginHorizontal: SPACING.lg,
+    marginBottom: SPACING.md,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 16,
+    padding: SPACING.xs,
+    width: 128,
+  },
+  yearPickerItem: {
+    paddingVertical: 10,
+    paddingHorizontal: SPACING.md,
+    borderRadius: 12,
+  },
+  yearPickerItemActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  yearPickerItemText: {
+    fontSize: 15,
+    color: COLORS.white,
+    textAlign: 'center',
+  },
+  yearPickerItemTextActive: {
+    fontWeight: '600',
+  },
+  monthCardsContainer: {
+    paddingHorizontal: SPACING.lg,
+    gap: 12,
+  },
+  monthCard: {
+    width: ALBUM_CARD_WIDTH, // Match album card width (140px)
+  },
+  monthCardInner: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  monthCardImage: {
+    width: '100%',
+    aspectRatio: 1,
+  },
+  monthBadge: {
+    position: 'absolute',
+    bottom: 12,
+    left: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  monthBadgeText: {
+    fontSize: 13,
+    color: COLORS.white,
+    fontWeight: '600',
+  },
+  multipleIcon: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+  },
+  stackIcon: {
+    width: 14,
+    height: 14,
+    position: 'relative',
+  },
+  stackBack: {
+    position: 'absolute',
+    top: 3,
+    left: 3,
+    width: 10,
+    height: 10,
+    borderRadius: 2,
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.15)',
+  },
+  stackFront: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: 10,
+    height: 10,
+    borderRadius: 2,
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.15)',
+  },
+  collageSection: {
+    paddingHorizontal: SPACING.lg,
+    marginTop: SPACING.lg,
+    marginBottom: SPACING.lg,
+  },
+  collageSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.xs,
+  },
+  collageSectionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: COLORS.white,
+  },
+  albumIconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  createAlbumButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: COLORS.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  createAlbumButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.white,
+  },
+  collageSectionSubtitle: {
+    fontSize: 14,
+    fontWeight: '400',
+    color: 'rgba(255, 255, 255, 0.6)',
+    marginBottom: SPACING.md,
+  },
+  monthModalContainer: {
+    flex: 1,
+  },
+  missionPickerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 100,
+  },
+  monthModalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  coverPickerBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'transparent',
+  },
+  coverPickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  monthModalContent: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '90%',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  monthModalCloseButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  monthModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.lg,
+    paddingTop: 32,
+    paddingBottom: SPACING.lg,
+  },
+  monthModalTitle: {
+    fontSize: 28,
+    color: COLORS.white,
+    fontWeight: '700',
+  },
+  monthModalCount: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontWeight: '500',
+    marginTop: 8,
+  },
+  monthModalGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: SPACING.lg - 1,
+    gap: 2,
+  },
+  monthModalItem: {
+    width: (width - SPACING.lg * 2 - 4) / 3,
+    aspectRatio: 1,
+  },
+  monthModalItemInner: {
+    flex: 1,
+    backgroundColor: '#222',
+    overflow: 'hidden',
+  },
+  monthModalItemImage: {
+    width: '100%',
+    height: '100%',
+  },
+  photoDetailContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: SPACING.lg,
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+  },
+  photoDetailCloseButton: {
+    position: 'absolute',
+    top: 48,
+    right: 24,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  photoDetailCard: {
+    width: '90%',
+    aspectRatio: 3 / 4,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  photoDetailImage: {
+    width: '100%',
+    height: '100%',
+  },
+  photoInfoCard: {
+    width: '90%',
+    marginTop: SPACING.lg,
+    padding: SPACING.lg,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  photoInfoTitle: {
+    fontSize: 20,
+    color: COLORS.white,
+    fontWeight: '700',
+    marginBottom: SPACING.md,
+  },
+  photoInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: SPACING.xs,
+  },
+  photoInfoText: {
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.9)',
+  },
+  photoMessages: {
+    marginTop: SPACING.md,
+    paddingTop: SPACING.md,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.2)',
+    gap: SPACING.md,
+  },
+  photoMessageItem: {},
+  photoMessageLabel: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  photoMessageText: {
+    fontSize: 15,
+    color: COLORS.white,
+    lineHeight: 22,
+  },
+  // Flip Card Styles
+  flipInstructionContainer: {
+    position: 'absolute',
+    top: 140,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  flipInstructionBadge: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  flipInstructionText: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '400',
+  },
+  flipCardContainer: {
+    width: '90%',
+    aspectRatio: 3 / 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  flipCardPressable: {
+    width: '100%',
+    height: '100%',
+  },
+  flipCardFace: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    backfaceVisibility: 'hidden',
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  flipCardBack: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  flipCardImage: {
+    width: '100%',
+    height: '100%',
+  },
+  flipCardBackGradient: {
+    flex: 1,
+    borderRadius: 16,
+  },
+  flipCardBackContent: {
+    flex: 1,
+    padding: 24,
+  },
+  flipCardBackTop: {
+    marginBottom: 16,
+  },
+  flipCardTitle: {
+    fontSize: 22,
+    color: COLORS.white,
+    fontWeight: '700',
+    marginBottom: 16,
+    lineHeight: 28,
+  },
+  flipCardInfoSection: {
+    gap: 8,
+    marginBottom: 16,
+  },
+  flipCardInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  flipCardInfoText: {
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontWeight: '400',
+  },
+  flipCardDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  flipCardMessages: {
+    flex: 1,
+    justifyContent: 'center',
+    gap: 20,
+  },
+  flipCardMessageItem: {
+    gap: 4,
+  },
+  flipCardMessageLabel: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontWeight: '600',
+  },
+  flipCardMessageText: {
+    fontSize: 15,
+    color: COLORS.white,
+    fontWeight: '400',
+    lineHeight: 22,
+  },
+  photoCounterContainer: {
+    position: 'absolute',
+    bottom: 80,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  photoCounterBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  photoCounterText: {
+    fontSize: 13,
+    color: COLORS.white,
+    fontWeight: '600',
+  },
+  // Album List Styles
+  albumsListContainer: {
+    marginHorizontal: -SPACING.lg,
+  },
+  albumsList: {
+    paddingHorizontal: SPACING.lg,
+    gap: 12,
+  },
+  albumItem: {
+    width: 140,
+  },
+  hardcoverBook: {
+    width: '100%',
+    aspectRatio: 3 / 4,
+    borderRadius: 4,
+    overflow: 'hidden',
+    position: 'relative',
+    // Book shadow
+    shadowColor: '#000',
+    shadowOffset: { width: 2, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  bookFullPhoto: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+  },
+  bookPlaceholder: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(40, 40, 40, 0.9)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bookSpineCurve: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 20,
+    zIndex: 10,
+  },
+  albumCoverWrapper: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  coverTextureOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  coverEdgeHighlight: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderTopRightRadius: 4,
+    borderBottomRightRadius: 4,
+    // Inner highlight
+    borderTopWidth: 1,
+    borderRightWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.15)',
+    borderRightColor: 'rgba(255, 255, 255, 0.08)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  albumCover: {
+    width: '100%',
+    height: '100%',
+  },
+  albumCoverPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'rgba(40, 40, 40, 0.9)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  albumNameOverlay: {
+    position: 'absolute',
+    maxWidth: ALBUM_CARD_WIDTH * 0.80, // 80% of album card width (140 * 0.80 = 112px), matches modal's draggableTextOverlay ratio
+  },
+  albumNameContainer: {
+    flexDirection: 'row',
+    flexWrap: 'nowrap',
+    alignItems: 'flex-start',
+  },
+  wordContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    gap: 1,
+    maxWidth: '100%',
+  },
+  wordContainerTiny: {
+    flexDirection: 'row',
+    flexWrap: 'nowrap', // Keep word characters together, prevent mid-word breaks
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    maxWidth: '100%',
+  },
+  // Space styles for ransom note
+  ransomSpace: {
+    width: 8,
+    height: 20,
+  },
+  ransomSpaceLarge: {
+    width: 12,
+    height: 36,
+  },
+  ransomSpaceSmall: {
+    width: 6,
+    height: 18,
+  },
+  ransomSpaceTiny: {
+    width: 3,
+    height: 10,
+  },
+  // Torn paper base style
+  ransomCharBox: {
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 2, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 4,
+  },
+  ransomChar: {
+    fontSize: 13,
+    color: '#1a1a1a',
+    fontWeight: '500',
+  },
+  // Paper style variations (0-9) - torn paper effects
+  paperStyle0: {
+    // Rough torn edges - top left corner torn
+    borderTopLeftRadius: 1,
+    borderTopRightRadius: 4,
+    borderBottomLeftRadius: 3,
+    borderBottomRightRadius: 2,
+    borderWidth: 0.5,
+    borderColor: 'rgba(80, 60, 40, 0.15)',
+  },
+  paperStyle1: {
+    // Magazine cutout - clean but slightly uneven
+    borderTopLeftRadius: 2,
+    borderTopRightRadius: 1,
+    borderBottomLeftRadius: 1,
+    borderBottomRightRadius: 3,
+    shadowOffset: { width: 3, height: 4 },
+    shadowOpacity: 0.3,
+    borderRightWidth: 1.5,
+    borderBottomWidth: 1.5,
+    borderColor: 'rgba(0, 0, 0, 0.06)',
+  },
+  paperStyle2: {
+    // Newspaper clipping - aged edges
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 2,
+    borderBottomLeftRadius: 4,
+    borderBottomRightRadius: 1,
+    borderWidth: 0.8,
+    borderColor: 'rgba(139, 119, 101, 0.25)',
+    shadowOffset: { width: 1, height: 2 },
+    shadowOpacity: 0.2,
+  },
+  paperStyle3: {
+    // Torn notebook paper
+    borderTopLeftRadius: 1,
+    borderTopRightRadius: 3,
+    borderBottomLeftRadius: 2,
+    borderBottomRightRadius: 4,
+    shadowOffset: { width: 2, height: 3 },
+    shadowOpacity: 0.35,
+    borderLeftWidth: 2,
+    borderLeftColor: 'rgba(200, 50, 50, 0.15)',
+  },
+  paperStyle4: {
+    // Rough tear - jagged look
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 1,
+    borderBottomLeftRadius: 1,
+    borderBottomRightRadius: 5,
+    shadowOffset: { width: 1, height: 4 },
+    shadowOpacity: 0.28,
+    borderWidth: 0.3,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  paperStyle5: {
+    // Old book page
+    borderTopLeftRadius: 2,
+    borderTopRightRadius: 4,
+    borderBottomLeftRadius: 5,
+    borderBottomRightRadius: 2,
+    borderWidth: 0.6,
+    borderColor: 'rgba(101, 67, 33, 0.2)',
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 0.22,
+  },
+  paperStyle6: {
+    // Card stock - thicker paper feel
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
+    borderBottomLeftRadius: 2,
+    borderBottomRightRadius: 3,
+    shadowOffset: { width: 3, height: 5 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    borderWidth: 0.4,
+    borderColor: 'rgba(0, 0, 0, 0.08)',
+  },
+  paperStyle7: {
+    // Sticky note style
+    borderTopLeftRadius: 1,
+    borderTopRightRadius: 1,
+    borderBottomLeftRadius: 6,
+    borderBottomRightRadius: 1,
+    shadowOffset: { width: 1, height: 3 },
+    shadowOpacity: 0.2,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  paperStyle8: {
+    // Ripped edge - bottom torn
+    borderTopLeftRadius: 2,
+    borderTopRightRadius: 2,
+    borderBottomLeftRadius: 5,
+    borderBottomRightRadius: 4,
+    shadowOffset: { width: 2, height: 4 },
+    shadowOpacity: 0.32,
+    borderTopWidth: 0.5,
+    borderTopColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  paperStyle9: {
+    // Vintage cutout
+    borderTopLeftRadius: 5,
+    borderTopRightRadius: 2,
+    borderBottomLeftRadius: 3,
+    borderBottomRightRadius: 6,
+    borderWidth: 0.7,
+    borderColor: 'rgba(139, 90, 43, 0.18)',
+    shadowOffset: { width: 1, height: 2 },
+    shadowOpacity: 0.25,
+  },
+  // Album Modal Styles
+  albumModalFadeWrapper: {
+    flex: 1,
+  },
+  albumModalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  albumModalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  keyboardAvoidingView: {
+    width: '100%',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  albumModalContent: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    borderRadius: 32,
+    padding: 24,
+    paddingBottom: 32,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  albumModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 0,
+  },
+  albumModalHeaderDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    marginTop: 16,
+    marginBottom: 20,
+    width: '100%',
+  },
+  albumModalCloseButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  albumModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.white,
+  },
+  albumModalSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.6)',
+    marginBottom: 20,
+  },
+  ransomPreviewContainer: {
+    minHeight: 80,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    position: 'relative',
+  },
+  refreshButton: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ransomPreview: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    gap: 4,
+    width: '100%',
+  },
+  wordContainerLarge: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    gap: 2,
+    maxWidth: '100%',
+  },
+  // Large preview torn paper style
+  ransomPreviewCharBox: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 3, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  ransomPreviewChar: {
+    fontSize: 26,
+    color: '#1a1a1a',
+    fontWeight: '500',
+  },
+  basicFontPreview: {
+    fontFamily: 'Jua_400Regular',
+    fontSize: 28,
+    color: COLORS.white,
+    textAlign: 'center',
+  },
+  basicFontOverlay: {
+    fontFamily: 'Jua_400Regular',
+    color: COLORS.white,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
+  },
+  basicFontTiny: {
+    fontFamily: 'Jua_400Regular',
+    color: COLORS.white,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0.5, height: 0.5 },
+    textShadowRadius: 2,
+  },
+  ransomPlaceholder: {
+    fontSize: 18,
+    color: 'rgba(255, 255, 255, 0.3)',
+  },
+  albumNameInput: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: COLORS.white,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    marginBottom: 20,
+  },
+  albumModalButton: {
+    flex: 1,
+    backgroundColor: COLORS.white,
+    borderRadius: 999,
+    paddingVertical: 16,
+    minHeight: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  albumModalButtonDisabled: {
+    opacity: 0.4,
+  },
+  albumModalButtonText: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#1a1a1a',
+  },
+  albumModalButtonTextDisabled: {
+    color: 'rgba(26, 26, 26, 0.5)',
+  },
+  coverPhotoContainer: {
+    width: '100%',
+    position: 'relative',
+    marginBottom: 12,
+  },
+  coverPhotoPickerContainer: {
+    width: '100%',
+    aspectRatio: 3 / 4, // 3:4 aspect ratio
+    borderRadius: 16,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  modalBookSpineCurve: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 24,
+    zIndex: 10,
+  },
+  coverPhotoInner: {
+    width: '100%',
+    height: '100%',
+  },
+  coverPhotoPreview: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  coverPhotoPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  coverPhotoPlaceholderText: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.5)',
+  },
+  draggableTextOverlay: {
+    position: 'absolute',
+    maxWidth: '80%',
+    zIndex: 20,
+  },
+  albumNameContainerSmall: {
+    flexDirection: 'row',
+    flexWrap: 'nowrap',
+    alignItems: 'flex-start',
+    gap: 2,
+  },
+  wordContainerSmall: {
+    flexDirection: 'row',
+    flexWrap: 'nowrap',
+    alignItems: 'flex-start',
+    gap: 1,
+  },
+  dragHintText: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.5)',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  // Size Selection Buttons
+  textStyleSelectionContainer: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+    paddingHorizontal: 8,
+  },
+  colorSelectionSection: {
+    alignItems: 'center',
+  },
+  sizeSelectionSection: {
+    alignItems: 'center',
+  },
+  selectionLabel: {
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginBottom: 10,
+  },
+  colorButtonRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  colorButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  colorButtonSelected: {
+    borderWidth: 3,
+    borderColor: COLORS.white,
+    shadowColor: '#fff',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 4,
+  },
+  sizeSelectionContainer: {
+    width: '100%',
+    marginBottom: 16,
+  },
+  sizeSelectionLabel: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  sizeButtonRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 12,
+  },
+  sizeButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sizeButtonSelected: {
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    borderColor: COLORS.white,
+  },
+  sizeButtonText: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontWeight: '700',
+  },
+  sizeButtonTextSelected: {
+    color: COLORS.white,
+  },
+  albumNamePreviewSmall: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 3,
+    marginBottom: 24,
+  },
+  // Small torn paper - for modal draggable text (larger modal view)
+  ransomCharBoxSmall: {
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 2, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 4,
+  },
+  ransomCharSmall: {
+    fontSize: 13,
+    color: '#1a1a1a',
+    fontWeight: '500',
+  },
+  // Tiny torn paper - for album list thumbnails (proportionally smaller ~0.56 ratio)
+  ransomCharBoxTiny: {
+    paddingHorizontal: 3,
+    paddingVertical: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 1.1, height: 1.7 },
+    shadowOpacity: 0.22,
+    shadowRadius: 1.7,
+    elevation: 2,
+  },
+  ransomCharTiny: {
+    fontSize: 7,
+    color: '#1a1a1a',
+    fontWeight: '500',
+  },
+  // Paper style variations for small boxes (0-9) - matching torn paper effects
+  paperStyleSmall0: {
+    borderTopLeftRadius: 1,
+    borderTopRightRadius: 4,
+    borderBottomLeftRadius: 3,
+    borderBottomRightRadius: 2,
+    borderWidth: 0.5,
+    borderColor: 'rgba(80, 60, 40, 0.15)',
+  },
+  paperStyleSmall1: {
+    borderTopLeftRadius: 2,
+    borderTopRightRadius: 1,
+    borderBottomLeftRadius: 1,
+    borderBottomRightRadius: 3,
+    shadowOffset: { width: 3, height: 4 },
+    shadowOpacity: 0.3,
+    borderRightWidth: 1.5,
+    borderBottomWidth: 1.5,
+    borderColor: 'rgba(0, 0, 0, 0.06)',
+  },
+  paperStyleSmall2: {
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 2,
+    borderBottomLeftRadius: 4,
+    borderBottomRightRadius: 1,
+    borderWidth: 0.8,
+    borderColor: 'rgba(139, 119, 101, 0.25)',
+    shadowOffset: { width: 1, height: 2 },
+    shadowOpacity: 0.2,
+  },
+  paperStyleSmall3: {
+    borderTopLeftRadius: 1,
+    borderTopRightRadius: 3,
+    borderBottomLeftRadius: 2,
+    borderBottomRightRadius: 4,
+    shadowOffset: { width: 2, height: 3 },
+    shadowOpacity: 0.35,
+    borderLeftWidth: 2,
+    borderLeftColor: 'rgba(200, 50, 50, 0.15)',
+  },
+  paperStyleSmall4: {
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 1,
+    borderBottomLeftRadius: 1,
+    borderBottomRightRadius: 5,
+    shadowOffset: { width: 1, height: 4 },
+    shadowOpacity: 0.28,
+    borderWidth: 0.3,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  paperStyleSmall5: {
+    borderTopLeftRadius: 2,
+    borderTopRightRadius: 4,
+    borderBottomLeftRadius: 5,
+    borderBottomRightRadius: 2,
+    borderWidth: 0.6,
+    borderColor: 'rgba(101, 67, 33, 0.2)',
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 0.22,
+  },
+  paperStyleSmall6: {
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
+    borderBottomLeftRadius: 2,
+    borderBottomRightRadius: 3,
+    shadowOffset: { width: 3, height: 5 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    borderWidth: 0.4,
+    borderColor: 'rgba(0, 0, 0, 0.08)',
+  },
+  paperStyleSmall7: {
+    borderTopLeftRadius: 1,
+    borderTopRightRadius: 1,
+    borderBottomLeftRadius: 6,
+    borderBottomRightRadius: 1,
+    shadowOffset: { width: 1, height: 3 },
+    shadowOpacity: 0.2,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  paperStyleSmall8: {
+    borderTopLeftRadius: 2,
+    borderTopRightRadius: 2,
+    borderBottomLeftRadius: 5,
+    borderBottomRightRadius: 4,
+    shadowOffset: { width: 2, height: 4 },
+    shadowOpacity: 0.32,
+    borderTopWidth: 0.5,
+    borderTopColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  paperStyleSmall9: {
+    borderTopLeftRadius: 5,
+    borderTopRightRadius: 2,
+    borderBottomLeftRadius: 3,
+    borderBottomRightRadius: 6,
+    borderWidth: 0.7,
+    borderColor: 'rgba(139, 90, 43, 0.18)',
+    shadowOffset: { width: 1, height: 2 },
+    shadowOpacity: 0.25,
+  },
+  // Paper style variations for tiny boxes (0-9) - for album list thumbnails
+  paperStyleTiny0: {
+    borderTopLeftRadius: 0.5,
+    borderTopRightRadius: 2,
+    borderBottomLeftRadius: 1.5,
+    borderBottomRightRadius: 1,
+    borderWidth: 0.3,
+    borderColor: 'rgba(80, 60, 40, 0.12)',
+  },
+  paperStyleTiny1: {
+    borderTopLeftRadius: 1,
+    borderTopRightRadius: 0.5,
+    borderBottomLeftRadius: 0.5,
+    borderBottomRightRadius: 1.5,
+    shadowOffset: { width: 1.5, height: 2 },
+    shadowOpacity: 0.25,
+    borderRightWidth: 0.8,
+    borderBottomWidth: 0.8,
+    borderColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  paperStyleTiny2: {
+    borderTopLeftRadius: 1.5,
+    borderTopRightRadius: 1,
+    borderBottomLeftRadius: 2,
+    borderBottomRightRadius: 0.5,
+    borderWidth: 0.4,
+    borderColor: 'rgba(139, 119, 101, 0.2)',
+    shadowOffset: { width: 0.5, height: 1 },
+    shadowOpacity: 0.15,
+  },
+  paperStyleTiny3: {
+    borderTopLeftRadius: 0.5,
+    borderTopRightRadius: 1.5,
+    borderBottomLeftRadius: 1,
+    borderBottomRightRadius: 2,
+    shadowOffset: { width: 1, height: 1.5 },
+    shadowOpacity: 0.28,
+    borderLeftWidth: 1,
+    borderLeftColor: 'rgba(200, 50, 50, 0.12)',
+  },
+  paperStyleTiny4: {
+    borderTopLeftRadius: 2,
+    borderTopRightRadius: 0.5,
+    borderBottomLeftRadius: 0.5,
+    borderBottomRightRadius: 2.5,
+    shadowOffset: { width: 0.5, height: 2 },
+    shadowOpacity: 0.22,
+    borderWidth: 0.2,
+    borderColor: 'rgba(0, 0, 0, 0.08)',
+  },
+  paperStyleTiny5: {
+    borderTopLeftRadius: 1,
+    borderTopRightRadius: 2,
+    borderBottomLeftRadius: 2.5,
+    borderBottomRightRadius: 1,
+    borderWidth: 0.3,
+    borderColor: 'rgba(101, 67, 33, 0.15)',
+    shadowOffset: { width: 1, height: 1 },
+    shadowOpacity: 0.18,
+  },
+  paperStyleTiny6: {
+    borderTopLeftRadius: 1.5,
+    borderTopRightRadius: 1.5,
+    borderBottomLeftRadius: 1,
+    borderBottomRightRadius: 1.5,
+    shadowOffset: { width: 1.5, height: 2.5 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    borderWidth: 0.2,
+    borderColor: 'rgba(0, 0, 0, 0.06)',
+  },
+  paperStyleTiny7: {
+    borderTopLeftRadius: 0.5,
+    borderTopRightRadius: 0.5,
+    borderBottomLeftRadius: 3,
+    borderBottomRightRadius: 0.5,
+    shadowOffset: { width: 0.5, height: 1.5 },
+    shadowOpacity: 0.15,
+    borderBottomWidth: 0.5,
+    borderBottomColor: 'rgba(0, 0, 0, 0.04)',
+  },
+  paperStyleTiny8: {
+    borderTopLeftRadius: 1,
+    borderTopRightRadius: 1,
+    borderBottomLeftRadius: 2.5,
+    borderBottomRightRadius: 2,
+    shadowOffset: { width: 1, height: 2 },
+    shadowOpacity: 0.25,
+    borderTopWidth: 0.3,
+    borderTopColor: 'rgba(0, 0, 0, 0.08)',
+  },
+  paperStyleTiny9: {
+    borderTopLeftRadius: 2.5,
+    borderTopRightRadius: 1,
+    borderBottomLeftRadius: 1.5,
+    borderBottomRightRadius: 3,
+    borderWidth: 0.4,
+    borderColor: 'rgba(139, 90, 43, 0.14)',
+    shadowOffset: { width: 0.5, height: 1 },
+    shadowOpacity: 0.2,
+  },
+  albumModalButtonRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  albumModalButtonSecondary: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 999,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  albumModalButtonSecondaryText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.white,
+  },
+  // Slider styles
+  sliderContainer: {
+    marginBottom: 20,
+    paddingHorizontal: 4,
+  },
+  sliderLabel: {
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginBottom: 12,
+  },
+  sliderTrackTouchable: {
+    height: 44,
+    justifyContent: 'center',
+    position: 'relative',
+    width: 280,
+    alignSelf: 'center',
+  },
+  sliderTrack: {
+    height: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  sliderFill: {
+    height: '100%',
+    backgroundColor: COLORS.white,
+    borderRadius: 4,
+  },
+  sliderThumb: {
+    position: 'absolute',
+    top: 10,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: COLORS.white,
+    marginLeft: -12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  sliderValue: {
+    fontSize: 14,
+    color: COLORS.white,
+    fontWeight: '600',
+    minWidth: 50,
+    textAlign: 'center',
+  },
+  // Padding variants for varied paper sizes (Large - for step 1 preview)
+  paddingVariantLarge0: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  paddingVariantLarge1: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  paddingVariantLarge2: {
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+  },
+  paddingVariantLarge3: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+  },
+  paddingVariantLarge4: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  // Padding variants for varied paper sizes (Small - for modal)
+  paddingVariantSmall0: {
+    paddingHorizontal: 4,
+    paddingVertical: 3,
+  },
+  paddingVariantSmall1: {
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+  },
+  paddingVariantSmall2: {
+    paddingHorizontal: 5,
+    paddingVertical: 5,
+  },
+  paddingVariantSmall3: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  paddingVariantSmall4: {
+    paddingHorizontal: 6,
+    paddingVertical: 6,
+  },
+  // Padding variants for varied paper sizes (Tiny - for album list)
+  paddingVariantTiny0: {
+    paddingHorizontal: 2,
+    paddingVertical: 1,
+  },
+  paddingVariantTiny1: {
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  paddingVariantTiny2: {
+    paddingHorizontal: 2.5,
+    paddingVertical: 2.5,
+  },
+  paddingVariantTiny3: {
+    paddingHorizontal: 4,
+    paddingVertical: 1.5,
+  },
+  paddingVariantTiny4: {
+    paddingHorizontal: 3,
+    paddingVertical: 3,
+  },
+  // Font style selection styles
+  fontStyleOptions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 24,
+  },
+  fontStyleOption: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 16,
+    padding: 20,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  fontStyleOptionSelected: {
+    borderColor: COLORS.white,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  fontStylePreviewBasic: {
+    fontSize: 24,
+    fontFamily: 'Jua_400Regular',
+    color: COLORS.white,
+    marginTop: 4,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  fontStylePreviewRansom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 29,
+    gap: 2,
+    marginTop: -1,
+    marginBottom: 8,
+    overflow: 'visible',
+  },
+  fontStyleLabel: {
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.7)',
+    textAlign: 'center',
+  },
+  ransomMiniBox: {
+    paddingHorizontal: 3,
+    paddingVertical: 1,
+    borderRadius: 2,
+    height: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'visible',
+  },
+  ransomMiniText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  // Circle paper styles (10-14)
+  paperStyle10: {
+    borderRadius: 100, // Full circle
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 0.2,
+  },
+  paperStyle11: {
+    borderRadius: 100,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+    shadowOffset: { width: 1, height: 2 },
+    shadowOpacity: 0.25,
+  },
+  paperStyle12: {
+    borderRadius: 100,
+    shadowOffset: { width: 2, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  paperStyle13: {
+    borderRadius: 100,
+    borderWidth: 0.5,
+    borderColor: 'rgba(139, 90, 43, 0.2)',
+    shadowOffset: { width: 1, height: 1 },
+    shadowOpacity: 0.15,
+  },
+  paperStyle14: {
+    borderRadius: 100,
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 0.2,
+    borderWidth: 1.5,
+    borderColor: 'rgba(0, 0, 0, 0.08)',
+  },
+  // Small circle styles
+  paperStyleSmall10: {
+    borderRadius: 100,
+    shadowOffset: { width: 1, height: 1 },
+    shadowOpacity: 0.2,
+  },
+  paperStyleSmall11: {
+    borderRadius: 100,
+    borderWidth: 0.5,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+    shadowOffset: { width: 1, height: 1.5 },
+    shadowOpacity: 0.2,
+  },
+  paperStyleSmall12: {
+    borderRadius: 100,
+    shadowOffset: { width: 1, height: 2 },
+    shadowOpacity: 0.25,
+  },
+  paperStyleSmall13: {
+    borderRadius: 100,
+    borderWidth: 0.5,
+    borderColor: 'rgba(139, 90, 43, 0.15)',
+  },
+  paperStyleSmall14: {
+    borderRadius: 100,
+    shadowOffset: { width: 1, height: 1 },
+    shadowOpacity: 0.18,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.06)',
+  },
+  // Tiny circle styles
+  paperStyleTiny10: {
+    borderRadius: 100,
+    shadowOffset: { width: 0.5, height: 0.5 },
+    shadowOpacity: 0.15,
+  },
+  paperStyleTiny11: {
+    borderRadius: 100,
+    borderWidth: 0.3,
+    borderColor: 'rgba(0, 0, 0, 0.08)',
+  },
+  paperStyleTiny12: {
+    borderRadius: 100,
+    shadowOffset: { width: 0.5, height: 1 },
+    shadowOpacity: 0.2,
+  },
+  paperStyleTiny13: {
+    borderRadius: 100,
+    borderWidth: 0.3,
+    borderColor: 'rgba(139, 90, 43, 0.12)',
+  },
+  paperStyleTiny14: {
+    borderRadius: 100,
+    shadowOffset: { width: 0.5, height: 0.5 },
+    shadowOpacity: 0.15,
+    borderWidth: 0.5,
+    borderColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  // Basic font style text
+  basicFontText: {
+    fontWeight: '700',
+  },
+  // Album Detail Full Screen Styles
+  albumDetailFullScreen: {
+    flex: 1,
+  },
+  albumDetailContent: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    marginTop: 60,
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    overflow: 'hidden',
+  },
+  albumDetailHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    position: 'relative',
+  },
+  albumDetailCloseButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  albumDetailTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.white,
+    flex: 1,
+    textAlign: 'center',
+  },
+  albumDetailMenuButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 50,
+  },
+  albumMenuDropdown: {
+    position: 'absolute',
+    top: 100,
+    right: 20,
+    borderRadius: 16,
+    paddingVertical: 8,
+    minWidth: 160,
+    zIndex: 100,
+    overflow: 'hidden',
+  },
+  albumMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    gap: 14,
+  },
+  albumMenuItemDanger: {
+    marginTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  albumMenuItemText: {
+    fontSize: 16,
+    color: COLORS.white,
+    fontWeight: '500',
+  },
+  albumDetailCoverContainer: {
+    alignItems: 'center',
+    paddingVertical: 24,
+    paddingHorizontal: 20,
+  },
+  albumDetailCoverWrapper: {
+    width: 180,
+    height: 240,
+    borderRadius: 12,
+    overflow: 'hidden',
+    position: 'relative',
+    backgroundColor: 'rgba(60, 60, 60, 0.5)',
+  },
+  albumDetailSpine: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 16,
+    zIndex: 10,
+  },
+  albumDetailCoverImage: {
+    width: '100%',
+    height: '100%',
+  },
+  albumDetailCoverPlaceholder: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(60, 60, 60, 0.5)',
+  },
+  albumDetailNameOverlay: {
+    position: 'absolute',
+    maxWidth: '80%',
+  },
+  albumNameContainerTiny: {
+    flexDirection: 'row',
+    flexWrap: 'nowrap',
+    gap: 1,
+  },
+  albumPhotosSection: {
+    flex: 1,
+    minHeight: 200,
+  },
+  albumPhotosSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingHorizontal: SPACING.lg,
+  },
+  albumPhotosSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.white,
+  },
+  selectionButtonsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  cancelButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  cancelButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.7)',
+  },
+  selectAddButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  selectAddButtonDisabled: {
+    opacity: 0.4,
+  },
+  selectAddButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.white,
+  },
+  selectAddButtonTextDisabled: {
+    color: 'rgba(255, 255, 255, 0.5)',
+  },
+  albumPhotosScrollView: {
+    flex: 1,
+  },
+  albumPhotosGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: SPACING.lg - 1,
+    paddingTop: SPACING.md,
+    gap: 2,
+    paddingBottom: 100,
+    flexGrow: 1,
+  },
+  albumMonthSection: {
+    width: '100%',
+    marginBottom: SPACING.lg,
+  },
+  albumMonthHeader: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.8)',
+    paddingHorizontal: SPACING.sm,
+    marginBottom: SPACING.sm,
+  },
+  albumMonthPhotosGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 2,
+  },
+  addPhotoButton: {
+    width: (width - SPACING.lg * 2 - 4) / 3,
+    aspectRatio: 1,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyAddPhotoButton: {
+    width: (width - SPACING.lg * 2 - 4) / 3,
+    height: (width - SPACING.lg * 2 - 4) / 3 + 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+  },
+  emptyAddPhotoButtonText: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.5)',
+    marginTop: 8,
+  },
+  addPhotoButtonText: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.5)',
+    marginTop: 8,
+  },
+  missionPhotoItem: {
+    width: (width - SPACING.lg * 2 - 4) / 3,
+    height: (width - SPACING.lg * 2 - 4) / 3 + 24,
+    borderRadius: 12,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  missionPhotoItemInAlbum: {
+    opacity: 0.5,
+  },
+  missionPhotoImage: {
+    width: '100%',
+    height: '100%',
+  },
+  photoSelectedOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(59, 130, 246, 0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoInAlbumOverlay: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Album Photo Action Buttons
+  albumPhotoActionButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  albumPhotoSelectButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 100,
+  },
+  albumPhotoSelectButtonText: {
+    fontSize: 14,
+    color: COLORS.white,
+    fontWeight: '500',
+  },
+  albumPhotoCancelButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 100,
+  },
+  albumPhotoCancelButtonText: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontWeight: '500',
+  },
+  albumPhotoDeleteButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(255, 107, 107, 0.2)',
+    borderRadius: 100,
+  },
+  albumPhotoDeleteButtonDisabled: {
+    opacity: 0.4,
+  },
+  albumPhotoDeleteButtonText: {
+    fontSize: 14,
+    color: '#FF6B6B',
+    fontWeight: '600',
+  },
+  albumPhotoDeleteButtonTextDisabled: {
+    color: 'rgba(255, 107, 107, 0.5)',
+  },
+  // Photo Selection Overlay
+  photoSelectionOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 12,
+  },
+  photoSelectionOverlaySelected: {
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  photoSelectionCheck: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#007AFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Mission Photos Picker Header (reused in month modal style)
+  missionPickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.lg,
+    paddingTop: 32,
+    paddingBottom: SPACING.lg,
+  },
+  missionPickerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: COLORS.white,
+    flex: 1,
+    textAlign: 'center',
+  },
+  missionPickerItemDisabled: {
+    opacity: 0.4,
+  },
+  missionPickerItemOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  missionPickerSelectedOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  missionPickerCheckBadge: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#007AFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  missionPickerEmpty: {
+    flex: 1,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  missionPickerEmptyText: {
+    fontSize: 15,
+    color: 'rgba(255, 255, 255, 0.5)',
+  },
+  missionPickerHeaderButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    minWidth: 50,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 100,
+  },
+  missionPickerHeaderButtonText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.9)',
+  },
+  missionPickerDoneButton: {
+    color: '#007AFF',
+    fontWeight: '600',
+  },
+  missionPickerDoneButtonDisabled: {
+    color: 'rgba(0, 122, 255, 0.4)',
+  },
+  missionPickerItemSelected: {
+    backgroundColor: 'rgba(236, 72, 153, 0.7)',
+    borderWidth: 3,
+    borderColor: '#EC4899',
+  },
+
+});
