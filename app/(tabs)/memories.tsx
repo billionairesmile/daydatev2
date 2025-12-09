@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -16,61 +16,31 @@ import {
   Platform,
   TouchableWithoutFeedback,
   Alert,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
+  LayoutChangeEvent,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
-import { ChevronDown, MapPin, Clock, X, Plus, ImageIcon, RefreshCw, BookHeart, MoreHorizontal, Edit2, Trash2, Check } from 'lucide-react-native';
+import * as MediaLibrary from 'expo-media-library';
+import { Paths, File as ExpoFile } from 'expo-file-system';
+import { ChevronDown, MapPin, Clock, X, Plus, ImageIcon, RefreshCw, BookHeart, MoreHorizontal, Edit2, Trash2, Check, Download } from 'lucide-react-native';
 import { useFonts } from 'expo-font';
-import { Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
-import { PlayfairDisplay_400Regular, PlayfairDisplay_700Bold } from '@expo-google-fonts/playfair-display';
-import { DancingScript_400Regular, DancingScript_700Bold } from '@expo-google-fonts/dancing-script';
-import { Pacifico_400Regular } from '@expo-google-fonts/pacifico';
-import { Lobster_400Regular } from '@expo-google-fonts/lobster';
-import { Oswald_400Regular, Oswald_700Bold } from '@expo-google-fonts/oswald';
-import { Merriweather_400Regular, Merriweather_700Bold } from '@expo-google-fonts/merriweather';
-import { Lora_400Regular, Lora_700Bold } from '@expo-google-fonts/lora';
-import { PTSerif_400Regular, PTSerif_700Bold } from '@expo-google-fonts/pt-serif';
-import { Bitter_400Regular, Bitter_700Bold } from '@expo-google-fonts/bitter';
-import { Raleway_400Regular, Raleway_700Bold } from '@expo-google-fonts/raleway';
-import { RobotoSlab_400Regular, RobotoSlab_700Bold } from '@expo-google-fonts/roboto-slab';
-import { CrimsonText_400Regular, CrimsonText_700Bold } from '@expo-google-fonts/crimson-text';
-import { LibreBaskerville_400Regular, LibreBaskerville_700Bold } from '@expo-google-fonts/libre-baskerville';
-import { EBGaramond_400Regular, EBGaramond_700Bold } from '@expo-google-fonts/eb-garamond';
-import { Cormorant_400Regular, Cormorant_700Bold } from '@expo-google-fonts/cormorant';
-import { Spectral_400Regular, Spectral_700Bold } from '@expo-google-fonts/spectral';
-import { Vollkorn_400Regular, Vollkorn_700Bold } from '@expo-google-fonts/vollkorn';
-import { Arvo_400Regular, Arvo_700Bold } from '@expo-google-fonts/arvo';
-import { PermanentMarker_400Regular } from '@expo-google-fonts/permanent-marker';
-import { SpecialElite_400Regular } from '@expo-google-fonts/special-elite';
-import { RockSalt_400Regular } from '@expo-google-fonts/rock-salt';
-import { ShadowsIntoLight_400Regular } from '@expo-google-fonts/shadows-into-light';
-import { IndieFlower_400Regular } from '@expo-google-fonts/indie-flower';
-import { AmaticSC_400Regular, AmaticSC_700Bold } from '@expo-google-fonts/amatic-sc';
-import { CabinSketch_400Regular, CabinSketch_700Bold } from '@expo-google-fonts/cabin-sketch';
-import { Caveat_400Regular, Caveat_700Bold } from '@expo-google-fonts/caveat';
-import { Kalam_400Regular, Kalam_700Bold } from '@expo-google-fonts/kalam';
-import { PatrickHand_400Regular } from '@expo-google-fonts/patrick-hand';
-// Korean fonts for proper Korean text support
-import { NotoSansKR_400Regular, NotoSansKR_700Bold } from '@expo-google-fonts/noto-sans-kr';
-import { NanumGothic_400Regular, NanumGothic_700Bold } from '@expo-google-fonts/nanum-gothic';
-import { NanumMyeongjo_400Regular, NanumMyeongjo_700Bold } from '@expo-google-fonts/nanum-myeongjo';
-import { GothicA1_400Regular, GothicA1_700Bold } from '@expo-google-fonts/gothic-a1';
-import { DoHyeon_400Regular } from '@expo-google-fonts/do-hyeon';
 import { Jua_400Regular } from '@expo-google-fonts/jua';
-import { BlackHanSans_400Regular } from '@expo-google-fonts/black-han-sans';
-import { Sunflower_300Light, Sunflower_500Medium, Sunflower_700Bold } from '@expo-google-fonts/sunflower';
-import { GamjaFlower_400Regular } from '@expo-google-fonts/gamja-flower';
-import { PoorStory_400Regular } from '@expo-google-fonts/poor-story';
-import { SingleDay_400Regular } from '@expo-google-fonts/single-day';
-import { CuteFont_400Regular } from '@expo-google-fonts/cute-font';
-import { HiMelody_400Regular } from '@expo-google-fonts/hi-melody';
-import { Gaegu_300Light, Gaegu_400Regular, Gaegu_700Bold } from '@expo-google-fonts/gaegu';
-import { EastSeaDokdo_400Regular } from '@expo-google-fonts/east-sea-dokdo';
+import ReanimatedModule, {
+  useSharedValue,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  interpolate,
+  Extrapolation,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
 
 import { COLORS, SPACING } from '@/constants/design';
-import { SAMPLE_MEMORIES } from '@/stores/memoryStore';
+import { useMemoryStore, SAMPLE_MEMORIES } from '@/stores/memoryStore';
 import { useBackground } from '@/contexts';
 import type { CompletedMission } from '@/types';
 import { RansomText } from '@/components/ransom';
@@ -84,133 +54,11 @@ interface Album {
   name: string;
   coverPhoto: string | null;
   createdAt: Date;
-  charStyles: CharStyle[]; // Legacy: kept for backward compatibility
   namePosition: { x: number; y: number }; // Position for draggable text overlay
   textScale: number; // Overall text scale (0.5 - 1.5)
   fontStyle: FontStyleType; // 'basic' for Jua, 'ransom' for image-based ransom style
   ransomSeed?: number; // Seed for consistent ransom text image selection
 }
-
-interface CharStyle {
-  fontFamily: string;
-  backgroundColor: string;
-  rotation: number;
-  paperStyle: number;
-  sizeScale: number; // Individual character size variation (0.85 - 1.15)
-  paddingVariant: number; // Padding variation index (0-4)
-  skewX: number; // Horizontal skew for torn effect (-3 to 3)
-  isCircle: boolean; // Whether to use circular shape
-  yOffset: number; // Vertical offset for organic baseline variation (-2 to 2)
-  shadowDepth: number; // Shadow intensity variation (0-3)
-  letterSpacing: number; // Individual letter spacing adjustment (-1 to 1)
-}
-
-// Seeded random number generator for consistent style generation
-const seededRandom = (seed: number): number => {
-  const x = Math.sin(seed * 9999) * 10000;
-  return x - Math.floor(x);
-};
-
-// Generate unique seed from character and index
-const getCharSeed = (char: string, index: number, baseSeed?: number): number => {
-  const charCode = char.charCodeAt(0);
-  return (baseSeed || Date.now()) + charCode * 100 + index * 13;
-};
-
-// Korean font families - decorative fonts for ransom style
-const KOREAN_FONT_FAMILIES = [
-  'DoHyeon_400Regular',
-  'Jua_400Regular',
-  'BlackHanSans_400Regular',
-  'GamjaFlower_400Regular',
-  'PoorStory_400Regular',
-  'SingleDay_400Regular',
-  'CuteFont_400Regular',
-  'HiMelody_400Regular',
-  'Gaegu_300Light',
-  'Gaegu_400Regular',
-  'Gaegu_700Bold',
-  'EastSeaDokdo_400Regular',
-  'NanumMyeongjo_700Bold',
-];
-
-// English/Latin font families - decorative fonts for ransom style
-const ENGLISH_FONT_FAMILIES = [
-  // Handwriting & Script
-  'DancingScript_400Regular',
-  'DancingScript_700Bold',
-  'Pacifico_400Regular',
-  'IndieFlower_400Regular',
-  'Kalam_400Regular',
-  'Kalam_700Bold',
-  'PatrickHand_400Regular',
-  'ShadowsIntoLight_400Regular',
-  'Caveat_400Regular',
-  'Caveat_700Bold',
-  // Bold & Display
-  'Lobster_400Regular',
-  'PermanentMarker_400Regular',
-  // Decorative & Unique
-  'SpecialElite_400Regular',
-  'RockSalt_400Regular',
-  'AmaticSC_400Regular',
-  'AmaticSC_700Bold',
-  'CabinSketch_400Regular',
-  'CabinSketch_700Bold',
-  // Elegant
-  'PlayfairDisplay_700Bold',
-  'Arvo_700Bold',
-];
-
-// Check if a character is Korean
-const isKorean = (char: string) => {
-  const code = char.charCodeAt(0);
-  return (code >= 0xAC00 && code <= 0xD7AF) || // Hangul Syllables
-    (code >= 0x1100 && code <= 0x11FF) || // Hangul Jamo
-    (code >= 0x3130 && code <= 0x318F);   // Hangul Compatibility Jamo
-};
-
-// Pastel background colors (forced theme)
-const PASTEL_COLORS = [
-  '#FFE4E1', '#FFB6C1', '#FFC0CB', // Pink pastel
-  '#E6E6FA', '#D8BFD8', '#DDA0DD', // Purple pastel
-  '#B0E0E6', '#ADD8E6', '#87CEEB', // Blue pastel
-  '#98FB98', '#90EE90', '#8FBC8F', // Green pastel
-  '#FFFACD', '#FAFAD2', '#FFFFE0', // Yellow pastel
-  '#FFDAB9', '#FFE4B5', '#FFEFD5', // Orange pastel
-  '#FFF8E7', '#F5F5DC', '#FFFEF0', // Cream
-];
-
-// Paper texture styles (0-9: torn paper, 10-14: circles)
-const PAPER_STYLES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
-
-// Shape types: 'rect' for torn paper, 'circle' for round badges
-const PAPER_SHAPES: ('rect' | 'circle')[] = [
-  'rect', 'rect', 'rect', 'rect', 'rect', // 0-4: rectangles
-  'rect', 'rect', 'rect', 'rect', 'rect', // 5-9: rectangles
-  'circle', 'circle', 'circle', 'circle', 'circle', // 10-14: circles
-];
-
-// Rotations optimized for authentic ransom note look (-7 to 7 degrees - more subtle)
-const RANSOM_ROTATIONS = [-7, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 7];
-
-// Individual character size variations for organic look
-const SIZE_SCALES = [0.88, 0.92, 0.96, 1.0, 1.04, 1.08, 1.12];
-
-// Padding variants for different paper sizes
-const PADDING_VARIANTS = [0, 1, 2, 3, 4];
-
-// Skew values for torn paper effect (more subtle)
-const SKEW_VALUES = [-2.5, -1.5, -0.5, 0, 0.5, 1.5, 2.5];
-
-// Vertical offset values for organic baseline variation
-const Y_OFFSETS = [-2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2];
-
-// Shadow depth variations (0 = none, 1 = subtle, 2 = medium, 3 = strong)
-const SHADOW_DEPTHS = [0, 1, 1, 2, 2, 2, 3];
-
-// Letter spacing adjustments for natural spacing
-const LETTER_SPACINGS = [-1, -0.5, 0, 0, 0.5, 1];
 
 const { width, height } = Dimensions.get('window');
 
@@ -235,87 +83,14 @@ interface MonthData {
 
 export default function MemoriesScreen() {
   const { backgroundImage } = useBackground();
+  const { memories } = useMemoryStore();
   const [selectedMonth, setSelectedMonth] = useState<MonthData | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<MemoryType | null>(null);
   const [showYearPicker, setShowYearPicker] = useState<string | null>(null);
 
-  // Load all fonts (English + Korean)
+  // Load fonts
   const [fontsLoaded] = useFonts({
-    // English fonts
-    Inter_400Regular,
-    Inter_700Bold,
-    PlayfairDisplay_400Regular,
-    PlayfairDisplay_700Bold,
-    DancingScript_400Regular,
-    DancingScript_700Bold,
-    Pacifico_400Regular,
-    Lobster_400Regular,
-    Oswald_400Regular,
-    Oswald_700Bold,
-    Merriweather_400Regular,
-    Merriweather_700Bold,
-    Lora_400Regular,
-    Lora_700Bold,
-    PTSerif_400Regular,
-    PTSerif_700Bold,
-    Bitter_400Regular,
-    Bitter_700Bold,
-    Raleway_400Regular,
-    Raleway_700Bold,
-    RobotoSlab_400Regular,
-    RobotoSlab_700Bold,
-    CrimsonText_400Regular,
-    CrimsonText_700Bold,
-    LibreBaskerville_400Regular,
-    LibreBaskerville_700Bold,
-    EBGaramond_400Regular,
-    EBGaramond_700Bold,
-    Cormorant_400Regular,
-    Cormorant_700Bold,
-    Spectral_400Regular,
-    Spectral_700Bold,
-    Vollkorn_400Regular,
-    Vollkorn_700Bold,
-    Arvo_400Regular,
-    Arvo_700Bold,
-    PermanentMarker_400Regular,
-    SpecialElite_400Regular,
-    RockSalt_400Regular,
-    ShadowsIntoLight_400Regular,
-    IndieFlower_400Regular,
-    AmaticSC_400Regular,
-    AmaticSC_700Bold,
-    CabinSketch_400Regular,
-    CabinSketch_700Bold,
-    Caveat_400Regular,
-    Caveat_700Bold,
-    Kalam_400Regular,
-    Kalam_700Bold,
-    PatrickHand_400Regular,
-    // Korean fonts
-    NotoSansKR_400Regular,
-    NotoSansKR_700Bold,
-    NanumGothic_400Regular,
-    NanumGothic_700Bold,
-    NanumMyeongjo_400Regular,
-    NanumMyeongjo_700Bold,
-    GothicA1_400Regular,
-    GothicA1_700Bold,
-    DoHyeon_400Regular,
     Jua_400Regular,
-    BlackHanSans_400Regular,
-    Sunflower_300Light,
-    Sunflower_500Medium,
-    Sunflower_700Bold,
-    GamjaFlower_400Regular,
-    PoorStory_400Regular,
-    SingleDay_400Regular,
-    CuteFont_400Regular,
-    HiMelody_400Regular,
-    Gaegu_300Light,
-    Gaegu_400Regular,
-    Gaegu_700Bold,
-    EastSeaDokdo_400Regular,
   });
 
   // Album creation states
@@ -324,7 +99,6 @@ export default function MemoriesScreen() {
   const [albumCoverPhoto, setAlbumCoverPhoto] = useState<string | null>(null);
   const [albums, setAlbums] = useState<Album[]>([]);
   const [albumStep, setAlbumStep] = useState<'fontStyle' | 'name' | 'cover'>('fontStyle'); // Start with font selection
-  const [charStyles, setCharStyles] = useState<CharStyle[]>([]);
   const [namePosition, setNamePosition] = useState({ x: 30, y: 16 }); // Default position (past 24px book spine)
   const [textScale, setTextScale] = useState(1.0); // Overall text scale (0.5 - 1.5)
   const [fontStyle, setFontStyle] = useState<FontStyleType>(null); // No style selected by default
@@ -350,7 +124,6 @@ export default function MemoriesScreen() {
   const [editAlbumName, setEditAlbumName] = useState('');
   const [editAlbumStep, setEditAlbumStep] = useState<'fontStyle' | 'name' | 'cover'>('fontStyle');
   const [editFontStyle, setEditFontStyle] = useState<FontStyleType>(null);
-  const [editCharStyles, setEditCharStyles] = useState<CharStyle[]>([]);
   const [editRansomSeed, setEditRansomSeed] = useState<number>(() => Math.floor(Math.random() * 1000000));
   const [editCoverPhoto, setEditCoverPhoto] = useState<string | null>(null);
   const [editTextPosition, setEditTextPosition] = useState({ x: 30, y: 16 });
@@ -363,6 +136,16 @@ export default function MemoriesScreen() {
   const editAlbumNameRef = useRef(editAlbumName);
   const editFontStyleRef = useRef(editFontStyle);
   const editTextScaleRef = useRef(editTextScale);
+
+  // Combine store memories with SAMPLE_MEMORIES (store memories take priority)
+  const allMemories = React.useMemo(() => {
+    // Get IDs of memories from store that are NOT from SAMPLE_MEMORIES
+    const storeOnlyMemories = memories.filter(
+      (m) => !SAMPLE_MEMORIES.some((s) => s.id === m.id)
+    );
+    // Combine: store-only memories first, then SAMPLE_MEMORIES
+    return [...storeOnlyMemories, ...SAMPLE_MEMORIES];
+  }, [memories]);
 
   // Keep refs in sync with state
   useEffect(() => { albumNameRef.current = albumName; }, [albumName]);
@@ -391,7 +174,7 @@ export default function MemoriesScreen() {
   const containerBounds = useRef({ width: MODAL_PREVIEW_WIDTH, height: MODAL_PREVIEW_WIDTH * 4 / 3 });
 
   // Handler to measure actual container dimensions
-  const handleContainerLayout = (event: any) => {
+  const handleContainerLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
     containerBounds.current = { width, height };
   };
@@ -407,6 +190,23 @@ export default function MemoriesScreen() {
     const spaceWidth = isRansom ? 8 : 6;
     const baseWidth = (charCount * charWidth + spaceCount * spaceWidth) * scale;
     return baseWidth + 12; // Small margin for safety
+  };
+
+  // Helper function to wrap text for RansomText preview (prevents overflow)
+  // 띄어쓰기 제거하고 8글자마다 줄바꿈
+  const wrapLongWordsForRansom = (text: string, maxChars: number = 8): string => {
+    // 띄어쓰기 제거
+    const textWithoutSpaces = text.replace(/\s/g, '');
+
+    // 8글자 이하면 그대로 반환
+    if (textWithoutSpaces.length <= maxChars) return textWithoutSpaces;
+
+    // 8글자씩 분할하여 공백으로 연결 (RansomText가 자동 줄바꿈)
+    const chunks = [];
+    for (let i = 0; i < textWithoutSpaces.length; i += maxChars) {
+      chunks.push(textWithoutSpaces.slice(i, i + maxChars));
+    }
+    return chunks.join(' ');
   };
 
   // PanResponder for dragging text position (constrained within photo bounds)
@@ -587,7 +387,7 @@ export default function MemoriesScreen() {
   };
 
   // Filter only completed missions (both users have written messages)
-  const completedMemories = SAMPLE_MEMORIES.filter(
+  const completedMemories = allMemories.filter(
     (memory) => memory.user1Message && memory.user2Message && memory.photoUrl
   );
 
@@ -602,75 +402,19 @@ export default function MemoriesScreen() {
     return monthNames[parseInt(monthNumber) - 1];
   };
 
-  // Generate ransom note style for each character (picks Korean or English font based on char)
-  const generateCharStyle = (char: string): CharStyle => {
-    const fontFamilies = isKorean(char) ? KOREAN_FONT_FAMILIES : ENGLISH_FONT_FAMILIES;
-    const paperStyleIndex = Math.floor(Math.random() * PAPER_STYLES.length);
-    const isCircle = PAPER_SHAPES[paperStyleIndex] === 'circle';
-    return {
-      fontFamily: fontFamilies[Math.floor(Math.random() * fontFamilies.length)],
-      backgroundColor: PASTEL_COLORS[Math.floor(Math.random() * PASTEL_COLORS.length)],
-      rotation: isCircle ? 0 : RANSOM_ROTATIONS[Math.floor(Math.random() * RANSOM_ROTATIONS.length)],
-      paperStyle: paperStyleIndex,
-      sizeScale: SIZE_SCALES[Math.floor(Math.random() * SIZE_SCALES.length)],
-      paddingVariant: PADDING_VARIANTS[Math.floor(Math.random() * PADDING_VARIANTS.length)],
-      skewX: isCircle ? 0 : SKEW_VALUES[Math.floor(Math.random() * SKEW_VALUES.length)],
-      isCircle,
-    };
-  };
-
-  // Update char styles when album name changes
+  // Update album name (filter to English only for ransom style)
   const handleAlbumNameChange = (text: string) => {
     // Filter to only allow English letters, numbers, and spaces when ransom style is selected
     const filteredText = fontStyle === 'ransom'
       ? text.replace(/[^a-zA-Z0-9\s]/g, '')
       : text;
     setAlbumName(filteredText);
-    // Generate new styles for new characters, keeping existing styles for unchanged positions
-    const newStyles: CharStyle[] = [];
-    for (let i = 0; i < filteredText.length; i++) {
-      if (i < charStyles.length && filteredText[i] !== ' ') {
-        // Keep existing style if we have one and character isn't a space
-        newStyles.push(charStyles[i]);
-      } else if (filteredText[i] !== ' ') {
-        // Generate new style for new character
-        newStyles.push(generateCharStyle(filteredText[i]));
-      } else {
-        // For spaces, use a placeholder style
-        newStyles.push({
-          fontFamily: 'Inter_400Regular',
-          backgroundColor: 'transparent',
-          rotation: 0,
-          paperStyle: 0,
-          sizeScale: 1,
-          paddingVariant: 0,
-          skewX: 0,
-          isCircle: false,
-        });
-      }
-    }
-    setCharStyles(newStyles);
   };
 
-  // Regenerate all character styles (refresh button)
+  // Regenerate ransom style with new seed
   const regenerateStyles = () => {
     if (albumName.length > 0 && fontStyle === 'ransom') {
-      const newStyles: CharStyle[] = albumName.split('').map((char) => {
-        if (char === ' ') {
-          return {
-            fontFamily: 'Inter_400Regular',
-            backgroundColor: 'transparent',
-            rotation: 0,
-            paperStyle: 0,
-            sizeScale: 1,
-            paddingVariant: 0,
-            skewX: 0,
-            isCircle: false,
-          };
-        }
-        return generateCharStyle(char);
-      });
-      setCharStyles(newStyles);
+      setRansomSeed(Math.floor(Math.random() * 1000000));
     }
   };
 
@@ -778,7 +522,6 @@ export default function MemoriesScreen() {
         name: albumName.trim(),
         coverPhoto: albumCoverPhoto,
         createdAt: new Date(),
-        charStyles: [...charStyles],
         namePosition: { ...namePosition },
         textScale: textScale,
         fontStyle: fontStyle,
@@ -803,7 +546,6 @@ export default function MemoriesScreen() {
         setAlbumName('');
         setAlbumCoverPhoto(null);
         setAlbumStep('fontStyle'); // Reset to font selection
-        setCharStyles([]);
         setNamePosition({ x: 30, y: 16 }); // Reset position (past 24px book spine)
         panPosition.setValue({ x: 30, y: 16 }); // Reset animated position
         setTextScale(1.0); // Reset text scale
@@ -843,7 +585,6 @@ export default function MemoriesScreen() {
     setAlbumStep('fontStyle'); // Start with font selection
     setAlbumName('');
     setAlbumCoverPhoto(null);
-    setCharStyles([]);
     setNamePosition({ x: 30, y: 16 }); // Reset position (past 24px book spine)
     panPosition.setValue({ x: 30, y: 16 }); // Reset animated position
     setTextScale(1.0); // Reset text scale
@@ -885,7 +626,6 @@ export default function MemoriesScreen() {
       setAlbumName('');
       setAlbumCoverPhoto(null);
       setAlbumStep('fontStyle');
-      setCharStyles([]);
       setNamePosition({ x: 30, y: 16 });
       panPosition.setValue({ x: 30, y: 16 });
       setTextScale(1.0);
@@ -1006,54 +746,19 @@ export default function MemoriesScreen() {
     })
   ).current;
 
-  // Update edit char styles when album name changes
+  // Update edit album name (filter to English only for ransom style)
   const handleEditAlbumNameChange = (text: string) => {
     // Filter to only allow English letters, numbers, and spaces when ransom style is selected
     const filteredText = editFontStyle === 'ransom'
       ? text.replace(/[^a-zA-Z0-9\s]/g, '')
       : text;
     setEditAlbumName(filteredText);
-    const newStyles: CharStyle[] = [];
-    for (let i = 0; i < filteredText.length; i++) {
-      if (i < editCharStyles.length && filteredText[i] !== ' ') {
-        newStyles.push(editCharStyles[i]);
-      } else if (filteredText[i] !== ' ') {
-        newStyles.push(generateCharStyle(filteredText[i]));
-      } else {
-        newStyles.push({
-          fontFamily: 'Inter_400Regular',
-          backgroundColor: 'transparent',
-          rotation: 0,
-          paperStyle: 0,
-          sizeScale: 1,
-          paddingVariant: 0,
-          skewX: 0,
-          isCircle: false,
-        });
-      }
-    }
-    setEditCharStyles(newStyles);
   };
 
-  // Regenerate edit char styles (refresh button)
+  // Regenerate edit ransom style with new seed
   const regenerateEditStyles = () => {
     if (editAlbumName.length > 0 && editFontStyle === 'ransom') {
-      const newStyles: CharStyle[] = editAlbumName.split('').map((char) => {
-        if (char === ' ') {
-          return {
-            fontFamily: 'Inter_400Regular',
-            backgroundColor: 'transparent',
-            rotation: 0,
-            paperStyle: 0,
-            sizeScale: 1,
-            paddingVariant: 0,
-            skewX: 0,
-            isCircle: false,
-          };
-        }
-        return generateCharStyle(char);
-      });
-      setEditCharStyles(newStyles);
+      setEditRansomSeed(Math.floor(Math.random() * 1000000));
     }
   };
 
@@ -1064,7 +769,6 @@ export default function MemoriesScreen() {
         ...selectedAlbum,
         name: editAlbumName.trim(),
         coverPhoto: editCoverPhoto,
-        charStyles: [...editCharStyles],
         namePosition: { ...editTextPosition },
         textScale: editTextScale,
         fontStyle: editFontStyle,
@@ -1092,11 +796,12 @@ export default function MemoriesScreen() {
       {/* Background Image */}
       <ImageBackground
         source={backgroundImage}
+        defaultSource={require('@/assets/images/backgroundimage.png')}
         style={styles.backgroundImage}
+        imageStyle={styles.backgroundImageStyle}
         blurRadius={40}
-      >
-        <View style={styles.backgroundScale} />
-      </ImageBackground>
+      />
+      <View style={styles.overlay} />
 
       {/* Header */}
       <View style={styles.header}>
@@ -1413,396 +1118,396 @@ export default function MemoriesScreen() {
       >
         <Animated.View style={[styles.albumModalFadeWrapper, { opacity: albumModalOpacityAnim }]}>
           <BlurView intensity={80} tint="dark" style={styles.albumModalContainer}>
-              <TouchableWithoutFeedback onPress={closeAlbumModal}>
-                <View style={styles.albumModalBackdrop} />
-              </TouchableWithoutFeedback>
-              <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={styles.keyboardAvoidingView}
-              >
-                <Animated.View
-                  style={[
-                    styles.albumModalContent,
-                    {
-                      transform: [{ scale: albumModalScaleAnim }],
-                    },
-                  ]}
-                >
-              {/* Header */}
-              <View style={styles.albumModalHeader}>
-                <Text style={styles.albumModalTitle}>
-                  {albumStep === 'fontStyle' ? '폰트 스타일' : albumStep === 'name' ? '앨범 이름' : '대표 사진'}
-                </Text>
-                <Pressable
-                  style={styles.albumModalCloseButton}
-                  onPress={closeAlbumModal}
-                >
-                  <X color="rgba(255,255,255,0.8)" size={20} />
-                </Pressable>
-              </View>
-              <View style={styles.albumModalHeaderDivider} />
-
-              <Animated.View style={{ opacity: stepOpacityAnim }}>
-              {albumStep === 'fontStyle' ? (
-                <>
-                  {/* Step 0: Font Style Selection */}
-                  <Text style={styles.albumModalSubtitle}>
-                    앨범 제목에 사용할 폰트 스타일을 선택하세요
-                  </Text>
-
-                  <View style={styles.fontStyleOptions}>
-                    {/* Basic Font Option */}
-                    <Pressable
-                      style={[
-                        styles.fontStyleOption,
-                        fontStyle === 'basic' && styles.fontStyleOptionSelected,
-                      ]}
-                      onPress={() => setFontStyle('basic')}
-                    >
-                      <Text style={styles.fontStylePreviewBasic}>기본폰트</Text>
-                      <Text style={styles.fontStyleLabel}>깔끔한 스타일</Text>
-                    </Pressable>
-
-                    {/* Ransom Font Option */}
-                    <Pressable
-                      style={[
-                        styles.fontStyleOption,
-                        fontStyle === 'ransom' && styles.fontStyleOptionSelected,
-                      ]}
-                      onPress={() => {
-                        setFontStyle('ransom');
-                        // Clear text if it contains Korean characters (not supported in ransom style)
-                        if (/[가-힣ㄱ-ㅎㅏ-ㅣ]/.test(albumName)) {
-                          setAlbumName('');
-                        }
-                      }}
-                    >
-                      <View style={styles.fontStylePreviewRansom}>
-                        <RansomText
-                          text="FONT"
-                          seed={12345}
-                          characterSize={28}
-                          spacing={-4}
-                          enableRotation={true}
-                          enableYOffset={true}
-                        />
-                      </View>
-                      <Text style={styles.fontStyleLabel}>랜섬노트 스타일</Text>
-                    </Pressable>
-                  </View>
-
-                  <Pressable
-                    style={[
-                      styles.albumModalButton,
-                      { width: '100%' },
-                      !fontStyle && styles.albumModalButtonDisabled,
-                    ]}
-                    onPress={() => transitionToNextStep('name')}
-                    disabled={!fontStyle}
-                  >
-                    <Text style={styles.albumModalButtonText}>다음</Text>
-                  </Pressable>
-                </>
-              ) : albumStep === 'name' ? (
-                <>
-                  {/* Step 1: Album Name Input */}
-                  <Text style={styles.albumModalSubtitle}>
-                    {fontStyle === 'basic' ? '깔끔한 폰트가 적용됩니다' : '입력하는 글자마다 특별한 스타일이 적용됩니다'}
-                  </Text>
-
-                  {/* Text Preview - Basic or Ransom Style */}
-                  <View style={styles.ransomPreviewContainer}>
-                    {albumName.length > 0 ? (
-                      fontStyle === 'basic' ? (
-                        // Basic Jua Font Style - Clean text without paper backgrounds
-                        <Text style={styles.basicFontPreview}>{albumName}</Text>
-                      ) : (
-                        // Ransom Style - Image-based character rendering
-                        <RansomText
-                          text={albumName}
-                          seed={ransomSeed}
-                          characterSize={36}
-                          spacing={-4}
-                          enableRotation={true}
-                          enableYOffset={true}
-                        />
-                      )
-                    ) : (
-                      <Text style={[styles.ransomPlaceholder, fontStyle === 'basic' && { fontFamily: 'Jua_400Regular' }]}>앨범 이름</Text>
-                    )}
-                    {/* Refresh Button for Ransom Style */}
-                    {fontStyle === 'ransom' && albumName.length > 0 && (
-                      <Pressable
-                        style={styles.refreshButton}
-                        onPress={() => setRansomSeed(Math.floor(Math.random() * 1000000))}
-                      >
-                        <RefreshCw color="rgba(255, 255, 255, 0.6)" size={18} />
-                      </Pressable>
-                    )}
-                  </View>
-
-                  {/* Text Input */}
-                  <TextInput
-                    style={styles.albumNameInput}
-                    value={albumName}
-                    onChangeText={handleAlbumNameChange}
-                    placeholder={fontStyle === 'ransom' ? "영어만 입력 가능 (A-Z, 0-9)" : "앨범 이름 입력..."}
-                    placeholderTextColor="rgba(255,255,255,0.4)"
-                    maxLength={20}
-                    autoFocus
-                  />
-
-                  {/* Button Row */}
-                  <View style={styles.albumModalButtonRow}>
-                    <Pressable
-                      style={styles.albumModalButtonSecondary}
-                      onPress={() => transitionToNextStep('fontStyle')}
-                    >
-                      <Text style={styles.albumModalButtonSecondaryText}>이전</Text>
-                    </Pressable>
-                    <Pressable
-                      style={[
-                        styles.albumModalButton,
-                        !albumName.trim() && styles.albumModalButtonDisabled,
-                      ]}
-                      onPress={goToNextStep}
-                      disabled={!albumName.trim()}
-                    >
-                      <Text style={styles.albumModalButtonText}>다음</Text>
-                    </Pressable>
-                  </View>
-                </>
-              ) : (
-                <>
-                  {/* Step 2: Cover Photo Selection with Draggable Text */}
-                  <Text style={styles.albumModalSubtitle}>
-                    사진을 선택하고 문구 위치를 드래그해서 조정하세요
-                  </Text>
-
-                  {/* Cover Photo Preview with Draggable Text */}
-                  <View style={styles.coverPhotoContainer}>
-                    <View style={styles.coverPhotoPickerContainer} onLayout={handleContainerLayout}>
-                      {/* Book Spine - Inward Curve Effect */}
-                      <LinearGradient
-                        colors={['rgba(0, 0, 0, 0.65)', 'rgba(0, 0, 0, 0.35)', 'rgba(0, 0, 0, 0.12)', 'rgba(255, 255, 255, 0.08)', 'transparent']}
-                        locations={[0, 0.25, 0.55, 0.8, 1]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={styles.modalBookSpineCurve}
-                      />
-
-                      <Pressable
-                        style={styles.coverPhotoInner}
-                        onPress={handlePickCoverPhoto}
-                      >
-                        {albumCoverPhoto ? (
-                          <Image
-                            source={{ uri: albumCoverPhoto }}
-                            style={styles.coverPhotoPreview}
-                            resizeMode="cover"
-                          />
-                        ) : (
-                          <View style={styles.coverPhotoPlaceholder}>
-                            <Plus color="rgba(255,255,255,0.6)" size={40} />
-                            <Text style={styles.coverPhotoPlaceholderText}>사진 선택</Text>
-                          </View>
-                        )}
-                      </Pressable>
-
-                      {/* Draggable Album Name Overlay */}
-                      {albumCoverPhoto && (
-                        <Animated.View
-                          {...panResponder.panHandlers}
-                          style={[
-                            styles.draggableTextOverlay,
-                            {
-                              transform: [
-                                { translateX: panPosition.x },
-                                { translateY: panPosition.y },
-                              ],
-                            },
-                          ]}
-                        >
-                          {fontStyle === 'basic' ? (
-                            // Basic Jua Font Style
-                            <Text style={[
-                              styles.basicFontOverlay,
-                              {
-                                fontSize: 16 * textScale,
-                                color: textColor === 'black' ? '#000000' : COLORS.white,
-                              }
-                            ]}>{albumName}</Text>
-                          ) : (
-                            // Ransom Style - Image-based
-                            <RansomText
-                              text={albumName}
-                              seed={ransomSeed}
-                              characterSize={18 * textScale}
-                              spacing={-4}
-                              enableRotation={true}
-                              enableYOffset={true}
-                            />
-                          )}
-                        </Animated.View>
-                      )}
-                    </View>
-                  </View>
-
-                  {/* Drag instruction */}
-                  {albumCoverPhoto && (
-                    <Text style={styles.dragHintText}>문구를 드래그하여 위치를 조정하세요</Text>
-                  )}
-
-                  {/* Text Style Selection - Different UI based on font style */}
-                  {albumCoverPhoto && fontStyle === 'basic' && (
-                    <View style={styles.textStyleSelectionContainer}>
-                      {/* Color Selection (Left) */}
-                      <View style={styles.colorSelectionSection}>
-                        <Text style={styles.selectionLabel}>색상</Text>
-                        <View style={styles.colorButtonRow}>
-                          <Pressable
-                            style={[
-                              styles.colorButton,
-                              { backgroundColor: '#000000' },
-                              textColor === 'black' && styles.colorButtonSelected,
-                            ]}
-                            onPress={() => setTextColor('black')}
-                          />
-                          <Pressable
-                            style={[
-                              styles.colorButton,
-                              { backgroundColor: '#FFFFFF' },
-                              textColor === 'white' && styles.colorButtonSelected,
-                            ]}
-                            onPress={() => setTextColor('white')}
-                          />
-                        </View>
-                      </View>
-
-                      {/* Size Selection (Right) */}
-                      <View style={styles.sizeSelectionSection}>
-                        <Text style={styles.selectionLabel}>크기</Text>
-                        <View style={styles.sizeButtonRow}>
-                          {[1.5, 2.25, 3.0].map((scale, index) => (
-                            <Pressable
-                              key={index}
-                              style={[
-                                styles.sizeButton,
-                                textScale === scale && styles.sizeButtonSelected,
-                              ]}
-                              onPress={() => setTextScale(scale)}
-                            >
-                              <Text style={[
-                                styles.sizeButtonText,
-                                { fontSize: 10 + index * 7 },
-                                textScale === scale && styles.sizeButtonTextSelected,
-                              ]}>A</Text>
-                            </Pressable>
-                          ))}
-                        </View>
-                      </View>
-                    </View>
-                  )}
-
-                  {/* Ransom Style - Size Only */}
-                  {albumCoverPhoto && fontStyle === 'ransom' && (
-                    <View style={styles.sizeSelectionContainer}>
-                      <Text style={styles.sizeSelectionLabel}>문구 크기</Text>
-                      <View style={styles.sizeButtonRow}>
-                        {[1.0, 1.5, 2.0].map((scale, index) => (
-                          <Pressable
-                            key={index}
-                            style={[
-                              styles.sizeButton,
-                              textScale === scale && styles.sizeButtonSelected,
-                            ]}
-                            onPress={() => setTextScale(scale)}
-                          >
-                            <Text style={[
-                              styles.sizeButtonText,
-                              { fontSize: 10 + index * 7 },
-                              textScale === scale && styles.sizeButtonTextSelected,
-                            ]}>A</Text>
-                          </Pressable>
-                        ))}
-                      </View>
-                    </View>
-                  )}
-
-                  {/* Action Buttons */}
-                  <View style={styles.albumModalButtonRow}>
-                    <Pressable
-                      style={styles.albumModalButtonSecondary}
-                      onPress={() => transitionToNextStep('name')}
-                    >
-                      <Text style={styles.albumModalButtonSecondaryText}>이전</Text>
-                    </Pressable>
-                    <Pressable
-                      style={[
-                        styles.albumModalButton,
-                        !albumCoverPhoto && styles.albumModalButtonDisabled
-                      ]}
-                      onPress={handleCreateAlbum}
-                      disabled={!albumCoverPhoto}
-                    >
-                      <Text style={[
-                        styles.albumModalButtonText,
-                        !albumCoverPhoto && styles.albumModalButtonTextDisabled
-                      ]}>완료</Text>
-                    </Pressable>
-                  </View>
-                </>
-              )}
-              </Animated.View>
-            </Animated.View>
-          </KeyboardAvoidingView>
-
-          {/* Cover Photo Picker Overlay */}
-          {showCoverPhotoPicker && (
-            <View style={styles.missionPickerOverlay}>
-              <Pressable
-                style={styles.monthModalBackdrop}
-                onPress={closeCoverPhotoPicker}
-              >
-                <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
-              </Pressable>
+            <TouchableWithoutFeedback onPress={closeAlbumModal}>
+              <View style={styles.albumModalBackdrop} />
+            </TouchableWithoutFeedback>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              style={styles.keyboardAvoidingView}
+            >
               <Animated.View
                 style={[
-                  styles.monthModalContent,
-                  { transform: [{ translateY: coverPickerSlideAnim }] }
+                  styles.albumModalContent,
+                  {
+                    transform: [{ scale: albumModalScaleAnim }],
+                  },
                 ]}
               >
-                <View style={styles.monthModalHeader}>
-                  <Text style={styles.monthModalTitle}>사진 선택</Text>
+                {/* Header */}
+                <View style={styles.albumModalHeader}>
+                  <Text style={styles.albumModalTitle}>
+                    {albumStep === 'fontStyle' ? '폰트 스타일' : albumStep === 'name' ? '앨범 이름' : '대표 사진'}
+                  </Text>
                   <Pressable
-                    style={styles.monthModalCloseButton}
-                    onPress={closeCoverPhotoPicker}
+                    style={styles.albumModalCloseButton}
+                    onPress={closeAlbumModal}
                   >
                     <X color="rgba(255,255,255,0.8)" size={20} />
                   </Pressable>
                 </View>
-                <ScrollView contentContainerStyle={styles.monthModalGrid}>
-                  {completedMemories.length === 0 ? (
-                    <View style={styles.missionPickerEmpty}>
-                      <Text style={styles.missionPickerEmptyText}>완료된 미션이 없습니다</Text>
-                    </View>
-                  ) : (
-                    completedMemories.map((mission) => (
+                <View style={styles.albumModalHeaderDivider} />
+
+                <Animated.View style={{ opacity: stepOpacityAnim }}>
+                  {albumStep === 'fontStyle' ? (
+                    <>
+                      {/* Step 0: Font Style Selection */}
+                      <Text style={styles.albumModalSubtitle}>
+                        앨범 제목에 사용할 폰트 스타일을 선택하세요
+                      </Text>
+
+                      <View style={styles.fontStyleOptions}>
+                        {/* Basic Font Option */}
+                        <Pressable
+                          style={[
+                            styles.fontStyleOption,
+                            fontStyle === 'basic' && styles.fontStyleOptionSelected,
+                          ]}
+                          onPress={() => setFontStyle('basic')}
+                        >
+                          <Text style={styles.fontStylePreviewBasic}>기본폰트</Text>
+                          <Text style={styles.fontStyleLabel}>깔끔한 스타일</Text>
+                        </Pressable>
+
+                        {/* Ransom Font Option */}
+                        <Pressable
+                          style={[
+                            styles.fontStyleOption,
+                            fontStyle === 'ransom' && styles.fontStyleOptionSelected,
+                          ]}
+                          onPress={() => {
+                            setFontStyle('ransom');
+                            // Clear text if it contains Korean characters (not supported in ransom style)
+                            if (/[가-힣ㄱ-ㅎㅏ-ㅣ]/.test(albumName)) {
+                              setAlbumName('');
+                            }
+                          }}
+                        >
+                          <View style={styles.fontStylePreviewRansom}>
+                            <RansomText
+                              text="FONT"
+                              seed={12345}
+                              characterSize={28}
+                              spacing={-4}
+                              enableRotation={true}
+                              enableYOffset={true}
+                            />
+                          </View>
+                          <Text style={styles.fontStyleLabel}>랜섬노트 스타일</Text>
+                        </Pressable>
+                      </View>
+
                       <Pressable
-                        key={mission.id}
-                        style={styles.monthModalItem}
-                        onPress={() => handleSelectCoverPhoto(mission.photoUrl)}
+                        style={[
+                          styles.albumModalButton,
+                          { width: '100%' },
+                          !fontStyle && styles.albumModalButtonDisabled,
+                        ]}
+                        onPress={() => transitionToNextStep('name')}
+                        disabled={!fontStyle}
                       >
-                        <View style={styles.monthModalItemInner}>
-                          <Image source={{ uri: mission.photoUrl }} style={styles.monthModalItemImage} />
-                        </View>
+                        <Text style={styles.albumModalButtonText}>다음</Text>
                       </Pressable>
-                    ))
+                    </>
+                  ) : albumStep === 'name' ? (
+                    <>
+                      {/* Step 1: Album Name Input */}
+                      <Text style={styles.albumModalSubtitle}>
+                        {fontStyle === 'basic' ? '깔끔한 폰트가 적용됩니다' : '입력하는 글자마다 특별한 스타일이 적용됩니다'}
+                      </Text>
+
+                      {/* Text Preview - Basic or Ransom Style */}
+                      <View style={styles.ransomPreviewContainer}>
+                        {albumName.length > 0 ? (
+                          fontStyle === 'basic' ? (
+                            // Basic Jua Font Style - Clean text without paper backgrounds
+                            <Text style={styles.basicFontPreview}>{albumName}</Text>
+                          ) : (
+                            // Ransom Style - Image-based character rendering
+                            <RansomText
+                              text={wrapLongWordsForRansom(albumName, 8)}
+                              seed={ransomSeed}
+                              characterSize={36}
+                              spacing={-4}
+                              enableRotation={true}
+                              enableYOffset={true}
+                            />
+                          )
+                        ) : (
+                          <Text style={[styles.ransomPlaceholder, fontStyle === 'basic' && { fontFamily: 'Jua_400Regular' }]}>앨범 이름</Text>
+                        )}
+                        {/* Refresh Button for Ransom Style */}
+                        {fontStyle === 'ransom' && albumName.length > 0 && (
+                          <Pressable
+                            style={styles.refreshButton}
+                            onPress={() => setRansomSeed(Math.floor(Math.random() * 1000000))}
+                          >
+                            <RefreshCw color="rgba(255, 255, 255, 0.6)" size={18} />
+                          </Pressable>
+                        )}
+                      </View>
+
+                      {/* Text Input */}
+                      <TextInput
+                        style={styles.albumNameInput}
+                        value={albumName}
+                        onChangeText={handleAlbumNameChange}
+                        placeholder={fontStyle === 'ransom' ? "영어만 입력 가능 (A-Z, 0-9)" : "앨범 이름 입력..."}
+                        placeholderTextColor="rgba(255,255,255,0.4)"
+                        maxLength={20}
+                        autoFocus
+                      />
+
+                      {/* Button Row */}
+                      <View style={styles.albumModalButtonRow}>
+                        <Pressable
+                          style={styles.albumModalButtonSecondary}
+                          onPress={() => transitionToNextStep('fontStyle')}
+                        >
+                          <Text style={styles.albumModalButtonSecondaryText}>이전</Text>
+                        </Pressable>
+                        <Pressable
+                          style={[
+                            styles.albumModalButton,
+                            !albumName.trim() && styles.albumModalButtonDisabled,
+                          ]}
+                          onPress={goToNextStep}
+                          disabled={!albumName.trim()}
+                        >
+                          <Text style={styles.albumModalButtonText}>다음</Text>
+                        </Pressable>
+                      </View>
+                    </>
+                  ) : (
+                    <>
+                      {/* Step 2: Cover Photo Selection with Draggable Text */}
+                      <Text style={styles.albumModalSubtitle}>
+                        사진을 선택하고 문구 위치를 드래그해서 조정하세요
+                      </Text>
+
+                      {/* Cover Photo Preview with Draggable Text */}
+                      <View style={styles.coverPhotoContainer}>
+                        <View style={styles.coverPhotoPickerContainer} onLayout={handleContainerLayout}>
+                          {/* Book Spine - Inward Curve Effect */}
+                          <LinearGradient
+                            colors={['rgba(0, 0, 0, 0.65)', 'rgba(0, 0, 0, 0.35)', 'rgba(0, 0, 0, 0.12)', 'rgba(255, 255, 255, 0.08)', 'transparent']}
+                            locations={[0, 0.25, 0.55, 0.8, 1]}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={styles.modalBookSpineCurve}
+                          />
+
+                          <Pressable
+                            style={styles.coverPhotoInner}
+                            onPress={handlePickCoverPhoto}
+                          >
+                            {albumCoverPhoto ? (
+                              <Image
+                                source={{ uri: albumCoverPhoto }}
+                                style={styles.coverPhotoPreview}
+                                resizeMode="cover"
+                              />
+                            ) : (
+                              <View style={styles.coverPhotoPlaceholder}>
+                                <Plus color="rgba(255,255,255,0.6)" size={40} />
+                                <Text style={styles.coverPhotoPlaceholderText}>사진 선택</Text>
+                              </View>
+                            )}
+                          </Pressable>
+
+                          {/* Draggable Album Name Overlay */}
+                          {albumCoverPhoto && (
+                            <Animated.View
+                              {...panResponder.panHandlers}
+                              style={[
+                                styles.draggableTextOverlay,
+                                {
+                                  transform: [
+                                    { translateX: panPosition.x },
+                                    { translateY: panPosition.y },
+                                  ],
+                                },
+                              ]}
+                            >
+                              {fontStyle === 'basic' ? (
+                                // Basic Jua Font Style
+                                <Text style={[
+                                  styles.basicFontOverlay,
+                                  {
+                                    fontSize: 16 * textScale,
+                                    color: textColor === 'black' ? '#000000' : COLORS.white,
+                                  }
+                                ]}>{albumName}</Text>
+                              ) : (
+                                // Ransom Style - Image-based
+                                <RansomText
+                                  text={albumName}
+                                  seed={ransomSeed}
+                                  characterSize={18 * textScale}
+                                  spacing={-4}
+                                  enableRotation={true}
+                                  enableYOffset={true}
+                                />
+                              )}
+                            </Animated.View>
+                          )}
+                        </View>
+                      </View>
+
+                      {/* Drag instruction */}
+                      {albumCoverPhoto && (
+                        <Text style={styles.dragHintText}>문구를 드래그하여 위치를 조정하세요</Text>
+                      )}
+
+                      {/* Text Style Selection - Different UI based on font style */}
+                      {albumCoverPhoto && fontStyle === 'basic' && (
+                        <View style={styles.textStyleSelectionContainer}>
+                          {/* Color Selection (Left) */}
+                          <View style={styles.colorSelectionSection}>
+                            <Text style={styles.selectionLabel}>색상</Text>
+                            <View style={styles.colorButtonRow}>
+                              <Pressable
+                                style={[
+                                  styles.colorButton,
+                                  { backgroundColor: '#000000' },
+                                  textColor === 'black' && styles.colorButtonSelected,
+                                ]}
+                                onPress={() => setTextColor('black')}
+                              />
+                              <Pressable
+                                style={[
+                                  styles.colorButton,
+                                  { backgroundColor: '#FFFFFF' },
+                                  textColor === 'white' && styles.colorButtonSelected,
+                                ]}
+                                onPress={() => setTextColor('white')}
+                              />
+                            </View>
+                          </View>
+
+                          {/* Size Selection (Right) */}
+                          <View style={styles.sizeSelectionSection}>
+                            <Text style={styles.selectionLabel}>크기</Text>
+                            <View style={styles.sizeButtonRow}>
+                              {[1.5, 2.25, 3.0].map((scale, index) => (
+                                <Pressable
+                                  key={index}
+                                  style={[
+                                    styles.sizeButton,
+                                    textScale === scale && styles.sizeButtonSelected,
+                                  ]}
+                                  onPress={() => setTextScale(scale)}
+                                >
+                                  <Text style={[
+                                    styles.sizeButtonText,
+                                    { fontSize: 10 + index * 7 },
+                                    textScale === scale && styles.sizeButtonTextSelected,
+                                  ]}>A</Text>
+                                </Pressable>
+                              ))}
+                            </View>
+                          </View>
+                        </View>
+                      )}
+
+                      {/* Ransom Style - Size Only */}
+                      {albumCoverPhoto && fontStyle === 'ransom' && (
+                        <View style={styles.sizeSelectionContainer}>
+                          <Text style={styles.sizeSelectionLabel}>문구 크기</Text>
+                          <View style={styles.sizeButtonRow}>
+                            {[1.0, 1.5, 2.0].map((scale, index) => (
+                              <Pressable
+                                key={index}
+                                style={[
+                                  styles.sizeButton,
+                                  textScale === scale && styles.sizeButtonSelected,
+                                ]}
+                                onPress={() => setTextScale(scale)}
+                              >
+                                <Text style={[
+                                  styles.sizeButtonText,
+                                  { fontSize: 10 + index * 7 },
+                                  textScale === scale && styles.sizeButtonTextSelected,
+                                ]}>A</Text>
+                              </Pressable>
+                            ))}
+                          </View>
+                        </View>
+                      )}
+
+                      {/* Action Buttons */}
+                      <View style={styles.albumModalButtonRow}>
+                        <Pressable
+                          style={styles.albumModalButtonSecondary}
+                          onPress={() => transitionToNextStep('name')}
+                        >
+                          <Text style={styles.albumModalButtonSecondaryText}>이전</Text>
+                        </Pressable>
+                        <Pressable
+                          style={[
+                            styles.albumModalButton,
+                            !albumCoverPhoto && styles.albumModalButtonDisabled
+                          ]}
+                          onPress={handleCreateAlbum}
+                          disabled={!albumCoverPhoto}
+                        >
+                          <Text style={[
+                            styles.albumModalButtonText,
+                            !albumCoverPhoto && styles.albumModalButtonTextDisabled
+                          ]}>완료</Text>
+                        </Pressable>
+                      </View>
+                    </>
                   )}
-                </ScrollView>
+                </Animated.View>
               </Animated.View>
-            </View>
-          )}
+            </KeyboardAvoidingView>
+
+            {/* Cover Photo Picker Overlay */}
+            {showCoverPhotoPicker && (
+              <View style={styles.missionPickerOverlay}>
+                <Pressable
+                  style={styles.monthModalBackdrop}
+                  onPress={closeCoverPhotoPicker}
+                >
+                  <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
+                </Pressable>
+                <Animated.View
+                  style={[
+                    styles.monthModalContent,
+                    { transform: [{ translateY: coverPickerSlideAnim }] }
+                  ]}
+                >
+                  <View style={styles.monthModalHeader}>
+                    <Text style={styles.monthModalTitle}>사진 선택</Text>
+                    <Pressable
+                      style={styles.monthModalCloseButton}
+                      onPress={closeCoverPhotoPicker}
+                    >
+                      <X color="rgba(255,255,255,0.8)" size={20} />
+                    </Pressable>
+                  </View>
+                  <ScrollView contentContainerStyle={styles.monthModalGrid}>
+                    {completedMemories.length === 0 ? (
+                      <View style={styles.missionPickerEmpty}>
+                        <Text style={styles.missionPickerEmptyText}>완료된 미션이 없습니다</Text>
+                      </View>
+                    ) : (
+                      completedMemories.map((mission) => (
+                        <Pressable
+                          key={mission.id}
+                          style={styles.monthModalItem}
+                          onPress={() => handleSelectCoverPhoto(mission.photoUrl)}
+                        >
+                          <View style={styles.monthModalItemInner}>
+                            <Image source={{ uri: mission.photoUrl }} style={styles.monthModalItemImage} />
+                          </View>
+                        </Pressable>
+                      ))
+                    )}
+                  </ScrollView>
+                </Animated.View>
+              </View>
+            )}
           </BlurView>
         </Animated.View>
       </Modal>
@@ -1823,7 +1528,7 @@ export default function MemoriesScreen() {
             },
           ]}
         >
-          <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000000' }]} />
           {/* Album Content (hidden when photo is selected) */}
           {!selectedAlbumPhoto && (
             <>
@@ -1840,7 +1545,7 @@ export default function MemoriesScreen() {
                   style={styles.albumDetailCloseButton}
                   onPress={closeAlbumDetailModal}
                 >
-                  <X color={COLORS.white} size={24} />
+                  <X color="#FFFFFF" size={24} />
                 </Pressable>
                 <Text
                   style={[
@@ -1857,12 +1562,12 @@ export default function MemoriesScreen() {
                   style={styles.albumDetailMenuButton}
                   onPress={() => setShowAlbumMenu(!showAlbumMenu)}
                 >
-                  <MoreHorizontal color={COLORS.white} size={24} />
+                  <MoreHorizontal color="#FFFFFF" size={24} />
                 </Pressable>
 
                 {/* Dropdown Menu */}
                 {showAlbumMenu && (
-                  <BlurView intensity={50} tint="dark" style={styles.albumMenuDropdown}>
+                  <View style={styles.albumMenuDropdown}>
                     <Pressable
                       style={styles.albumMenuItem}
                       onPress={() => {
@@ -1870,7 +1575,7 @@ export default function MemoriesScreen() {
                         setShowMissionPhotosPicker(true);
                       }}
                     >
-                      <Plus color={COLORS.white} size={18} />
+                      <Plus color="#FFFFFF" size={18} />
                       <Text style={styles.albumMenuItemText}>사진 추가</Text>
                     </Pressable>
                     <Pressable
@@ -1880,7 +1585,6 @@ export default function MemoriesScreen() {
                           // Initialize all edit states from existing album data
                           setEditAlbumName(selectedAlbum.name);
                           setEditFontStyle(selectedAlbum.fontStyle);
-                          setEditCharStyles(selectedAlbum.charStyles || []);
                           setEditCoverPhoto(selectedAlbum.coverPhoto);
                           setEditTextPosition(selectedAlbum.namePosition || { x: 30, y: 16 });
                           setEditTextScale(selectedAlbum.textScale || 1);
@@ -1891,7 +1595,7 @@ export default function MemoriesScreen() {
                         setShowAlbumMenu(false);
                       }}
                     >
-                      <Edit2 color={COLORS.white} size={18} />
+                      <Edit2 color="#FFFFFF" size={18} />
                       <Text style={styles.albumMenuItemText}>표지 편집</Text>
                     </Pressable>
                     <Pressable
@@ -1935,139 +1639,145 @@ export default function MemoriesScreen() {
                       <Trash2 color="#FF6B6B" size={18} />
                       <Text style={[styles.albumMenuItemText, { color: '#FF6B6B' }]}>앨범 삭제</Text>
                     </Pressable>
-                  </BlurView>
+                  </View>
                 )}
               </View>
 
-              {/* Album Cover Preview */}
-              {selectedAlbum && (
+              {/* Scrollable Content - Album Cover + Sticky Header + Photos */}
+              <ScrollView
+                style={styles.albumDetailScrollView}
+                contentContainerStyle={styles.albumDetailScrollContent}
+                showsVerticalScrollIndicator={false}
+                stickyHeaderIndices={[1]}
+              >
+                {/* Index 0: Album Cover Preview */}
                 <View style={styles.albumDetailCoverContainer}>
-                  <View style={styles.albumDetailCoverWrapper}>
-                    {/* Book Spine Effect */}
-                    <LinearGradient
-                      colors={['rgba(0, 0, 0, 0.65)', 'rgba(0, 0, 0, 0.35)', 'rgba(0, 0, 0, 0.12)', 'rgba(255, 255, 255, 0.08)', 'transparent']}
-                      locations={[0, 0.25, 0.55, 0.8, 1]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={styles.albumDetailSpine}
-                    />
-                    {selectedAlbum.coverPhoto ? (
-                      <Image source={{ uri: selectedAlbum.coverPhoto }} style={styles.albumDetailCoverImage} />
-                    ) : (
-                      <View style={styles.albumDetailCoverPlaceholder}>
-                        <ImageIcon color="rgba(255,255,255,0.3)" size={40} />
+                  {selectedAlbum && (
+                    <View style={styles.albumDetailCoverWrapper}>
+                      {/* Book Spine Effect */}
+                      <LinearGradient
+                        colors={['rgba(0, 0, 0, 0.65)', 'rgba(0, 0, 0, 0.35)', 'rgba(0, 0, 0, 0.12)', 'rgba(255, 255, 255, 0.08)', 'transparent']}
+                        locations={[0, 0.25, 0.55, 0.8, 1]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.albumDetailSpine}
+                      />
+                      {selectedAlbum.coverPhoto ? (
+                        <Image source={{ uri: selectedAlbum.coverPhoto }} style={styles.albumDetailCoverImage} />
+                      ) : (
+                        <View style={styles.albumDetailCoverPlaceholder}>
+                          <ImageIcon color="rgba(255,255,255,0.3)" size={40} />
+                        </View>
+                      )}
+                      {/* Album Name Overlay */}
+                      <View style={[
+                        styles.albumDetailNameOverlay,
+                        {
+                          left: (selectedAlbum.namePosition?.x ?? 30) * ALBUM_DETAIL_SCALE_RATIO,
+                          top: (selectedAlbum.namePosition?.y ?? 16) * ALBUM_DETAIL_SCALE_RATIO,
+                        }
+                      ]}>
+                        {selectedAlbum.fontStyle === 'basic' ? (
+                          <Text style={[styles.basicFontOverlay, { fontSize: 16 * selectedAlbum.textScale * ALBUM_DETAIL_SCALE_RATIO }]}>
+                            {selectedAlbum.name}
+                          </Text>
+                        ) : (
+                          <RansomText
+                            text={selectedAlbum.name}
+                            seed={selectedAlbum.ransomSeed || 12345}
+                            characterSize={18 * (selectedAlbum.textScale || 1) * ALBUM_DETAIL_SCALE_RATIO}
+                            spacing={-4 * ALBUM_DETAIL_SCALE_RATIO}
+                            enableRotation={true}
+                            enableYOffset={true}
+                          />
+                        )}
                       </View>
-                    )}
-                    {/* Album Name Overlay */}
-                    <View style={[
-                      styles.albumDetailNameOverlay,
-                      {
-                        left: (selectedAlbum.namePosition?.x ?? 30) * ALBUM_DETAIL_SCALE_RATIO,
-                        top: (selectedAlbum.namePosition?.y ?? 16) * ALBUM_DETAIL_SCALE_RATIO,
-                      }
-                    ]}>
-                      {selectedAlbum.fontStyle === 'basic' ? (
-                        <Text style={[styles.basicFontOverlay, { fontSize: 16 * selectedAlbum.textScale * ALBUM_DETAIL_SCALE_RATIO }]}>
-                          {selectedAlbum.name}
-                        </Text>
-                      ) : (
-                        <RansomText
-                          text={selectedAlbum.name}
-                          seed={selectedAlbum.ransomSeed || 12345}
-                          characterSize={18 * (selectedAlbum.textScale || 1) * ALBUM_DETAIL_SCALE_RATIO}
-                          spacing={-4}
-                          enableRotation={true}
-                          enableYOffset={true}
-                        />
-                      )}
-                    </View>
-                  </View>
-                </View>
-              )}
-
-              {/* Photos Section */}
-              <View style={styles.albumPhotosSection}>
-                <View style={styles.albumPhotosSectionHeader}>
-                  <Text style={styles.albumPhotosSectionTitle}>
-                    {selectedAlbum ? `${(albumPhotos[selectedAlbum.id] || []).length}개의 항목` : '0개의 항목'}
-                  </Text>
-                  {/* Select/Delete/Cancel Buttons */}
-                  {selectedAlbum && (albumPhotos[selectedAlbum.id] || []).length > 0 && (
-                    <View style={styles.albumPhotoActionButtons}>
-                      {isSelectingAlbumPhotos ? (
-                        <>
-                          <Pressable
-                            style={styles.albumPhotoCancelButton}
-                            onPress={() => {
-                              setIsSelectingAlbumPhotos(false);
-                              setSelectedAlbumPhotoIndices(new Set());
-                            }}
-                          >
-                            <Text style={styles.albumPhotoCancelButtonText}>취소</Text>
-                          </Pressable>
-                          <Pressable
-                            style={[
-                              styles.albumPhotoDeleteButton,
-                              selectedAlbumPhotoIndices.size === 0 && styles.albumPhotoDeleteButtonDisabled
-                            ]}
-                            disabled={selectedAlbumPhotoIndices.size === 0}
-                            onPress={() => {
-                              if (selectedAlbumPhotoIndices.size > 0) {
-                                Alert.alert(
-                                  '사진 삭제',
-                                  `${selectedAlbumPhotoIndices.size}개의 사진을 삭제하시겠습니까?`,
-                                  [
-                                    { text: '취소', style: 'cancel' },
-                                    {
-                                      text: '삭제',
-                                      style: 'destructive',
-                                      onPress: () => {
-                                        if (selectedAlbum) {
-                                          const currentPhotos = albumPhotos[selectedAlbum.id] || [];
-                                          const newPhotos = currentPhotos.filter((_, idx) => !selectedAlbumPhotoIndices.has(idx));
-                                          setAlbumPhotos(prev => ({
-                                            ...prev,
-                                            [selectedAlbum.id]: newPhotos
-                                          }));
-                                          setSelectedAlbumPhotoIndices(new Set());
-                                          setIsSelectingAlbumPhotos(false);
-                                        }
-                                      }
-                                    }
-                                  ]
-                                );
-                              }
-                            }}
-                          >
-                            <Text style={[
-                              styles.albumPhotoDeleteButtonText,
-                              selectedAlbumPhotoIndices.size === 0 && styles.albumPhotoDeleteButtonTextDisabled
-                            ]}>삭제</Text>
-                          </Pressable>
-                        </>
-                      ) : (
-                        <Pressable
-                          style={styles.albumPhotoSelectButton}
-                          onPress={() => setIsSelectingAlbumPhotos(true)}
-                        >
-                          <Text style={styles.albumPhotoSelectButtonText}>선택</Text>
-                        </Pressable>
-                      )}
                     </View>
                   )}
                 </View>
-                <ScrollView
-                  style={styles.albumPhotosScrollView}
-                  contentContainerStyle={styles.albumPhotosGrid}
-                  showsVerticalScrollIndicator={false}
-                >
+
+                {/* Index 1: Photos Section Header - Sticky */}
+                <View style={styles.albumPhotosSectionHeaderSticky}>
+                  <View style={styles.albumPhotosSectionHeaderInner}>
+                    <Text style={styles.albumPhotosSectionTitle}>
+                      {selectedAlbum ? `${(albumPhotos[selectedAlbum.id] || []).length}개의 항목` : '0개의 항목'}
+                    </Text>
+                    {/* Select/Delete/Cancel Buttons */}
+                    {selectedAlbum && (albumPhotos[selectedAlbum.id] || []).length > 0 && (
+                      <View style={styles.albumPhotoActionButtons}>
+                        {isSelectingAlbumPhotos ? (
+                          <>
+                            <Pressable
+                              style={styles.albumPhotoCancelButton}
+                              onPress={() => {
+                                setIsSelectingAlbumPhotos(false);
+                                setSelectedAlbumPhotoIndices(new Set());
+                              }}
+                            >
+                              <Text style={styles.albumPhotoCancelButtonText}>취소</Text>
+                            </Pressable>
+                            <Pressable
+                              style={[
+                                styles.albumPhotoDeleteButton,
+                                selectedAlbumPhotoIndices.size === 0 && styles.albumPhotoDeleteButtonDisabled
+                              ]}
+                              disabled={selectedAlbumPhotoIndices.size === 0}
+                              onPress={() => {
+                                if (selectedAlbumPhotoIndices.size > 0) {
+                                  Alert.alert(
+                                    '사진 삭제',
+                                    `${selectedAlbumPhotoIndices.size}개의 사진을 삭제하시겠습니까?`,
+                                    [
+                                      { text: '취소', style: 'cancel' },
+                                      {
+                                        text: '삭제',
+                                        style: 'destructive',
+                                        onPress: () => {
+                                          if (selectedAlbum) {
+                                            const currentPhotos = albumPhotos[selectedAlbum.id] || [];
+                                            const newPhotos = currentPhotos.filter((_, idx) => !selectedAlbumPhotoIndices.has(idx));
+                                            setAlbumPhotos(prev => ({
+                                              ...prev,
+                                              [selectedAlbum.id]: newPhotos
+                                            }));
+                                            setSelectedAlbumPhotoIndices(new Set());
+                                            setIsSelectingAlbumPhotos(false);
+                                          }
+                                        }
+                                      }
+                                    ]
+                                  );
+                                }
+                              }}
+                            >
+                              <Text style={[
+                                styles.albumPhotoDeleteButtonText,
+                                selectedAlbumPhotoIndices.size === 0 && styles.albumPhotoDeleteButtonTextDisabled
+                              ]}>삭제</Text>
+                            </Pressable>
+                          </>
+                        ) : (
+                          <Pressable
+                            style={styles.albumPhotoSelectButton}
+                            onPress={() => setIsSelectingAlbumPhotos(true)}
+                          >
+                            <Text style={styles.albumPhotoSelectButtonText}>선택</Text>
+                          </Pressable>
+                        )}
+                      </View>
+                    )}
+                  </View>
+                </View>
+
+                {/* Index 2+: Photos Grid */}
+                <View style={styles.albumPhotosGridContainer}>
                   {/* Empty state - Add Photo Button */}
                   {selectedAlbum && (albumPhotos[selectedAlbum.id] || []).length === 0 && (
                     <Pressable
                       style={styles.emptyAddPhotoButton}
                       onPress={() => setShowMissionPhotosPicker(true)}
                     >
-                      <Plus color="rgba(255,255,255,0.6)" size={32} />
+                      <Plus color="#FFFFFF" size={32} />
                       <Text style={styles.emptyAddPhotoButtonText}>사진 추가</Text>
                     </Pressable>
                   )}
@@ -2145,8 +1855,8 @@ export default function MemoriesScreen() {
                       </View>
                     ));
                   })()}
-                </ScrollView>
-              </View>
+                </View>
+              </ScrollView>
             </>
           )}
 
@@ -2614,37 +2324,28 @@ export default function MemoriesScreen() {
   );
 }
 
-// Photo Detail View Component with Flip Card (rendered inside modal, not as separate modal)
-function PhotoDetailView({
-  missions,
-  initialPhoto,
-  onClose,
+// Photo Detail View Component with Flip Card
+// Individual flip card item component for FlatList
+function FlipCardItem({
+  mission,
+  isActive,
 }: {
-  missions: MemoryType[];
-  initialPhoto: MemoryType;
-  onClose: () => void;
+  mission: MemoryType;
+  isActive: boolean;
 }) {
-  const initialIndex = missions.findIndex((m) => m.id === initialPhoto.id);
-  const [currentIndex, setCurrentIndex] = useState(
-    initialIndex >= 0 ? initialIndex : 0
-  );
   const [isFlipped, setIsFlipped] = useState(false);
-
-  // All hooks must be called at the top level
   const flipAnim = useRef(new Animated.Value(0)).current;
-  const translateX = useRef(new Animated.Value(0)).current;
-  const cardOpacity = useRef(new Animated.Value(1)).current;
-  const currentIndexRef = useRef(currentIndex);
 
-  // Keep ref in sync with state
+  // Reset flip state when card becomes inactive
   useEffect(() => {
-    currentIndexRef.current = currentIndex;
-  }, [currentIndex]);
+    if (!isActive && isFlipped) {
+      setIsFlipped(false);
+      flipAnim.setValue(0);
+    }
+  }, [isActive]);
 
-  const currentMission = missions[currentIndex];
-
-  // Format date (with fallback for safety)
-  const date = currentMission ? new Date(currentMission.completedAt) : new Date();
+  // Format date
+  const date = new Date(mission.completedAt);
   const formattedDate = `${date.getFullYear()}.${(date.getMonth() + 1)
     .toString()
     .padStart(2, '0')}.${date.getDate().toString().padStart(2, '0')}`;
@@ -2665,75 +2366,7 @@ function PhotoDetailView({
     setIsFlipped(!isFlipped);
   };
 
-  // Animate card change
-  const animateCardChange = (newIndex: number, direction: number) => {
-    Animated.parallel([
-      Animated.timing(translateX, {
-        toValue: direction > 0 ? width : -width,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(cardOpacity, {
-        toValue: 0,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setCurrentIndex(newIndex);
-      setIsFlipped(false);
-      flipAnim.setValue(0);
-      translateX.setValue(direction > 0 ? -width : width);
-
-      Animated.parallel([
-        Animated.spring(translateX, {
-          toValue: 0,
-          useNativeDriver: true,
-          friction: 8,
-        }),
-        Animated.timing(cardOpacity, {
-          toValue: 1,
-          duration: 150,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    });
-  };
-
-  // Pan responder for swipe - use ref to get current index
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        return Math.abs(gestureState.dx) > 10 && Math.abs(gestureState.dy) < 30;
-      },
-      onPanResponderMove: (_, gestureState) => {
-        translateX.setValue(gestureState.dx);
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        const idx = currentIndexRef.current;
-        if (Math.abs(gestureState.dx) > 80) {
-          const direction = gestureState.dx > 0 ? 1 : -1;
-          if (direction > 0 && idx > 0) {
-            animateCardChange(idx - 1, direction);
-          } else if (direction < 0 && idx < missions.length - 1) {
-            animateCardChange(idx + 1, direction);
-          } else {
-            Animated.spring(translateX, {
-              toValue: 0,
-              useNativeDriver: true,
-            }).start();
-          }
-        } else {
-          Animated.spring(translateX, {
-            toValue: 0,
-            useNativeDriver: true,
-          }).start();
-        }
-      },
-    })
-  ).current;
-
-  // Interpolations for flip
+  // Flip interpolations
   const frontInterpolate = flipAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ['0deg', '180deg'],
@@ -2744,127 +2377,402 @@ function PhotoDetailView({
     outputRange: ['180deg', '360deg'],
   });
 
-  const frontAnimatedStyle = {
-    transform: [{ rotateY: frontInterpolate }],
-  };
-
-  const backAnimatedStyle = {
-    transform: [{ rotateY: backInterpolate }],
-  };
-
-  // Safety check - if no mission, don't render content
-  if (!currentMission) {
-    return null;
-  }
-
   return (
-    <View style={styles.photoDetailContainer}>
-      {/* Close Button */}
-      <Pressable
-        style={styles.photoDetailCloseButton}
-        onPress={onClose}
-      >
-        <X color={COLORS.white} size={20} />
-      </Pressable>
-
-      {/* Instruction Text */}
-      <View style={styles.flipInstructionContainer}>
-        <View style={styles.flipInstructionBadge}>
-          <Text style={styles.flipInstructionText}>
-            {isFlipped ? '탭하여 사진 보기' : '탭하여 뒷면 확인'}
-          </Text>
-        </View>
-      </View>
-
-      {/* Flip Card Container */}
-      <Animated.View
-        {...panResponder.panHandlers}
-        style={[
-          styles.flipCardContainer,
-          {
-            transform: [{ translateX }],
-            opacity: cardOpacity,
-          },
-        ]}
-      >
+    <View style={styles.flatListCardWrapper}>
+      <View style={styles.flipCardContainer}>
         <Pressable onPress={handleFlip} style={styles.flipCardPressable}>
           {/* Front - Photo */}
-          <Animated.View style={[styles.flipCardFace, frontAnimatedStyle]}>
+          <Animated.View
+            style={[
+              styles.flipCardFace,
+              { transform: [{ perspective: 1000 }, { rotateY: frontInterpolate }] },
+            ]}
+          >
             <Image
-              source={{ uri: currentMission.photoUrl }}
+              source={{ uri: mission.photoUrl }}
               style={styles.flipCardImage}
               resizeMode="cover"
             />
           </Animated.View>
 
           {/* Back - Info */}
-          <Animated.View style={[styles.flipCardFace, styles.flipCardBack, backAnimatedStyle]}>
-            <LinearGradient
-              colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.6)']}
-              style={styles.flipCardBackGradient}
-            >
-              {/* Mission Info */}
-              <View style={styles.flipCardBackContent}>
-                {/* Top Section */}
-                <View style={styles.flipCardBackTop}>
-                  {/* Mission Title */}
-                  <Text style={styles.flipCardTitle}>
-                    함께한 순간
-                  </Text>
-
-                  {/* Location and Time */}
-                  <View style={styles.flipCardInfoSection}>
-                    <View style={styles.flipCardInfoRow}>
-                      <MapPin color="rgba(255,255,255,0.9)" size={16} />
-                      <Text style={styles.flipCardInfoText}>
-                        {currentMission.location}
-                      </Text>
-                    </View>
-                    <View style={styles.flipCardInfoRow}>
-                      <Clock color="rgba(255,255,255,0.9)" size={16} />
-                      <Text style={styles.flipCardInfoText}>
-                        {formattedDate} {formattedTime}
-                      </Text>
-                    </View>
+          <Animated.View
+            style={[
+              styles.flipCardFace,
+              styles.flipCardBack,
+              { transform: [{ perspective: 1000 }, { rotateY: backInterpolate }] },
+            ]}
+          >
+            <View style={styles.flipCardBackContent}>
+              <View style={styles.flipCardBackTop}>
+                <Text style={styles.flipCardTitle} allowFontScaling={false}>
+                  {mission.mission?.title || '함께한 순간'}
+                </Text>
+                <View style={styles.flipCardInfoSection}>
+                  <View style={styles.flipCardInfoRow}>
+                    <MapPin color="rgba(255,255,255,0.9)" size={16} />
+                    <Text style={styles.flipCardInfoText} allowFontScaling={false}>
+                      {mission.location}
+                    </Text>
                   </View>
-
-                  {/* Divider */}
-                  <View style={styles.flipCardDivider} />
+                  <View style={styles.flipCardInfoRow}>
+                    <Clock color="rgba(255,255,255,0.9)" size={16} />
+                    <Text style={styles.flipCardInfoText} allowFontScaling={false}>
+                      {formattedDate} {formattedTime}
+                    </Text>
+                  </View>
                 </View>
-
-                {/* Messages Section */}
-                <View style={styles.flipCardMessages}>
-                  {currentMission.user1Message && (
-                    <View style={styles.flipCardMessageItem}>
-                      <Text style={styles.flipCardMessageLabel}>지민</Text>
-                      <Text style={styles.flipCardMessageText}>
-                        {currentMission.user1Message}
-                      </Text>
-                    </View>
-                  )}
-                  {currentMission.user2Message && (
-                    <View style={styles.flipCardMessageItem}>
-                      <Text style={styles.flipCardMessageLabel}>준호</Text>
-                      <Text style={styles.flipCardMessageText}>
-                        {currentMission.user2Message}
-                      </Text>
-                    </View>
-                  )}
-                </View>
+                <View style={styles.flipCardDivider} />
               </View>
-            </LinearGradient>
+              <View style={styles.flipCardMessages}>
+                {mission.user1Message && (
+                  <View style={styles.flipCardMessageItem}>
+                    <Text style={styles.flipCardMessageLabel} allowFontScaling={false}>
+                      지민
+                    </Text>
+                    <Text style={styles.flipCardMessageText} allowFontScaling={false}>
+                      {mission.user1Message}
+                    </Text>
+                  </View>
+                )}
+                {mission.user2Message && (
+                  <View style={styles.flipCardMessageItem}>
+                    <Text style={styles.flipCardMessageLabel} allowFontScaling={false}>
+                      준호
+                    </Text>
+                    <Text style={styles.flipCardMessageText} allowFontScaling={false}>
+                      {mission.user2Message}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
           </Animated.View>
         </Pressable>
-      </Animated.View>
-
-      {/* Photo Counter */}
-      <View style={styles.photoCounterContainer}>
-        <View style={styles.photoCounterBadge}>
-          <Text style={styles.photoCounterText}>
-            {currentIndex + 1} / {missions.length}
-          </Text>
-        </View>
       </View>
+    </View>
+  );
+}
+
+// Background image component with animated opacity and scale
+function CarouselBackgroundImage({
+  image,
+  index,
+  scrollX,
+}: {
+  image: string;
+  index: number;
+  scrollX: { value: number };
+}) {
+  const animatedStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(
+      scrollX.value,
+      [(index - 1) * width, index * width, (index + 1) * width],
+      [0, 1, 0],
+      Extrapolation.CLAMP
+    );
+
+    const scale = interpolate(
+      scrollX.value,
+      [(index - 1) * width, index * width, (index + 1) * width],
+      [1.2, 1, 1.2],
+      Extrapolation.CLAMP
+    );
+
+    return {
+      opacity,
+      transform: [{ scale }],
+    };
+  });
+
+  return (
+    <ReanimatedModule.Image
+      source={{ uri: image }}
+      style={[StyleSheet.absoluteFill, animatedStyle]}
+      blurRadius={18}
+    />
+  );
+}
+
+// Carousel card wrapper (no scale to prevent text blur)
+function CarouselCardWrapper({
+  mission,
+  index,
+  scrollX,
+  currentIndex,
+}: {
+  mission: MemoryType;
+  index: number;
+  scrollX: { value: number };
+  currentIndex: number;
+}) {
+  const animatedStyle = useAnimatedStyle(() => {
+    const inputRange = [(index - 1) * width, index * width, (index + 1) * width];
+
+    const opacity = interpolate(
+      scrollX.value,
+      inputRange,
+      [0, 1, 0],
+      Extrapolation.CLAMP
+    );
+
+    const scale = interpolate(
+      scrollX.value,
+      inputRange,
+      [0.9, 1, 0.9],
+      Extrapolation.CLAMP
+    );
+
+    return {
+      opacity,
+      transform: [{ scale }],
+    };
+  });
+
+  return (
+    <ReanimatedModule.View style={[styles.carouselCardContainer, animatedStyle]}>
+      <FlipCardItem mission={mission} isActive={index === currentIndex} />
+    </ReanimatedModule.View>
+  );
+}
+
+function PhotoDetailView({
+  missions,
+  initialPhoto,
+  onClose,
+}: {
+  missions: MemoryType[];
+  initialPhoto: MemoryType;
+  onClose: () => void;
+}) {
+  const initialIndex = missions.findIndex((m) => m.id === initialPhoto.id);
+  const [currentIndex, setCurrentIndex] = useState(
+    initialIndex >= 0 ? initialIndex : 0
+  );
+  const scrollViewRef = useRef<any>(null);
+
+  // Track current flip state for instruction text
+  const [isFlipped, setIsFlipped] = useState(false);
+
+  // Dropdown menu state
+  const [showPhotoDetailMenu, setShowPhotoDetailMenu] = useState(false);
+
+  // Animation values for smooth entrance
+  const animProgress = useSharedValue(0);
+
+  // Reanimated scroll value
+  const scrollX = useSharedValue(initialIndex >= 0 ? initialIndex * width : 0);
+
+  // Background fade style (simple fade)
+  const backgroundFadeStyle = useAnimatedStyle(() => ({
+    opacity: animProgress.value,
+  }));
+
+  // Content animated style (fade + scale + slide)
+  const contentAnimStyle = useAnimatedStyle(() => ({
+    opacity: animProgress.value,
+    transform: [
+      { scale: interpolate(animProgress.value, [0, 1], [0.92, 1]) },
+      { translateY: interpolate(animProgress.value, [0, 1], [30, 0]) },
+    ],
+  }));
+
+  // Handle download photo to gallery
+  const handleDownload = useCallback(async () => {
+    const currentMission = missions[currentIndex];
+    if (!currentMission?.photoUrl) return;
+
+    try {
+      // Request permission
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('권한 필요', '사진을 저장하려면 갤러리 접근 권한이 필요합니다.');
+        return;
+      }
+
+      // Download image using new expo-file-system API
+      const filename = `daydate_${Date.now()}.jpg`;
+      const destination = new ExpoFile(Paths.cache, filename);
+
+      // Use static method to download
+      const downloadedFile = await ExpoFile.downloadFileAsync(currentMission.photoUrl, destination);
+
+      // Save to media library
+      await MediaLibrary.saveToLibraryAsync(downloadedFile.uri);
+      Alert.alert('저장 완료', '사진이 갤러리에 저장되었습니다.');
+
+      // Clean up temp file
+      await downloadedFile.delete();
+    } catch (error) {
+      console.log('Download error:', error);
+      Alert.alert('저장 실패', '사진을 저장하는 중 오류가 발생했습니다.');
+    }
+  }, [currentIndex, missions]);
+
+  // Animated scroll handler (direct value without spring for better text rendering)
+  const onScrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollX.value = event.contentOffset.x;
+    },
+  });
+
+  // Scroll to initial index after mount and trigger entrance animation
+  useEffect(() => {
+    if (scrollViewRef.current && initialIndex > 0) {
+      scrollViewRef.current?.scrollTo({
+        x: initialIndex * width,
+        animated: false,
+      });
+    }
+    // Start entrance animation with natural easing
+    const timer = setTimeout(() => {
+      animProgress.value = withTiming(1, {
+        duration: 350,
+        easing: Easing.out(Easing.cubic),
+      });
+    }, 20);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Handle scroll end to update current index
+  const handleMomentumScrollEnd = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const offsetX = event.nativeEvent.contentOffset.x;
+      const newIndex = Math.round(offsetX / width);
+      if (newIndex !== currentIndex && newIndex >= 0 && newIndex < missions.length) {
+        setCurrentIndex(newIndex);
+        setIsFlipped(false);
+      }
+    },
+    [currentIndex, missions.length]
+  );
+
+  return (
+    <View style={styles.carouselContainer}>
+      {/* Solid black background - always visible to prevent flickering */}
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
+
+      {/* Background with smooth fade animation */}
+      <ReanimatedModule.View style={[StyleSheet.absoluteFill, backgroundFadeStyle]}>
+        {/* Animated Background Images with Blur */}
+        <View style={StyleSheet.absoluteFill}>
+          {missions.map((mission, index) => (
+            <CarouselBackgroundImage
+              key={`background_${mission.id}`}
+              image={mission.photoUrl}
+              index={index}
+              scrollX={scrollX}
+            />
+          ))}
+        </View>
+
+        {/* Dark overlay for better card visibility */}
+        <View style={styles.carouselOverlay} />
+      </ReanimatedModule.View>
+
+      {/* Top Buttons - Close (left) and More Options (right) */}
+      <View style={styles.photoDetailTopButtonsContainer}>
+        <Pressable style={styles.photoDetailButton} onPress={onClose}>
+          <X color={COLORS.white} size={20} />
+        </Pressable>
+        <Pressable
+          style={styles.photoDetailButton}
+          onPress={() => setShowPhotoDetailMenu(!showPhotoDetailMenu)}
+        >
+          <MoreHorizontal color={COLORS.white} size={20} />
+        </Pressable>
+      </View>
+
+      {/* Photo Detail Dropdown Menu */}
+      {showPhotoDetailMenu && (
+        <Pressable
+          style={styles.photoDetailMenuOverlay}
+          onPress={() => setShowPhotoDetailMenu(false)}
+        >
+          <BlurView intensity={50} tint="dark" style={styles.photoDetailMenuDropdown}>
+            <Pressable
+              style={styles.photoDetailMenuItem}
+              onPress={() => {
+                setShowPhotoDetailMenu(false);
+                handleDownload();
+              }}
+            >
+              <Download color={COLORS.white} size={18} />
+              <Text style={styles.photoDetailMenuItemText}>사진 저장</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.photoDetailMenuItem, styles.photoDetailMenuItemDanger]}
+              onPress={() => {
+                setShowPhotoDetailMenu(false);
+                Alert.alert(
+                  '사진 삭제',
+                  '이 사진을 삭제하시겠습니까?',
+                  [
+                    { text: '취소', style: 'cancel' },
+                    {
+                      text: '삭제',
+                      style: 'destructive',
+                      onPress: () => {
+                        // Close the photo detail view after deletion
+                        onClose();
+                      }
+                    }
+                  ]
+                );
+              }}
+            >
+              <Trash2 color="#FF6B6B" size={18} />
+              <Text style={[styles.photoDetailMenuItemText, { color: '#FF6B6B' }]}>사진 삭제</Text>
+            </Pressable>
+          </BlurView>
+        </Pressable>
+      )}
+
+      {/* Content with smooth entrance animation (fade + scale + slide) */}
+      <ReanimatedModule.View style={[{ flex: 1 }, contentAnimStyle]}>
+        {/* Instruction Text */}
+        <View style={styles.flipInstructionContainer}>
+          <View style={styles.flipInstructionBadge}>
+            <Text style={styles.flipInstructionText}>
+              {isFlipped ? '탭하여 사진 보기' : '탭하여 뒷면 확인'}
+            </Text>
+          </View>
+        </View>
+
+        {/* Carousel ScrollView */}
+        <ReanimatedModule.ScrollView
+          ref={scrollViewRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onScroll={onScrollHandler}
+          onMomentumScrollEnd={handleMomentumScrollEnd}
+          scrollEventThrottle={16}
+          decelerationRate="fast"
+          bounces={true}
+          alwaysBounceHorizontal={true}
+          contentContainerStyle={styles.carouselScrollContent}
+        >
+          {missions.map((mission, index) => (
+            <CarouselCardWrapper
+              key={`card_${mission.id}`}
+              mission={mission}
+              index={index}
+              scrollX={scrollX}
+              currentIndex={currentIndex}
+            />
+          ))}
+        </ReanimatedModule.ScrollView>
+
+        {/* Photo Counter */}
+        <View style={styles.photoCounterContainer}>
+          <View style={styles.photoCounterBadge}>
+            <Text style={styles.photoCounterText}>
+              {currentIndex + 1} / {missions.length}
+            </Text>
+          </View>
+        </View>
+      </ReanimatedModule.View>
     </View>
   );
 }
@@ -2872,16 +2780,15 @@ function PhotoDetailView({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.black,
+    backgroundColor: COLORS.white,
   },
   backgroundImage: {
     position: 'absolute',
     width: width,
     height: height,
   },
-  backgroundScale: {
-    flex: 1,
-    transform: [{ scale: 1.1 }],
+  backgroundImageStyle: {
+    transform: [{ scale: 1.0 }],
   },
   overlay: {
     position: 'absolute',
@@ -3084,7 +2991,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: COLORS.secondary,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -3196,6 +3103,95 @@ const styles = StyleSheet.create({
     padding: SPACING.lg,
     backgroundColor: 'rgba(0, 0, 0, 0.95)',
   },
+  // Carousel styles
+  carouselContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  carouselOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  carouselScrollContent: {
+    alignItems: 'center',
+  },
+  carouselCardContainer: {
+    width: width,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 0,
+    },
+    shadowRadius: 20,
+    shadowOpacity: 0.5,
+    elevation: 10,
+  },
+  photoDetailBackgroundOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  photoDetailTopButtons: {
+    position: 'absolute',
+    top: 48,
+    right: 24,
+    flexDirection: 'row',
+    gap: 12,
+    zIndex: 10,
+  },
+  photoDetailTopButtonsContainer: {
+    position: 'absolute',
+    top: 48,
+    left: 24,
+    right: 24,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    zIndex: 10,
+  },
+  photoDetailMenuOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 50,
+  },
+  photoDetailMenuDropdown: {
+    position: 'absolute',
+    top: 96,
+    right: 24,
+    borderRadius: 12,
+    paddingVertical: 6,
+    minWidth: 120,
+    zIndex: 100,
+    overflow: 'hidden',
+  },
+  photoDetailMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 10,
+  },
+  photoDetailMenuItemDanger: {
+    marginTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  photoDetailMenuItemText: {
+    fontSize: 16,
+    color: COLORS.white,
+    fontWeight: '500',
+  },
+  photoDetailButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   photoDetailCloseButton: {
     position: 'absolute',
     top: 48,
@@ -3289,11 +3285,24 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.8)',
     fontWeight: '400',
   },
+  singleCardContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  photoFlatList: {
+    flex: 1,
+  },
+  flatListCardWrapper: {
+    width: width,
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: width * 0.05,
+  },
   flipCardContainer: {
     width: '90%',
     aspectRatio: 3 / 4,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   flipCardPressable: {
     width: '100%',
@@ -3306,6 +3315,7 @@ const styles = StyleSheet.create({
     backfaceVisibility: 'hidden',
     borderRadius: 16,
     overflow: 'hidden',
+    backgroundColor: '#000',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.4,
@@ -3313,9 +3323,9 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   flipCardBack: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#1a1a1a',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   flipCardImage: {
     width: '100%',
@@ -3328,6 +3338,8 @@ const styles = StyleSheet.create({
   flipCardBackContent: {
     flex: 1,
     padding: 24,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
   },
   flipCardBackTop: {
     marginBottom: 16,
@@ -4514,8 +4526,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
     position: 'relative',
   },
   albumDetailCloseButton: {
@@ -4529,7 +4539,7 @@ const styles = StyleSheet.create({
   albumDetailTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: COLORS.white,
+    color: '#FFFFFF',
     flex: 1,
     textAlign: 'center',
   },
@@ -4558,6 +4568,9 @@ const styles = StyleSheet.create({
     minWidth: 160,
     zIndex: 100,
     overflow: 'hidden',
+    backgroundColor: 'rgba(40, 40, 40, 0.98)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   albumMenuItem: {
     flexDirection: 'row',
@@ -4573,12 +4586,13 @@ const styles = StyleSheet.create({
   },
   albumMenuItemText: {
     fontSize: 16,
-    color: COLORS.white,
+    color: '#FFFFFF',
     fontWeight: '500',
   },
   albumDetailCoverContainer: {
     alignItems: 'center',
-    paddingVertical: 24,
+    paddingTop: 12,
+    paddingBottom: 24,
     paddingHorizontal: 20,
   },
   albumDetailCoverWrapper: {
@@ -4621,17 +4635,37 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 200,
   },
+  albumDetailScrollView: {
+    flex: 1,
+  },
+  albumDetailScrollContent: {
+    flexGrow: 1,
+    paddingBottom: 100,
+  },
+  albumPhotosSectionHeaderSticky: {
+    paddingVertical: 14,
+    paddingHorizontal: SPACING.lg,
+    backgroundColor: '#000000',
+  },
+  albumPhotosSectionHeaderInner: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  albumPhotosGridContainer: {
+    paddingHorizontal: SPACING.lg - 1,
+    paddingTop: SPACING.md,
+  },
   albumPhotosSectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
     paddingHorizontal: SPACING.lg,
   },
   albumPhotosSectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: COLORS.white,
+    color: '#FFFFFF',
   },
   selectionButtonsRow: {
     flexDirection: 'row',
@@ -4772,7 +4806,7 @@ const styles = StyleSheet.create({
   },
   albumPhotoSelectButtonText: {
     fontSize: 14,
-    color: COLORS.white,
+    color: '#FFFFFF',
     fontWeight: '500',
   },
   albumPhotoCancelButton: {
@@ -4783,7 +4817,7 @@ const styles = StyleSheet.create({
   },
   albumPhotoCancelButtonText: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: '#FFFFFF',
     fontWeight: '500',
   },
   albumPhotoDeleteButton: {

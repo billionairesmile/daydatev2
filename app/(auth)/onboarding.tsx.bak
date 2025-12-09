@@ -46,7 +46,7 @@ import { db, isDemoMode } from '@/lib/supabase';
 const { width, height } = Dimensions.get('window');
 
 // Step configuration for progress bar
-const STEP_A = ['terms', 'basic_info', 'pairing', 'couple_info'];
+const STEP_A = ['terms', 'basic_info', 'pairing'];
 const STEP_B = ['mbti', 'activity_type', 'date_worries', 'constraints'];
 
 export default function OnboardingScreen() {
@@ -100,22 +100,12 @@ export default function OnboardingScreen() {
         const user = useAuthStore.getState().user;
 
         if (user?.id) {
-          // Prepare preferences object for DB storage
-          const preferences = {
-            mbti: data.mbti,
-            gender: data.gender,
-            birthDateCalendarType: data.birthDateCalendarType,
-            activityTypes: data.activityTypes,
-            dateWorries: data.dateWorries,
-            constraints: data.constraints,
-            relationshipType: data.relationshipType,
-          };
-
-          // Update profile with birth date and preferences
-          await db.profiles.update(user.id, {
-            birth_date: data.birthDate ? data.birthDate.toISOString().split('T')[0] : undefined,
-            preferences,
-          });
+          // Update profile with birth date (location will be collected later during mission generation)
+          if (data.birthDate) {
+            await db.profiles.update(user.id, {
+              birth_date: data.birthDate.toISOString().split('T')[0], // Convert to ISO date string (YYYY-MM-DD)
+            });
+          }
 
           // Create or update couple with dating start date
           if (data.anniversaryDate) {
@@ -179,7 +169,7 @@ export default function OnboardingScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-      enabled={currentStep !== 'basic_info' && currentStep !== 'pairing'}
+      enabled={currentStep !== 'nickname' && currentStep !== 'pairing'}
     >
       {/* Background */}
       <ImageBackground
@@ -238,12 +228,6 @@ export default function OnboardingScreen() {
               setBirthDate={(date) => updateData({ birthDate: date })}
               calendarType={data.birthDateCalendarType}
               setCalendarType={(type) => updateData({ birthDateCalendarType: type })}
-              onNext={handleNext}
-              onBack={handleBack}
-            />
-          )}
-          {currentStep === 'couple_info' && (
-            <CoupleInfoStep
               relationshipType={data.relationshipType}
               setRelationshipType={(type) => updateData({ relationshipType: type })}
               anniversaryDate={data.anniversaryDate}
@@ -331,7 +315,7 @@ function WelcomeStep({ onNext }: { onNext: () => void }) {
   );
 }
 
-// Basic Info Step - Nickname, gender, and birthdate only
+// Basic Info Step - Combined nickname, gender, birthdate, and anniversary
 function BasicInfoStep({
   nickname,
   setNickname,
@@ -341,6 +325,10 @@ function BasicInfoStep({
   setBirthDate,
   calendarType,
   setCalendarType,
+  relationshipType,
+  setRelationshipType,
+  anniversaryDate,
+  setAnniversaryDate,
   onNext,
   onBack,
 }: {
@@ -352,10 +340,15 @@ function BasicInfoStep({
   setBirthDate: (date: Date | null) => void;
   calendarType: CalendarType;
   setCalendarType: (type: CalendarType) => void;
+  relationshipType: RelationshipType;
+  setRelationshipType: (type: RelationshipType) => void;
+  anniversaryDate: Date | null;
+  setAnniversaryDate: (date: Date | null) => void;
   onNext: () => void;
   onBack: () => void;
 }) {
   const [showBirthDatePicker, setShowBirthDatePicker] = useState(false);
+  const [showAnniversaryPicker, setShowAnniversaryPicker] = useState(false);
 
   const ensureBirthDate = (date: Date | string | null): Date => {
     if (!date) return new Date(2000, 0, 1);
@@ -363,7 +356,14 @@ function BasicInfoStep({
     return new Date(date);
   };
 
+  const ensureAnniversaryDate = (date: Date | string | null): Date => {
+    if (!date) return new Date();
+    if (date instanceof Date) return date;
+    return new Date(date);
+  };
+
   const [tempBirthDate, setTempBirthDate] = useState(ensureBirthDate(birthDate));
+  const [tempAnniversaryDate, setTempAnniversaryDate] = useState(ensureAnniversaryDate(anniversaryDate));
 
   const formatDate = (date: Date | string | null) => {
     const d = date instanceof Date ? date : date ? new Date(date) : new Date();
@@ -386,18 +386,47 @@ function BasicInfoStep({
     }
   };
 
+  const handleAnniversaryDateChange = (_event: unknown, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowAnniversaryPicker(false);
+      if (selectedDate) {
+        setAnniversaryDate(selectedDate);
+      }
+    } else {
+      if (selectedDate) {
+        setTempAnniversaryDate(selectedDate);
+      }
+    }
+  };
+
   const handleConfirmBirthDate = () => {
     setBirthDate(tempBirthDate);
     setShowBirthDatePicker(false);
   };
 
-  const isValid = nickname.trim().length >= 1 && gender !== null && birthDate !== null;
+  const handleConfirmAnniversaryDate = () => {
+    setAnniversaryDate(tempAnniversaryDate);
+    setShowAnniversaryPicker(false);
+  };
+
+  const getAnniversaryLabel = () => {
+    switch (relationshipType) {
+      case 'dating': return '사귄 날';
+      case 'married': return '결혼기념일';
+      case 'friendship': return '친구가 된 날';
+    }
+  };
+
+  const isValid = nickname.trim().length >= 1 && gender !== null && birthDate !== null && anniversaryDate !== null;
 
   return (
     <View style={styles.centeredStepContainer}>
       {/* Title fixed at top */}
       <View style={styles.nicknameTitleContainer}>
         <Text style={styles.stepTitle}>기본 정보를{'\n'}입력해주세요</Text>
+        <Text style={styles.stepDescription}>
+          맞춤형 데이트 추천을 위해 필요한 정보예요
+        </Text>
       </View>
 
       {/* Scrollable content */}
@@ -406,73 +435,95 @@ function BasicInfoStep({
         contentContainerStyle={styles.basicInfoScrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Nickname */}
+        {/* Nickname with Gender */}
         <View style={styles.basicInfoSection}>
           <Text style={styles.basicInfoLabel}>닉네임</Text>
-          <TextInput
-            style={styles.basicInfoInput}
-            placeholderTextColor="rgba(255, 255, 255, 0.4)"
-            placeholder="닉네임 입력"
-            value={nickname}
-            onChangeText={setNickname}
-            autoCapitalize="none"
-            maxLength={10}
-          />
-        </View>
-
-        {/* Gender */}
-        <View style={styles.basicInfoSection}>
-          <Text style={styles.basicInfoLabel}>성별</Text>
-          <View style={styles.genderButtons}>
-            <Pressable
-              style={[styles.genderButton, gender === 'male' && styles.genderButtonActive]}
-              onPress={() => setGender('male')}
-            >
-              <Text style={[styles.genderButtonText, gender === 'male' && styles.genderButtonTextActive]}>남</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.genderButton, gender === 'female' && styles.genderButtonActive]}
-              onPress={() => setGender('female')}
-            >
-              <Text style={[styles.genderButtonText, gender === 'female' && styles.genderButtonTextActive]}>여</Text>
-            </Pressable>
+          <View style={styles.nicknameGenderRow}>
+            <View style={styles.nicknameInputWrapper}>
+              <TextInput
+                style={styles.basicInfoInput}
+                placeholderTextColor="rgba(255, 255, 255, 0.4)"
+                placeholder="닉네임 입력"
+                value={nickname}
+                onChangeText={setNickname}
+                autoCapitalize="none"
+                maxLength={10}
+              />
+            </View>
+            <View style={styles.genderButtons}>
+              <Pressable
+                style={[styles.genderButton, gender === 'male' && styles.genderButtonActive]}
+                onPress={() => setGender('male')}
+              >
+                <Text style={[styles.genderButtonText, gender === 'male' && styles.genderButtonTextActive]}>남</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.genderButton, gender === 'female' && styles.genderButtonActive]}
+                onPress={() => setGender('female')}
+              >
+                <Text style={[styles.genderButtonText, gender === 'female' && styles.genderButtonTextActive]}>여</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
 
         {/* Birth Date */}
         <View style={styles.basicInfoSection}>
           <Text style={styles.basicInfoLabel}>생년월일</Text>
-          <View style={styles.birthDateRow}>
-            {/* Date picker button */}
+          <Pressable
+            style={styles.basicInfoDateButton}
+            onPress={() => setShowBirthDatePicker(true)}
+          >
+            <Text style={[styles.basicInfoDateText, birthDate && styles.basicInfoDateTextSelected]}>
+              {birthDate ? formatDate(birthDate) : '생년월일 선택'}
+            </Text>
+            <Calendar color={birthDate ? COLORS.white : 'rgba(255, 255, 255, 0.4)'} size={20} />
+          </Pressable>
+          <View style={styles.calendarTypeRow}>
             <Pressable
-              style={styles.birthDateButton}
-              onPress={() => setShowBirthDatePicker(true)}
+              style={[styles.calendarTypeButton, calendarType === 'solar' && styles.calendarTypeButtonActive]}
+              onPress={() => setCalendarType('solar')}
             >
-              <Text style={[styles.basicInfoDateText, birthDate && styles.basicInfoDateTextSelected]}>
-                {birthDate ? formatDate(birthDate) : '생년월일 선택'}
+              <Text style={[styles.calendarTypeButtonText, calendarType === 'solar' && styles.calendarTypeButtonTextActive]}>
+                양력
               </Text>
-              <Calendar color={birthDate ? COLORS.white : 'rgba(255, 255, 255, 0.4)'} size={20} />
             </Pressable>
-            {/* Calendar Type buttons on the right */}
-            <View style={styles.calendarTypeButtons}>
-              <Pressable
-                style={[styles.calendarTypeButtonSmall, calendarType === 'solar' && styles.calendarTypeButtonActive]}
-                onPress={() => setCalendarType('solar')}
-              >
-                <Text style={[styles.calendarTypeButtonText, calendarType === 'solar' && styles.calendarTypeButtonTextActive]}>
-                  양력
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[styles.calendarTypeButtonSmall, calendarType === 'lunar' && styles.calendarTypeButtonActive]}
-                onPress={() => setCalendarType('lunar')}
-              >
-                <Text style={[styles.calendarTypeButtonText, calendarType === 'lunar' && styles.calendarTypeButtonTextActive]}>
-                  음력
-                </Text>
-              </Pressable>
-            </View>
+            <Pressable
+              style={[styles.calendarTypeButton, calendarType === 'lunar' && styles.calendarTypeButtonActive]}
+              onPress={() => setCalendarType('lunar')}
+            >
+              <Text style={[styles.calendarTypeButtonText, calendarType === 'lunar' && styles.calendarTypeButtonTextActive]}>
+                음력
+              </Text>
+            </Pressable>
           </View>
+        </View>
+
+        {/* Anniversary Date with Relationship Type */}
+        <View style={styles.basicInfoSection}>
+          <Text style={styles.basicInfoLabel}>기념일</Text>
+          <View style={styles.relationshipTypeRow}>
+            {(['dating', 'married', 'friendship'] as RelationshipType[]).map((type) => (
+              <Pressable
+                key={type}
+                style={[styles.relationshipTypeButton, relationshipType === type && styles.relationshipTypeButtonActive]}
+                onPress={() => setRelationshipType(type)}
+              >
+                <Text style={[styles.relationshipTypeButtonText, relationshipType === type && styles.relationshipTypeButtonTextActive]}>
+                  {type === 'dating' ? '사귄 날' : type === 'married' ? '결혼기념일' : '친구가 된 날'}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <Pressable
+            style={styles.basicInfoDateButton}
+            onPress={() => setShowAnniversaryPicker(true)}
+          >
+            <Text style={[styles.basicInfoDateText, anniversaryDate && styles.basicInfoDateTextSelected]}>
+              {anniversaryDate ? formatDate(anniversaryDate) : `${getAnniversaryLabel()} 선택`}
+            </Text>
+            <Calendar color={anniversaryDate ? COLORS.white : 'rgba(255, 255, 255, 0.4)'} size={20} />
+          </Pressable>
         </View>
       </ScrollView>
 
@@ -517,7 +568,256 @@ function BasicInfoStep({
         />
       )}
 
+      {/* Anniversary Date Picker Modals */}
+      {Platform.OS === 'ios' && (
+        <Modal
+          visible={showAnniversaryPicker}
+          transparent
+          animationType="slide"
+        >
+          <View style={styles.datePickerModal}>
+            <View style={styles.datePickerModalContent}>
+              <View style={styles.datePickerHeader}>
+                <Pressable onPress={() => setShowAnniversaryPicker(false)}>
+                  <Text style={styles.datePickerCancel}>취소</Text>
+                </Pressable>
+                <Pressable onPress={handleConfirmAnniversaryDate}>
+                  <Text style={styles.datePickerConfirm}>확인</Text>
+                </Pressable>
+              </View>
+              <DateTimePicker
+                value={tempAnniversaryDate}
+                mode="date"
+                display="spinner"
+                onChange={handleAnniversaryDateChange}
+                maximumDate={new Date()}
+                locale="ko-KR"
+                style={styles.datePicker}
+              />
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {Platform.OS === 'android' && showAnniversaryPicker && (
+        <DateTimePicker
+          value={tempAnniversaryDate}
+          mode="date"
+          display="default"
+          onChange={handleAnniversaryDateChange}
+          maximumDate={new Date()}
+        />
+      )}
+
       {/* Buttons fixed at bottom */}
+      <View style={styles.buttonRow}>
+        <Pressable style={styles.secondaryButton} onPress={onBack}>
+          <Text style={styles.secondaryButtonText}>이전</Text>
+        </Pressable>
+        <Pressable
+          style={[styles.primaryButton, styles.buttonFlex, !isValid && styles.primaryButtonDisabled]}
+          onPress={onNext}
+          disabled={!isValid}
+        >
+          <Text style={styles.primaryButtonText}>다음</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+// Nickname Step
+function NicknameStep({
+  nickname,
+  setNickname,
+  onNext,
+  onBack,
+}: {
+  nickname: string;
+  setNickname: (name: string) => void;
+  onNext: () => void;
+  onBack: () => void;
+}) {
+  const isValid = nickname.trim().length >= 1;
+
+  return (
+    <View style={styles.centeredStepContainer}>
+      {/* Title fixed at top */}
+      <View style={styles.nicknameTitleContainer}>
+        <Text style={styles.stepTitle}>
+          닉네임을{'\n'}입력해주세요
+        </Text>
+        <Text style={styles.stepDescription}>
+          파트너에게 보여질 이름이에요
+        </Text>
+      </View>
+
+      {/* Input centered in remaining space */}
+      <View style={styles.nicknameCenterArea}>
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.textInput}
+            placeholderTextColor="rgba(255, 255, 255, 0.4)"
+            value={nickname}
+            onChangeText={setNickname}
+            autoCapitalize="none"
+            maxLength={10}
+          />
+        </View>
+      </View>
+
+      {/* Buttons fixed at bottom */}
+      <View style={styles.buttonRow}>
+        <Pressable style={styles.secondaryButton} onPress={onBack}>
+          <Text style={styles.secondaryButtonText}>이전</Text>
+        </Pressable>
+        <Pressable
+          style={[styles.primaryButton, styles.buttonFlex, !isValid && styles.primaryButtonDisabled]}
+          onPress={onNext}
+          disabled={!isValid}
+        >
+          <Text style={styles.primaryButtonText}>다음</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+// BirthDate Step
+function BirthDateStep({
+  birthDate,
+  setBirthDate,
+  calendarType,
+  setCalendarType,
+  onNext,
+  onBack,
+}: {
+  birthDate: Date | null;
+  setBirthDate: (date: Date | null) => void;
+  calendarType: CalendarType;
+  setCalendarType: (type: CalendarType) => void;
+  onNext: () => void;
+  onBack: () => void;
+}) {
+  const [showPicker, setShowPicker] = useState(false);
+
+  // Ensure birthDate is a Date object
+  const ensureDate = (date: Date | string | null): Date => {
+    if (!date) return new Date(2000, 0, 1); // Default to year 2000
+    if (date instanceof Date) return date;
+    return new Date(date);
+  };
+
+  const [tempDate, setTempDate] = useState(ensureDate(birthDate));
+
+  const formatDate = (date: Date | string | null) => {
+    const d = ensureDate(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}년 ${month}월 ${day}일`;
+  };
+
+  const handleDateChange = (_event: unknown, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowPicker(false);
+      if (selectedDate) {
+        setBirthDate(selectedDate);
+      }
+    } else {
+      if (selectedDate) {
+        setTempDate(selectedDate);
+      }
+    }
+  };
+
+  const handleConfirmDate = () => {
+    setBirthDate(tempDate);
+    setShowPicker(false);
+  };
+
+  const isValid = birthDate !== null;
+
+  return (
+    <View style={styles.centeredStepContainer}>
+      <View style={styles.centeredContent}>
+        <Text style={styles.stepTitle}>
+          생년월일을{'\n'}입력해주세요
+        </Text>
+        <Text style={[styles.stepDescription, { marginBottom: SPACING.xxxl }]}>
+          특별한 날을 기억할 수 있도록 도와드릴게요
+        </Text>
+
+        <Pressable style={styles.datePickerButton} onPress={() => setShowPicker(true)}>
+          <Calendar color="rgba(255, 255, 255, 0.6)" size={20} />
+          <Text style={[styles.datePickerText, birthDate && styles.datePickerTextSelected]}>
+            {birthDate ? formatDate(birthDate) : '생년월일을 선택해주세요'}
+          </Text>
+        </Pressable>
+
+        {/* Calendar Type Toggle */}
+        <View style={[styles.toggleRow, { width: 'auto', alignSelf: 'center' }]}>
+          <Pressable
+            style={[styles.toggleButtonSmall, calendarType === 'solar' && styles.toggleButtonActive]}
+            onPress={() => setCalendarType('solar')}
+          >
+            <Text style={[styles.toggleButtonText, calendarType === 'solar' && styles.toggleButtonTextActive]}>
+              양력
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.toggleButtonSmall, calendarType === 'lunar' && styles.toggleButtonActive]}
+            onPress={() => setCalendarType('lunar')}
+          >
+            <Text style={[styles.toggleButtonText, calendarType === 'lunar' && styles.toggleButtonTextActive]}>
+              음력
+            </Text>
+          </Pressable>
+        </View>
+
+        {/* iOS Date Picker Modal */}
+        {Platform.OS === 'ios' && (
+          <Modal
+            visible={showPicker}
+            transparent
+            animationType="slide"
+          >
+            <View style={styles.datePickerModal}>
+              <View style={styles.datePickerModalContent}>
+                <View style={styles.datePickerHeader}>
+                  <Pressable onPress={() => setShowPicker(false)}>
+                    <Text style={styles.datePickerCancel}>취소</Text>
+                  </Pressable>
+                  <Pressable onPress={handleConfirmDate}>
+                    <Text style={styles.datePickerConfirm}>확인</Text>
+                  </Pressable>
+                </View>
+                <DateTimePicker
+                  value={tempDate}
+                  mode="date"
+                  display="spinner"
+                  onChange={handleDateChange}
+                  maximumDate={new Date()}
+                  locale="ko-KR"
+                  style={styles.datePicker}
+                />
+              </View>
+            </View>
+          </Modal>
+        )}
+
+        {/* Android Date Picker */}
+        {Platform.OS === 'android' && showPicker && (
+          <DateTimePicker
+            value={tempDate}
+            mode="date"
+            display="default"
+            onChange={handleDateChange}
+            maximumDate={new Date()}
+          />
+        )}
+      </View>
+
       <View style={styles.buttonRow}>
         <Pressable style={styles.secondaryButton} onPress={onBack}>
           <Text style={styles.secondaryButtonText}>이전</Text>
@@ -557,7 +857,7 @@ function TermsStep({
     <View style={styles.centeredStepContainer}>
       {/* Title fixed at top */}
       <View style={styles.nicknameTitleContainer}>
-        <Text style={[styles.stepTitle, { minHeight: 36 }]}>이용약관 동의</Text>
+        <Text style={styles.stepTitle}>이용약관 동의</Text>
         <Text style={styles.stepDescription}>
           서비스 이용을 위해 약관에 동의해주세요
         </Text>
@@ -655,7 +955,7 @@ function PairingStep({
       </View>
 
       {/* Content centered in remaining space */}
-      <View style={[styles.nicknameCenterArea, { paddingTop: 60 }]}>
+      <View style={styles.nicknameCenterArea}>
         {/* Toggle */}
         <View style={[styles.toggleRow, { marginBottom: SPACING.xl }]}>
           <Pressable
@@ -720,185 +1020,6 @@ function PairingStep({
   );
 }
 
-// Couple Info Step - Anniversary date input
-function CoupleInfoStep({
-  relationshipType,
-  setRelationshipType,
-  anniversaryDate,
-  setAnniversaryDate,
-  onNext,
-  onBack,
-}: {
-  relationshipType: RelationshipType;
-  setRelationshipType: (type: RelationshipType) => void;
-  anniversaryDate: Date | null;
-  setAnniversaryDate: (date: Date | null) => void;
-  onNext: () => void;
-  onBack: () => void;
-}) {
-  const [showAnniversaryPicker, setShowAnniversaryPicker] = useState(false);
-
-  const ensureAnniversaryDate = (date: Date | string | null): Date => {
-    if (!date) return new Date();
-    if (date instanceof Date) return date;
-    return new Date(date);
-  };
-
-  const [tempAnniversaryDate, setTempAnniversaryDate] = useState(ensureAnniversaryDate(anniversaryDate));
-
-  const formatDate = (date: Date | string | null) => {
-    const d = date instanceof Date ? date : date ? new Date(date) : new Date();
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}.${month}.${day}`;
-  };
-
-  const handleAnniversaryDateChange = (_event: unknown, selectedDate?: Date) => {
-    if (Platform.OS === 'android') {
-      setShowAnniversaryPicker(false);
-      if (selectedDate) {
-        setAnniversaryDate(selectedDate);
-      }
-    } else {
-      if (selectedDate) {
-        setTempAnniversaryDate(selectedDate);
-      }
-    }
-  };
-
-  const handleConfirmAnniversaryDate = () => {
-    setAnniversaryDate(tempAnniversaryDate);
-    setShowAnniversaryPicker(false);
-  };
-
-  const getAnniversaryLabel = () => {
-    switch (relationshipType) {
-      case 'dating': return '사귄 날';
-      case 'married': return '결혼 기념일';
-      case 'friendship': return '친구 된 날';
-    }
-  };
-
-  const isValid = anniversaryDate !== null;
-
-  return (
-    <View style={styles.centeredStepContainer}>
-      {/* Title fixed at top */}
-      <View style={styles.nicknameTitleContainer}>
-        <Text style={styles.stepTitle}>커플 정보를{'\n'}입력해주세요</Text>
-      </View>
-
-      {/* Scrollable content */}
-      <ScrollView
-        style={styles.basicInfoScrollView}
-        contentContainerStyle={styles.basicInfoScrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Relationship Type Selection */}
-        <View style={styles.basicInfoSection}>
-          <Text style={styles.basicInfoLabel}>관계</Text>
-          <View style={styles.relationshipTypeRow}>
-            <Pressable
-              style={[styles.relationshipTypeButton, relationshipType === 'dating' && styles.relationshipTypeButtonActive]}
-              onPress={() => setRelationshipType('dating')}
-            >
-              <Text style={[styles.relationshipTypeButtonText, relationshipType === 'dating' && styles.relationshipTypeButtonTextActive]}>
-                연애
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[styles.relationshipTypeButton, relationshipType === 'married' && styles.relationshipTypeButtonActive]}
-              onPress={() => setRelationshipType('married')}
-            >
-              <Text style={[styles.relationshipTypeButtonText, relationshipType === 'married' && styles.relationshipTypeButtonTextActive]}>
-                결혼
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[styles.relationshipTypeButton, relationshipType === 'friendship' && styles.relationshipTypeButtonActive]}
-              onPress={() => setRelationshipType('friendship')}
-            >
-              <Text style={[styles.relationshipTypeButtonText, relationshipType === 'friendship' && styles.relationshipTypeButtonTextActive]}>
-                우정
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-
-        {/* Anniversary Date */}
-        <View style={styles.basicInfoSection}>
-          <Text style={styles.basicInfoLabel}>{getAnniversaryLabel()}</Text>
-          <Pressable
-            style={styles.basicInfoDateButton}
-            onPress={() => setShowAnniversaryPicker(true)}
-          >
-            <Text style={[styles.basicInfoDateText, anniversaryDate && styles.basicInfoDateTextSelected]}>
-              {anniversaryDate ? formatDate(anniversaryDate) : `${getAnniversaryLabel()} 선택`}
-            </Text>
-            <Calendar color={anniversaryDate ? COLORS.white : 'rgba(255, 255, 255, 0.4)'} size={20} />
-          </Pressable>
-        </View>
-      </ScrollView>
-
-      {/* Anniversary Date Picker Modals */}
-      {Platform.OS === 'ios' && (
-        <Modal
-          visible={showAnniversaryPicker}
-          transparent
-          animationType="slide"
-        >
-          <View style={styles.datePickerModal}>
-            <View style={styles.datePickerModalContent}>
-              <View style={styles.datePickerHeader}>
-                <Pressable onPress={() => setShowAnniversaryPicker(false)}>
-                  <Text style={styles.datePickerCancel}>취소</Text>
-                </Pressable>
-                <Pressable onPress={handleConfirmAnniversaryDate}>
-                  <Text style={styles.datePickerConfirm}>확인</Text>
-                </Pressable>
-              </View>
-              <DateTimePicker
-                value={tempAnniversaryDate}
-                mode="date"
-                display="spinner"
-                onChange={handleAnniversaryDateChange}
-                maximumDate={new Date()}
-                locale="ko-KR"
-                style={styles.datePicker}
-              />
-            </View>
-          </View>
-        </Modal>
-      )}
-
-      {Platform.OS === 'android' && showAnniversaryPicker && (
-        <DateTimePicker
-          value={tempAnniversaryDate}
-          mode="date"
-          display="default"
-          onChange={handleAnniversaryDateChange}
-          maximumDate={new Date()}
-        />
-      )}
-
-      {/* Buttons fixed at bottom */}
-      <View style={styles.buttonRow}>
-        <Pressable style={styles.secondaryButton} onPress={onBack}>
-          <Text style={styles.secondaryButtonText}>이전</Text>
-        </Pressable>
-        <Pressable
-          style={[styles.primaryButton, styles.buttonFlex, !isValid && styles.primaryButtonDisabled]}
-          onPress={onNext}
-          disabled={!isValid}
-        >
-          <Text style={styles.primaryButtonText}>다음</Text>
-        </Pressable>
-      </View>
-    </View>
-  );
-}
-
 // Preferences Intro Step
 function PreferencesIntroStep({
   onNext,
@@ -910,12 +1031,12 @@ function PreferencesIntroStep({
   return (
     <View style={styles.centeredStepContainer}>
       {/* Title fixed at top */}
-      <View style={[styles.nicknameTitleContainer, { paddingTop: SPACING.xxxl + 60 }]}>
+      <View style={styles.nicknameTitleContainer}>
         <Text style={styles.stepTitle}>
           맞춤형 미션을 위해{'\n'}취향을 알려주세요
         </Text>
         <Text style={styles.stepDescription}>
-          두 분의 취향을 분석해서{'\n'}적절한 데이트 미션을 추천해드릴게요
+          두 분의 취향을 분석해서{'\n'}딱 맞는 데이트 미션을 추천해드려요
         </Text>
       </View>
 
@@ -1022,7 +1143,7 @@ function ActivityTypeStep({
       {/* Title at top */}
       <View style={{ width: '100%', paddingHorizontal: SPACING.xl, paddingTop: SPACING.xxxl + 40, alignItems: 'center' }}>
         <Text style={styles.stepTitle}>선호하는 활동을{'\n'}선택해주세요</Text>
-        <Text style={styles.stepDescription}>
+        <Text style={[styles.stepDescription, { marginTop: SPACING.sm }]}>
           여러 개 선택할 수 있어요
         </Text>
       </View>
@@ -1189,12 +1310,12 @@ function ConstraintsStep({
       {/* Title at top */}
       <View style={{ width: '100%', paddingHorizontal: SPACING.xl, paddingTop: SPACING.xxxl + 40, alignItems: 'center' }}>
         <Text style={styles.stepTitle}>미션을 줄 때{'\n'}참고할 사항은?</Text>
-        <Text style={styles.stepDescription}>
+        <Text style={[styles.stepDescription, { marginTop: SPACING.sm }]}>
           해당하는 것을 모두 선택해주세요
         </Text>
       </View>
 
-      <View style={[styles.topCenteredContent, { paddingTop: SPACING.lg }]}>
+      <View style={styles.topCenteredContent}>
         <View style={styles.constraintGrid}>
           {CONSTRAINT_OPTIONS.map((option) => (
             <Pressable
@@ -1323,7 +1444,7 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     justifyContent: 'flex-start',
-    paddingHorizontal: SPACING.md,
+    paddingHorizontal: SPACING.xl,
     paddingTop: SPACING.xxxl + 40,
     height: 180,
   },
@@ -1334,7 +1455,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingTop: 10,
     paddingBottom: 200,
-    paddingHorizontal: SPACING.md,
   },
   centeredContent: {
     flex: 1,
@@ -1383,9 +1503,13 @@ const styles = StyleSheet.create({
   iconContainer: {
     width: 96,
     height: 96,
+    borderRadius: 48,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: SPACING.xxl,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   iconContainerSmall: {
     width: 80,
@@ -1604,7 +1728,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.6)',
     fontWeight: '500',
     marginBottom: SPACING.md,
-    marginLeft: SPACING.xs,
   },
   codeText: {
     fontSize: 32,
@@ -1754,8 +1877,6 @@ const styles = StyleSheet.create({
   },
   datePicker: {
     height: 200,
-    alignSelf: 'center',
-    width: '100%',
   },
   preferencesInfoBox: {
     width: '100%',
@@ -2049,9 +2170,13 @@ const styles = StyleSheet.create({
   celebrationIconContainer: {
     width: 96,
     height: 96,
+    borderRadius: 48,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: SPACING.xxl,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   celebrationTitle: {
     fontSize: 36,
@@ -2118,22 +2243,22 @@ const styles = StyleSheet.create({
   },
   calendarTypeButton: {
     flex: 1,
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.md,
-    borderRadius: RADIUS.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: RADIUS.full,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
   },
   calendarTypeButtonActive: {
     backgroundColor: COLORS.white,
     borderColor: COLORS.white,
   },
   calendarTypeButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 14,
     color: COLORS.white,
+    fontWeight: '500',
   },
   calendarTypeButtonTextActive: {
     color: COLORS.black,
@@ -2144,19 +2269,18 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   basicInfoScrollContent: {
-    paddingHorizontal: SPACING.md,
+    paddingHorizontal: SPACING.xl,
     paddingTop: SPACING.lg,
     paddingBottom: SPACING.xxxl,
   },
   basicInfoSection: {
-    marginBottom: SPACING.huge,
+    marginBottom: SPACING.xl,
   },
   basicInfoLabel: {
     fontSize: 16,
     fontWeight: '600',
     color: COLORS.white,
     marginBottom: SPACING.sm,
-    marginLeft: SPACING.xs,
   },
   nicknameGenderRow: {
     flexDirection: 'row',
@@ -2175,15 +2299,13 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
-    height: 50,
-    letterSpacing: 0,
   },
   genderButtons: {
     flexDirection: 'row',
-    gap: SPACING.sm,
+    gap: SPACING.xs,
   },
   genderButton: {
-    flex: 1,
+    width: 50,
     height: 50,
     borderRadius: RADIUS.lg,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
@@ -2215,83 +2337,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  birthDateRow: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    alignItems: 'center',
-  },
-  birthDateButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: RADIUS.lg,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    height: 50,
-    flex: 1,
-  },
-  calendarTypeButtons: {
-    flexDirection: 'row',
-    gap: 4,
-  },
-  calendarTypeButtonSmall: {
-    width: 56,
-    height: 50,
-    borderRadius: RADIUS.lg,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  birthDateButtonFull: {
-    width: '100%',
-    height: 50,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: RADIUS.lg,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  anniversaryDateRow: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    alignItems: 'center',
-  },
-  anniversaryDateButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: RADIUS.lg,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    height: 50,
-    flex: 1,
-  },
-  relationshipTypeButtons: {
-    flexDirection: 'row',
-    gap: SPACING.xs,
-  },
-  relationshipTypeButtonSmall: {
-    width: 50,
-    height: 50,
-    borderRadius: RADIUS.lg,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   basicInfoDateText: {
     fontSize: 16,
     color: 'rgba(255, 255, 255, 0.4)',
@@ -2302,75 +2347,33 @@ const styles = StyleSheet.create({
   calendarTypeRow: {
     flexDirection: 'row',
     gap: SPACING.xs,
-    marginBottom: SPACING.sm,
+    marginTop: SPACING.sm,
   },
   relationshipTypeRow: {
     flexDirection: 'row',
-    gap: SPACING.sm,
+    gap: SPACING.xs,
+    marginBottom: SPACING.sm,
   },
   relationshipTypeButton: {
     flex: 1,
-    height: 50,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
     borderRadius: RADIUS.lg,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
-    justifyContent: 'center',
   },
   relationshipTypeButtonActive: {
     backgroundColor: COLORS.white,
     borderColor: COLORS.white,
   },
   relationshipTypeButtonText: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '600',
     color: COLORS.white,
   },
   relationshipTypeButtonTextActive: {
     color: COLORS.black,
-  },
-  relationshipDropdownButton: {
-    width: 70,
-    height: 50,
-    borderRadius: RADIUS.lg,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.xs,
-  },
-  relationshipDropdownText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.white,
-  },
-  relationshipDropdownMenu: {
-    marginTop: SPACING.sm,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    overflow: 'hidden',
-  },
-  relationshipDropdownItem: {
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  relationshipDropdownItemActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  relationshipDropdownItemText: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: COLORS.white,
-    textAlign: 'center',
-  },
-  relationshipDropdownItemTextActive: {
-    fontWeight: '700',
   },
 });

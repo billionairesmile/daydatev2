@@ -21,12 +21,21 @@ export const supabase: SupabaseClient | null =
 // 개발 모드에서 Supabase 없이도 앱 테스트 가능
 export const isDemoMode = !supabase;
 
+// Helper to get supabase client with null check
+function getSupabase(): SupabaseClient {
+  if (!supabase) {
+    throw new Error('Supabase client is not initialized. Check your environment variables.');
+  }
+  return supabase;
+}
+
 // Database helper functions
 export const db = {
   // Profiles
   profiles: {
     async get(userId: string) {
-      const { data, error } = await supabase
+      const client = getSupabase();
+      const { data, error } = await client
         .from('profiles')
         .select('*')
         .eq('id', userId)
@@ -39,8 +48,14 @@ export const db = {
       nickname: string;
       invite_code: string;
       preferences?: Record<string, unknown>;
+      birth_date?: string; // ISO date string
+      location_latitude?: number;
+      location_longitude?: number;
+      location_city?: string;
+      location_district?: string;
     }) {
-      const { data, error } = await supabase
+      const client = getSupabase();
+      const { data, error } = await client
         .from('profiles')
         .insert(profile)
         .select()
@@ -49,7 +64,8 @@ export const db = {
     },
 
     async update(userId: string, updates: Record<string, unknown>) {
-      const { data, error } = await supabase
+      const client = getSupabase();
+      const { data, error } = await client
         .from('profiles')
         .update(updates)
         .eq('id', userId)
@@ -59,7 +75,8 @@ export const db = {
     },
 
     async findByInviteCode(code: string) {
-      const { data, error } = await supabase
+      const client = getSupabase();
+      const { data, error } = await client
         .from('profiles')
         .select('*')
         .eq('invite_code', code)
@@ -71,10 +88,21 @@ export const db = {
   // Couples
   couples: {
     async get(coupleId: string) {
-      const { data, error } = await supabase
+      const client = getSupabase();
+      const { data, error } = await client
         .from('couples')
         .select('*')
         .eq('id', coupleId)
+        .single();
+      return { data, error };
+    },
+
+    async getByUserId(userId: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('couples')
+        .select('*')
+        .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
         .single();
       return { data, error };
     },
@@ -83,8 +111,11 @@ export const db = {
       user1_id: string;
       anniversary_date?: string;
       anniversary_type?: string;
+      dating_start_date?: string; // ISO date string - when they started dating
+      wedding_date?: string; // ISO date string - wedding anniversary (if married)
     }) {
-      const { data, error } = await supabase
+      const client = getSupabase();
+      const { data, error } = await client
         .from('couples')
         .insert(couple)
         .select()
@@ -93,9 +124,21 @@ export const db = {
     },
 
     async joinCouple(coupleId: string, userId: string) {
-      const { data, error } = await supabase
+      const client = getSupabase();
+      const { data, error } = await client
         .from('couples')
         .update({ user2_id: userId, status: 'active' })
+        .eq('id', coupleId)
+        .select()
+        .single();
+      return { data, error };
+    },
+
+    async update(coupleId: string, updates: Record<string, unknown>) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('couples')
+        .update(updates)
         .eq('id', coupleId)
         .select()
         .single();
@@ -106,7 +149,8 @@ export const db = {
   // Missions
   missions: {
     async getAll() {
-      const { data, error } = await supabase
+      const client = getSupabase();
+      const { data, error } = await client
         .from('missions')
         .select('*')
         .order('created_at', { ascending: false });
@@ -114,7 +158,8 @@ export const db = {
     },
 
     async getByCategory(category: string) {
-      const { data, error } = await supabase
+      const client = getSupabase();
+      const { data, error } = await client
         .from('missions')
         .select('*')
         .eq('category', category);
@@ -122,7 +167,8 @@ export const db = {
     },
 
     async getRandom(limit = 5) {
-      const { data, error } = await supabase
+      const client = getSupabase();
+      const { data, error } = await client
         .from('missions')
         .select('*')
         .limit(limit);
@@ -133,8 +179,9 @@ export const db = {
   // Daily Missions
   dailyMissions: {
     async getToday(coupleId: string) {
+      const client = getSupabase();
       const today = new Date().toISOString().split('T')[0];
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from('daily_missions')
         .select('*, mission:missions(*)')
         .eq('couple_id', coupleId)
@@ -149,7 +196,8 @@ export const db = {
       ai_reason: string;
       assigned_date: string;
     }) {
-      const { data, error } = await supabase
+      const client = getSupabase();
+      const { data, error } = await client
         .from('daily_missions')
         .insert(dailyMission)
         .select('*, mission:missions(*)')
@@ -158,7 +206,8 @@ export const db = {
     },
 
     async updateStatus(id: string, status: string) {
-      const { data, error } = await supabase
+      const client = getSupabase();
+      const { data, error } = await client
         .from('daily_missions')
         .update({ status })
         .eq('id', id)
@@ -168,7 +217,8 @@ export const db = {
     },
 
     async getHistory(coupleId: string, limit = 30) {
-      const { data, error } = await supabase
+      const client = getSupabase();
+      const { data, error } = await client
         .from('daily_missions')
         .select('*, mission:missions(*)')
         .eq('couple_id', coupleId)
@@ -181,7 +231,8 @@ export const db = {
   // Completed Missions (Memories)
   completedMissions: {
     async getAll(coupleId: string) {
-      const { data, error } = await supabase
+      const client = getSupabase();
+      const { data, error } = await client
         .from('completed_missions')
         .select('*, mission:missions(*)')
         .eq('couple_id', coupleId)
@@ -190,10 +241,11 @@ export const db = {
     },
 
     async getByMonth(coupleId: string, year: number, month: number) {
+      const client = getSupabase();
       const startDate = new Date(year, month, 1).toISOString();
       const endDate = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
 
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from('completed_missions')
         .select('*, mission:missions(*)')
         .eq('couple_id', coupleId)
@@ -211,7 +263,8 @@ export const db = {
       user2_message: string;
       location: string;
     }) {
-      const { data, error } = await supabase
+      const client = getSupabase();
+      const { data, error } = await client
         .from('completed_missions')
         .insert(memory)
         .select('*, mission:missions(*)')
@@ -220,15 +273,454 @@ export const db = {
     },
   },
 
+  // Onboarding Answers
+  onboardingAnswers: {
+    async get(userId: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('onboarding_answers')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+      return { data, error };
+    },
+
+    async upsert(userId: string, answers: Record<string, unknown>) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('onboarding_answers')
+        .upsert({ user_id: userId, answers })
+        .select()
+        .single();
+      return { data, error };
+    },
+  },
+
+  // Anniversaries
+  anniversaries: {
+    async getAll(coupleId: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('anniversaries')
+        .select('*')
+        .eq('couple_id', coupleId)
+        .order('date', { ascending: true });
+      return { data, error };
+    },
+
+    async create(anniversary: {
+      couple_id: string;
+      title: string;
+      date: string;
+      is_recurring?: boolean;
+    }) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('anniversaries')
+        .insert(anniversary)
+        .select()
+        .single();
+      return { data, error };
+    },
+
+    async update(id: string, updates: Record<string, unknown>) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('anniversaries')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+      return { data, error };
+    },
+
+    async delete(id: string) {
+      const client = getSupabase();
+      const { error } = await client
+        .from('anniversaries')
+        .delete()
+        .eq('id', id);
+      return { error };
+    },
+  },
+
+  // Todos
+  todos: {
+    async getAll(coupleId: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('todos')
+        .select('*')
+        .eq('couple_id', coupleId)
+        .order('date', { ascending: true });
+      return { data, error };
+    },
+
+    async getByDate(coupleId: string, date: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('todos')
+        .select('*')
+        .eq('couple_id', coupleId)
+        .eq('date', date)
+        .order('created_at', { ascending: true });
+      return { data, error };
+    },
+
+    async create(todo: {
+      couple_id: string;
+      title: string;
+      date?: string;
+      created_by?: string;
+    }) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('todos')
+        .insert(todo)
+        .select()
+        .single();
+      return { data, error };
+    },
+
+    async toggleComplete(id: string, completed: boolean, completedBy?: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('todos')
+        .update({
+          completed,
+          completed_by: completed ? completedBy : null,
+          completed_at: completed ? new Date().toISOString() : null,
+        })
+        .eq('id', id)
+        .select()
+        .single();
+      return { data, error };
+    },
+
+    async delete(id: string) {
+      const client = getSupabase();
+      const { error } = await client
+        .from('todos')
+        .delete()
+        .eq('id', id);
+      return { error };
+    },
+  },
+
+  // Mission Completions (per-user)
+  missionCompletions: {
+    async getByMission(dailyMissionId: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('mission_completions')
+        .select('*')
+        .eq('daily_mission_id', dailyMissionId);
+      return { data, error };
+    },
+
+    async create(completion: {
+      daily_mission_id: string;
+      user_id: string;
+      photo_url?: string;
+      message?: string;
+    }) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('mission_completions')
+        .insert(completion)
+        .select()
+        .single();
+      return { data, error };
+    },
+
+    async update(id: string, updates: Record<string, unknown>) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('mission_completions')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+      return { data, error };
+    },
+  },
+
+  // Featured Missions (Admin-created special missions)
+  featuredMissions: {
+    async getActiveForToday() {
+      const client = getSupabase();
+      const today = new Date().toISOString().split('T')[0];
+
+      const { data, error } = await client
+        .from('featured_missions')
+        .select('*')
+        .eq('is_active', true)
+        .or(`start_date.is.null,start_date.lte.${today}`)
+        .or(`end_date.is.null,end_date.gte.${today}`)
+        .order('priority', { ascending: false })
+        .limit(2); // 최대 2개
+
+      return { data, error };
+    },
+
+    async getAll() {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('featured_missions')
+        .select('*')
+        .order('priority', { ascending: false });
+      return { data, error };
+    },
+
+    async getById(id: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('featured_missions')
+        .select('*')
+        .eq('id', id)
+        .single();
+      return { data, error };
+    },
+
+    async create(mission: {
+      mission_id?: string;
+      title: string;
+      description: string;
+      category: string;
+      difficulty: number;
+      duration: string;
+      location_type: string;
+      tags: string[];
+      icon: string;
+      image_url: string;
+      estimated_time: number;
+      start_date?: string;
+      end_date?: string;
+      priority?: number;
+      target_audience?: string;
+    }) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('featured_missions')
+        .insert(mission)
+        .select()
+        .single();
+      return { data, error };
+    },
+
+    async update(id: string, updates: Record<string, unknown>) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('featured_missions')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+      return { data, error };
+    },
+
+    async delete(id: string) {
+      const client = getSupabase();
+      const { error } = await client
+        .from('featured_missions')
+        .delete()
+        .eq('id', id);
+      return { error };
+    },
+  },
+
+  // Announcements
+  announcements: {
+    async getActive() {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('announcements')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+      return { data, error };
+    },
+
+    async getAll() {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('announcements')
+        .select('*')
+        .order('created_at', { ascending: false });
+      return { data, error };
+    },
+
+    async getById(id: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('announcements')
+        .select('*')
+        .eq('id', id)
+        .single();
+      return { data, error };
+    },
+
+    async create(announcement: {
+      title: string;
+      date: string;
+      is_new?: boolean;
+      content?: string;
+      is_active?: boolean;
+    }) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('announcements')
+        .insert(announcement)
+        .select()
+        .single();
+      return { data, error };
+    },
+
+    async update(id: string, updates: Record<string, unknown>) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('announcements')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+      return { data, error };
+    },
+
+    async delete(id: string) {
+      const client = getSupabase();
+      const { error } = await client
+        .from('announcements')
+        .delete()
+        .eq('id', id);
+      return { error };
+    },
+  },
+
+  // FAQ Items
+  faqItems: {
+    async getActive() {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('faq_items')
+        .select('*')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+      return { data, error };
+    },
+
+    async getAll() {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('faq_items')
+        .select('*')
+        .order('display_order', { ascending: true });
+      return { data, error };
+    },
+
+    async getByCategory(category: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('faq_items')
+        .select('*')
+        .eq('category', category)
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+      return { data, error };
+    },
+
+    async getById(id: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('faq_items')
+        .select('*')
+        .eq('id', id)
+        .single();
+      return { data, error };
+    },
+
+    async create(faqItem: {
+      question: string;
+      answer: string;
+      category?: string;
+      display_order?: number;
+      is_active?: boolean;
+    }) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('faq_items')
+        .insert(faqItem)
+        .select()
+        .single();
+      return { data, error };
+    },
+
+    async update(id: string, updates: Record<string, unknown>) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('faq_items')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+      return { data, error };
+    },
+
+    async delete(id: string) {
+      const client = getSupabase();
+      const { error } = await client
+        .from('faq_items')
+        .delete()
+        .eq('id', id);
+      return { error };
+    },
+  },
+
+  // Mission Categories
+  missionCategories: {
+    async getAll() {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('mission_categories')
+        .select('*')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+      return { data, error };
+    },
+
+    async getByCategory(category: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('mission_categories')
+        .select('*')
+        .eq('category', category)
+        .eq('is_active', true)
+        .single();
+      return { data, error };
+    },
+
+    async getByGroup(groupName: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('mission_categories')
+        .select('*')
+        .eq('group_name', groupName)
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+      return { data, error };
+    },
+  },
+
   // Storage
   storage: {
     async uploadPhoto(coupleId: string, uri: string): Promise<string | null> {
       try {
+        const client = getSupabase();
         const response = await fetch(uri);
         const blob = await response.blob();
         const fileName = `${coupleId}/${Date.now()}.jpg`;
 
-        const { data, error } = await supabase.storage
+        const { data, error } = await client.storage
           .from('memories')
           .upload(fileName, blob, {
             contentType: 'image/jpeg',
@@ -239,7 +731,7 @@ export const db = {
           return null;
         }
 
-        const { data: urlData } = supabase.storage
+        const { data: urlData } = client.storage
           .from('memories')
           .getPublicUrl(data.path);
 

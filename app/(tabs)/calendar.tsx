@@ -26,7 +26,6 @@ import {
   Check,
   Trash2,
   Droplet,
-  CheckCircle2,
   Calendar as CalendarIcon,
   Clock,
   Info,
@@ -36,6 +35,7 @@ import {
 
 import { COLORS, SPACING, RADIUS } from '@/constants/design';
 import { useBackground } from '@/contexts';
+import { useMemoryStore, SAMPLE_MEMORIES } from '@/stores/memoryStore';
 
 const { width, height } = Dimensions.get('window');
 
@@ -64,42 +64,12 @@ const HOLIDAYS_2025: Record<string, string> = {
   '2025-12-25': '크리스마스',
 };
 
-// Sample mission completion data
-const COMPLETED_MISSIONS: Record<string, { imageUrl: string; title: string }> = {
-  '2025-11-24': {
-    imageUrl: 'https://images.unsplash.com/photo-1528082687530-3a8fcf190670?w=400',
-    title: '오늘의 순간',
-  },
-  '2025-11-5': {
-    imageUrl: 'https://images.unsplash.com/photo-1581153438971-3222a5814529?w=400',
-    title: '등산 데이트',
-  },
-  '2025-11-10': {
-    imageUrl: 'https://images.unsplash.com/photo-1621797005674-48e0150206da?w=400',
-    title: '일몰 산책',
-  },
-  '2025-11-15': {
-    imageUrl: 'https://images.unsplash.com/photo-1742639162097-12414175e556?w=400',
-    title: '카페 데이트',
-  },
-  '2025-11-18': {
-    imageUrl: 'https://images.unsplash.com/photo-1695686017637-cbba70d6d5a5?w=400',
-    title: '디너 데이트',
-  },
-  '2025-11-20': {
-    imageUrl: 'https://images.unsplash.com/photo-1610193296072-d773349cddeb?w=400',
-    title: '해변 피크닉',
-  },
-};
-
 interface Todo {
   id: string;
   date: string;
   text: string;
   completed: boolean;
 }
-
-const SWIPE_THRESHOLD = 50;
 
 // Swipeable Todo Item Component
 function SwipeableTodoItem({
@@ -310,6 +280,7 @@ function SwipeableTodoItem({
 
 export default function CalendarScreen() {
   const { backgroundImage } = useBackground();
+  const { memories } = useMemoryStore();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<number | null>(null);
   const [todos, setTodos] = useState<Todo[]>([]);
@@ -456,8 +427,42 @@ export default function CalendarScreen() {
   };
 
   const getMissionForDate = (day: number) => {
-    const dateKey = `${year}-${month + 1}-${day}`;
-    return COMPLETED_MISSIONS[dateKey];
+    // First check actual memories from store (includes newly completed missions)
+    const memoryForDate = memories.find((memory) => {
+      const completedDate = new Date(memory.completedAt);
+      return (
+        completedDate.getFullYear() === year &&
+        completedDate.getMonth() === month &&
+        completedDate.getDate() === day
+      );
+    });
+
+    if (memoryForDate) {
+      return {
+        imageUrl: memoryForDate.photoUrl,
+        title: memoryForDate.mission?.title || '미션 완료',
+      };
+    }
+
+    // Then check SAMPLE_MEMORIES for development data
+    const sampleMemory = SAMPLE_MEMORIES.find((memory) => {
+      const completedDate = new Date(memory.completedAt);
+      return (
+        completedDate.getFullYear() === year &&
+        completedDate.getMonth() === month &&
+        completedDate.getDate() === day
+      );
+    });
+
+    if (sampleMemory) {
+      return {
+        imageUrl: sampleMemory.photoUrl,
+        title: sampleMemory.mission?.title || '미션 완료',
+      };
+    }
+
+    // No mission data found
+    return undefined;
   };
 
   const getHolidayForDate = (day: number) => {
@@ -638,11 +643,11 @@ export default function CalendarScreen() {
       {/* Background Image */}
       <ImageBackground
         source={backgroundImage}
+        defaultSource={require('@/assets/images/backgroundimage.png')}
         style={styles.backgroundImage}
+        imageStyle={styles.backgroundImageStyle}
         blurRadius={40}
-      >
-        <View style={styles.backgroundScale} />
-      </ImageBackground>
+      />
       <View style={styles.overlay} />
 
       {/* Header - Fixed at top */}
@@ -1283,9 +1288,8 @@ const styles = StyleSheet.create({
     width: width,
     height: height,
   },
-  backgroundScale: {
-    flex: 1,
-    transform: [{ scale: 1.1 }],
+  backgroundImageStyle: {
+    transform: [{ scale: 1.0 }],
   },
   overlay: {
     position: 'absolute',
@@ -1616,9 +1620,6 @@ const styles = StyleSheet.create({
     textDecorationLine: 'line-through',
     opacity: 0.5,
   },
-  todoDeleteButton: {
-    padding: 4,
-  },
   periodSection: {
     marginTop: SPACING.xl,
     paddingBottom: SPACING.lg,
@@ -1655,11 +1656,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: COLORS.foreground,
     fontWeight: '600',
-  },
-  emptyPeriodSubtitle: {
-    fontSize: 14,
-    color: COLORS.mutedForeground,
-    fontWeight: '400',
   },
   periodDataContainer: {
     gap: 12,
@@ -1817,12 +1813,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingBottom: 24,
   },
-  modalFooterRow: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 24,
-    paddingBottom: 24,
-  },
   // Button styles - rounded like navigation bar
   // Figma: primary button - bg-white text-black, very rounded
   modalDoneButton: {
@@ -1837,31 +1827,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: COLORS.black,
     fontWeight: '600',
-  },
-  // Figma: ghost button - text-white/70 hover:bg-white/10, very rounded
-  modalCancelButton: {
-    flex: 1,
-    height: 44,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    paddingHorizontal: 24,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalCancelButtonText: {
-    fontSize: 15,
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontWeight: '600',
-  },
-  // Figma: primary button - bg-white text-black, very rounded
-  modalAddButton: {
-    flex: 1,
-    height: 44,
-    backgroundColor: COLORS.white,
-    paddingHorizontal: 24,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   modalAddButtonFull: {
     width: '100%',
@@ -1964,18 +1929,6 @@ const styles = StyleSheet.create({
   periodSettingSection: {
     marginBottom: 20,
   },
-  periodSettingSectionFirst: {
-    marginBottom: 20,
-    paddingTop: 4,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  periodSettingLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 10,
-  },
   periodSettingLabel: {
     fontSize: 14,
     color: 'rgba(255, 255, 255, 0.7)',
@@ -2065,10 +2018,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  pickerNavButtonLeft: {
-  },
-  pickerNavButtonRight: {
   },
   pickerMonthText: {
     fontSize: 16,

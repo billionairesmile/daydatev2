@@ -1,17 +1,16 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { StyleSheet, View, Pressable, Text, Platform } from 'react-native';
+import { StyleSheet, View, Pressable, Text } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Target, BookHeart, Home, Calendar, Menu } from 'lucide-react-native';
+import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 
-import { COLORS, SPACING, RADIUS } from '@/constants/design';
+import { COLORS } from '@/constants/design';
 
 function TabBarIcon({
   Icon,
-  focused
 }: {
   Icon: React.ComponentType<{ color: string; size: number; strokeWidth: number }>;
-  focused: boolean;
 }) {
   return (
     <Icon
@@ -38,13 +37,13 @@ const TAB_ICONS: Record<string, React.ComponentType<{ color: string; size: numbe
   more: Menu,
 };
 
-function CustomTabBar({ state, descriptors, navigation }: any) {
+function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   return (
     <View style={styles.tabBarContainer}>
       <View style={styles.tabBarOuter}>
         <BlurView intensity={50} tint="dark" style={styles.tabBarBlur}>
           <View style={styles.tabBarInner}>
-            {state.routes.map((route: any, index: number) => {
+            {state.routes.map((route, index) => {
               const { options } = descriptors[route.key];
               const isFocused = state.index === index;
 
@@ -75,7 +74,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
                     isFocused && styles.tabItemActive,
                   ]}
                 >
-                  <TabBarIcon Icon={IconComponent} focused={isFocused} />
+                  <TabBarIcon Icon={IconComponent} />
                   <Text
                     style={[
                       styles.tabLabel,
@@ -176,16 +175,6 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 6,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    // Inset shadow effect
-    ...Platform.select({
-      ios: {
-        shadowColor: 'rgba(255, 255, 255, 0.3)',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 1,
-        shadowRadius: 0,
-      },
-      android: {},
-    }),
   },
   tabItem: {
     flex: 1,

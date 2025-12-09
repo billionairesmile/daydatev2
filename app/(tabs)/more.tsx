@@ -7,22 +7,25 @@ import {
   Dimensions,
   Pressable,
   ScrollView,
+  Alert,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import {
   User,
   Heart,
   Settings,
-  Bell,
-  Shield,
-  HelpCircle,
-  LogOut,
   ChevronRight,
+  RotateCcw,
+  Megaphone,
+  Headphones,
+  LogOut,
 } from 'lucide-react-native';
+import { BlurView } from 'expo-blur';
+import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '@/constants/design';
+import { COLORS, SPACING } from '@/constants/design';
 import { useBackground } from '@/contexts';
+import { useAuthStore, useOnboardingStore, useMissionStore } from '@/stores';
 
 const { width, height } = Dimensions.get('window');
 
@@ -40,41 +43,139 @@ type MenuSectionType = {
 
 export default function MoreScreen() {
   const { backgroundImage } = useBackground();
+  const router = useRouter();
+  const resetOnboarding = useOnboardingStore((state) => state.reset);
+  const setIsOnboardingComplete = useAuthStore((state) => state.setIsOnboardingComplete);
+  const resetGeneratedMissions = useMissionStore((state) => state.resetGeneratedMissions);
+
+  const handleDevReset = () => {
+    Alert.alert(
+      '개발자 리셋',
+      '온보딩 상태를 초기화하고 처음부터 다시 시작하시겠습니까?',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '초기화',
+          style: 'destructive',
+          onPress: async () => {
+            resetOnboarding();
+            setIsOnboardingComplete(false);
+            // Reset home tutorial so it shows again after onboarding
+            await AsyncStorage.removeItem('hasSeenHomeTutorial');
+            router.replace('/(auth)/onboarding');
+          },
+        },
+      ]
+    );
+  };
+
+  const handleMissionReset = () => {
+    Alert.alert(
+      '미션 리셋',
+      '오늘의 미션을 초기화하고 다시 생성하시겠습니까?',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '리셋',
+          style: 'destructive',
+          onPress: () => {
+            resetGeneratedMissions();
+            Alert.alert(
+              '리셋 완료',
+              '미션이 초기화되었습니다. 미션 탭으로 이동하여 새로운 미션을 생성하세요.',
+              [{ text: '확인' }]
+            );
+          },
+        },
+      ]
+    );
+  };
+
+  const handleLogout = () => {
+    Alert.alert(
+      '로그아웃',
+      '정말 로그아웃 하시겠습니까?',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '로그아웃',
+          style: 'destructive',
+          onPress: async () => {
+            resetOnboarding();
+            setIsOnboardingComplete(false);
+            await AsyncStorage.removeItem('hasSeenHomeTutorial');
+            router.replace('/(auth)/onboarding');
+          },
+        },
+      ]
+    );
+  };
+
   const menuSections: MenuSectionType[] = [
     {
       title: '프로필',
       items: [
-        { icon: User, label: '내 프로필', onPress: () => {} },
-        { icon: Heart, label: '커플 프로필', onPress: () => {} },
+        { icon: User, label: '내 프로필', onPress: () => router.push('/more/my-profile') },
+        { icon: Heart, label: '커플 프로필', onPress: () => router.push('/more/couple-profile') },
       ],
     },
     {
       title: '설정',
       items: [
-        { icon: Settings, label: '앱 설정', onPress: () => {} },
-        { icon: Bell, label: '알림 설정', onPress: () => {} },
-        { icon: Shield, label: '개인정보 보호', onPress: () => {} },
+        { icon: Settings, label: '설정', onPress: () => router.push('/more/settings') },
       ],
     },
     {
       title: '지원',
       items: [
-        { icon: HelpCircle, label: '도움말', onPress: () => {} },
-        { icon: LogOut, label: '로그아웃', onPress: () => {} },
+        { icon: Megaphone, label: '공지사항', onPress: () => router.push('/more/announcements') },
+        { icon: Headphones, label: '고객센터', onPress: () => router.push('/more/customer-service') },
+      ],
+    },
+    {
+      title: '개발자',
+      items: [
+        { icon: RotateCcw, label: '온보딩 리셋', onPress: handleDevReset },
+        { icon: RotateCcw, label: '미션 리셋', onPress: handleMissionReset },
       ],
     },
   ];
+
+  const renderMenuItem = (
+    item: MenuItemType,
+    isLast: boolean,
+    itemIndex: number
+  ) => {
+    const IconComponent = item.icon;
+
+    return (
+      <Pressable
+        key={itemIndex}
+        style={[
+          styles.menuItem,
+          !isLast && styles.menuItemBorder,
+        ]}
+        onPress={item.onPress}
+      >
+        <View style={styles.menuItemLeft}>
+          <IconComponent color="rgba(255, 255, 255, 0.8)" size={22} />
+          <Text style={styles.menuItemLabel}>{item.label}</Text>
+        </View>
+        <ChevronRight color="rgba(255, 255, 255, 0.4)" size={20} />
+      </Pressable>
+    );
+  };
 
   return (
     <View style={styles.container}>
       {/* Background */}
       <ImageBackground
         source={backgroundImage}
+        defaultSource={require('@/assets/images/backgroundimage.png')}
         style={styles.backgroundImage}
+        imageStyle={styles.backgroundImageStyle}
         blurRadius={40}
-      >
-        <View style={styles.backgroundScale} />
-      </ImageBackground>
+      />
       <View style={styles.overlay} />
 
       <ScrollView
@@ -93,35 +194,19 @@ export default function MoreScreen() {
             <Text style={styles.sectionTitle}>{section.title}</Text>
             <View style={styles.menuCard}>
               {section.items.map((item, itemIndex) => {
-                const IconComponent = item.icon;
                 const isLast = itemIndex === section.items.length - 1;
-                return (
-                  <Pressable
-                    key={itemIndex}
-                    style={[
-                      styles.menuItem,
-                      !isLast && styles.menuItemBorder,
-                    ]}
-                    onPress={item.onPress}
-                  >
-                    <View style={styles.menuItemLeft}>
-                      <IconComponent color="rgba(255, 255, 255, 0.8)" size={22} />
-                      <Text style={styles.menuItemLabel}>{item.label}</Text>
-                    </View>
-                    <ChevronRight color="rgba(255, 255, 255, 0.4)" size={20} />
-                  </Pressable>
-                );
+                return renderMenuItem(item, isLast, itemIndex);
               })}
             </View>
           </View>
         ))}
 
-        {/* App Info */}
-        <View style={styles.appInfo}>
-          <Text style={styles.appName}>Daydate</Text>
-          <Text style={styles.appSlogan}>Everyday, a new Date</Text>
-          <Text style={styles.appVersion}>v1.0.0</Text>
-        </View>
+        {/* Logout Button - Red Glass Style */}
+        <Pressable style={styles.logoutButton} onPress={handleLogout}>
+          <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+          <LogOut color="#ff4444" size={20} />
+          <Text style={styles.logoutButtonText}>로그아웃</Text>
+        </Pressable>
       </ScrollView>
     </View>
   );
@@ -137,9 +222,8 @@ const styles = StyleSheet.create({
     width: width,
     height: height,
   },
-  backgroundScale: {
-    flex: 1,
-    transform: [{ scale: 1.1 }],
+  backgroundImageStyle: {
+    transform: [{ scale: 1.0 }],
   },
   overlay: {
     position: 'absolute',
@@ -148,14 +232,6 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
-  },
-  topFadeOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 50,
-    zIndex: 10,
   },
   scrollView: {
     flex: 1,
@@ -213,25 +289,23 @@ const styles = StyleSheet.create({
     marginLeft: SPACING.md,
     fontWeight: '400',
   },
-  appInfo: {
+  logoutButton: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: SPACING.xxl,
-    paddingBottom: SPACING.lg,
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    marginTop: SPACING.xl,
+    marginHorizontal: SPACING.xs,
+    paddingVertical: 16,
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255, 68, 68, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 68, 68, 0.3)',
   },
-  appName: {
-    fontSize: 18,
-    color: 'rgba(255, 255, 255, 0.4)',
+  logoutButtonText: {
+    fontSize: 16,
     fontWeight: '600',
-  },
-  appSlogan: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.3)',
-    marginTop: SPACING.xs,
-    fontStyle: 'italic',
-  },
-  appVersion: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.25)',
-    marginTop: SPACING.sm,
+    color: '#ff4444',
   },
 });

@@ -76,8 +76,9 @@ export default function LoginScreen() {
           }
         }
       }
-    } catch (error: any) {
-      Alert.alert('로그인 실패', error.message || '다시 시도해주세요.');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '다시 시도해주세요.';
+      Alert.alert('로그인 실패', message);
     } finally {
       setLoading(false);
     }

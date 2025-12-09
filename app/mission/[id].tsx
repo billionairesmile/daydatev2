@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,22 +7,33 @@ import {
   Dimensions,
   Pressable,
   ScrollView,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
+  Image,
+  GestureResponderEvent,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as ImageManipulator from 'expo-image-manipulator';
 import {
   ChevronLeft,
-  Clock,
   MapPin,
   Camera,
   Edit3,
   Check,
   User,
+  SwitchCamera,
+  X,
 } from 'lucide-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '@/constants/design';
-import { SAMPLE_MISSIONS } from '@/stores/missionStore';
+import { useMissionStore } from '@/stores/missionStore';
+import { useMemoryStore } from '@/stores/memoryStore';
+import type { CompletedMission, Mission } from '@/types';
 
 const { width, height } = Dimensions.get('window');
 
@@ -31,26 +42,511 @@ export default function MissionDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
 
   const [photoTaken, setPhotoTaken] = useState(false);
+  const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
+  const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
+  const [showCamera, setShowCamera] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [showMessageModal, setShowMessageModal] = useState(false);
+  const [messageText, setMessageText] = useState('');
   const [user1Message, setUser1Message] = useState<string | null>(null);
   const [user2Message, setUser2Message] = useState<string | null>(null);
+  const [facing, setFacing] = useState<'front' | 'back'>('back');
+  const [isCapturing, setIsCapturing] = useState(false);
 
-  const mission = SAMPLE_MISSIONS.find((m) => m.id === id) || SAMPLE_MISSIONS[0];
+  // Zoom state for pinch-to-zoom (0 = 1x default, 1 = max zoom ~4x)
+  const [zoom, setZoom] = useState(0);
+  const lastPinchDistance = useRef<number | null>(null);
 
-  const handleTakePhoto = () => {
-    // TODO: Implement camera functionality
-    setPhotoTaken(true);
-  };
+  // Photo aspect ratio state - always 3:4 portrait frame
+  const [photoAspectRatio, setPhotoAspectRatio] = useState<number>(3 / 4); // Always portrait 3:4
+  // Track if captured photo is landscape (for cover mode display)
+  const [isLandscapePhoto, setIsLandscapePhoto] = useState(false);
 
-  const handleAddMessage = () => {
-    // TODO: Implement message modal
-    if (!user1Message) {
-      setUser1Message('오늘 정말 재밌었어!');
-    } else if (!user2Message) {
-      setUser2Message('나도 너무 좋았어 💕');
+  const [permission, requestPermission] = useCameraPermissions();
+  const cameraRef = useRef<CameraView>(null);
+
+  // Get mission from store (AI-generated or featured missions)
+  const { getTodayMissions, completeTodayMission, hasTodayCompletedMission, isTodayCompletedMission, keptMissions } = useMissionStore();
+  const todayMissions = getTodayMissions();
+
+  // Find mission in today's missions, kept missions, or provide a fallback
+  const mission: Mission =
+    todayMissions.find((m) => m.id === id) ||
+    keptMissions.find((m) => m.id === id) ||
+    {
+      id: id || 'unknown',
+      title: '미션을 찾을 수 없습니다',
+      description: '이 미션은 더 이상 사용할 수 없습니다.',
+      category: 'home' as const,
+      difficulty: 1 as const,
+      locationType: 'indoor' as const,
+      tags: [],
+      icon: '❓',
+      imageUrl: '',
+      isPremium: false,
+    };
+  const { addMemory, memories } = useMemoryStore();
+  const hasCompletedRef = useRef(false);
+  const memorySavedRef = useRef(false);
+  const hasRestoredRef = useRef(false);
+
+  // Restore completed state when re-entering the page
+  useEffect(() => {
+    if (hasRestoredRef.current) return;
+
+    if (isTodayCompletedMission(mission.id)) {
+      hasRestoredRef.current = true;
+      hasCompletedRef.current = true;
+      memorySavedRef.current = true;
+
+      // Find the memory for this mission from today
+      const today = new Date();
+      const todayMemory = memories.find((m) => {
+        const completedDate = new Date(m.completedAt);
+        return (
+          m.missionId === mission.id &&
+          completedDate.getFullYear() === today.getFullYear() &&
+          completedDate.getMonth() === today.getMonth() &&
+          completedDate.getDate() === today.getDate()
+        );
+      });
+
+      if (todayMemory) {
+        setCapturedPhoto(todayMemory.photoUrl);
+        setPhotoTaken(true);
+        setUser1Message(todayMemory.user1Message);
+        setUser2Message(todayMemory.user2Message || null);
+      } else {
+        // Mission is completed but no memory found - show as completed anyway
+        setPhotoTaken(true);
+        setUser1Message('완료됨');
+        setUser2Message('완료됨');
+      }
+    }
+  }, [mission.id, isTodayCompletedMission, memories]);
+
+  // Pinch-to-zoom gesture handler
+  const handlePinchMove = (evt: GestureResponderEvent) => {
+    const touches = evt.nativeEvent.touches;
+    if (touches.length === 2) {
+      const touch1 = touches[0];
+      const touch2 = touches[1];
+
+      const dx = touch1.pageX - touch2.pageX;
+      const dy = touch1.pageY - touch2.pageY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (lastPinchDistance.current !== null) {
+        const diff = distance - lastPinchDistance.current;
+        // Adjust zoom based on pinch distance change
+        setZoom((prevZoom) => {
+          const newZoom = prevZoom + diff * 0.003; // Sensitivity factor
+          return Math.max(0, Math.min(1, newZoom));
+        });
+      }
+      lastPinchDistance.current = distance;
     }
   };
 
+  const handlePinchEnd = () => {
+    lastPinchDistance.current = null;
+  };
+
+  const locationText =
+    mission.locationType === 'indoor'
+      ? '실내'
+      : mission.locationType === 'outdoor'
+        ? '야외'
+        : '무관';
+
+  const handleTakePhoto = async () => {
+    if (!permission?.granted) {
+      const result = await requestPermission();
+      if (!result.granted) {
+        Alert.alert(
+          '카메라 권한 필요',
+          '사진을 촬영하려면 카메라 권한이 필요합니다.',
+          [{ text: '확인' }]
+        );
+        return;
+      }
+    }
+    setShowCamera(true);
+  };
+
+  const handleCapture = async () => {
+    if (cameraRef.current && !isCapturing) {
+      setIsCapturing(true);
+      try {
+        const photo = await cameraRef.current.takePictureAsync({
+          quality: 0.9,
+          skipProcessing: true,
+        });
+
+        if (photo) {
+          // Get original image dimensions
+          Image.getSize(photo.uri, async (originalWidth, originalHeight) => {
+            try {
+              const isLandscapeImage = originalWidth > originalHeight;
+              const manipulations: ImageManipulator.Action[] = [];
+
+              // Track dimensions after each manipulation
+              let currentWidth = originalWidth;
+              let currentHeight = originalHeight;
+
+              // Step 1: Rotate if needed (camera returns landscape for portrait capture)
+              if (isLandscapeImage) {
+                if (facing === 'back') {
+                  manipulations.push({ rotate: -90 });
+                } else {
+                  manipulations.push({ rotate: 90 });
+                }
+                // After rotation, dimensions swap
+                currentWidth = originalHeight;
+                currentHeight = originalWidth;
+              }
+
+              // Step 2: Calculate crop to match what was visible in preview
+              // The preview uses "cover" mode, so we need to crop to the visible region
+              const screenAspect = width / height;
+              const imageAspect = currentWidth / currentHeight;
+
+              let visibleWidth = currentWidth;
+              let visibleHeight = currentHeight;
+              let offsetX = 0;
+              let offsetY = 0;
+
+              if (imageAspect > screenAspect) {
+                // Image is wider than screen - sides were cropped in preview
+                visibleWidth = Math.round(currentHeight * screenAspect);
+                offsetX = Math.round((currentWidth - visibleWidth) / 2);
+              } else {
+                // Image is taller than screen - top/bottom were cropped in preview
+                visibleHeight = Math.round(currentWidth / screenAspect);
+                offsetY = Math.round((currentHeight - visibleHeight) / 2);
+              }
+
+              // Step 3: Now crop to 3:4 within the visible region
+              // Frame guide is 85% of screen width, centered
+              const frameRatio = 0.85;
+              const targetAspect = 3 / 4;
+
+              // Calculate frame position within visible region
+              const frameWidthInImage = Math.round(visibleWidth * frameRatio);
+              const frameHeightInImage = Math.round(frameWidthInImage / targetAspect);
+
+              // Center the frame within the visible region
+              const frameOffsetX = Math.round((visibleWidth - frameWidthInImage) / 2);
+              // Account for the -40 pixel vertical offset of the frame guide
+              const verticalOffsetRatio = 40 / height;
+              const frameOffsetY = Math.round((visibleHeight - frameHeightInImage) / 2 - visibleHeight * verticalOffsetRatio);
+
+              // Final crop coordinates (relative to full image)
+              const cropX = Math.max(0, offsetX + frameOffsetX);
+              const cropY = Math.max(0, offsetY + frameOffsetY);
+              const cropWidth = Math.min(frameWidthInImage, currentWidth - cropX);
+              const cropHeight = Math.min(frameHeightInImage, currentHeight - cropY);
+
+              manipulations.push({
+                crop: {
+                  originX: cropX,
+                  originY: cropY,
+                  width: cropWidth,
+                  height: cropHeight,
+                },
+              });
+
+              // Step 4: Flip horizontally for selfie (front camera)
+              if (facing === 'front') {
+                manipulations.push({ flip: ImageManipulator.FlipType.Horizontal });
+              }
+
+              // Apply all manipulations
+              const result = await ImageManipulator.manipulateAsync(
+                photo.uri,
+                manipulations,
+                { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
+              );
+
+              // Set the cropped image - always 3:4 portrait
+              setPhotoAspectRatio(3 / 4);
+              setIsLandscapePhoto(false);
+              setPreviewPhoto(result.uri);
+              setShowPreview(true);
+            } catch (manipError) {
+              console.error('Image manipulation error:', manipError);
+              setPhotoAspectRatio(3 / 4);
+              setIsLandscapePhoto(false);
+              setPreviewPhoto(photo.uri);
+              setShowPreview(true);
+            }
+          }, (error) => {
+            console.error('Failed to get original image size:', error);
+            setPhotoAspectRatio(3 / 4);
+            setIsLandscapePhoto(false);
+            setPreviewPhoto(photo.uri);
+            setShowPreview(true);
+          });
+        }
+      } catch (error) {
+        console.error('Failed to take picture:', error);
+        Alert.alert('오류', '사진 촬영에 실패했습니다. 다시 시도해주세요.');
+      } finally {
+        setIsCapturing(false);
+      }
+    }
+  };
+
+  const handleConfirmPhoto = () => {
+    if (previewPhoto) {
+      setCapturedPhoto(previewPhoto);
+      setPhotoTaken(true);
+      setShowCamera(false);
+      setShowPreview(false);
+      setPreviewPhoto(null);
+    }
+  };
+
+  const handleRetakePhoto = () => {
+    setPreviewPhoto(null);
+    setShowPreview(false);
+  };
+
+  const handleRetakeFromDetail = async () => {
+    setCapturedPhoto(null);
+    setPhotoTaken(false);
+    await handleTakePhoto();
+  };
+
+  const toggleCameraFacing = () => {
+    setFacing((current) => (current === 'back' ? 'front' : 'back'));
+  };
+
+  const handleOpenMessageModal = () => {
+    // Only open modal if user hasn't written their message yet
+    if (!user1Message) {
+      setShowMessageModal(true);
+    }
+  };
+
+  const handleAddMessage = () => {
+    if (messageText.trim()) {
+      // User can only write their own message (user1Message)
+      setUser1Message(messageText.trim());
+      setMessageText('');
+      setShowMessageModal(false);
+
+      // Simulate partner writing after 2 seconds (for testing)
+      // In production, this would come from backend/real-time sync
+      setTimeout(() => {
+        setUser2Message('너와 함께여서 행복해 💕');
+      }, 2000);
+    }
+  };
+
+  const handleCompleteMission = () => {
+    // Mark mission as completed and save to memory
+    if (!hasCompletedRef.current && !hasTodayCompletedMission()) {
+      hasCompletedRef.current = true;
+      completeTodayMission(mission.id);
+    }
+  };
+
+  const handleCompleteAndClose = () => {
+    // Save to memory album (only once)
+    if (!memorySavedRef.current && capturedPhoto && user1Message && user2Message) {
+      memorySavedRef.current = true;
+      const newMemory: CompletedMission = {
+        id: `memory-${Date.now()}`,
+        coupleId: 'sample-couple',
+        missionId: mission.id,
+        mission: mission,
+        photoUrl: capturedPhoto,
+        user1Message: user1Message,
+        user2Message: user2Message,
+        location: locationText,
+        completedAt: new Date(),
+      };
+      addMemory(newMemory);
+    }
+
+    handleCompleteMission();
+    router.back();
+  };
+
   const isComplete = photoTaken && user1Message && user2Message;
+  const isWaitingForPartner = photoTaken && user1Message && !user2Message;
+
+  // Mark mission as completed when all steps are done
+  useEffect(() => {
+    if (isComplete && !hasCompletedRef.current && !hasTodayCompletedMission()) {
+      hasCompletedRef.current = true;
+      completeTodayMission(mission.id);
+    }
+  }, [isComplete, mission.id, completeTodayMission, hasTodayCompletedMission]);
+
+  // Camera UI
+  if (showCamera) {
+    // Show preview after capturing
+    if (showPreview && previewPhoto) {
+      // Calculate preview dimensions based on current photo aspect ratio
+      // Max dimensions for preview area
+      const maxPreviewWidth = width * 0.85;
+      const maxPreviewHeight = maxPreviewWidth * (4 / 3);
+
+      // Calculate actual preview size based on photo aspect ratio
+      let previewWidth: number;
+      let previewHeight: number;
+
+      if (photoAspectRatio >= 1) {
+        // Landscape or square - fit to width
+        previewWidth = maxPreviewWidth;
+        previewHeight = previewWidth / photoAspectRatio;
+        // If height exceeds max, scale down
+        if (previewHeight > maxPreviewHeight) {
+          previewHeight = maxPreviewHeight;
+          previewWidth = previewHeight * photoAspectRatio;
+        }
+      } else {
+        // Portrait - fit to height first, then check width
+        previewHeight = maxPreviewHeight;
+        previewWidth = previewHeight * photoAspectRatio;
+        // If width exceeds max, scale down
+        if (previewWidth > maxPreviewWidth) {
+          previewWidth = maxPreviewWidth;
+          previewHeight = previewWidth / photoAspectRatio;
+        }
+      }
+
+      const previewTop = (height - previewHeight) / 2 - 40;
+
+      return (
+        <View style={styles.cameraContainer}>
+          {/* Dark Background */}
+          <View style={styles.previewBackground} />
+
+          {/* Preview Header */}
+          <View style={styles.cameraHeader}>
+            <Pressable
+              onPress={handleRetakePhoto}
+              style={styles.cameraBackButton}
+            >
+              <ChevronLeft color={COLORS.white} size={24} />
+            </Pressable>
+            <Text style={styles.cameraTitle}>사진 확인</Text>
+            <View style={styles.headerSpacer} />
+          </View>
+
+          {/* Photo Preview - adapts to photo aspect ratio */}
+          <View style={[styles.previewFrameContainer, {
+            position: 'absolute',
+            top: previewTop,
+            left: (width - previewWidth) / 2,
+            width: previewWidth,
+            height: previewHeight
+          }]}>
+            <Image
+              source={{ uri: previewPhoto }}
+              style={styles.previewFrameImage}
+              resizeMode="contain"
+            />
+          </View>
+
+          {/* Confirm Button */}
+          <Pressable onPress={handleConfirmPhoto} style={styles.floatingConfirmButton}>
+            <Text style={styles.confirmButtonText}>사용하기</Text>
+          </Pressable>
+        </View>
+      );
+    }
+
+    // Show camera viewfinder with 3:4 frame guide
+    // Calculate 3:4 frame dimensions (width 3, height 4)
+    const frameWidth = width * 0.85;
+    const frameHeight = frameWidth * (4 / 3);
+    const frameTop = (height - frameHeight) / 2 - 40; // Offset for header/buttons
+
+    return (
+      <View style={styles.cameraContainer}>
+        <View
+          style={styles.cameraViewfinder}
+          onTouchMove={handlePinchMove}
+          onTouchEnd={handlePinchEnd}
+          onTouchCancel={handlePinchEnd}
+        >
+          <CameraView
+            ref={cameraRef}
+            style={StyleSheet.absoluteFill}
+            facing={facing}
+            mode="picture"
+            zoom={zoom}
+          />
+        </View>
+
+        {/* 3:4 Frame Guide Overlay */}
+        <View style={styles.frameGuideOverlay} pointerEvents="none">
+          {/* Top dark area */}
+          <View style={[styles.frameGuideDark, { top: 0, left: 0, right: 0, height: frameTop }]} />
+          {/* Bottom dark area */}
+          <View style={[styles.frameGuideDark, { top: frameTop + frameHeight, left: 0, right: 0, bottom: 0 }]} />
+          {/* Left dark area */}
+          <View style={[styles.frameGuideDark, { top: frameTop, left: 0, width: (width - frameWidth) / 2, height: frameHeight }]} />
+          {/* Right dark area */}
+          <View style={[styles.frameGuideDark, { top: frameTop, right: 0, width: (width - frameWidth) / 2, height: frameHeight }]} />
+          {/* Frame border */}
+          <View style={[styles.frameGuideBorder, {
+            top: frameTop,
+            left: (width - frameWidth) / 2,
+            width: frameWidth,
+            height: frameHeight
+          }]} />
+        </View>
+
+        {/* Camera Header */}
+        <View style={styles.cameraHeader}>
+          <Pressable
+            onPress={() => {
+              setShowCamera(false);
+              setShowPreview(false);
+              setPreviewPhoto(null);
+            }}
+            style={styles.cameraBackButton}
+          >
+            <X color={COLORS.white} size={24} />
+          </Pressable>
+          <Text style={styles.cameraTitle}>사진 촬영</Text>
+          <Pressable
+            onPress={toggleCameraFacing}
+            style={styles.cameraBackButton}
+          >
+            <SwitchCamera color={COLORS.white} size={24} />
+          </Pressable>
+        </View>
+
+        {/* Zoom Level Indicator - 1.0x to 4.0x */}
+        {zoom > 0.01 && (
+          <View style={styles.zoomIndicatorContainer}>
+            <View style={styles.zoomIndicator}>
+              <Text style={styles.zoomIndicatorText}>
+                {(1.0 + zoom * 3.0).toFixed(1)}x
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Capture Button */}
+        <View style={styles.captureButtonContainer}>
+          <Pressable
+            onPress={handleCapture}
+            style={[styles.captureButton, isCapturing && styles.captureButtonDisabled]}
+            disabled={isCapturing}
+          >
+            <View style={styles.captureButtonInner} />
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -58,23 +554,23 @@ export default function MissionDetailScreen() {
       <ImageBackground
         source={{ uri: mission.imageUrl }}
         style={styles.backgroundImage}
+        blurRadius={8}
       >
-        <LinearGradient
-          colors={['rgba(0,0,0,0.4)', 'rgba(0,0,0,0.7)']}
-          style={styles.overlay}
-        />
+        <View style={styles.overlay} />
       </ImageBackground>
 
+
       {/* Header */}
-      <BlurView intensity={60} tint="dark" style={styles.header}>
+      <View style={styles.header}>
         <View style={styles.headerContent}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <ChevronLeft color={COLORS.white} size={24} />
+            <ChevronLeft color={COLORS.white} size={20} />
           </Pressable>
           <Text style={styles.headerTitle}>미션 상세</Text>
           <View style={styles.headerSpacer} />
         </View>
-      </BlurView>
+        <View style={styles.headerLine} />
+      </View>
 
       <ScrollView
         style={styles.scrollView}
@@ -82,189 +578,277 @@ export default function MissionDetailScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Mission Info Card */}
-        <BlurView intensity={60} tint="dark" style={styles.missionCard}>
-          <View style={styles.missionContent}>
-            <View style={styles.missionHeader}>
+        <View style={styles.missionCard}>
+          <BlurView intensity={30} tint="light" style={styles.cardBlur}>
+            <View style={styles.missionContent}>
+              {/* Title */}
               <Text style={styles.missionTitle}>{mission.title}</Text>
-            </View>
 
-            <View style={styles.categoryBadge}>
-              <Text style={styles.categoryText}>{mission.category}</Text>
-            </View>
+              {/* Description */}
+              <Text style={styles.missionDescription}>{mission.description}</Text>
 
-            <Text style={styles.missionDescription}>{mission.description}</Text>
-
-            <View style={styles.missionMeta}>
-              <View style={styles.metaItem}>
-                <Clock color={COLORS.glass.white70} size={18} />
-                <Text style={styles.metaText}>{mission.duration}</Text>
-              </View>
-              <View style={styles.metaItem}>
-                <MapPin color={COLORS.glass.white70} size={18} />
-                <Text style={styles.metaText}>{mission.locationType}</Text>
-              </View>
-            </View>
-
-            <View style={styles.tagsContainer}>
-              {mission.tags.map((tag, index) => (
-                <View key={index} style={styles.tag}>
-                  <Text style={styles.tagText}>#{tag}</Text>
+              {/* Meta Info */}
+              <View style={styles.missionMeta}>
+                <View style={styles.metaItem}>
+                  <MapPin color="rgba(255,255,255,0.8)" size={20} />
+                  <Text style={styles.metaText}>{locationText}</Text>
                 </View>
-              ))}
-            </View>
-          </View>
-        </BlurView>
+              </View>
 
-        {/* Mission Steps Card */}
-        <BlurView intensity={60} tint="dark" style={styles.stepsCard}>
-          <View style={styles.stepsContent}>
-            <View style={styles.stepsHeader}>
-              <Text style={styles.stepsTitle}>미션 완료 방법</Text>
-              {isComplete && (
-                <View style={styles.completeBadge}>
-                  <Check color={COLORS.status.success} size={14} />
-                  <Text style={styles.completeText}>미션 완료!</Text>
+              {/* Tags */}
+              {mission.tags.length > 0 && (
+                <View style={styles.tagsContainer}>
+                  {mission.tags.map((tag, index) => (
+                    <View key={index} style={styles.tag}>
+                      <Text style={styles.tagText}>#{tag}</Text>
+                    </View>
+                  ))}
                 </View>
               )}
             </View>
+          </BlurView>
+        </View>
 
-            {/* Step 1: Photo */}
-            <View style={styles.stepItem}>
-              <View style={styles.stepIndicator}>
-                <View
-                  style={[
-                    styles.stepCircle,
-                    photoTaken && styles.stepCircleComplete,
-                  ]}
-                >
-                  {photoTaken ? (
-                    <Check color={COLORS.white} size={16} />
-                  ) : (
-                    <Text style={styles.stepNumber}>1</Text>
-                  )}
-                </View>
-                <View style={styles.stepLine} />
-              </View>
-              <View style={styles.stepContent}>
-                <View style={styles.stepTitleRow}>
-                  <Camera color={COLORS.white} size={18} />
-                  <Text style={styles.stepTitle}>사진 촬영하기</Text>
-                  {photoTaken && <Text style={styles.stepComplete}>완료</Text>}
-                </View>
-                <Text style={styles.stepDescription}>
-                  두 분의 특별한 순간을 사진으로 담아주세요.
-                </Text>
-              </View>
-            </View>
-
-            {/* Step 2: Messages */}
-            <View style={styles.stepItem}>
-              <View style={styles.stepIndicator}>
-                <View
-                  style={[
-                    styles.stepCircle,
-                    user1Message && user2Message && styles.stepCircleComplete,
-                  ]}
-                >
-                  {user1Message && user2Message ? (
-                    <Check color={COLORS.white} size={16} />
-                  ) : (
-                    <Text style={styles.stepNumber}>2</Text>
-                  )}
-                </View>
-              </View>
-              <View style={styles.stepContent}>
-                <View style={styles.stepTitleRow}>
-                  <Edit3 color={COLORS.white} size={18} />
-                  <Text style={styles.stepTitle}>서로에게 한마디</Text>
-                  {user1Message && user2Message && (
-                    <Text style={styles.stepComplete}>완료</Text>
-                  )}
-                </View>
-                <Text style={styles.stepDescription}>
-                  이 순간 상대방에게 전하고 싶은 마음을 남겨보세요.
-                </Text>
-
-                {/* User Status */}
-                <View style={styles.userStatusContainer}>
-                  <View style={styles.userStatus}>
-                    <View
-                      style={[
-                        styles.userIcon,
-                        user1Message && styles.userIconComplete,
-                      ]}
-                    >
-                      <User
-                        color={user1Message ? COLORS.white : COLORS.glass.white50}
-                        size={14}
-                      />
-                    </View>
-                    <View style={styles.userInfo}>
-                      <Text style={styles.userLabel}>나</Text>
-                      <Text
-                        style={[
-                          styles.userStatusText,
-                          user1Message && styles.userStatusComplete,
-                        ]}
-                      >
-                        {user1Message ? '작성 완료' : '미작성'}
-                      </Text>
-                    </View>
+        {/* Mission Steps Card */}
+        <View style={styles.stepsCard}>
+          <BlurView intensity={30} tint="light" style={styles.cardBlur}>
+            <View style={styles.stepsContent}>
+              {/* Step 1: Photo */}
+              <View style={styles.stepItem}>
+                <View style={styles.stepIndicator}>
+                  <View
+                    style={[
+                      styles.stepCircle,
+                      photoTaken && styles.stepCircleComplete,
+                    ]}
+                  >
+                    {photoTaken ? (
+                      <Check color="#86efac" size={20} />
+                    ) : (
+                      <Text style={styles.stepNumber}>1</Text>
+                    )}
                   </View>
-                  <View style={styles.userStatus}>
-                    <View
-                      style={[
-                        styles.userIcon,
-                        user2Message && styles.userIconComplete,
-                      ]}
-                    >
-                      <User
-                        color={user2Message ? COLORS.white : COLORS.glass.white50}
-                        size={14}
+                  <View style={styles.stepLine} />
+                </View>
+                <View style={styles.stepContent}>
+                  <View style={styles.stepTitleRow}>
+                    <Camera color={COLORS.white} size={20} />
+                    <Text style={styles.stepTitle}>사진 촬영하기</Text>
+                    {photoTaken && <Text style={styles.stepComplete}>완료</Text>}
+                  </View>
+                  <Text style={styles.stepDescription}>
+                    두 분의 특별한 순간을 사진으로 담아주세요.
+                  </Text>
+                  <Text style={styles.stepDescription}>
+                    지금 이 순간의 설렘과 행복을 사진에 담아{'\n'}추억으로 만들어보세요.
+                  </Text>
+                  {capturedPhoto && (
+                    <View style={styles.photoPreviewContainer}>
+                      <Image
+                        source={{ uri: capturedPhoto }}
+                        style={[styles.photoPreview, { aspectRatio: photoAspectRatio }]}
+                        resizeMode="contain"
                       />
+                      {!isComplete && (
+                        <Pressable
+                          onPress={handleRetakeFromDetail}
+                          style={styles.detailRetakeButton}
+                        >
+                          <Camera color={COLORS.white} size={16} />
+                          <Text style={styles.detailRetakeButtonText}>다시 찍기</Text>
+                        </Pressable>
+                      )}
                     </View>
-                    <View style={styles.userInfo}>
-                      <Text style={styles.userLabel}>상대방</Text>
-                      <Text
-                        style={[
-                          styles.userStatusText,
-                          user2Message && styles.userStatusComplete,
-                        ]}
-                      >
-                        {user2Message ? '작성 완료' : '미작성'}
-                      </Text>
-                    </View>
+                  )}
+                </View>
+              </View>
+
+              {/* Step 2: Messages */}
+              <View style={styles.stepItem}>
+                <View style={styles.stepIndicator}>
+                  <View
+                    style={[
+                      styles.stepCircle,
+                      user1Message && user2Message && styles.stepCircleComplete,
+                    ]}
+                  >
+                    {user1Message && user2Message ? (
+                      <Check color="#86efac" size={20} />
+                    ) : (
+                      <Text style={styles.stepNumber}>2</Text>
+                    )}
                   </View>
                 </View>
+                <View style={styles.stepContent}>
+                  <View style={styles.stepTitleRow}>
+                    <Edit3 color={COLORS.white} size={20} />
+                    <Text style={styles.stepTitle}>서로에게 한마디 작성하기</Text>
+                    {user1Message && user2Message && (
+                      <Text style={styles.stepComplete}>완료</Text>
+                    )}
+                  </View>
+                  <Text style={styles.stepDescription}>
+                    이 순간 상대방에게 전하고 싶은 마음을 글로 남겨보세요. 진심이 담긴 메시지가 더 특별한 추억을{'\n'}만듭니다.
+                  </Text>
+
+                  {/* User Status Cards */}
+                  <View style={styles.userStatusContainer}>
+                    <View style={styles.userStatus}>
+                      <View
+                        style={[
+                          styles.userIcon,
+                          user1Message && styles.userIconComplete,
+                        ]}
+                      >
+                        <User
+                          color={user1Message ? '#86efac' : 'rgba(255,255,255,0.5)'}
+                          size={14}
+                        />
+                      </View>
+                      <View style={styles.userInfo}>
+                        <Text style={styles.userLabel}>나</Text>
+                        <Text
+                          style={[
+                            styles.userStatusText,
+                            user1Message && styles.userStatusComplete,
+                          ]}
+                        >
+                          {user1Message ? '작성 완료' : '미작성'}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.userStatus}>
+                      <View
+                        style={[
+                          styles.userIcon,
+                          user2Message && styles.userIconComplete,
+                        ]}
+                      >
+                        <User
+                          color={user2Message ? '#86efac' : 'rgba(255,255,255,0.5)'}
+                          size={14}
+                        />
+                      </View>
+                      <View style={styles.userInfo}>
+                        <Text style={styles.userLabel}>상대방</Text>
+                        <Text
+                          style={[
+                            styles.userStatusText,
+                            user2Message && styles.userStatusComplete,
+                          ]}
+                        >
+                          {user2Message ? '작성 완료' : '미작성'}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
               </View>
+
             </View>
-          </View>
-        </BlurView>
+          </BlurView>
+        </View>
       </ScrollView>
 
       {/* Bottom CTA */}
-      <BlurView intensity={60} tint="dark" style={styles.bottomBar}>
+      <BlurView intensity={40} tint="dark" style={styles.bottomBar}>
         <View style={styles.bottomContent}>
           <Pressable
-            style={styles.ctaButton}
+            style={[
+              styles.ctaButton,
+              isWaitingForPartner && styles.ctaButtonDisabled,
+              isComplete && styles.ctaButtonComplete,
+            ]}
             onPress={
               isComplete
-                ? () => router.back()
-                : photoTaken
-                ? handleAddMessage
-                : handleTakePhoto
+                ? handleCompleteAndClose
+                : isWaitingForPartner
+                  ? undefined
+                  : photoTaken
+                    ? handleOpenMessageModal
+                    : handleTakePhoto
             }
+            disabled={!!isWaitingForPartner}
           >
-            <Text style={styles.ctaButtonText}>
-              {isComplete
-                ? '확인'
-                : photoTaken
-                ? '서로에게 한마디'
-                : '사진 촬영하기'}
-            </Text>
+            {isComplete ? (
+              <View style={styles.ctaButtonCompleteContent}>
+                <Check color="#86efac" size={18} />
+                <Text style={styles.ctaButtonCompleteText}>미션 완료! 🎉</Text>
+              </View>
+            ) : (
+              <Text style={[
+                styles.ctaButtonText,
+                isWaitingForPartner && styles.ctaButtonTextDisabled,
+              ]}>
+                {isWaitingForPartner
+                  ? '상대방 대기 중...'
+                  : photoTaken
+                    ? '서로에게 한마디 작성'
+                    : '사진 촬영'}
+              </Text>
+            )}
           </Pressable>
         </View>
       </BlurView>
+
+      {/* Message Modal - Small Todo-list Style */}
+      <Modal
+        visible={showMessageModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowMessageModal(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => setShowMessageModal(false)}
+          />
+          <View style={styles.modalContainer}>
+            <BlurView intensity={60} tint="dark" style={styles.modalBlur}>
+              <View style={styles.modalContent}>
+                {/* Modal Header */}
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>서로에게 한마디</Text>
+                  <Pressable
+                    onPress={() => {
+                      setShowMessageModal(false);
+                      setMessageText('');
+                    }}
+                    style={styles.modalCloseButton}
+                  >
+                    <X color={COLORS.white} size={20} />
+                  </Pressable>
+                </View>
+
+                <View style={styles.textInputContainer}>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="상대방에게 전하고 싶은 말을 적어주세요"
+                    placeholderTextColor="rgba(255,255,255,0.5)"
+                    value={messageText}
+                    onChangeText={setMessageText}
+                    maxLength={100}
+                    multiline
+                    numberOfLines={4}
+                  />
+                  <Text style={styles.charCount}>{messageText.length}/100</Text>
+                </View>
+
+                <Pressable
+                  style={[styles.submitButton, !messageText.trim() && styles.submitButtonDisabled]}
+                  onPress={handleAddMessage}
+                  disabled={!messageText.trim()}
+                >
+                  <Text style={styles.submitButtonText}>완료</Text>
+                </Pressable>
+              </View>
+            </BlurView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -281,32 +865,33 @@ const styles = StyleSheet.create({
   },
   overlay: {
     flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
   },
   header: {
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.glass.white20,
   },
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: SPACING.lg,
-    paddingTop: 50,
+    paddingTop: 56,
     paddingBottom: SPACING.md,
-    backgroundColor: COLORS.glass.white10,
+  },
+  headerLine: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    marginHorizontal: SPACING.lg,
   },
   backButton: {
     width: 40,
     height: 40,
-    borderRadius: RADIUS.full,
-    backgroundColor: COLORS.glass.white20,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontSize: 18,
     color: COLORS.white,
-    fontWeight: TYPOGRAPHY.fontWeight.semiBold,
+    fontWeight: '600',
   },
   headerSpacer: {
     width: 40,
@@ -317,110 +902,106 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: SPACING.lg,
     paddingTop: SPACING.lg,
-    paddingBottom: 120,
+    paddingBottom: 140,
   },
   missionCard: {
-    borderRadius: RADIUS.xxl,
+    borderRadius: 24,
     overflow: 'hidden',
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.md,
     borderWidth: 1,
-    borderColor: COLORS.glass.white20,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  cardBlur: {
+    overflow: 'hidden',
   },
   missionContent: {
     padding: SPACING.lg,
-    backgroundColor: COLORS.glass.white10,
-  },
-  missionHeader: {
-    marginBottom: SPACING.sm,
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   missionTitle: {
-    fontSize: TYPOGRAPHY.fontSize.display,
+    fontSize: 28,
     color: COLORS.white,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-  },
-  categoryBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs,
-    backgroundColor: COLORS.glass.white30,
-    borderRadius: RADIUS.full,
-    marginBottom: SPACING.md,
-  },
-  categoryText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.white,
-    fontWeight: TYPOGRAPHY.fontWeight.medium,
+    fontWeight: '700',
+    lineHeight: 34,
+    marginBottom: 12,
   },
   missionDescription: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    color: COLORS.glass.white90,
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.9)',
     lineHeight: 24,
     marginBottom: SPACING.lg,
   },
   missionMeta: {
     flexDirection: 'row',
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.lg,
+    gap: SPACING.xl,
   },
   metaItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: SPACING.xl,
+    gap: 8,
   },
   metaText: {
-    fontSize: TYPOGRAPHY.fontSize.md,
-    color: COLORS.glass.white70,
-    marginLeft: SPACING.sm,
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.8)',
   },
   tagsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    gap: 8,
   },
   tag: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs,
-    backgroundColor: COLORS.glass.white20,
-    borderRadius: RADIUS.full,
-    marginRight: SPACING.sm,
-    marginBottom: SPACING.xs,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 100,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
   },
   tagText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.glass.white80,
+    fontSize: 12,
+    color: COLORS.white,
   },
   stepsCard: {
-    borderRadius: RADIUS.xxl,
+    borderRadius: 24,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: COLORS.glass.white20,
+    borderColor: 'rgba(255,255,255,0.3)',
   },
   stepsContent: {
-    padding: SPACING.lg,
-    backgroundColor: COLORS.glass.white10,
+    paddingTop: SPACING.lg,
+    paddingHorizontal: SPACING.lg,
+    paddingBottom: 0,
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
-  stepsHeader: {
-    flexDirection: 'row',
+  completeBadgeContainer: {
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: SPACING.lg,
+    marginTop: SPACING.lg,
+    paddingBottom: SPACING.lg,
   },
-  stepsTitle: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    color: COLORS.white,
-    fontWeight: TYPOGRAPHY.fontWeight.semiBold,
+  completeBadgeContainerTop: {
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+  },
+  completeBadgeContainerBottom: {
+    alignItems: 'center',
+    marginTop: SPACING.md,
   },
   completeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs,
-    backgroundColor: COLORS.status.successLight,
-    borderRadius: RADIUS.full,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(74,222,128,0.2)',
+    borderRadius: 100,
+    borderWidth: 1,
+    borderColor: 'rgba(134,239,172,0.4)',
+    gap: 6,
   },
   completeText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.status.success,
-    fontWeight: TYPOGRAPHY.fontWeight.semiBold,
-    marginLeft: SPACING.xs,
+    fontSize: 13,
+    color: '#86efac',
+    fontWeight: '600',
   },
   stepItem: {
     flexDirection: 'row',
@@ -431,93 +1012,109 @@ const styles = StyleSheet.create({
     marginRight: SPACING.md,
   },
   stepCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: COLORS.glass.white30,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.4)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   stepCircleComplete: {
-    backgroundColor: COLORS.status.success,
+    backgroundColor: 'rgba(74,222,128,0.3)',
+    borderColor: 'rgba(134,239,172,0.4)',
   },
   stepNumber: {
-    fontSize: TYPOGRAPHY.fontSize.md,
+    fontSize: 14,
     color: COLORS.white,
-    fontWeight: TYPOGRAPHY.fontWeight.semiBold,
+    fontWeight: '600',
   },
   stepLine: {
     width: 2,
     flex: 1,
-    backgroundColor: COLORS.glass.white20,
-    marginTop: SPACING.sm,
+    minHeight: 40,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    marginTop: 8,
   },
   stepContent: {
     flex: 1,
-    paddingBottom: SPACING.md,
+    paddingBottom: 8,
   },
   stepTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: SPACING.xs,
+    marginBottom: 8,
+    gap: 8,
   },
   stepTitle: {
-    fontSize: TYPOGRAPHY.fontSize.base,
+    fontSize: 15,
     color: COLORS.white,
-    fontWeight: TYPOGRAPHY.fontWeight.semiBold,
-    marginLeft: SPACING.sm,
+    fontWeight: '600',
   },
   stepComplete: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.status.success,
-    marginLeft: SPACING.sm,
+    fontSize: 13,
+    color: '#86efac',
+    fontWeight: '500',
   },
   stepDescription: {
-    fontSize: TYPOGRAPHY.fontSize.md,
-    color: COLORS.glass.white70,
-    lineHeight: 20,
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.8)',
+    lineHeight: 21,
+  },
+  photoPreviewContainer: {
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  photoPreview: {
+    width: '80%',
+    aspectRatio: 3 / 4,
+    borderRadius: 12,
   },
   userStatusContainer: {
     flexDirection: 'row',
-    marginTop: SPACING.md,
-    gap: SPACING.sm,
+    marginTop: 12,
+    gap: 8,
   },
   userStatus: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: SPACING.sm,
-    backgroundColor: COLORS.glass.white10,
-    borderRadius: RADIUS.lg,
+    padding: 10,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 100,
     borderWidth: 1,
-    borderColor: COLORS.glass.white20,
+    borderColor: 'rgba(255,255,255,0.2)',
+    gap: 8,
   },
   userIcon: {
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: COLORS.glass.white20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   userIconComplete: {
-    backgroundColor: COLORS.status.success,
+    backgroundColor: 'rgba(74,222,128,0.3)',
+    borderColor: 'rgba(134,239,172,0.4)',
   },
   userInfo: {
-    marginLeft: SPACING.sm,
     flex: 1,
   },
   userLabel: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.glass.white60,
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.7)',
   },
   userStatusText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.glass.white50,
-    fontWeight: TYPOGRAPHY.fontWeight.medium,
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.5)',
+    fontWeight: '500',
   },
   userStatusComplete: {
-    color: COLORS.status.success,
+    color: '#86efac',
   },
   bottomBar: {
     position: 'absolute',
@@ -525,22 +1122,519 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     borderTopWidth: 1,
-    borderTopColor: COLORS.glass.white20,
+    borderTopColor: 'rgba(255,255,255,0.2)',
   },
   bottomContent: {
-    padding: SPACING.lg,
-    paddingBottom: 34,
-    backgroundColor: COLORS.glass.white10,
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.md,
+    paddingBottom: 28,
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   ctaButton: {
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.xl,
-    paddingVertical: SPACING.lg,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: 100,
+    paddingVertical: 14,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.5)',
   },
   ctaButtonText: {
-    fontSize: TYPOGRAPHY.fontSize.base,
+    fontSize: 16,
     color: COLORS.black,
-    fontWeight: TYPOGRAPHY.fontWeight.semiBold,
+    fontWeight: '600',
+  },
+  ctaButtonDisabled: {
+    backgroundColor: 'rgba(255,255,255,0.3)',
+  },
+  ctaButtonTextDisabled: {
+    color: 'rgba(0,0,0,0.4)',
+  },
+  ctaButtonComplete: {
+    backgroundColor: 'rgba(74, 222, 128, 0.2)',
+    borderColor: 'rgba(74, 222, 128, 0.5)',
+  },
+  ctaButtonCompleteContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  ctaButtonCompleteText: {
+    fontSize: 16,
+    color: '#86efac',
+    fontWeight: '600',
+  },
+  // Camera Styles
+  cameraContainer: {
+    flex: 1,
+    backgroundColor: COLORS.black,
+  },
+  cameraViewfinder: {
+    flex: 1,
+    backgroundColor: '#111',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cameraHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.lg,
+    paddingTop: 56,
+    paddingBottom: SPACING.md,
+  },
+  cameraBackButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cameraTitle: {
+    fontSize: 16,
+    color: COLORS.white,
+    fontWeight: '600',
+  },
+  captureButtonContainer: {
+    position: 'absolute',
+    bottom: 40,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  zoomIndicatorContainer: {
+    position: 'absolute',
+    bottom: 140,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  zoomIndicator: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 20,
+  },
+  zoomIndicatorText: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  captureButton: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: COLORS.white,
+    borderWidth: 4,
+    borderColor: 'rgba(255,255,255,0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  captureButtonInner: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 40,
+    borderWidth: 2,
+    borderColor: 'rgba(0,0,0,0.1)',
+  },
+  captureButtonDisabled: {
+    opacity: 0.5,
+  },
+  // Preview Buttons
+  previewButtonContainer: {
+    position: 'absolute',
+    bottom: 40,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 16,
+    paddingHorizontal: SPACING.lg,
+  },
+  retakeButton: {
+    flex: 1,
+    paddingVertical: 16,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 100,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  retakeButtonText: {
+    fontSize: 16,
+    color: COLORS.white,
+    fontWeight: '600',
+  },
+  confirmButton: {
+    flex: 1,
+    paddingVertical: 16,
+    backgroundColor: COLORS.white,
+    borderRadius: 100,
+    alignItems: 'center',
+  },
+  confirmButtonText: {
+    fontSize: 16,
+    color: COLORS.black,
+    fontWeight: '600',
+  },
+  floatingConfirmButton: {
+    position: 'absolute',
+    bottom: 50,
+    left: SPACING.lg,
+    right: SPACING.lg,
+    paddingVertical: 16,
+    backgroundColor: COLORS.white,
+    borderRadius: 100,
+    alignItems: 'center',
+  },
+  // Preview Frame styles (3:4 aspect ratio)
+  previewBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: COLORS.black,
+  },
+  previewCenterContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewFrameContainer: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+  },
+  previewFrameImage: {
+    width: '100%',
+    height: '100%',
+  },
+  // Capture Area styles (3:4 aspect ratio)
+  captureAreaOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  captureAreaDark: {
+    position: 'absolute',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  captureAreaFrame: {
+    position: 'absolute',
+    borderWidth: 2,
+    borderColor: COLORS.white,
+    borderRadius: 16,
+  },
+  // Crop styles
+  cropOverlayContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  cropOverlay: {
+    position: 'absolute',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  cropFrame: {
+    position: 'absolute',
+    borderWidth: 2,
+    borderColor: COLORS.white,
+  },
+  cropCornerHandle: {
+    position: 'absolute',
+    width: 40,
+    height: 40,
+  },
+  headerIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cropCornerTL: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 20,
+    height: 20,
+    borderTopWidth: 3,
+    borderLeftWidth: 3,
+    borderColor: COLORS.white,
+  },
+  cropCornerTR: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    width: 20,
+    height: 20,
+    borderTopWidth: 3,
+    borderRightWidth: 3,
+    borderColor: COLORS.white,
+  },
+  cropCornerBL: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 20,
+    height: 20,
+    borderBottomWidth: 3,
+    borderLeftWidth: 3,
+    borderColor: COLORS.white,
+  },
+  cropCornerBR: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: 20,
+    height: 20,
+    borderBottomWidth: 3,
+    borderRightWidth: 3,
+    borderColor: COLORS.white,
+  },
+  cropGridLine: {
+    position: 'absolute',
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  cropGridLineH1: {
+    left: 0,
+    right: 0,
+    top: '33.33%',
+    height: 1,
+  },
+  cropGridLineH2: {
+    left: 0,
+    right: 0,
+    top: '66.66%',
+    height: 1,
+  },
+  cropGridLineV1: {
+    top: 0,
+    bottom: 0,
+    left: '33.33%',
+    width: 1,
+  },
+  cropGridLineV2: {
+    top: 0,
+    bottom: 0,
+    left: '66.66%',
+    width: 1,
+  },
+  detailRetakeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 12,
+    paddingVertical: 10,
+    width: '80%',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 100,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  detailRetakeButtonText: {
+    fontSize: 14,
+    color: COLORS.white,
+    fontWeight: '500',
+  },
+  // Photo Preview with Filters
+  photoPreviewWrapper: {
+    flex: 1,
+    position: 'relative',
+  },
+  filterOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  bwOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(128, 128, 128, 0.3)',
+  },
+  previewBottomContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingBottom: 40,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  filterScrollView: {
+    marginBottom: 16,
+  },
+  filterScrollContent: {
+    paddingHorizontal: SPACING.lg,
+    gap: 12,
+  },
+  filterOption: {
+    alignItems: 'center',
+    gap: 8,
+    opacity: 0.7,
+  },
+  filterOptionSelected: {
+    opacity: 1,
+  },
+  filterPreviewContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  filterPreviewSelected: {
+    borderColor: COLORS.white,
+    borderWidth: 3,
+  },
+  filterPreviewImage: {
+    width: '100%',
+    height: '100%',
+  },
+  filterPreviewOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  filterPreviewBw: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(128, 128, 128, 0.5)',
+  },
+  filterName: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.7)',
+    fontWeight: '500',
+  },
+  filterNameSelected: {
+    color: COLORS.white,
+    fontWeight: '600',
+  },
+  confirmButtonContainer: {
+    paddingHorizontal: SPACING.lg,
+  },
+  // Modal Styles - Small Todo-list Style
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  modalContainer: {
+    width: width - 48,
+    maxWidth: 340,
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  modalBlur: {
+    overflow: 'hidden',
+  },
+  modalContent: {
+    padding: 20,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  modalCloseButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalTitle: {
+    fontSize: 17,
+    color: COLORS.white,
+    fontWeight: '600',
+  },
+  textInputContainer: {
+    marginBottom: 16,
+  },
+  textInput: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 16,
+    padding: 16,
+    color: COLORS.white,
+    fontSize: 15,
+    minHeight: 120,
+    textAlignVertical: 'top',
+  },
+  charCount: {
+    position: 'absolute',
+    bottom: 8,
+    right: 12,
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.4)',
+  },
+  submitButton: {
+    paddingVertical: 14,
+    backgroundColor: COLORS.white,
+    borderRadius: 100,
+    alignItems: 'center',
+  },
+  submitButtonDisabled: {
+    backgroundColor: 'rgba(255,255,255,0.3)',
+  },
+  submitButtonText: {
+    fontSize: 15,
+    color: COLORS.black,
+    fontWeight: '600',
+  },
+  // Frame guide overlay styles for 3:4 camera viewfinder
+  frameGuideOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  frameGuideDark: {
+    position: 'absolute',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  frameGuideBorder: {
+    position: 'absolute',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.6)',
+    borderRadius: 16,
   },
 });

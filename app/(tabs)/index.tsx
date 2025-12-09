@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -17,14 +17,53 @@ import {
   Animated,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
+import Svg, { Rect, Circle, Defs, Mask } from 'react-native-svg';
 import { Image as ImageIcon, X, Edit2, Trash2 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Swipeable } from 'react-native-gesture-handler';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '@/constants/design';
 import { useBackground } from '@/contexts';
+import { useOnboardingStore } from '@/stores';
+import KoreanLunarCalendar from 'korean-lunar-calendar';
+
+// Lunar to Solar date conversion utility
+const lunarToSolar = (lunarYear: number, lunarMonth: number, lunarDay: number): Date => {
+  const calendar = new KoreanLunarCalendar();
+  calendar.setLunarDate(lunarYear, lunarMonth, lunarDay, false);
+  const solarDate = calendar.getSolarCalendar();
+  return new Date(solarDate.year, solarDate.month - 1, solarDate.day);
+};
+
+// Get next birthday date (handling lunar if needed)
+const getNextBirthdayDate = (birthDate: Date, isLunar: boolean, today: Date): Date => {
+  const thisYear = today.getFullYear();
+
+  if (isLunar) {
+    // For lunar birthday, convert this year's lunar date to solar
+    const birthMonth = birthDate.getMonth() + 1;
+    const birthDay = birthDate.getDate();
+
+    // Get this year's solar equivalent of the lunar birthday
+    let solarBirthday = lunarToSolar(thisYear, birthMonth, birthDay);
+
+    // If already passed, get next year's
+    if (solarBirthday < today) {
+      solarBirthday = lunarToSolar(thisYear + 1, birthMonth, birthDay);
+    }
+    return solarBirthday;
+  } else {
+    // For solar birthday, simple calculation
+    const birthdayThisYear = new Date(thisYear, birthDate.getMonth(), birthDate.getDate());
+    if (birthdayThisYear < today) {
+      return new Date(thisYear + 1, birthDate.getMonth(), birthDate.getDate());
+    }
+    return birthdayThisYear;
+  }
+};
 
 const { width, height } = Dimensions.get('window');
 
@@ -156,7 +195,7 @@ function SwipeableAnniversaryCard({ anniversary, onEdit, onDelete, isCustom }: S
 
 const swipeStyles = StyleSheet.create({
   container: {
-    marginBottom: 12,
+    marginBottom: 8,
     borderRadius: 20,
     overflow: 'hidden',
   },
@@ -200,8 +239,11 @@ const swipeStyles = StyleSheet.create({
   },
   card: {
     borderRadius: 20,
-    padding: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     width: '100%',
+    minHeight: 70,
+    justifyContent: 'center',
   },
   cardContent: {
     flexDirection: 'row',
@@ -240,6 +282,7 @@ const swipeStyles = StyleSheet.create({
 
 export default function HomeScreen() {
   const { backgroundImage, setBackgroundImage, resetToDefault } = useBackground();
+  const { data: onboardingData } = useOnboardingStore();
   const [showAnniversaryModal, setShowAnniversaryModal] = useState(false);
   const [showImagePickerModal, setShowImagePickerModal] = useState(false);
   const [showAddAnniversary, setShowAddAnniversary] = useState(false);
@@ -252,6 +295,20 @@ export default function HomeScreen() {
   // Custom anniversaries added by user (yearly repeating)
   const [customAnniversaries, setCustomAnniversaries] = useState<Anniversary[]>([]);
 
+  // Tutorial overlay state
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [buttonPosition, setButtonPosition] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const imageButtonRef = useRef<View>(null);
+
+  // Measure the image change button position for tutorial overlay
+  const measureButton = useCallback(() => {
+    if (imageButtonRef.current) {
+      imageButtonRef.current.measureInWindow((x, y, buttonWidth, buttonHeight) => {
+        setButtonPosition({ x, y, width: buttonWidth, height: buttonHeight });
+      });
+    }
+  }, []);
+
   // Edit anniversary states
   const [showEditAnniversary, setShowEditAnniversary] = useState(false);
   const [editingAnniversary, setEditingAnniversary] = useState<Anniversary | null>(null);
@@ -263,6 +320,37 @@ export default function HomeScreen() {
 
   // Emoji options for anniversary icons
   const emojiOptions = ['💝', '❤️', '💕', '💗', '🤍', '🎉', '🎂', '🎄', '✨', '🌹', '💐', '💍', '👶', '💋'];
+
+  // Check for first-time tutorial
+  useEffect(() => {
+    const checkFirstTimeVisit = async () => {
+      try {
+        const hasSeenTutorial = await AsyncStorage.getItem('hasSeenHomeTutorial');
+        if (!hasSeenTutorial) {
+          // Measure button position first, then show tutorial
+          setTimeout(() => {
+            measureButton();
+            setTimeout(() => {
+              setShowTutorial(true);
+            }, 100);
+          }, 500);
+        }
+      } catch {
+        // If error, don't show tutorial
+      }
+    };
+    checkFirstTimeVisit();
+  }, [measureButton]);
+
+  // Close tutorial and save to AsyncStorage
+  const closeTutorial = async () => {
+    setShowTutorial(false);
+    try {
+      await AsyncStorage.setItem('hasSeenHomeTutorial', 'true');
+    } catch {
+      // Ignore storage errors
+    }
+  };
 
   // Anniversary modal animation
   const anniversaryModalOpacity = useRef(new Animated.Value(0)).current;
@@ -287,11 +375,13 @@ export default function HomeScreen() {
     });
   };
 
-  // Calculate D-day
-  const anniversaryDate = new Date(2022, 3, 15); // April 15, 2022
+  // Calculate D-day using onboarding anniversaryDate
+  const anniversaryDate = onboardingData.anniversaryDate
+    ? new Date(onboardingData.anniversaryDate)
+    : new Date(2022, 3, 15); // Fallback to April 15, 2022
   const today = new Date();
   const diffTime = today.getTime() - anniversaryDate.getTime();
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to count from day 1
 
   // Helper function to calculate D-day
   const calculateDDay = (targetDate: Date) => {
@@ -318,60 +408,116 @@ export default function HomeScreen() {
     return anniversaryThisYear;
   };
 
-  // Default anniversary list data (will sync with onboarding data in production)
-  const defaultAnniversaries: Anniversary[] = [
-    {
-      id: 1,
-      label: '1000일',
-      targetDate: new Date(anniversaryDate.getTime() + 999 * 24 * 60 * 60 * 1000),
-      icon: '🎉',
-      bgColor: 'rgba(236, 72, 153, 0.25)',
-      gradientColors: ['#A855F7', '#EC4899'] as const,
-    },
-    {
-      id: 2,
-      label: '크리스마스',
-      targetDate: new Date(2025, 11, 25),
-      icon: '🎄',
-      bgColor: 'rgba(239, 68, 68, 0.25)',
-      gradientColors: ['#EF4444', '#22C55E'] as const,
-      isYearly: true,
-    },
-    {
-      id: 3,
-      label: '발렌타인데이',
-      targetDate: new Date(2026, 1, 14),
-      icon: '💝',
-      bgColor: 'rgba(236, 72, 153, 0.25)',
-      gradientColors: ['#EC4899', '#F43F5E'] as const,
-      isYearly: true,
-    },
-    {
-      id: 4,
-      label: '화이트데이',
-      targetDate: new Date(2026, 2, 14),
-      icon: '🤍',
-      bgColor: 'rgba(59, 130, 246, 0.25)',
-      gradientColors: ['#3B82F6', '#06B6D4'] as const,
-      isYearly: true,
-    },
-    {
-      id: 5,
-      label: '4주년',
-      targetDate: new Date(2026, 3, 15),
-      icon: '💖',
-      bgColor: 'rgba(168, 85, 247, 0.25)',
-      gradientColors: ['#A855F7', '#EC4899'] as const,
-    },
-    {
-      id: 6,
-      label: '1500일',
-      targetDate: new Date(anniversaryDate.getTime() + 1499 * 24 * 60 * 60 * 1000),
-      icon: '✨',
-      bgColor: 'rgba(251, 191, 36, 0.25)',
-      gradientColors: ['#FBBF24', '#F59E0B'] as const,
-    },
-  ];
+  // Generate dynamic anniversaries based on relationship type
+  const generateDefaultAnniversaries = (): Anniversary[] => {
+    const baseAnniversaries: Anniversary[] = [];
+    const isMarried = onboardingData.relationshipType === 'married';
+    let idCounter = 1;
+
+    if (isMarried) {
+      // For married couples: only show the nearest upcoming wedding anniversary
+      for (let year = 1; year <= 50; year++) {
+        const yearlyDate = new Date(anniversaryDate);
+        yearlyDate.setFullYear(anniversaryDate.getFullYear() + year);
+        if (yearlyDate > today) {
+          baseAnniversaries.push({
+            id: idCounter++,
+            label: `결혼기념일 ${year}주년`,
+            targetDate: yearlyDate,
+            icon: year === 1 ? '💍' : '💖',
+            bgColor: 'rgba(168, 85, 247, 0.25)',
+            gradientColors: ['#A855F7', '#EC4899'] as const,
+            isYearly: true,
+          });
+          break; // Only add the nearest upcoming anniversary
+        }
+      }
+    } else {
+      // For dating/friendship: 100-day intervals up to 1000, then 500-day intervals
+      // Calculate days passed since anniversary
+      const daysPassed = Math.floor((today.getTime() - anniversaryDate.getTime()) / (24 * 60 * 60 * 1000)) + 1;
+
+      let nextMilestone: number;
+
+      if (daysPassed < 1000) {
+        // 100-day intervals: 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000
+        nextMilestone = Math.ceil(daysPassed / 100) * 100;
+        if (nextMilestone === 0) nextMilestone = 100;
+      } else {
+        // 500-day intervals: 1000, 1500, 2000, 2500, 3000, ...
+        if (daysPassed < 1500) {
+          nextMilestone = 1500;
+        } else {
+          nextMilestone = Math.ceil(daysPassed / 500) * 500;
+        }
+      }
+
+      // Only add the next milestone
+      const milestoneDate = new Date(anniversaryDate.getTime() + (nextMilestone - 1) * 24 * 60 * 60 * 1000);
+      if (milestoneDate > today) {
+        baseAnniversaries.push({
+          id: idCounter++,
+          label: `${nextMilestone}일`,
+          targetDate: milestoneDate,
+          icon: nextMilestone >= 1000 ? '🎉' : '✨',
+          bgColor: nextMilestone >= 1000 ? 'rgba(236, 72, 153, 0.25)' : 'rgba(251, 191, 36, 0.25)',
+          gradientColors: nextMilestone >= 1000 ? ['#A855F7', '#EC4899'] as const : ['#FBBF24', '#F59E0B'] as const,
+        });
+      }
+    }
+
+    // Add birthday if birthDate exists
+    if (onboardingData.birthDate) {
+      const birthDate = new Date(onboardingData.birthDate);
+      const isLunar = onboardingData.birthDateCalendarType === 'lunar';
+      const nextBirthday = getNextBirthdayDate(birthDate, isLunar, today);
+
+      baseAnniversaries.push({
+        id: idCounter++,
+        label: `내 생일${isLunar ? ' (음력)' : ''}`,
+        targetDate: nextBirthday,
+        icon: '🎂',
+        bgColor: 'rgba(251, 191, 36, 0.25)',
+        gradientColors: ['#FBBF24', '#F59E0B'] as const,
+        isYearly: true,
+      });
+    }
+
+    // Add common yearly holidays
+    baseAnniversaries.push(
+      {
+        id: idCounter++,
+        label: '크리스마스',
+        targetDate: new Date(today.getFullYear(), 11, 25),
+        icon: '🎄',
+        bgColor: 'rgba(239, 68, 68, 0.25)',
+        gradientColors: ['#EF4444', '#22C55E'] as const,
+        isYearly: true,
+      },
+      {
+        id: idCounter++,
+        label: '발렌타인데이',
+        targetDate: new Date(today.getFullYear(), 1, 14),
+        icon: '💝',
+        bgColor: 'rgba(236, 72, 153, 0.25)',
+        gradientColors: ['#EC4899', '#F43F5E'] as const,
+        isYearly: true,
+      },
+      {
+        id: idCounter++,
+        label: '화이트데이',
+        targetDate: new Date(today.getFullYear(), 2, 14),
+        icon: '🤍',
+        bgColor: 'rgba(59, 130, 246, 0.25)',
+        gradientColors: ['#3B82F6', '#06B6D4'] as const,
+        isYearly: true,
+      }
+    );
+
+    return baseAnniversaries;
+  };
+
+  const defaultAnniversaries = generateDefaultAnniversaries();
 
   // Combine default and custom anniversaries
   const allAnniversaries = [...defaultAnniversaries, ...customAnniversaries];
@@ -466,11 +612,11 @@ export default function HomeScreen() {
         prev.map((ann) =>
           ann.id === editingAnniversary.id
             ? {
-                ...ann,
-                label: editAnniversaryName.trim(),
-                icon: editAnniversaryIcon,
-                targetDate: editAnniversaryDate,
-              }
+              ...ann,
+              label: editAnniversaryName.trim(),
+              icon: editAnniversaryIcon,
+              targetDate: editAnniversaryDate,
+            }
             : ann
         )
       );
@@ -510,18 +656,24 @@ export default function HomeScreen() {
       {/* Background Image - No blur like Figma */}
       <ImageBackground
         source={backgroundImage}
+        defaultSource={require('@/assets/images/backgroundimage.png')}
         style={styles.backgroundImage}
+        imageStyle={styles.backgroundImageStyle}
       />
 
       {/* Content */}
       <View style={styles.content}>
         {/* Anniversary Info - Top Section */}
         <View style={styles.anniversarySection}>
-          <Text style={styles.coupleNames}>
-            <Text>지민 </Text>
+          <View style={styles.coupleNamesRow}>
+            <Text style={[styles.coupleNameText, styles.coupleNameLeft]} numberOfLines={1}>
+              {onboardingData.nickname || '나'}
+            </Text>
             <Text style={styles.heartEmoji}>❤️</Text>
-            <Text> 준호</Text>
-          </Text>
+            <Text style={[styles.coupleNameText, styles.coupleNameRight]} numberOfLines={1}>
+              파트너
+            </Text>
+          </View>
           <Pressable
             onPress={openAnniversaryModal}
             style={styles.anniversaryButton}
@@ -568,7 +720,9 @@ export default function HomeScreen() {
                 </View>
                 {/* Image Change Button */}
                 <Pressable
+                  ref={imageButtonRef}
                   onPress={() => setShowImagePickerModal(true)}
+                  onLayout={measureButton}
                   style={styles.imageChangeButton}
                 >
                   <ImageIcon color="#333" size={20} />
@@ -721,7 +875,7 @@ export default function HomeScreen() {
             <View style={styles.addAnniversaryModalContent}>
               {/* Header */}
               <View style={styles.addAnniversaryHeader}>
-                <Text style={styles.addAnniversaryTitle}>새 기념일 추가</Text>
+                <Text style={styles.addAnniversaryTitle}>기념일 추가</Text>
                 <Pressable
                   onPress={() => setShowAddAnniversary(false)}
                   style={styles.modalCloseButton}
@@ -822,7 +976,7 @@ export default function HomeScreen() {
                   disabled={!newAnniversaryName.trim()}
                 >
                   <View style={styles.submitButtonInner}>
-                    <Text style={styles.submitButtonText}>추가하기</Text>
+                    <Text style={styles.submitButtonText}>완료</Text>
                   </View>
                 </Pressable>
               </View>
@@ -967,6 +1121,73 @@ export default function HomeScreen() {
           </KeyboardAvoidingView>
         </BlurView>
       </Modal>
+
+      {/* First-Time Tutorial Overlay */}
+      <Modal
+        visible={showTutorial && buttonPosition !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={closeTutorial}
+      >
+        <Pressable style={styles.tutorialOverlay} onPress={closeTutorial}>
+          {buttonPosition && (
+            <>
+              {/* SVG overlay with circular hole */}
+              <Svg width={width} height={height} style={styles.tutorialSvg}>
+                <Defs>
+                  <Mask id="holeMask">
+                    {/* White = visible, Black = hidden */}
+                    <Rect x="0" y="0" width={width} height={height} fill="white" />
+                    <Circle
+                      cx={buttonPosition.x + buttonPosition.width / 2}
+                      cy={buttonPosition.y + buttonPosition.height / 2}
+                      r={28}
+                      fill="black"
+                    />
+                  </Mask>
+                </Defs>
+                <Rect
+                  x="0"
+                  y="0"
+                  width={width}
+                  height={height}
+                  fill="rgba(0, 0, 0, 0.85)"
+                  mask="url(#holeMask)"
+                />
+              </Svg>
+              {/* Circular highlight ring */}
+              <View
+                style={[
+                  styles.tutorialHole,
+                  {
+                    position: 'absolute',
+                    left: buttonPosition.x + buttonPosition.width / 2 - 28,
+                    top: buttonPosition.y + buttonPosition.height / 2 - 28,
+                  },
+                ]}
+              />
+              {/* Message box - right aligned with hole */}
+              <View
+                style={[
+                  styles.tutorialMessageContainer,
+                  {
+                    position: 'absolute',
+                    top: buttonPosition.y + buttonPosition.height / 2 + 40,
+                    right: width - buttonPosition.x - buttonPosition.width - 8,
+                  },
+                ]}
+              >
+                <View style={styles.tutorialMessageBox}>
+                  <Text style={styles.tutorialMessageTitle}>배경사진을 변경해보세요</Text>
+                  <Text style={styles.tutorialMessageText}>
+                    이 버튼을 눌러 커플 사진으로{'\n'}배경을 꾸밀 수 있어요
+                  </Text>
+                </View>
+              </View>
+            </>
+          )}
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -980,6 +1201,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: width,
     height: height,
+  },
+  backgroundImageStyle: {
+    transform: [{ scale: 1.0 }],
   },
   overlay: {
     flex: 1,
@@ -995,15 +1219,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'transparent',
   },
-  coupleNames: {
+  coupleNamesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.xl,
+  },
+  coupleNameText: {
     fontSize: 18,
     color: COLORS.white,
     fontFamily: TYPOGRAPHY.fontFamily.display,
     fontWeight: '400',
     letterSpacing: 0.5,
     opacity: 0.95,
-    marginBottom: SPACING.xl,
     backgroundColor: 'transparent',
+  },
+  coupleNameLeft: {
+    flex: 1,
+    textAlign: 'right',
+    marginRight: SPACING.sm,
+  },
+  coupleNameRight: {
+    flex: 1,
+    textAlign: 'left',
+    marginLeft: SPACING.sm,
   },
   heartEmoji: {
     fontFamily: 'System',
@@ -1266,47 +1505,6 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 16,
   },
-  anniversaryCard: {
-    borderRadius: 24,
-    paddingVertical: 20,
-    paddingHorizontal: 16,
-    marginBottom: SPACING.sm,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  anniversaryCardContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  anniversaryCardLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-  },
-  anniversaryIcon: {
-    fontSize: 24,
-  },
-  anniversaryLabel: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
-    marginBottom: 4,
-  },
-  anniversaryDate: {
-    fontSize: 14,
-    color: COLORS.white,
-    fontWeight: '500',
-  },
-  anniversaryBadge: {
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 4,
-    borderRadius: 100,
-  },
-  anniversaryDDay: {
-    fontSize: 12,
-    color: COLORS.white,
-    fontWeight: '600',
-  },
   anniversaryFooterDivider: {
     height: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
@@ -1539,5 +1737,52 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.black,
     fontWeight: '600',
+  },
+  // Tutorial overlay styles - SVG with circular hole
+  tutorialOverlay: {
+    flex: 1,
+  },
+  tutorialSvg: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+  },
+  tutorialHole: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'transparent',
+    // Glowing border to highlight the button
+    borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.9)',
+    shadowColor: '#FFFFFF',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  tutorialMessageContainer: {
+    alignItems: 'flex-end',
+  },
+  tutorialMessageBox: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  tutorialMessageTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.white,
+    marginBottom: 6,
+    textAlign: 'right',
+  },
+  tutorialMessageText: {
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'right',
+    lineHeight: 18,
   },
 });

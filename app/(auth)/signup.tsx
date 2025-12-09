@@ -92,8 +92,9 @@ export default function SignupScreen() {
           [{ text: '확인', onPress: () => router.replace('/(auth)/login') }]
         );
       }
-    } catch (error: any) {
-      Alert.alert('회원가입 실패', error.message || '다시 시도해주세요.');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '다시 시도해주세요.';
+      Alert.alert('회원가입 실패', message);
     } finally {
       setLoading(false);
     }
