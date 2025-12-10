@@ -46,7 +46,7 @@ export default function MoreScreen() {
   const router = useRouter();
   const resetOnboarding = useOnboardingStore((state) => state.reset);
   const setIsOnboardingComplete = useAuthStore((state) => state.setIsOnboardingComplete);
-  const resetGeneratedMissions = useMissionStore((state) => state.resetGeneratedMissions);
+  const resetAllTodayMissions = useMissionStore((state) => state.resetAllTodayMissions);
 
   const handleDevReset = () => {
     Alert.alert(
@@ -72,14 +72,14 @@ export default function MoreScreen() {
   const handleMissionReset = () => {
     Alert.alert(
       '미션 리셋',
-      '오늘의 미션을 초기화하고 다시 생성하시겠습니까?',
+      '오늘의 미션과 완료 상태를 모두 초기화하시겠습니까?',
       [
         { text: '취소', style: 'cancel' },
         {
           text: '리셋',
           style: 'destructive',
           onPress: () => {
-            resetGeneratedMissions();
+            resetAllTodayMissions();
             Alert.alert(
               '리셋 완료',
               '미션이 초기화되었습니다. 미션 탭으로 이동하여 새로운 미션을 생성하세요.',

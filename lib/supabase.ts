@@ -234,7 +234,7 @@ export const db = {
       const client = getSupabase();
       const { data, error } = await client
         .from('completed_missions')
-        .select('*, mission:missions(*)')
+        .select('*')
         .eq('couple_id', coupleId)
         .order('completed_at', { ascending: false });
       return { data, error };
@@ -247,7 +247,7 @@ export const db = {
 
       const { data, error } = await client
         .from('completed_missions')
-        .select('*, mission:missions(*)')
+        .select('*')
         .eq('couple_id', coupleId)
         .gte('completed_at', startDate)
         .lte('completed_at', endDate)
@@ -255,21 +255,72 @@ export const db = {
       return { data, error };
     },
 
+    // Create memory for AI-generated missions (no mission_id FK)
     async create(memory: {
       couple_id: string;
-      mission_id: string;
       photo_url: string;
       user1_message: string;
-      user2_message: string;
-      location: string;
+      user2_message?: string;
+      location?: string;
+      mission_data: {
+        id: string;
+        title: string;
+        description: string;
+        category: string;
+        icon: string;
+        imageUrl?: string;
+        difficulty?: number;
+        tags?: string[];
+      };
     }) {
       const client = getSupabase();
       const { data, error } = await client
         .from('completed_missions')
-        .insert(memory)
-        .select('*, mission:missions(*)')
+        .insert({
+          couple_id: memory.couple_id,
+          photo_url: memory.photo_url,
+          user1_message: memory.user1_message,
+          user2_message: memory.user2_message || '',
+          location: memory.location || '',
+          mission_data: memory.mission_data,
+          // mission_id is null for AI-generated missions
+        })
+        .select()
         .single();
       return { data, error };
+    },
+
+    // Get single memory by ID
+    async getById(id: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('completed_missions')
+        .select('*')
+        .eq('id', id)
+        .single();
+      return { data, error };
+    },
+
+    // Update memory (e.g., add partner's message)
+    async update(id: string, updates: Record<string, unknown>) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('completed_missions')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+      return { data, error };
+    },
+
+    // Delete memory
+    async delete(id: string) {
+      const client = getSupabase();
+      const { error } = await client
+        .from('completed_missions')
+        .delete()
+        .eq('id', id);
+      return { error };
     },
   },
 

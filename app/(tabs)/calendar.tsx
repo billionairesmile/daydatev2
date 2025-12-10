@@ -36,6 +36,8 @@ import {
 import { COLORS, SPACING, RADIUS } from '@/constants/design';
 import { useBackground } from '@/contexts';
 import { useMemoryStore, SAMPLE_MEMORIES } from '@/stores/memoryStore';
+import { useAuthStore } from '@/stores/authStore';
+import { isDemoMode } from '@/lib/supabase';
 
 const { width, height } = Dimensions.get('window');
 
@@ -280,7 +282,8 @@ function SwipeableTodoItem({
 
 export default function CalendarScreen() {
   const { backgroundImage } = useBackground();
-  const { memories } = useMemoryStore();
+  const { memories, loadFromDB } = useMemoryStore();
+  const { couple } = useAuthStore();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<number | null>(null);
   const [todos, setTodos] = useState<Todo[]>([]);
@@ -380,6 +383,13 @@ export default function CalendarScreen() {
       setIsPeriodSettingsOpen(false);
     });
   };
+
+  // Load memories from DB when couple is available
+  useEffect(() => {
+    if (!isDemoMode && couple?.id) {
+      loadFromDB(couple.id);
+    }
+  }, [couple?.id, loadFromDB]);
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';

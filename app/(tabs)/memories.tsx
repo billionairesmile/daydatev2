@@ -41,6 +41,8 @@ import ReanimatedModule, {
 
 import { COLORS, SPACING } from '@/constants/design';
 import { useMemoryStore, SAMPLE_MEMORIES } from '@/stores/memoryStore';
+import { useAuthStore } from '@/stores/authStore';
+import { useOnboardingStore } from '@/stores/onboardingStore';
 import { useBackground } from '@/contexts';
 import type { CompletedMission } from '@/types';
 import { RansomText } from '@/components/ransom';
@@ -83,7 +85,8 @@ interface MonthData {
 
 export default function MemoriesScreen() {
   const { backgroundImage } = useBackground();
-  const { memories } = useMemoryStore();
+  const { memories, deleteMemory } = useMemoryStore();
+  const { user, partner } = useAuthStore();
   const [selectedMonth, setSelectedMonth] = useState<MonthData | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<MemoryType | null>(null);
   const [showYearPicker, setShowYearPicker] = useState<string | null>(null);
@@ -1104,6 +1107,9 @@ export default function MemoriesScreen() {
               missions={selectedMonth.missions}
               initialPhoto={selectedPhoto}
               onClose={() => setSelectedPhoto(null)}
+              onDelete={(memoryId) => {
+                deleteMemory(memoryId);
+              }}
             />
           )}
         </View>
@@ -1866,6 +1872,15 @@ export default function MemoriesScreen() {
               missions={albumPhotos[selectedAlbum.id] || []}
               initialPhoto={selectedAlbumPhoto}
               onClose={() => setSelectedAlbumPhoto(null)}
+              onDelete={(memoryId) => {
+                // Delete from album photos
+                setAlbumPhotos(prev => ({
+                  ...prev,
+                  [selectedAlbum.id]: (prev[selectedAlbum.id] || []).filter(p => p.id !== memoryId)
+                }));
+                // Also delete from memories store
+                deleteMemory(memoryId);
+              }}
             />
           )}
 
@@ -2333,6 +2348,8 @@ function FlipCardItem({
   mission: MemoryType;
   isActive: boolean;
 }) {
+  const { user, partner } = useAuthStore();
+  const { data: onboardingData } = useOnboardingStore();
   const [isFlipped, setIsFlipped] = useState(false);
   const flipAnim = useRef(new Animated.Value(0)).current;
 
@@ -2428,7 +2445,7 @@ function FlipCardItem({
                 {mission.user1Message && (
                   <View style={styles.flipCardMessageItem}>
                     <Text style={styles.flipCardMessageLabel} allowFontScaling={false}>
-                      지민
+                      {user?.nickname || onboardingData.nickname || '나'}
                     </Text>
                     <Text style={styles.flipCardMessageText} allowFontScaling={false}>
                       {mission.user1Message}
@@ -2438,7 +2455,7 @@ function FlipCardItem({
                 {mission.user2Message && (
                   <View style={styles.flipCardMessageItem}>
                     <Text style={styles.flipCardMessageLabel} allowFontScaling={false}>
-                      준호
+                      {partner?.nickname || '상대방'}
                     </Text>
                     <Text style={styles.flipCardMessageText} allowFontScaling={false}>
                       {mission.user2Message}
@@ -2540,10 +2557,12 @@ function PhotoDetailView({
   missions,
   initialPhoto,
   onClose,
+  onDelete,
 }: {
   missions: MemoryType[];
   initialPhoto: MemoryType;
   onClose: () => void;
+  onDelete: (memoryId: string) => void;
 }) {
   const initialIndex = missions.findIndex((m) => m.id === initialPhoto.id);
   const [currentIndex, setCurrentIndex] = useState(
@@ -2704,6 +2723,7 @@ function PhotoDetailView({
               style={[styles.photoDetailMenuItem, styles.photoDetailMenuItemDanger]}
               onPress={() => {
                 setShowPhotoDetailMenu(false);
+                const currentMission = missions[currentIndex];
                 Alert.alert(
                   '사진 삭제',
                   '이 사진을 삭제하시겠습니까?',
@@ -2713,7 +2733,8 @@ function PhotoDetailView({
                       text: '삭제',
                       style: 'destructive',
                       onPress: () => {
-                        // Close the photo detail view after deletion
+                        // Delete the photo and close the view
+                        onDelete(currentMission.id);
                         onClose();
                       }
                     }

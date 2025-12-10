@@ -65,8 +65,41 @@ export async function generateMissionsWithAI(input: MissionGenerationInput): Pro
   // Build context from user preferences
   const contextParts: string[] = [];
 
-  // 🎯 MBTI - 가장 중요한 정보이므로 최우선으로 추가
-  contextParts.push('=== 📌 MBTI 정보 (최우선 고려!) ===');
+  // 🚨 제약사항 - 가장 먼저 확인해야 할 필수 조건
+  const allConstraints: string[] = [];
+  if (input.userAPreferences?.constraints) {
+    allConstraints.push(...input.userAPreferences.constraints);
+  }
+  if (input.userBPreferences?.constraints) {
+    allConstraints.push(...input.userBPreferences.constraints);
+  }
+  // 중복 제거
+  const uniqueConstraints = [...new Set(allConstraints)].filter(c => c !== 'none');
+
+  contextParts.push('=== 🚨 제약사항 (최우선 필수 조건!) ===');
+  if (uniqueConstraints.length > 0) {
+    contextParts.push(`적용 제약사항: ${uniqueConstraints.join(', ')}`);
+    // 제약사항별 상세 설명 추가
+    const constraintDescriptions: Record<string, string> = {
+      pet: '🐾 반려동물 있음 → 반려동물 동반 가능한 실내나 야외에서 할 수 있는 활동 추천',
+      child: '👶 아이 있음 → 아이와 함께할 수 있는 가족 친화적 활동 추천',
+      long_distance: '✈️ 장거리 연애 → 온라인/영상통화로 할 수 있는 활동 또는 만났을 때 특별한 활동 추천',
+      far_distance: '🚗 거리가 멂 → 만나기 어려우므로 온라인 활동 또는 만났을 때 가치 있는 활동 추천',
+      no_car: '🚘 차/면허 없음 → 대중교통 접근 가능하거나 도보 가능한 장소, 또는 실내 활동 추천',
+      no_alcohol: '🍻 술 안함 → 주류 관련 활동 절대 제외, 카페/디저트/논알콜 음료 추천',
+      avoid_crowd: '👥 인파 피함 → 한적한 장소, 예약제 공간, 집에서 하는 활동 추천',
+    };
+    uniqueConstraints.forEach(constraint => {
+      if (constraintDescriptions[constraint]) {
+        contextParts.push(constraintDescriptions[constraint]);
+      }
+    });
+  } else {
+    contextParts.push('제약사항 없음');
+  }
+
+  // 🎯 MBTI - 두 번째로 중요한 정보
+  contextParts.push('\n=== 📌 MBTI 정보 ===');
   if (input.userAPreferences?.mbti) {
     contextParts.push(`사용자 A MBTI: ${input.userAPreferences.mbti}`);
   }
@@ -83,7 +116,6 @@ export async function generateMissionsWithAI(input: MissionGenerationInput): Pro
     contextParts.push('\n=== 사용자 A 선호도 ===');
     if (prefs.activityTypes.length > 0) contextParts.push(`선호 활동: ${prefs.activityTypes.join(', ')}`);
     if (prefs.dateWorries.length > 0) contextParts.push(`데이트 고민: ${prefs.dateWorries.join(', ')}`);
-    if (prefs.constraints.length > 0) contextParts.push(`제약사항: ${prefs.constraints.join(', ')}`);
   }
 
   // User B preferences (if available, for paired users)
@@ -92,7 +124,6 @@ export async function generateMissionsWithAI(input: MissionGenerationInput): Pro
     contextParts.push('\n=== 사용자 B (파트너) 선호도 ===');
     if (prefs.activityTypes.length > 0) contextParts.push(`선호 활동: ${prefs.activityTypes.join(', ')}`);
     if (prefs.dateWorries.length > 0) contextParts.push(`데이트 고민: ${prefs.dateWorries.join(', ')}`);
-    if (prefs.constraints.length > 0) contextParts.push(`제약사항: ${prefs.constraints.join(', ')}`);
   }
 
   // Today's answers
@@ -123,40 +154,61 @@ export async function generateMissionsWithAI(input: MissionGenerationInput): Pro
   const contextString = contextParts.join('\n');
 
   const systemPrompt = `당신은 커플을 위한 특별한 데이트 미션을 추천하는 AI 어시스턴트입니다.
-사용자의 MBTI와 선호도, 오늘의 상황을 고려하여 두 사람의 기억에 오래 남을 특별한 데이트 미션 3개를 생성해주세요.
+사용자의 제약사항, MBTI, 선호도, 오늘의 상황을 고려하여 두 사람의 기억에 오래 남을 특별한 데이트 미션 3개를 생성해주세요.
 
 🎯 핵심 원칙:
-1. **MBTI 최우선**: 두 사람의 MBTI 성향을 가장 중요하게 고려하여 그들에게 딱 맞는 활동을 추천하세요
+1. **🚨 제약사항 최우선 (절대 위반 금지!)**:
+   사용자가 선택한 제약사항은 반드시 모든 미션에 적용해야 합니다. 제약사항을 위반하는 미션은 절대 생성하지 마세요.
+   - 🐾 반려동물 있음: 반려동물 동반 가능한 장소 또는 집에서 할 수 있는 활동만 추천
+   - 👶 아이 있음: 아이와 함께할 수 있는 가족 친화적인 활동만 추천
+   - ✈️ 장거리 연애: 온라인/영상통화로 할 수 있는 활동 또는 만났을 때 특별한 활동 추천
+   - 🚗 거리가 멂: 만나기 어려우므로 온라인 활동 또는 만났을 때 가치 있는 활동 추천
+   - 🚘 차/면허 없음: 대중교통 접근 가능하거나 도보 가능한 장소, 드라이브 관련 미션 제외
+   - 🍻 술 안함: 주류 관련 활동 절대 제외 (바, 펍, 와인바, 칵테일, 술집 등 금지), 카페/디저트/논알콜 음료만 추천
+   - 👥 인파 피함: 한적한 장소, 예약제 공간, 집에서 하는 활동 추천
+
+2. **MBTI 고려**: 두 사람의 MBTI 성향을 고려하여 그들에게 맞는 활동을 추천하세요
    - E/I: 에너지 충전 방식 (사람들과의 활동 vs 조용한 활동)
    - N/S: 정보 수집 방식 (창의적/상상력 vs 현실적/구체적)
    - T/F: 의사결정 방식 (논리적/분석 vs 감정적/공감)
    - J/P: 생활양식 (계획적/체계적 vs 유연한/즉흥적)
 
-2. **특별하고 기억에 남는 경험**:
+3. **특별하고 기억에 남는 경험**:
    ❌ 피해야 할 뻔한 미션: "카페에서 얘기하기", "공원 산책하기", "영화 보기"
    ✅ 추천하는 특별한 미션: "카페에서 서로의 버킷리스트 교환하고 하나씩 실천 약속하기", "공원에서 공용 자전거 타고 숨겨진 포토존 찾기", "눈 오는 날 눈사람 콘테스트하기"
 
-3. **구체적인 활동 제시**: 단순히 "가기"가 아니라 "무엇을 하기"까지 구체적으로 제시하세요
+4. **구체적인 활동 제시**: 단순히 "가기"가 아니라 "무엇을 하기"까지 구체적으로 제시하세요
+   - 각 미션은 단순한 활동이 아니라 실행 방법, 감정, 목적, 기억 포인트(사진/대화/행동)를 포함해 제안하세요.
 
-4. **상황 맞춤화**:
+5. **📸 사진으로 남길 수 있는 미션 (중요!)**:
+   - 미션을 완료하려면 사진을 찍어야 합니다. 반드시 사진으로 기록할 수 있는 활동을 추천하세요.
+   - ❌ 피해야 할 미션: 영상통화하기, 전화로 대화하기, 사진 공유하기, 메시지 보내기 등 사진 촬영이 불가능한 활동
+   - ✅ 좋은 미션: 함께 찍은 셀카, 음식 사진, 장소 인증, 활동 중 사진 등 시각적 증거를 남길 수 있는 활동
+   - canMeetToday가 false인 경우에도: 홈데이트 인증샷, 같은 음식 각자 먹고 인증, 화상통화 중 같은 포즈 캡처 등 사진을 남길 수 있는 방식으로 제안
+
+6. **상황 맞춤화**:
    - 오늘의 분위기(mood)를 반영하세요
-   - canMeetToday가 false면 온라인/집에서 할 수 있는 창의적인 미션 추천
-   - 제약사항을 반드시 고려하세요
+   - canMeetToday가 false면 온라인/집에서 할 수 있는 창의적인 미션 추천 (단, 사진 촬영 가능해야 함)
    - 계절, 날씨, 시간대를 고려한 활동 추천
 
-5. **한국 문화 반영**: 한국의 데이트 문화와 실정에 맞는 실행 가능한 미션
+7. **한국 문화 반영**: 한국의 데이트 문화와 실정에 맞는 실행 가능한 미션
 
-6. **연령 제한 준수 (중요!)**:
+8. **연령 제한 준수 (중요!)**:
    ⚠️ 사용자 정보에 "연령 제한: 사용자 중 한 명 이상이 만 19세 미만입니다"라고 명시된 경우:
    - 절대로 'drink' 카테고리 미션을 생성하지 마세요
    - 바, 펍, 와인바, 칵테일, 술집 등 주류 관련 장소는 제외하세요
    - 대신 카페, 디저트 카페, 주스바, 논알콜 음료 카페 등을 추천하세요
 
-응답 형식은 반드시 JSON 배열이어야 하며, 다음 구조를 따라주세요:
-[
-  {
-    "title": "미션 제목 (구체적이고 매력적으로, 20자 이내)",
-    "description": "미션 설명 (50-100자, 왜 특별한지, 어떤 추억을 만들 수 있는지 포함)",
+📝 **글자 수 제한 (필수!)**:
+- 미션명(title): 공백 포함 15자 이내
+- 미션 설명(description): 공백 포함 80자 이내
+
+응답 형식은 반드시 다음 JSON 객체 형식이어야 합니다:
+{
+  "missions": [
+    {
+      "title": "미션 제목 (공백 포함 15자 이내, 간략하고 명확하게)",
+      "description": "미션 설명 (공백 포함 80자 이내, 실행 방법/감정/목적/기억 포인트 포함)",
     "category": "다음 카테고리 중 하나를 선택하세요:
 
       🍴 Food & Drink:
@@ -198,12 +250,13 @@ export async function generateMissionsWithAI(input: MissionGenerationInput): Pro
       🌐 Online:
       - online: 영상통화, 넷플릭스 파티, 온라인 데이트
       - challenge: 커플 챌린지, 함께하는 챌린지",
-    "difficulty": 1-3 사이의 숫자,
-    "locationType": "indoor 또는 outdoor",
-    "tags": ["태그1", "태그2", "태그3"] (최대 3개, 한글로 작성),
-    "icon": "이모지 하나"
-  }
-]`;
+      "difficulty": 1-3 사이의 숫자,
+      "locationType": "indoor 또는 outdoor",
+      "tags": ["태그1", "태그2", "태그3"] (최대 3개, 한글로 작성),
+      "icon": "이모지 하나"
+    }
+  ]
+}`;
 
   const userPrompt = `다음 정보를 바탕으로 오늘의 데이트 미션 3개를 생성해주세요:
 
@@ -218,8 +271,10 @@ ${contextString}
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
-      temperature: 1.0,
+      temperature: 0.85,
       max_tokens: 2000,
+      presence_penalty: 0.6,
+      frequency_penalty: 0.3,
       response_format: { type: 'json_object' },
     });
 
@@ -230,9 +285,25 @@ ${contextString}
 
     // Parse response
     const parsedResponse = JSON.parse(responseContent);
-    const missionsData: GeneratedMissionData[] = Array.isArray(parsedResponse)
-      ? parsedResponse
-      : parsedResponse.missions || [];
+
+    // Handle various response formats
+    let missionsData: GeneratedMissionData[] = [];
+    if (Array.isArray(parsedResponse)) {
+      missionsData = parsedResponse;
+    } else if (parsedResponse.missions && Array.isArray(parsedResponse.missions)) {
+      missionsData = parsedResponse.missions;
+    } else if (parsedResponse.data && Array.isArray(parsedResponse.data)) {
+      missionsData = parsedResponse.data;
+    } else {
+      // Try to find any array in the response
+      const keys = Object.keys(parsedResponse);
+      for (const key of keys) {
+        if (Array.isArray(parsedResponse[key]) && parsedResponse[key].length > 0) {
+          missionsData = parsedResponse[key];
+          break;
+        }
+      }
+    }
 
     if (missionsData.length === 0) {
       throw new Error('No missions generated');
@@ -263,7 +334,6 @@ ${contextString}
 
     return missions;
   } catch (error) {
-    console.error('Error generating missions with AI:', error);
     throw error;
   }
 }

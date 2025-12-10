@@ -1,8 +1,22 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Animated, Easing, StyleSheet } from 'react-native';
-import Svg, { Circle } from 'react-native-svg';
-
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+import { useEffect, useMemo } from 'react';
+import {
+  BlurMask,
+  Canvas,
+  Path,
+  Skia,
+  Color,
+} from '@shopify/react-native-skia';
+import Animated, {
+  Easing,
+  FadeIn,
+  FadeOut,
+  interpolate,
+  useAnimatedStyle,
+  useDerivedValue,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
 
 interface CircularLoadingAnimationProps {
   size?: number;
@@ -13,105 +27,72 @@ interface CircularLoadingAnimationProps {
 
 export function CircularLoadingAnimation({
   size = 80,
-  strokeWidth = 4,
+  strokeWidth = 10,
   color = '#FFFFFF',
-  duration = 3500,
+  duration = 1000,
 }: CircularLoadingAnimationProps) {
-  const animatedValue = useRef(new Animated.Value(0)).current;
-  const rotateValue = useRef(new Animated.Value(0)).current;
-
   const radius = (size - strokeWidth) / 2;
-  const circumference = radius * 2 * Math.PI;
+  const canvasSize = size + 30; // Space for blur
+
+  // Create circular path
+  const circle = useMemo(() => {
+    const skPath = Skia.Path.Make();
+    skPath.addCircle(canvasSize / 2, canvasSize / 2, radius);
+    return skPath;
+  }, [canvasSize, radius]);
+
+  const progress = useSharedValue(0);
 
   useEffect(() => {
-    // Stroke animation (원을 그리는 애니메이션) - 더 부드럽고 고급스러운 easing
-    const strokeAnimation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(animatedValue, {
-          toValue: 1,
-          duration: duration * 0.65,
-          easing: Easing.bezier(0.4, 0.0, 0.2, 1), // Material Design standard easing
-          useNativeDriver: true,
-        }),
-        Animated.timing(animatedValue, {
-          toValue: 0,
-          duration: duration * 0.35,
-          easing: Easing.bezier(0.4, 0.0, 0.6, 1), // Smoother ease-out
-          useNativeDriver: true,
-        }),
-      ])
+    // Continuous clockwise rotation
+    progress.value = withRepeat(
+      withTiming(1, { duration, easing: Easing.linear }),
+      -1, // Infinite repeat
+      false, // No reverse - always clockwise
     );
+  }, [progress, duration]);
 
-    // Rotation animation (회전 애니메이션) - 약간 더 부드러운 회전
-    const rotateAnimation = Animated.loop(
-      Animated.timing(rotateValue, {
-        toValue: 1,
-        duration: duration * 1.2,
-        easing: Easing.bezier(0.4, 0.0, 0.6, 1),
-        useNativeDriver: true,
-      })
-    );
-
-    strokeAnimation.start();
-    rotateAnimation.start();
-
-    return () => {
-      strokeAnimation.stop();
-      rotateAnimation.stop();
+  // Rotation animation style
+  const rContainerStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ rotate: `${2 * Math.PI * progress.value}rad` }],
     };
-  }, [animatedValue, rotateValue, duration]);
-
-  const strokeDashoffset = animatedValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: [circumference, 0],
   });
 
-  const rotate = rotateValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
+  // Dynamic stroke start point for flowing effect
+  const startPath = useDerivedValue(() => {
+    return interpolate(progress.value, [0, 0.5, 1], [0.6, 0.3, 0.6]);
+  }, []);
 
   return (
     <Animated.View
+      entering={FadeIn.duration(500)}
+      exiting={FadeOut.duration(300)}
       style={[
-        styles.container,
+        rContainerStyle,
         {
-          width: size,
-          height: size,
-          transform: [{ rotate }],
+          width: canvasSize,
+          height: canvasSize,
+          justifyContent: 'center',
+          alignItems: 'center',
         },
-      ]}
-    >
-      <Svg width={size} height={size}>
-        {/* Background circle (optional) */}
-        <Circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          stroke="rgba(255, 255, 255, 0.2)"
+      ]}>
+      <Canvas
+        style={{
+          width: canvasSize,
+          height: canvasSize,
+        }}>
+        <Path
+          path={circle}
+          color={color as Color}
+          style="stroke"
           strokeWidth={strokeWidth}
-          fill="none"
-        />
-        {/* Animated circle */}
-        <AnimatedCircle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          stroke={color}
-          strokeWidth={strokeWidth}
-          fill="none"
-          strokeDasharray={circumference}
-          strokeDashoffset={strokeDashoffset}
-          strokeLinecap="round"
-        />
-      </Svg>
+          start={startPath}
+          end={1}
+          strokeCap="round">
+          <BlurMask blur={5} style="solid" />
+        </Path>
+      </Canvas>
     </Animated.View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});

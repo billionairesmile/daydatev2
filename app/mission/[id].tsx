@@ -18,6 +18,7 @@ import {
 import { BlurView } from 'expo-blur';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImageManipulator from 'expo-image-manipulator';
+import * as Location from 'expo-location';
 import {
   ChevronLeft,
   MapPin,
@@ -33,6 +34,8 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '@/constants/design';
 import { useMissionStore } from '@/stores/missionStore';
 import { useMemoryStore } from '@/stores/memoryStore';
+import { useAuthStore } from '@/stores/authStore';
+import { db, isDemoMode } from '@/lib/supabase';
 import type { CompletedMission, Mission } from '@/types';
 
 const { width, height } = Dimensions.get('window');
@@ -62,12 +65,19 @@ export default function MissionDetailScreen() {
   // Track if captured photo is landscape (for cover mode display)
   const [isLandscapePhoto, setIsLandscapePhoto] = useState(false);
 
+  // Location state for photo
+  const [currentLocation, setCurrentLocation] = useState<string | null>(null);
+  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
 
   // Get mission from store (AI-generated or featured missions)
-  const { getTodayMissions, completeTodayMission, hasTodayCompletedMission, isTodayCompletedMission, keptMissions } = useMissionStore();
+  const { getTodayMissions, completeTodayMission, hasTodayCompletedMission, isTodayCompletedMission, keptMissions, saveInProgressMission, getInProgressMission, clearInProgressMission } = useMissionStore();
   const todayMissions = getTodayMissions();
+
+  // Get couple info for DB storage
+  const { couple } = useAuthStore();
 
   // Find mission in today's missions, kept missions, or provide a fallback
   const mission: Mission =
@@ -90,10 +100,11 @@ export default function MissionDetailScreen() {
   const memorySavedRef = useRef(false);
   const hasRestoredRef = useRef(false);
 
-  // Restore completed state when re-entering the page
+  // Restore completed or in-progress state when re-entering the page
   useEffect(() => {
     if (hasRestoredRef.current) return;
 
+    // First check if mission is fully completed today
     if (isTodayCompletedMission(mission.id)) {
       hasRestoredRef.current = true;
       hasCompletedRef.current = true;
@@ -122,8 +133,26 @@ export default function MissionDetailScreen() {
         setUser1Message('완료됨');
         setUser2Message('완료됨');
       }
+      return;
     }
-  }, [mission.id, isTodayCompletedMission, memories]);
+
+    // Check for in-progress mission data (photo taken but not fully completed)
+    const inProgressData = getInProgressMission(mission.id);
+    if (inProgressData) {
+      hasRestoredRef.current = true;
+
+      if (inProgressData.capturedPhoto) {
+        setCapturedPhoto(inProgressData.capturedPhoto);
+        setPhotoTaken(true);
+      }
+      if (inProgressData.user1Message) {
+        setUser1Message(inProgressData.user1Message);
+      }
+      if (inProgressData.user2Message) {
+        setUser2Message(inProgressData.user2Message);
+      }
+    }
+  }, [mission.id, isTodayCompletedMission, memories, getInProgressMission]);
 
   // Pinch-to-zoom gesture handler
   const handlePinchMove = (evt: GestureResponderEvent) => {
@@ -179,7 +208,7 @@ export default function MissionDetailScreen() {
       setIsCapturing(true);
       try {
         const photo = await cameraRef.current.takePictureAsync({
-          quality: 0.9,
+          quality: 1.0, // Maximum quality at capture
           skipProcessing: true,
         });
 
@@ -265,7 +294,7 @@ export default function MissionDetailScreen() {
               const result = await ImageManipulator.manipulateAsync(
                 photo.uri,
                 manipulations,
-                { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
+                { compress: 0.95, format: ImageManipulator.SaveFormat.JPEG } // High quality compression
               );
 
               // Set the cropped image - always 3:4 portrait
@@ -297,13 +326,88 @@ export default function MissionDetailScreen() {
     }
   };
 
-  const handleConfirmPhoto = () => {
+  // Function to get current location with reverse geocoding
+  const getCurrentLocationName = async (): Promise<string> => {
+    try {
+      setIsLoadingLocation(true);
+
+      // Request location permission
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        console.log('Location permission denied');
+        return '위치 정보 없음';
+      }
+
+      // Get current position
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      // Reverse geocode to get address
+      const [address] = await Location.reverseGeocodeAsync({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      });
+
+      if (address) {
+        // Build location string (Korean format: district + city or name)
+        const parts: string[] = [];
+
+        // Try to get the most specific location name
+        if (address.name && !address.name.match(/^\d/)) {
+          // If name exists and doesn't start with number (not just street number)
+          parts.push(address.name);
+        } else if (address.street) {
+          parts.push(address.street);
+        }
+
+        if (address.district) {
+          parts.push(address.district);
+        } else if (address.subregion) {
+          parts.push(address.subregion);
+        }
+
+        if (address.city) {
+          parts.push(address.city);
+        }
+
+        // Return formatted location (최대 2-3 요소만)
+        if (parts.length > 0) {
+          return parts.slice(0, 2).join(', ');
+        }
+
+        // Fallback to region if no specific location
+        if (address.region) {
+          return address.region;
+        }
+      }
+
+      return '위치 정보 없음';
+    } catch (error) {
+      console.error('Error getting location:', error);
+      return '위치 정보 없음';
+    } finally {
+      setIsLoadingLocation(false);
+    }
+  };
+
+  const handleConfirmPhoto = async () => {
     if (previewPhoto) {
       setCapturedPhoto(previewPhoto);
       setPhotoTaken(true);
       setShowCamera(false);
       setShowPreview(false);
       setPreviewPhoto(null);
+
+      // Get current location when photo is confirmed
+      const locationName = await getCurrentLocationName();
+      setCurrentLocation(locationName);
+
+      // Save to in-progress mission data for persistence
+      saveInProgressMission({
+        missionId: mission.id,
+        capturedPhoto: previewPhoto,
+      });
     }
   };
 
@@ -331,15 +435,28 @@ export default function MissionDetailScreen() {
 
   const handleAddMessage = () => {
     if (messageText.trim()) {
+      const message = messageText.trim();
       // User can only write their own message (user1Message)
-      setUser1Message(messageText.trim());
+      setUser1Message(message);
       setMessageText('');
       setShowMessageModal(false);
+
+      // Save to in-progress mission data for persistence
+      saveInProgressMission({
+        missionId: mission.id,
+        user1Message: message,
+      });
 
       // Simulate partner writing after 2 seconds (for testing)
       // In production, this would come from backend/real-time sync
       setTimeout(() => {
-        setUser2Message('너와 함께여서 행복해 💕');
+        const partnerMessage = '너와 함께여서 행복해 💕';
+        setUser2Message(partnerMessage);
+        // Also save partner's message to in-progress
+        saveInProgressMission({
+          missionId: mission.id,
+          user2Message: partnerMessage,
+        });
       }, 2000);
     }
   };
@@ -352,23 +469,62 @@ export default function MissionDetailScreen() {
     }
   };
 
-  const handleCompleteAndClose = () => {
+  const handleCompleteAndClose = async () => {
     // Save to memory album (only once)
     if (!memorySavedRef.current && capturedPhoto && user1Message && user2Message) {
       memorySavedRef.current = true;
+
+      // Use actual location if available, otherwise fallback to mission location type
+      const finalLocation = currentLocation || locationText;
+
       const newMemory: CompletedMission = {
         id: `memory-${Date.now()}`,
-        coupleId: 'sample-couple',
+        coupleId: couple?.id || 'sample-couple',
         missionId: mission.id,
         mission: mission,
         photoUrl: capturedPhoto,
         user1Message: user1Message,
         user2Message: user2Message,
-        location: locationText,
+        location: finalLocation,
         completedAt: new Date(),
       };
+
+      // Save to local store
       addMemory(newMemory);
+
+      // Save to database (if not in demo mode and couple exists)
+      if (!isDemoMode && couple?.id) {
+        try {
+          // Upload photo to storage first
+          const uploadedPhotoUrl = await db.storage.uploadPhoto(couple.id, capturedPhoto);
+
+          // Save to completed_missions table
+          await db.completedMissions.create({
+            couple_id: couple.id,
+            photo_url: uploadedPhotoUrl || capturedPhoto,
+            user1_message: user1Message,
+            user2_message: user2Message,
+            location: finalLocation,
+            mission_data: {
+              id: mission.id,
+              title: mission.title,
+              description: mission.description,
+              category: mission.category,
+              icon: mission.icon,
+              imageUrl: mission.imageUrl,
+              difficulty: mission.difficulty,
+              tags: mission.tags,
+            },
+          });
+        } catch (error) {
+          console.error('Error saving memory to DB:', error);
+          // Local save already done, so continue even if DB fails
+        }
+      }
     }
+
+    // Clear in-progress data since mission is now fully completed
+    clearInProgressMission(mission.id);
 
     handleCompleteMission();
     router.back();
@@ -591,7 +747,9 @@ export default function MissionDetailScreen() {
               <View style={styles.missionMeta}>
                 <View style={styles.metaItem}>
                   <MapPin color="rgba(255,255,255,0.8)" size={20} />
-                  <Text style={styles.metaText}>{locationText}</Text>
+                  <Text style={styles.metaText}>
+                    {isLoadingLocation ? '위치 확인 중...' : (currentLocation || locationText)}
+                  </Text>
                 </View>
               </View>
 

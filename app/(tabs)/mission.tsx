@@ -210,13 +210,43 @@ export default function MissionScreen() {
     // Generate missions (this calls AI API)
     await generateTodayMissions(answers);
 
-    // Hide loading animation
+    // Get the newly generated missions
+    const newMissions = getTodayMissions();
+
+    // Prefetch all mission images before hiding loading animation
+    if (newMissions.length > 0) {
+      try {
+        const imagePromises = newMissions
+          .filter(mission => mission.imageUrl)
+          .map(mission => Image.prefetch(`${mission.imageUrl}?w=800&h=1000&fit=crop`));
+
+        // Wait for all images to load (with timeout fallback)
+        await Promise.race([
+          Promise.all(imagePromises),
+          new Promise(resolve => setTimeout(resolve, 5000)), // 5초 타임아웃
+        ]);
+      } catch (error) {
+        console.log('Image prefetch error:', error);
+        // Continue even if prefetch fails
+      }
+    }
+
+    // Reset carousel state before showing
+    setCurrentIndex(0);
+    scrollX.setValue(0);
+
+    // Hide loading animation after images are loaded
     setIsGenerating(false);
+
+    // Scroll to beginning after a short delay to ensure FlatList is mounted
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToOffset({ offset: 0, animated: false });
+    }, 100);
 
     // Reset form
     setCanMeetToday(null);
     setSelectedMoods([]);
-  }, [canMeetToday, selectedMoods, generateTodayMissions]);
+  }, [canMeetToday, selectedMoods, generateTodayMissions, getTodayMissions, scrollX]);
 
   const toggleMood = (mood: TodayMood) => {
     if (selectedMoods.includes(mood)) {
@@ -345,6 +375,7 @@ export default function MissionScreen() {
         {hasGeneratedMissions || featuredMissions.length > 0 ? (
           <View style={styles.carouselWrapper}>
             <Animated.FlatList
+              key={`mission-list-${allMissions.length}`}
               ref={scrollViewRef}
               data={allMissions}
               keyExtractor={(item) => item.id}
@@ -367,6 +398,11 @@ export default function MissionScreen() {
                 offset: SNAP_INTERVAL * index,
                 index,
               })}
+              extraData={[hasGeneratedMissions, allMissions.map(m => m.id).join(',')]}
+              initialNumToRender={3}
+              maxToRenderPerBatch={3}
+              windowSize={5}
+              removeClippedSubviews={false}
             />
 
             {/* Dots Indicator - Positioned at bottom of carousel */}

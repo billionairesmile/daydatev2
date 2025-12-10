@@ -19,16 +19,26 @@ export const unstable_settings = {
   initialRouteName: '(tabs)',
 };
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
-let splashScreenPrevented = false;
-SplashScreen.preventAutoHideAsync()
-  .then(() => {
-    splashScreenPrevented = true;
-  })
-  .catch(() => {
-    // Splash screen may already be hidden or not available
-    splashScreenPrevented = false;
-  });
+// Safe SplashScreen helper to handle hot reload and edge cases
+const safeSplashScreen = {
+  preventAutoHide: async () => {
+    try {
+      await SplashScreen.preventAutoHideAsync();
+    } catch {
+      // Silently ignore - splash screen may not be available
+    }
+  },
+  hide: async () => {
+    try {
+      await SplashScreen.hideAsync();
+    } catch {
+      // Silently ignore - splash screen may already be hidden
+    }
+  },
+};
+
+// Prevent the splash screen from auto-hiding before asset loading is complete
+safeSplashScreen.preventAutoHide();
 
 export default function RootLayout() {
   const [assetsLoaded, setAssetsLoaded] = useState(false);
@@ -51,13 +61,12 @@ export default function RootLayout() {
   }, [fontError]);
 
   useEffect(() => {
-    if (fontsLoaded && assetsLoaded && backgroundLoaded && splashScreenPrevented) {
+    if (fontsLoaded && assetsLoaded && backgroundLoaded) {
       // Add minimum display time for splash screen (1.5 seconds)
-      setTimeout(() => {
-        SplashScreen.hideAsync().catch(() => {
-          // Ignore error if splash screen is already hidden or not available
-        });
+      const timer = setTimeout(() => {
+        safeSplashScreen.hide();
       }, 1500);
+      return () => clearTimeout(timer);
     }
   }, [fontsLoaded, assetsLoaded, backgroundLoaded]);
 
