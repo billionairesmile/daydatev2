@@ -31,6 +31,127 @@ function getSupabase(): SupabaseClient {
 
 // Database helper functions
 export const db = {
+  // Pairing Codes
+  pairingCodes: {
+    // Create a new pairing code
+    async create(code: string, creatorId: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('pairing_codes')
+        .insert({
+          code,
+          creator_id: creatorId,
+          status: 'pending',
+        })
+        .select()
+        .single();
+      return { data, error };
+    },
+
+    // Find pairing code by code string
+    async findByCode(code: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('pairing_codes')
+        .select('*')
+        .eq('code', code)
+        .eq('status', 'pending')
+        .single();
+      return { data, error };
+    },
+
+    // Join a pairing code (joiner enters the code)
+    async join(code: string, joinerId: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('pairing_codes')
+        .update({
+          joiner_id: joinerId,
+          status: 'connected',
+          connected_at: new Date().toISOString(),
+        })
+        .eq('code', code)
+        .eq('status', 'pending')
+        .select()
+        .single();
+      return { data, error };
+    },
+
+    // Get pairing status by creator ID
+    async getByCreatorId(creatorId: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('pairing_codes')
+        .select('*')
+        .eq('creator_id', creatorId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      return { data, error };
+    },
+
+    // Subscribe to pairing code changes (for creator to know when joiner connects)
+    subscribeToCode(code: string, callback: (payload: { status: string; joiner_id: string | null }) => void) {
+      const client = getSupabase();
+      const channel = client
+        .channel(`pairing:${code}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'pairing_codes',
+            filter: `code=eq.${code}`,
+          },
+          (payload) => {
+            const newRecord = payload.new as { status: string; joiner_id: string | null };
+            callback({ status: newRecord.status, joiner_id: newRecord.joiner_id });
+          }
+        )
+        .subscribe();
+      return channel;
+    },
+
+    // Unsubscribe from pairing code changes
+    unsubscribe(channel: ReturnType<SupabaseClient['channel']>) {
+      const client = getSupabase();
+      client.removeChannel(channel);
+    },
+
+    // Delete expired or used pairing codes
+    async cleanup(creatorId: string) {
+      const client = getSupabase();
+      const { error } = await client
+        .from('pairing_codes')
+        .delete()
+        .eq('creator_id', creatorId);
+      return { error };
+    },
+
+    // Update couple_id on pairing code (called after creator creates couple)
+    async setCoupleId(code: string, coupleId: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('pairing_codes')
+        .update({ couple_id: coupleId })
+        .eq('code', code)
+        .select()
+        .single();
+      return { data, error };
+    },
+
+    // Get pairing code with couple info (for joiner to get couple_id)
+    async getWithCouple(code: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('pairing_codes')
+        .select('*, couple_id')
+        .eq('code', code)
+        .single();
+      return { data, error };
+    },
+  },
+
   // Profiles
   profiles: {
     async get(userId: string) {
@@ -69,6 +190,26 @@ export const db = {
         .from('profiles')
         .update(updates)
         .eq('id', userId)
+        .select()
+        .single();
+      return { data, error };
+    },
+
+    async upsert(profile: {
+      id: string;
+      nickname?: string;
+      invite_code?: string;
+      preferences?: Record<string, unknown>;
+      birth_date?: string;
+      location_latitude?: number;
+      location_longitude?: number;
+      location_city?: string;
+      location_district?: string;
+    }) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('profiles')
+        .upsert(profile)
         .select()
         .single();
       return { data, error };
@@ -267,7 +408,7 @@ export const db = {
         title: string;
         description: string;
         category: string;
-        icon: string;
+        icon?: string;
         imageUrl?: string;
         difficulty?: number;
         tags?: string[];
@@ -759,6 +900,849 @@ export const db = {
         .eq('is_active', true)
         .order('display_order', { ascending: true });
       return { data, error };
+    },
+  },
+
+  // ============================================
+  // COUPLE SYNC HELPERS (Real-time sync between paired users)
+  // ============================================
+
+  // Couple Missions (shared generated missions)
+  coupleMissions: {
+    async getToday(coupleId: string) {
+      const client = getSupabase();
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const { data, error } = await client
+        .from('couple_missions')
+        .select('*')
+        .eq('couple_id', coupleId)
+        .eq('status', 'active')
+        .gte('expires_at', today.toISOString())
+        .order('generated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return { data, error };
+    },
+
+    async create(
+      coupleId: string,
+      missions: unknown[],
+      answers: unknown,
+      userId: string
+    ) {
+      const client = getSupabase();
+      // Set expiration to next midnight
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 1);
+      expiresAt.setHours(0, 0, 0, 0);
+
+      const { data, error } = await client
+        .from('couple_missions')
+        .insert({
+          couple_id: coupleId,
+          missions,
+          generation_answers: answers,
+          generated_by: userId,
+          expires_at: expiresAt.toISOString(),
+          status: 'active',
+        })
+        .select()
+        .single();
+      return { data, error };
+    },
+
+    async expireOld(coupleId: string) {
+      const client = getSupabase();
+      const { error } = await client
+        .from('couple_missions')
+        .update({ status: 'expired' })
+        .eq('couple_id', coupleId)
+        .eq('status', 'active')
+        .lt('expires_at', new Date().toISOString());
+      return { error };
+    },
+
+    subscribeToMissions(
+      coupleId: string,
+      callback: (payload: { missions: unknown[]; generated_by: string }) => void
+    ) {
+      const client = getSupabase();
+      const channel = client
+        .channel(`couple_missions:${coupleId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'couple_missions',
+            filter: `couple_id=eq.${coupleId}`,
+          },
+          (payload) => {
+            const record = payload.new as { missions: unknown[]; generated_by: string };
+            callback({ missions: record.missions, generated_by: record.generated_by });
+          }
+        )
+        .subscribe();
+      return channel;
+    },
+
+    unsubscribe(channel: ReturnType<SupabaseClient['channel']>) {
+      const client = getSupabase();
+      client.removeChannel(channel);
+    },
+  },
+
+  // Mission Generation Lock (prevents simultaneous generation)
+  missionLock: {
+    async getStatus(coupleId: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('mission_generation_lock')
+        .select('*')
+        .eq('couple_id', coupleId)
+        .maybeSingle();
+      return { data, error };
+    },
+
+    async acquire(coupleId: string, userId: string): Promise<boolean> {
+      const client = getSupabase();
+
+      // First check if lock exists
+      const { data: existing } = await client
+        .from('mission_generation_lock')
+        .select('*')
+        .eq('couple_id', coupleId)
+        .maybeSingle();
+
+      if (existing) {
+        // If already generating by someone else, fail
+        if (existing.status === 'generating' && existing.locked_by !== userId) {
+          // Check if lock is stale (older than 2 minutes)
+          const lockTime = new Date(existing.locked_at).getTime();
+          const now = Date.now();
+          if (now - lockTime < 120000) {
+            // Lock is fresh, cannot acquire
+            return false;
+          }
+          // Lock is stale, proceed to update
+        }
+
+        // Update existing lock
+        const { error } = await client
+          .from('mission_generation_lock')
+          .update({
+            locked_by: userId,
+            locked_at: new Date().toISOString(),
+            status: 'generating',
+          })
+          .eq('couple_id', coupleId);
+
+        return !error;
+      } else {
+        // Create new lock
+        const { error } = await client
+          .from('mission_generation_lock')
+          .insert({
+            couple_id: coupleId,
+            locked_by: userId,
+            locked_at: new Date().toISOString(),
+            status: 'generating',
+          });
+
+        return !error;
+      }
+    },
+
+    async release(coupleId: string, status: 'completed' | 'idle' = 'completed') {
+      const client = getSupabase();
+      const { error } = await client
+        .from('mission_generation_lock')
+        .update({
+          status,
+          locked_by: null,
+          locked_at: null,
+        })
+        .eq('couple_id', coupleId);
+      return { error };
+    },
+
+    subscribeToLock(
+      coupleId: string,
+      callback: (payload: { status: string; locked_by: string | null }) => void
+    ) {
+      const client = getSupabase();
+      const channel = client
+        .channel(`mission_lock:${coupleId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'mission_generation_lock',
+            filter: `couple_id=eq.${coupleId}`,
+          },
+          (payload) => {
+            const record = payload.new as { status: string; locked_by: string | null };
+            callback({ status: record.status, locked_by: record.locked_by });
+          }
+        )
+        .subscribe();
+      return channel;
+    },
+
+    unsubscribe(channel: ReturnType<SupabaseClient['channel']>) {
+      const client = getSupabase();
+      client.removeChannel(channel);
+    },
+  },
+
+  // Couple Bookmarks (shared bookmarked missions)
+  coupleBookmarks: {
+    async getAll(coupleId: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('couple_bookmarks')
+        .select('*')
+        .eq('couple_id', coupleId)
+        .order('created_at', { ascending: false });
+      return { data, error };
+    },
+
+    async add(coupleId: string, missionId: string, missionData: unknown, userId: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('couple_bookmarks')
+        .insert({
+          couple_id: coupleId,
+          mission_id: missionId,
+          mission_data: missionData,
+          bookmarked_by: userId,
+        })
+        .select()
+        .single();
+      return { data, error };
+    },
+
+    async remove(coupleId: string, missionId: string) {
+      const client = getSupabase();
+      const { error } = await client
+        .from('couple_bookmarks')
+        .delete()
+        .eq('couple_id', coupleId)
+        .eq('mission_id', missionId);
+      return { error };
+    },
+
+    async exists(coupleId: string, missionId: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('couple_bookmarks')
+        .select('id')
+        .eq('couple_id', coupleId)
+        .eq('mission_id', missionId)
+        .maybeSingle();
+      return { exists: !!data, error };
+    },
+
+    subscribeToBookmarks(
+      coupleId: string,
+      callback: (payload: { eventType: string; bookmark: unknown }) => void
+    ) {
+      const client = getSupabase();
+      const channel = client
+        .channel(`couple_bookmarks:${coupleId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'couple_bookmarks',
+            filter: `couple_id=eq.${coupleId}`,
+          },
+          (payload) => {
+            callback({
+              eventType: payload.eventType,
+              bookmark: payload.eventType === 'DELETE' ? payload.old : payload.new,
+            });
+          }
+        )
+        .subscribe();
+      return channel;
+    },
+
+    unsubscribe(channel: ReturnType<SupabaseClient['channel']>) {
+      const client = getSupabase();
+      client.removeChannel(channel);
+    },
+  },
+
+  // Couple Todos (shared todo list - different from the existing todos table)
+  coupleTodos: {
+    async getAll(coupleId: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('couple_todos')
+        .select('*')
+        .eq('couple_id', coupleId)
+        .order('date', { ascending: true })
+        .order('created_at', { ascending: true });
+      return { data, error };
+    },
+
+    async getByDate(coupleId: string, date: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('couple_todos')
+        .select('*')
+        .eq('couple_id', coupleId)
+        .eq('date', date)
+        .order('created_at', { ascending: true });
+      return { data, error };
+    },
+
+    async create(coupleId: string, date: string, text: string, userId: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('couple_todos')
+        .insert({
+          couple_id: coupleId,
+          date,
+          text,
+          created_by: userId,
+        })
+        .select()
+        .single();
+      return { data, error };
+    },
+
+    async toggleComplete(todoId: string, completed: boolean, userId: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('couple_todos')
+        .update({
+          completed,
+          completed_by: completed ? userId : null,
+          completed_at: completed ? new Date().toISOString() : null,
+        })
+        .eq('id', todoId)
+        .select()
+        .single();
+      return { data, error };
+    },
+
+    async delete(todoId: string) {
+      const client = getSupabase();
+      const { error } = await client
+        .from('couple_todos')
+        .delete()
+        .eq('id', todoId);
+      return { error };
+    },
+
+    subscribeToTodos(
+      coupleId: string,
+      callback: (payload: { eventType: string; todo: unknown }) => void
+    ) {
+      const client = getSupabase();
+      const channel = client
+        .channel(`couple_todos:${coupleId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'couple_todos',
+            filter: `couple_id=eq.${coupleId}`,
+          },
+          (payload) => {
+            callback({
+              eventType: payload.eventType,
+              todo: payload.eventType === 'DELETE' ? payload.old : payload.new,
+            });
+          }
+        )
+        .subscribe();
+      return channel;
+    },
+
+    unsubscribe(channel: ReturnType<SupabaseClient['channel']>) {
+      const client = getSupabase();
+      client.removeChannel(channel);
+    },
+  },
+
+  // Menstrual Settings (shared menstrual calendar settings)
+  menstrualSettings: {
+    async get(coupleId: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('menstrual_settings')
+        .select('*')
+        .eq('couple_id', coupleId)
+        .maybeSingle();
+      return { data, error };
+    },
+
+    async upsert(
+      coupleId: string,
+      settings: {
+        enabled: boolean;
+        last_period_date?: string;
+        cycle_length?: number;
+        period_length?: number;
+      },
+      userId: string
+    ) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('menstrual_settings')
+        .upsert({
+          couple_id: coupleId,
+          ...settings,
+          updated_by: userId,
+        })
+        .select()
+        .single();
+      return { data, error };
+    },
+
+    subscribeToSettings(
+      coupleId: string,
+      callback: (payload: unknown) => void
+    ) {
+      const client = getSupabase();
+      const channel = client
+        .channel(`menstrual:${coupleId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'menstrual_settings',
+            filter: `couple_id=eq.${coupleId}`,
+          },
+          (payload) => {
+            callback(payload.new);
+          }
+        )
+        .subscribe();
+      return channel;
+    },
+
+    unsubscribe(channel: ReturnType<SupabaseClient['channel']>) {
+      const client = getSupabase();
+      client.removeChannel(channel);
+    },
+  },
+
+  // ============================================
+  // EXTENDED SYNC HELPERS (Background, Mission Progress, Albums)
+  // ============================================
+
+  // Couple Settings (background image sync)
+  coupleSettings: {
+    async get(coupleId: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('couple_settings')
+        .select('*')
+        .eq('couple_id', coupleId)
+        .maybeSingle();
+      return { data, error };
+    },
+
+    async upsert(
+      coupleId: string,
+      settings: {
+        background_image_url?: string | null;
+      },
+      userId: string
+    ) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('couple_settings')
+        .upsert({
+          couple_id: coupleId,
+          ...settings,
+          updated_by: userId,
+        })
+        .select()
+        .single();
+      return { data, error };
+    },
+
+    subscribeToSettings(
+      coupleId: string,
+      callback: (payload: { background_image_url: string | null }) => void
+    ) {
+      const client = getSupabase();
+      const channel = client
+        .channel(`couple_settings:${coupleId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'couple_settings',
+            filter: `couple_id=eq.${coupleId}`,
+          },
+          (payload) => {
+            const record = payload.new as { background_image_url: string | null };
+            callback({ background_image_url: record.background_image_url });
+          }
+        )
+        .subscribe();
+      return channel;
+    },
+
+    unsubscribe(channel: ReturnType<SupabaseClient['channel']>) {
+      const client = getSupabase();
+      client.removeChannel(channel);
+    },
+  },
+
+  // Mission Progress (real-time mission sync with both user messages)
+  missionProgress: {
+    async getToday(coupleId: string) {
+      const client = getSupabase();
+      const today = new Date().toISOString().split('T')[0];
+      const { data, error } = await client
+        .from('mission_progress')
+        .select('*')
+        .eq('couple_id', coupleId)
+        .eq('date', today)
+        .maybeSingle();
+      return { data, error };
+    },
+
+    async getById(progressId: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('mission_progress')
+        .select('*')
+        .eq('id', progressId)
+        .single();
+      return { data, error };
+    },
+
+    async start(
+      coupleId: string,
+      missionId: string,
+      missionData: unknown,
+      userId: string
+    ) {
+      const client = getSupabase();
+      const today = new Date().toISOString().split('T')[0];
+      const { data, error } = await client
+        .from('mission_progress')
+        .insert({
+          couple_id: coupleId,
+          mission_id: missionId,
+          mission_data: missionData,
+          user1_id: userId,
+          started_by: userId,
+          date: today,
+          status: 'photo_pending',
+        })
+        .select()
+        .single();
+      return { data, error };
+    },
+
+    async uploadPhoto(progressId: string, photoUrl: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('mission_progress')
+        .update({
+          photo_url: photoUrl,
+          status: 'message_pending',
+        })
+        .eq('id', progressId)
+        .select()
+        .single();
+      return { data, error };
+    },
+
+    async submitMessage(
+      progressId: string,
+      userId: string,
+      message: string,
+      isUser1: boolean
+    ) {
+      const client = getSupabase();
+      const now = new Date().toISOString();
+
+      const updateData: Record<string, unknown> = isUser1
+        ? { user1_message: message, user1_message_at: now }
+        : { user2_id: userId, user2_message: message, user2_message_at: now };
+
+      // First get current state to check if both messages are now complete
+      const { data: current } = await client
+        .from('mission_progress')
+        .select('user1_message, user2_message, status')
+        .eq('id', progressId)
+        .single();
+
+      // Determine new status
+      if (current) {
+        const hasUser1Message = isUser1 ? true : !!current.user1_message;
+        const hasUser2Message = isUser1 ? !!current.user2_message : true;
+
+        if (hasUser1Message && hasUser2Message) {
+          updateData.status = 'completed';
+          updateData.completed_at = now;
+        } else {
+          updateData.status = 'waiting_partner';
+        }
+      }
+
+      const { data, error } = await client
+        .from('mission_progress')
+        .update(updateData)
+        .eq('id', progressId)
+        .select()
+        .single();
+      return { data, error };
+    },
+
+    async updateLocation(progressId: string, location: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('mission_progress')
+        .update({ location })
+        .eq('id', progressId)
+        .select()
+        .single();
+      return { data, error };
+    },
+
+    async delete(progressId: string) {
+      const client = getSupabase();
+      const { error } = await client
+        .from('mission_progress')
+        .delete()
+        .eq('id', progressId);
+      return { error };
+    },
+
+    subscribeToProgress(
+      coupleId: string,
+      callback: (payload: { eventType: string; progress: unknown }) => void
+    ) {
+      const client = getSupabase();
+      const channel = client
+        .channel(`mission_progress:${coupleId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'mission_progress',
+            filter: `couple_id=eq.${coupleId}`,
+          },
+          (payload) => {
+            callback({
+              eventType: payload.eventType,
+              progress: payload.eventType === 'DELETE' ? payload.old : payload.new,
+            });
+          }
+        )
+        .subscribe();
+      return channel;
+    },
+
+    unsubscribe(channel: ReturnType<SupabaseClient['channel']>) {
+      const client = getSupabase();
+      client.removeChannel(channel);
+    },
+  },
+
+  // Couple Albums (user-created albums sync)
+  coupleAlbums: {
+    async getAll(coupleId: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('couple_albums')
+        .select('*')
+        .eq('couple_id', coupleId)
+        .order('created_at', { ascending: false });
+      return { data, error };
+    },
+
+    async getById(albumId: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('couple_albums')
+        .select('*')
+        .eq('id', albumId)
+        .single();
+      return { data, error };
+    },
+
+    async create(
+      coupleId: string,
+      album: {
+        name: string;
+        cover_photo_url?: string;
+        name_position?: { x: number; y: number };
+        text_scale?: number;
+        font_style?: string;
+        ransom_seed?: number;
+      },
+      userId: string
+    ) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('couple_albums')
+        .insert({
+          couple_id: coupleId,
+          ...album,
+          created_by: userId,
+        })
+        .select()
+        .single();
+      return { data, error };
+    },
+
+    async update(
+      albumId: string,
+      updates: {
+        name?: string;
+        cover_photo_url?: string | null;
+        name_position?: { x: number; y: number };
+        text_scale?: number;
+        font_style?: string;
+        ransom_seed?: number;
+      }
+    ) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('couple_albums')
+        .update(updates)
+        .eq('id', albumId)
+        .select()
+        .single();
+      return { data, error };
+    },
+
+    async delete(albumId: string) {
+      const client = getSupabase();
+      const { error } = await client
+        .from('couple_albums')
+        .delete()
+        .eq('id', albumId);
+      return { error };
+    },
+
+    subscribeToAlbums(
+      coupleId: string,
+      callback: (payload: { eventType: string; album: unknown }) => void
+    ) {
+      const client = getSupabase();
+      const channel = client
+        .channel(`couple_albums:${coupleId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'couple_albums',
+            filter: `couple_id=eq.${coupleId}`,
+          },
+          (payload) => {
+            callback({
+              eventType: payload.eventType,
+              album: payload.eventType === 'DELETE' ? payload.old : payload.new,
+            });
+          }
+        )
+        .subscribe();
+      return channel;
+    },
+
+    unsubscribe(channel: ReturnType<SupabaseClient['channel']>) {
+      const client = getSupabase();
+      client.removeChannel(channel);
+    },
+  },
+
+  // Album Photos (junction table for album-photo relationships)
+  albumPhotos: {
+    async getByAlbum(albumId: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('album_photos')
+        .select('*, memory:completed_missions(*)')
+        .eq('album_id', albumId)
+        .order('added_at', { ascending: false });
+      return { data, error };
+    },
+
+    async add(albumId: string, memoryId: string, userId: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('album_photos')
+        .insert({
+          album_id: albumId,
+          memory_id: memoryId,
+          added_by: userId,
+        })
+        .select()
+        .single();
+      return { data, error };
+    },
+
+    async remove(albumId: string, memoryId: string) {
+      const client = getSupabase();
+      const { error } = await client
+        .from('album_photos')
+        .delete()
+        .eq('album_id', albumId)
+        .eq('memory_id', memoryId);
+      return { error };
+    },
+
+    async getAlbumsForMemory(memoryId: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('album_photos')
+        .select('album_id')
+        .eq('memory_id', memoryId);
+      return { data, error };
+    },
+
+    subscribeToAlbumPhotos(
+      coupleId: string,
+      callback: (payload: { eventType: string; albumPhoto: unknown }) => void
+    ) {
+      const client = getSupabase();
+      // Subscribe to all album_photos changes for albums belonging to this couple
+      // Note: Filtered at application level since we can't filter by couple_id directly
+      const channel = client
+        .channel(`album_photos:${coupleId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'album_photos',
+          },
+          (payload) => {
+            callback({
+              eventType: payload.eventType,
+              albumPhoto: payload.eventType === 'DELETE' ? payload.old : payload.new,
+            });
+          }
+        )
+        .subscribe();
+      return channel;
+    },
+
+    unsubscribe(channel: ReturnType<SupabaseClient['channel']>) {
+      const client = getSupabase();
+      client.removeChannel(channel);
     },
   },
 

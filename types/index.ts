@@ -52,10 +52,7 @@ export interface Mission {
   title: string;
   description: string;
   category: MissionCategory;
-  difficulty: MissionDifficulty;
-  locationType: LocationType;
   tags: string[];
-  icon: string;
   imageUrl: string;
   isPremium: boolean;
   moodTags?: ('fun' | 'deep_talk' | 'romantic' | 'healing' | 'adventure' | 'active' | 'culture')[];

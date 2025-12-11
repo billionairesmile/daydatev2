@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { DailyMission, Mission, MissionState, KeptMission, TodayCompletedMission } from '@/types';
 import { generateMissionsWithAI, generateMissionsFallback } from '@/services/missionGenerator';
 import { useOnboardingStore } from '@/stores/onboardingStore';
+import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
 
 // Helper to get today's date string in YYYY-MM-DD format
 const getTodayDateString = (): string => {
@@ -13,11 +14,20 @@ const getTodayDateString = (): string => {
 
 // Mission generation types
 export type TodayMood = 'fun' | 'deep_talk' | 'romantic' | 'healing' | 'adventure' | 'active' | 'culture';
+export type AvailableTime = '30min' | '1hour' | '2hour' | 'allday';
 
 export interface MissionGenerationAnswers {
   canMeetToday: boolean;
+  availableTime: AvailableTime;
   todayMoods: TodayMood[];
 }
+
+export const TIME_OPTIONS: { id: AvailableTime; label: string }[] = [
+  { id: '30min', label: '30분' },
+  { id: '1hour', label: '1시간' },
+  { id: '2hour', label: '2시간 +' },
+  { id: 'allday', label: '하루종일' },
+];
 
 export interface GeneratedMissionData {
   missions: Mission[];
@@ -64,7 +74,7 @@ interface MissionActions {
   getTodayCompletedMissionId: () => string | null;
   isTodayCompletedMission: (missionId: string) => boolean;
   // Mission generation actions
-  generateTodayMissions: (answers: MissionGenerationAnswers) => void;
+  generateTodayMissions: (answers: MissionGenerationAnswers) => Promise<{ status: 'success' | 'locked' | 'exists'; message?: string }>;
   hasTodayMissions: () => boolean;
   getTodayMissions: () => Mission[];
   checkAndResetMissions: () => void;
@@ -239,8 +249,34 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
       },
 
       // Generate today's missions based on user answers (with AI)
+      // Returns: { status: 'success' | 'locked' | 'error', message?: string }
       generateTodayMissions: async (answers) => {
         const today = getTodayDateString();
+        const syncStore = useCoupleSyncStore.getState();
+
+        // Check if couple sync is initialized
+        if (syncStore.isInitialized && syncStore.coupleId) {
+          // Check if missions already exist from partner
+          const existingMissions = syncStore.sharedMissions;
+          if (existingMissions.length > 0) {
+            // Use existing shared missions
+            set({
+              generatedMissionData: {
+                missions: existingMissions,
+                generatedDate: today,
+                answers,
+              },
+            });
+            return { status: 'exists' as const, message: '이미 생성된 미션이 있습니다.' };
+          }
+
+          // Try to acquire lock for generation
+          const acquired = await syncStore.acquireMissionLock();
+          if (!acquired) {
+            // Partner is generating
+            return { status: 'locked' as const, message: '파트너가 미션을 생성 중입니다...' };
+          }
+        }
 
         try {
           // Get user preferences from onboarding store for personalization
@@ -252,6 +288,7 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
             todayAnswers: answers,
           });
 
+          // Save to local state
           set({
             generatedMissionData: {
               missions: aiMissions,
@@ -259,8 +296,20 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
               answers,
             },
           });
+
+          // Save to couple sync (will broadcast to partner)
+          if (syncStore.isInitialized && syncStore.coupleId) {
+            await syncStore.saveSharedMissions(aiMissions, answers);
+          }
+
+          return { status: 'success' as const };
         } catch (error) {
           console.error('Error generating missions with AI:', error);
+
+          // Release lock on error
+          if (syncStore.isInitialized && syncStore.coupleId) {
+            await syncStore.releaseMissionLock('idle');
+          }
 
           // Fallback to basic missions if AI fails
           const fallbackMissions = generateMissionsFallback(answers.todayMoods);
@@ -272,22 +321,51 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
               answers,
             },
           });
+
+          // Save fallback missions to couple sync
+          if (syncStore.isInitialized && syncStore.coupleId) {
+            await syncStore.saveSharedMissions(fallbackMissions, answers);
+          }
+
+          return { status: 'success' as const };
         }
       },
 
-      // Check if today's missions are already generated
+      // Check if today's missions are already generated (local or synced)
       hasTodayMissions: () => {
         const { generatedMissionData } = get();
-        if (!generatedMissionData) return false;
-        return generatedMissionData.generatedDate === getTodayDateString();
+        const syncStore = useCoupleSyncStore.getState();
+
+        // Check local state first
+        if (generatedMissionData && generatedMissionData.generatedDate === getTodayDateString()) {
+          return true;
+        }
+
+        // Check synced state
+        if (syncStore.isInitialized && syncStore.sharedMissions.length > 0) {
+          return true;
+        }
+
+        return false;
       },
 
-      // Get today's generated missions
+      // Get today's generated missions (local or synced)
       getTodayMissions: () => {
         const { generatedMissionData } = get();
-        if (!generatedMissionData) return [];
-        if (generatedMissionData.generatedDate !== getTodayDateString()) return [];
-        return generatedMissionData.missions;
+        const syncStore = useCoupleSyncStore.getState();
+        const today = getTodayDateString();
+
+        // Check local state first
+        if (generatedMissionData && generatedMissionData.generatedDate === today) {
+          return generatedMissionData.missions;
+        }
+
+        // Check synced state
+        if (syncStore.isInitialized && syncStore.sharedMissions.length > 0) {
+          return syncStore.sharedMissions;
+        }
+
+        return [];
       },
 
       // Check and reset missions if date changed (called on app focus)

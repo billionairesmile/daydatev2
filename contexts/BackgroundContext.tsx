@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Asset } from 'expo-asset';
 import { Image } from 'react-native';
+import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
 
 interface BackgroundContextType {
   backgroundImage: any;
@@ -20,7 +21,14 @@ export function BackgroundProvider({ children }: { children: ReactNode }) {
   const [backgroundImage, setBackgroundImageState] = useState<any>(DEFAULT_BACKGROUND);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Preload default background image
+  // Get sync store values and actions
+  const {
+    isInitialized: isSyncInitialized,
+    backgroundImageUrl: syncedBackgroundUrl,
+    updateBackgroundImage: syncBackgroundImage,
+  } = useCoupleSyncStore();
+
+  // Preload default background image and check for saved/synced backgrounds
   useEffect(() => {
     const preloadImages = async () => {
       try {
@@ -28,14 +36,29 @@ export function BackgroundProvider({ children }: { children: ReactNode }) {
         const asset = Asset.fromModule(DEFAULT_BACKGROUND);
         await asset.downloadAsync();
 
-        // Check for saved custom background
-        const savedBackground = await AsyncStorage.getItem(BACKGROUND_STORAGE_KEY);
+        // First priority: Check for synced background from partner
+        if (isSyncInitialized && syncedBackgroundUrl) {
+          try {
+            await Image.prefetch(syncedBackgroundUrl);
+            setBackgroundImageState({ uri: syncedBackgroundUrl });
+            // Also save to local storage as fallback
+            await AsyncStorage.setItem(BACKGROUND_STORAGE_KEY, syncedBackgroundUrl);
+          } catch {
+            console.warn('Failed to load synced background, falling back to local');
+          }
+        } else {
+          // Fallback: Check for locally saved custom background
+          const savedBackground = await AsyncStorage.getItem(BACKGROUND_STORAGE_KEY);
 
-        if (savedBackground) {
-          const uri = savedBackground;
-          // Preload custom image and set it
-          await Image.prefetch(uri);
-          setBackgroundImageState({ uri });
+          if (savedBackground) {
+            const uri = savedBackground;
+            try {
+              await Image.prefetch(uri);
+              setBackgroundImageState({ uri });
+            } catch {
+              console.warn('Failed to load saved background');
+            }
+          }
         }
 
         setIsLoaded(true);
@@ -46,9 +69,36 @@ export function BackgroundProvider({ children }: { children: ReactNode }) {
     };
 
     preloadImages();
-  }, []);
+  }, [isSyncInitialized, syncedBackgroundUrl]);
 
-  const setBackgroundImage = async (image: any) => {
+  // Listen for synced background updates from partner
+  useEffect(() => {
+    if (!isSyncInitialized) return;
+
+    // If there's a synced background URL that's different from current
+    if (syncedBackgroundUrl) {
+      const currentUri = backgroundImage?.uri;
+      if (currentUri !== syncedBackgroundUrl) {
+        // Partner changed the background - update ours
+        const updateFromSync = async () => {
+          try {
+            await Image.prefetch(syncedBackgroundUrl);
+            setBackgroundImageState({ uri: syncedBackgroundUrl });
+            await AsyncStorage.setItem(BACKGROUND_STORAGE_KEY, syncedBackgroundUrl);
+          } catch (error) {
+            console.error('Error loading synced background:', error);
+          }
+        };
+        updateFromSync();
+      }
+    } else if (syncedBackgroundUrl === null && backgroundImage?.uri) {
+      // Partner reset to default - reset ours too
+      setBackgroundImageState(DEFAULT_BACKGROUND);
+      AsyncStorage.removeItem(BACKGROUND_STORAGE_KEY);
+    }
+  }, [isSyncInitialized, syncedBackgroundUrl, backgroundImage?.uri]);
+
+  const setBackgroundImage = useCallback(async (image: any) => {
     try {
       setBackgroundImageState(image);
 
@@ -57,20 +107,30 @@ export function BackgroundProvider({ children }: { children: ReactNode }) {
         await AsyncStorage.setItem(BACKGROUND_STORAGE_KEY, image.uri);
         // Preload the new image
         await Image.prefetch(image.uri);
+
+        // Sync to partner via coupleSyncStore
+        if (isSyncInitialized) {
+          await syncBackgroundImage(image.uri);
+        }
       }
     } catch (error) {
       console.error('Error saving background image:', error);
     }
-  };
+  }, [isSyncInitialized, syncBackgroundImage]);
 
-  const resetToDefault = async () => {
+  const resetToDefault = useCallback(async () => {
     try {
       setBackgroundImageState(DEFAULT_BACKGROUND);
       await AsyncStorage.removeItem(BACKGROUND_STORAGE_KEY);
+
+      // Sync reset to partner
+      if (isSyncInitialized) {
+        await syncBackgroundImage(null);
+      }
     } catch (error) {
       console.error('Error resetting background:', error);
     }
-  };
+  }, [isSyncInitialized, syncBackgroundImage]);
 
   return (
     <BackgroundContext.Provider value={{

@@ -15,15 +15,41 @@ import { useRouter } from 'expo-router';
 
 import { COLORS, SPACING } from '@/constants/design';
 import { useMissionStore } from '@/stores/missionStore';
-import type { KeptMission } from '@/types';
+import { useCoupleSyncStore, type SyncedBookmark } from '@/stores/coupleSyncStore';
+import type { KeptMission, Mission } from '@/types';
 
 interface BookmarkedMissionsPageProps {
   onBack: () => void;
 }
 
+// Union type for both local and synced bookmarks
+type BookmarkItem = KeptMission | SyncedBookmark;
+
 export function BookmarkedMissionsPage({ onBack }: BookmarkedMissionsPageProps) {
   const router = useRouter();
   const { keptMissions, removeKeptMissionByKeptId, canStartMission, isTodayCompletedMission } = useMissionStore();
+  const { sharedBookmarks, removeBookmark, isInitialized: isSyncInitialized } = useCoupleSyncStore();
+
+  // Use synced bookmarks if available, otherwise fall back to local
+  const bookmarks: BookmarkItem[] = isSyncInitialized && sharedBookmarks.length > 0
+    ? sharedBookmarks
+    : keptMissions;
+
+  // Helper to get mission data from bookmark
+  const getMissionFromBookmark = (bookmark: BookmarkItem): Mission => {
+    if ('mission_data' in bookmark) {
+      return bookmark.mission_data;
+    }
+    return bookmark as Mission;
+  };
+
+  // Helper to get unique ID from bookmark
+  const getBookmarkId = (bookmark: BookmarkItem): string => {
+    if ('mission_data' in bookmark) {
+      return bookmark.id;
+    }
+    return (bookmark as KeptMission).keptId;
+  };
 
   const handleMissionPress = useCallback((missionId: string) => {
     // Show message if can't start (already completed another mission today)
@@ -39,7 +65,7 @@ export function BookmarkedMissionsPage({ onBack }: BookmarkedMissionsPageProps) 
     router.push(`/mission/${missionId}`);
   }, [router, canStartMission, isTodayCompletedMission]);
 
-  const handleRemove = useCallback((keptId: string, title: string) => {
+  const handleRemove = useCallback((bookmark: BookmarkItem, title: string) => {
     Alert.alert(
       '미션 삭제',
       `'${title}' 미션을 삭제하시겠어요?`,
@@ -48,11 +74,19 @@ export function BookmarkedMissionsPage({ onBack }: BookmarkedMissionsPageProps) 
         {
           text: '삭제',
           style: 'destructive',
-          onPress: () => removeKeptMissionByKeptId(keptId),
+          onPress: async () => {
+            if ('mission_data' in bookmark) {
+              // Synced bookmark - remove from DB
+              await removeBookmark(bookmark.mission_id);
+            } else {
+              // Local bookmark - remove locally
+              removeKeptMissionByKeptId((bookmark as KeptMission).keptId);
+            }
+          },
         },
       ]
     );
-  }, [removeKeptMissionByKeptId]);
+  }, [removeKeptMissionByKeptId, removeBookmark]);
 
   return (
     <View style={styles.container}>
@@ -79,7 +113,7 @@ export function BookmarkedMissionsPage({ onBack }: BookmarkedMissionsPageProps) 
       </View>
 
       {/* Content */}
-      {keptMissions.length === 0 ? (
+      {bookmarks.length === 0 ? (
         <View style={styles.emptyContainer}>
           <View style={styles.emptyIconContainer}>
             <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
@@ -96,66 +130,71 @@ export function BookmarkedMissionsPage({ onBack }: BookmarkedMissionsPageProps) 
           bounces={true}
           alwaysBounceVertical={true}
         >
-          {keptMissions.map((mission: KeptMission) => (
-            <View key={mission.keptId} style={styles.missionCard}>
-              <BlurView intensity={10} tint="dark" style={StyleSheet.absoluteFill} />
+          {bookmarks.map((bookmark) => {
+            const mission = getMissionFromBookmark(bookmark);
+            const bookmarkId = getBookmarkId(bookmark);
 
-              <View style={styles.cardInner}>
-                {/* Thumbnail */}
-                <View style={styles.thumbnailContainer}>
-                  <Image
-                    source={{ uri: `${mission.imageUrl}?w=300&h=400&fit=crop` }}
-                    style={styles.thumbnail}
-                    resizeMode="cover"
-                  />
-                  <LinearGradient
-                    colors={['transparent', 'rgba(0,0,0,0.5)']}
-                    style={styles.thumbnailOverlay}
-                  />
-                </View>
+            return (
+              <View key={bookmarkId} style={styles.missionCard}>
+                <BlurView intensity={10} tint="dark" style={StyleSheet.absoluteFill} />
 
-                {/* Content */}
-                <View style={styles.cardContent}>
-                  {/* Title */}
-                  <Text style={styles.missionTitle} numberOfLines={2}>
-                    {mission.title}
-                  </Text>
+                <View style={styles.cardInner}>
+                  {/* Thumbnail */}
+                  <View style={styles.thumbnailContainer}>
+                    <Image
+                      source={{ uri: `${mission.imageUrl}?w=300&h=400&fit=crop` }}
+                      style={styles.thumbnail}
+                      resizeMode="cover"
+                    />
+                    <LinearGradient
+                      colors={['transparent', 'rgba(0,0,0,0.5)']}
+                      style={styles.thumbnailOverlay}
+                    />
+                  </View>
 
-                  {/* Description */}
-                  <Text style={styles.missionDescription} numberOfLines={2}>
-                    {mission.description}
-                  </Text>
+                  {/* Content */}
+                  <View style={styles.cardContent}>
+                    {/* Title */}
+                    <Text style={styles.missionTitle} numberOfLines={2}>
+                      {mission.title}
+                    </Text>
 
-                  {/* Action Buttons */}
-                  <View style={styles.actionButtonsRow}>
-                    {/* Start Button */}
-                    <Pressable
-                      style={[
-                        styles.startButton,
-                        !canStartMission(mission.id) && !isTodayCompletedMission(mission.id) && styles.startButtonDisabled,
-                      ]}
-                      onPress={() => handleMissionPress(mission.id)}
-                    >
-                      <Text style={[
-                        styles.startButtonText,
-                        !canStartMission(mission.id) && !isTodayCompletedMission(mission.id) && styles.startButtonTextDisabled,
-                      ]}>
-                        {isTodayCompletedMission(mission.id) ? '완료' : '시작하기'}
-                      </Text>
-                    </Pressable>
+                    {/* Description */}
+                    <Text style={styles.missionDescription} numberOfLines={2}>
+                      {mission.description}
+                    </Text>
 
-                    {/* Delete Button */}
-                    <Pressable
-                      style={styles.deleteButton}
-                      onPress={() => handleRemove(mission.keptId, mission.title)}
-                    >
-                      <Trash2 color={COLORS.white} size={18} />
-                    </Pressable>
+                    {/* Action Buttons */}
+                    <View style={styles.actionButtonsRow}>
+                      {/* Start Button */}
+                      <Pressable
+                        style={[
+                          styles.startButton,
+                          !canStartMission(mission.id) && !isTodayCompletedMission(mission.id) && styles.startButtonDisabled,
+                        ]}
+                        onPress={() => handleMissionPress(mission.id)}
+                      >
+                        <Text style={[
+                          styles.startButtonText,
+                          !canStartMission(mission.id) && !isTodayCompletedMission(mission.id) && styles.startButtonTextDisabled,
+                        ]}>
+                          {isTodayCompletedMission(mission.id) ? '완료' : '시작하기'}
+                        </Text>
+                      </Pressable>
+
+                      {/* Delete Button */}
+                      <Pressable
+                        style={styles.deleteButton}
+                        onPress={() => handleRemove(bookmark, mission.title)}
+                      >
+                        <Trash2 color={COLORS.white} size={18} />
+                      </Pressable>
+                    </View>
                   </View>
                 </View>
               </View>
-            </View>
-          ))}
+            );
+          })}
         </ScrollView>
       )}
     </View>

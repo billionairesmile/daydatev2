@@ -18,12 +18,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { easeGradient } from 'react-native-easing-gradient';
-import { MapPin, Bookmark, Sparkles, X } from 'lucide-react-native';
+import { Bookmark, Sparkles, X } from 'lucide-react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Location from 'expo-location';
 
 import { COLORS, SPACING, RADIUS } from '@/constants/design';
-import { useMissionStore, MOOD_OPTIONS, type TodayMood, type MissionGenerationAnswers } from '@/stores/missionStore';
+import { useMissionStore, MOOD_OPTIONS, TIME_OPTIONS, type TodayMood, type AvailableTime, type MissionGenerationAnswers } from '@/stores/missionStore';
+import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
 import { useBackground } from '@/contexts';
 import { BookmarkedMissionsPage } from '@/components/BookmarkedMissionsPage';
 import { CircularLoadingAnimation } from '@/components/CircularLoadingAnimation';
@@ -54,9 +55,11 @@ export default function MissionScreen() {
   const [showGenerationModal, setShowGenerationModal] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [canMeetToday, setCanMeetToday] = useState<boolean | null>(null);
+  const [availableTime, setAvailableTime] = useState<AvailableTime | null>(null);
   const [selectedMoods, setSelectedMoods] = useState<TodayMood[]>([]);
   const [featuredMissions, setFeaturedMissions] = useState<Mission[]>([]);
   const [isLoadingFeatured, setIsLoadingFeatured] = useState(false);
+  const [partnerGeneratingMessage, setPartnerGeneratingMessage] = useState<string | null>(null);
   const scrollX = useRef(new Animated.Value(0)).current;
   const scrollViewRef = useRef<Animated.FlatList<Mission>>(null);
 
@@ -71,6 +74,37 @@ export default function MissionScreen() {
     generateTodayMissions,
     checkAndResetMissions,
   } = useMissionStore();
+
+  // Couple sync state
+  const {
+    missionGenerationStatus,
+    sharedMissions,
+    sharedBookmarks,
+    isInitialized: isSyncInitialized,
+    addBookmark,
+    isBookmarked,
+  } = useCoupleSyncStore();
+
+  // Use synced bookmark check if initialized, otherwise local
+  const checkIsKept = useCallback((missionId: string) => {
+    if (isSyncInitialized) {
+      return isBookmarked(missionId);
+    }
+    return isKeptMission(missionId);
+  }, [isSyncInitialized, isBookmarked, isKeptMission]);
+
+  // Handle keeping/bookmarking a mission
+  const handleKeepMission = useCallback(async (mission: Mission): Promise<boolean> => {
+    if (isSyncInitialized) {
+      // Use synced bookmarks
+      return await addBookmark(mission);
+    }
+    // Fallback to local
+    return keepMission(mission);
+  }, [isSyncInitialized, addBookmark, keepMission]);
+
+  // Count bookmarks for badge
+  const bookmarkCount = isSyncInitialized ? sharedBookmarks.length : keptMissions.length;
 
   // Get today's missions or empty array
   const todayMissions = getTodayMissions();
@@ -99,10 +133,7 @@ export default function MissionScreen() {
           title: fm.title,
           description: fm.description,
           category: fm.category as Mission['category'],
-          difficulty: fm.difficulty as Mission['difficulty'],
-          locationType: fm.location_type as Mission['locationType'],
           tags: fm.tags,
-          icon: fm.icon,
           imageUrl: fm.image_url,
           isPremium: false, // Featured missions are free
         }));
@@ -124,6 +155,19 @@ export default function MissionScreen() {
       loadFeaturedMissions(); // Load featured missions on focus
     }, [checkAndResetMissions, loadFeaturedMissions])
   );
+
+  // Watch for partner generating missions (via real-time sync)
+  useEffect(() => {
+    if (isSyncInitialized && missionGenerationStatus === 'generating') {
+      // Partner is generating - show loading state
+      setIsGenerating(true);
+      setPartnerGeneratingMessage('파트너가 미션을 생성 중입니다...');
+    } else if (missionGenerationStatus === 'completed' && sharedMissions.length > 0) {
+      // Missions were generated (by partner or self) - hide loading
+      setIsGenerating(false);
+      setPartnerGeneratingMessage(null);
+    }
+  }, [isSyncInitialized, missionGenerationStatus, sharedMissions.length]);
 
   // Check location permission
   const checkLocationPermission = async (): Promise<boolean> => {
@@ -193,22 +237,39 @@ export default function MissionScreen() {
 
   // Handle mission generation
   const handleGenerateMissions = useCallback(async () => {
-    if (canMeetToday === null || selectedMoods.length === 0) return;
+    if (canMeetToday === null || availableTime === null || selectedMoods.length === 0) return;
 
     // Close modal first
     setShowGenerationModal(false);
 
     // Show loading animation
     setIsGenerating(true);
+    setPartnerGeneratingMessage(null);
 
     // Prepare answers
     const answers: MissionGenerationAnswers = {
       canMeetToday,
+      availableTime,
       todayMoods: selectedMoods,
     };
 
     // Generate missions (this calls AI API)
-    await generateTodayMissions(answers);
+    const result = await generateTodayMissions(answers);
+
+    // Handle different generation statuses
+    if (result && result.status === 'locked') {
+      // Partner is already generating - show their message
+      setPartnerGeneratingMessage(result.message || '파트너가 미션을 생성 중입니다...');
+      // Don't hide loading - wait for sync update
+      return;
+    }
+
+    if (result && result.status === 'exists') {
+      // Missions already exist - just show them
+      setIsGenerating(false);
+      setPartnerGeneratingMessage(null);
+      return;
+    }
 
     // Get the newly generated missions
     const newMissions = getTodayMissions();
@@ -245,8 +306,9 @@ export default function MissionScreen() {
 
     // Reset form
     setCanMeetToday(null);
+    setAvailableTime(null);
     setSelectedMoods([]);
-  }, [canMeetToday, selectedMoods, generateTodayMissions, getTodayMissions, scrollX]);
+  }, [canMeetToday, availableTime, selectedMoods, generateTodayMissions, getTodayMissions, scrollX]);
 
   const toggleMood = (mood: TodayMood) => {
     if (selectedMoods.includes(mood)) {
@@ -256,7 +318,7 @@ export default function MissionScreen() {
     }
   };
 
-  const isGenerationFormValid = canMeetToday !== null && selectedMoods.length > 0;
+  const isGenerationFormValid = canMeetToday !== null && availableTime !== null && selectedMoods.length > 0;
 
   const handleMissionPress = useCallback((missionId: string) => {
     router.push(`/mission/${missionId}`);
@@ -316,8 +378,8 @@ export default function MissionScreen() {
             <MissionCardContent
               mission={item}
               onStartPress={() => handleMissionPress(item.id)}
-              onKeepPress={() => keepMission(item)}
-              isKept={isKeptMission(item.id)}
+              onKeepPress={() => handleKeepMission(item)}
+              isKept={checkIsKept(item.id)}
               canStart={canStartMission(item.id)}
               isCompletedToday={isTodayCompletedMission(item.id)}
             />
@@ -362,9 +424,9 @@ export default function MissionScreen() {
           onPress={() => setShowBookmarkedMissions(true)}
         >
           <Bookmark color={COLORS.white} size={20} strokeWidth={2} />
-          {keptMissions.length > 0 && (
+          {bookmarkCount > 0 && (
             <View style={styles.badgeContainer}>
-              <Text style={styles.badgeText}>{keptMissions.length}</Text>
+              <Text style={styles.badgeText}>{bookmarkCount}</Text>
             </View>
           )}
         </Pressable>
@@ -425,8 +487,12 @@ export default function MissionScreen() {
             {isGenerating ? (
               <View style={styles.loadingAnimationWrapper}>
                 <CircularLoadingAnimation size={100} strokeWidth={6} color={COLORS.white} />
-                <Text style={styles.loadingAnimationText}>미션을 생성하고 있어요</Text>
-                <Text style={styles.loadingAnimationSubtext}>잠시만 기다려주세요</Text>
+                <Text style={styles.loadingAnimationText}>
+                  {partnerGeneratingMessage ? '미션 생성 중...' : '미션을 생성하고 있어요'}
+                </Text>
+                <Text style={styles.loadingAnimationSubtext}>
+                  {partnerGeneratingMessage || '잠시만 기다려주세요'}
+                </Text>
               </View>
             ) : (
               <Pressable
@@ -505,7 +571,31 @@ export default function MissionScreen() {
               </View>
             </View>
 
-            {/* Question 2: Today's Mood */}
+            {/* Question 2: Available Time */}
+            <View style={styles.whiteQuestionSection}>
+              <Text style={styles.whiteQuestionLabel}>오늘 함께할 시간이 얼마나 되나요?</Text>
+              <View style={styles.whiteTimeOptions}>
+                {TIME_OPTIONS.map((time) => (
+                  <Pressable
+                    key={time.id}
+                    style={[
+                      styles.whiteTimeOption,
+                      availableTime === time.id && styles.whiteTimeOptionActive,
+                    ]}
+                    onPress={() => setAvailableTime(time.id)}
+                  >
+                    <Text style={[
+                      styles.whiteTimeOptionLabel,
+                      availableTime === time.id && styles.whiteTimeOptionLabelActive,
+                    ]}>
+                      {time.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+
+            {/* Question 3: Today's Mood */}
             <View style={styles.whiteQuestionSection}>
               <Text style={styles.whiteQuestionLabel}>오늘 원하는 분위기는? (모두 선택)</Text>
               <View style={styles.whiteMoodOptions}>
@@ -568,21 +658,14 @@ export default function MissionScreen() {
 interface MissionCardContentProps {
   mission: Mission;
   onStartPress?: () => void;
-  onKeepPress?: () => boolean | void;
+  onKeepPress?: () => boolean | void | Promise<boolean>;
   isKept?: boolean;
   canStart?: boolean;
   isCompletedToday?: boolean;
 }
 
 function MissionCardContent({ mission, onStartPress, onKeepPress, isKept, canStart = true, isCompletedToday = false }: MissionCardContentProps) {
-  const locationText =
-    mission.locationType === 'indoor'
-      ? '실내'
-      : mission.locationType === 'outdoor'
-        ? '야외'
-        : '무관';
-
-  const blurHeight = CARD_HEIGHT * 0.75; // Blur covers bottom 55% of card
+  const blurHeight = CARD_HEIGHT * 0.65; // Blur covers bottom 55% of card
 
   const handleKeepPress = (e: { stopPropagation: () => void }) => {
     e.stopPropagation();
@@ -609,8 +692,8 @@ function MissionCardContent({ mission, onStartPress, onKeepPress, isKept, canSta
         { text: '취소', style: 'cancel' },
         {
           text: '저장',
-          onPress: () => {
-            const success = onKeepPress?.();
+          onPress: async () => {
+            const success = await onKeepPress?.();
             if (success === false) {
               Alert.alert(
                 '보관 제한',
@@ -677,14 +760,6 @@ function MissionCardContent({ mission, onStartPress, onKeepPress, isKept, canSta
 
       {/* Content */}
       <View style={styles.cardContent}>
-        {/* Location Badge */}
-        <View style={styles.locationBadge}>
-          <View style={styles.locationIcon}>
-            <MapPin color={COLORS.white} size={16} />
-          </View>
-          <Text style={styles.locationText}>{locationText}</Text>
-        </View>
-
         {/* Title */}
         <Text style={styles.missionTitle}>{mission.title}</Text>
 
@@ -765,8 +840,12 @@ const styles = StyleSheet.create({
   },
   backgroundImage: {
     position: 'absolute',
-    width: width,
-    height: height,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
   },
   backgroundImageStyle: {
     transform: [{ scale: 1.0 }],
@@ -863,29 +942,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     padding: SPACING.lg,
     zIndex: 2,
-  },
-  locationBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 100,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    marginBottom: 12,
-  },
-  locationIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 4,
-  },
-  locationText: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontWeight: '400',
   },
   missionTitle: {
     fontSize: 28,
@@ -1117,6 +1173,35 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   whiteBinaryOptionTextActive: {
+    color: COLORS.black,
+  },
+  whiteTimeOptions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  whiteTimeOption: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 100,
+    backgroundColor: '#f5f5f5',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  whiteTimeOptionActive: {
+    backgroundColor: '#e8f5e9',
+    borderColor: '#4CAF50',
+  },
+  whiteTimeOptionIcon: {
+    fontSize: 14,
+  },
+  whiteTimeOptionLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#333',
+  },
+  whiteTimeOptionLabelActive: {
     color: COLORS.black,
   },
   whiteMoodOptions: {

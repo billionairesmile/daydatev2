@@ -21,7 +21,6 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import * as Location from 'expo-location';
 import {
   ChevronLeft,
-  MapPin,
   Camera,
   Edit3,
   Check,
@@ -35,6 +34,7 @@ import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '@/constants/design';
 import { useMissionStore } from '@/stores/missionStore';
 import { useMemoryStore } from '@/stores/memoryStore';
 import { useAuthStore } from '@/stores/authStore';
+import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
 import { db, isDemoMode } from '@/lib/supabase';
 import type { CompletedMission, Mission } from '@/types';
 
@@ -77,7 +77,20 @@ export default function MissionDetailScreen() {
   const todayMissions = getTodayMissions();
 
   // Get couple info for DB storage
-  const { couple } = useAuthStore();
+  const { couple, user } = useAuthStore();
+
+  // Get mission progress sync store
+  const {
+    isInitialized: isSyncInitialized,
+    activeMissionProgress,
+    startMissionProgress,
+    uploadMissionPhoto,
+    submitMissionMessage,
+    updateMissionLocation,
+    isUserMessage1Submitter,
+    hasUserSubmittedMessage,
+    hasPartnerSubmittedMessage,
+  } = useCoupleSyncStore();
 
   // Find mission in today's missions, kept missions, or provide a fallback
   const mission: Mission =
@@ -88,10 +101,7 @@ export default function MissionDetailScreen() {
       title: '미션을 찾을 수 없습니다',
       description: '이 미션은 더 이상 사용할 수 없습니다.',
       category: 'home' as const,
-      difficulty: 1 as const,
-      locationType: 'indoor' as const,
       tags: [],
-      icon: '❓',
       imageUrl: '',
       isPremium: false,
     };
@@ -99,6 +109,57 @@ export default function MissionDetailScreen() {
   const hasCompletedRef = useRef(false);
   const memorySavedRef = useRef(false);
   const hasRestoredRef = useRef(false);
+
+  // Sync state from activeMissionProgress (real-time updates from partner)
+  useEffect(() => {
+    if (!isSyncInitialized || !activeMissionProgress) return;
+
+    // Only sync if this is the same mission
+    if (activeMissionProgress.mission_id !== mission.id) return;
+
+    // Sync photo
+    if (activeMissionProgress.photo_url && !capturedPhoto) {
+      setCapturedPhoto(activeMissionProgress.photo_url);
+      setPhotoTaken(true);
+    }
+
+    // Sync messages based on user role
+    const isUser1 = user?.id === activeMissionProgress.user1_id;
+
+    if (isUser1) {
+      // User is user1 - their message is user1_message
+      if (activeMissionProgress.user1_message && !user1Message) {
+        setUser1Message(activeMissionProgress.user1_message);
+      }
+      // Partner's message is user2_message
+      if (activeMissionProgress.user2_message && !user2Message) {
+        setUser2Message(activeMissionProgress.user2_message);
+      }
+    } else {
+      // User is user2 - their message is user2_message
+      if (activeMissionProgress.user2_message && !user1Message) {
+        setUser1Message(activeMissionProgress.user2_message);
+      }
+      // Partner's message (user1) goes to user2Message display
+      if (activeMissionProgress.user1_message && !user2Message) {
+        setUser2Message(activeMissionProgress.user1_message);
+      }
+    }
+
+    // Sync location
+    if (activeMissionProgress.location && !currentLocation) {
+      setCurrentLocation(activeMissionProgress.location);
+    }
+  }, [
+    isSyncInitialized,
+    activeMissionProgress,
+    mission.id,
+    user?.id,
+    capturedPhoto,
+    user1Message,
+    user2Message,
+    currentLocation,
+  ]);
 
   // Restore completed or in-progress state when re-entering the page
   useEffect(() => {
@@ -180,13 +241,6 @@ export default function MissionDetailScreen() {
   const handlePinchEnd = () => {
     lastPinchDistance.current = null;
   };
-
-  const locationText =
-    mission.locationType === 'indoor'
-      ? '실내'
-      : mission.locationType === 'outdoor'
-        ? '야외'
-        : '무관';
 
   const handleTakePhoto = async () => {
     if (!permission?.granted) {
@@ -408,6 +462,39 @@ export default function MissionDetailScreen() {
         missionId: mission.id,
         capturedPhoto: previewPhoto,
       });
+
+      // Start synced mission progress if sync is initialized
+      if (isSyncInitialized && couple?.id) {
+        try {
+          // Upload photo to storage first
+          const uploadedPhotoUrl = await db.storage.uploadPhoto(couple.id, previewPhoto);
+
+          if (uploadedPhotoUrl) {
+            // Check if there's already an active mission progress for today
+            if (!activeMissionProgress) {
+              // Start new mission progress
+              const progress = await startMissionProgress(mission.id, mission);
+              if (progress) {
+                // Upload photo to the progress
+                await uploadMissionPhoto(uploadedPhotoUrl);
+                // Update location
+                if (locationName && locationName !== '위치 정보 없음') {
+                  await updateMissionLocation(locationName);
+                }
+              }
+            } else {
+              // Mission already started (maybe by partner), just upload photo
+              await uploadMissionPhoto(uploadedPhotoUrl);
+              if (locationName && locationName !== '위치 정보 없음') {
+                await updateMissionLocation(locationName);
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error syncing photo:', error);
+          // Local save already done, continue even if sync fails
+        }
+      }
     }
   };
 
@@ -433,7 +520,7 @@ export default function MissionDetailScreen() {
     }
   };
 
-  const handleAddMessage = () => {
+  const handleAddMessage = async () => {
     if (messageText.trim()) {
       const message = messageText.trim();
       // User can only write their own message (user1Message)
@@ -447,17 +534,27 @@ export default function MissionDetailScreen() {
         user1Message: message,
       });
 
-      // Simulate partner writing after 2 seconds (for testing)
-      // In production, this would come from backend/real-time sync
-      setTimeout(() => {
-        const partnerMessage = '너와 함께여서 행복해 💕';
-        setUser2Message(partnerMessage);
-        // Also save partner's message to in-progress
-        saveInProgressMission({
-          missionId: mission.id,
-          user2Message: partnerMessage,
-        });
-      }, 2000);
+      // Sync message to partner via coupleSyncStore
+      // Partner's message will arrive via real-time subscription (useEffect above)
+      if (isSyncInitialized && activeMissionProgress) {
+        try {
+          await submitMissionMessage(message);
+        } catch (error) {
+          console.error('Error syncing message:', error);
+          // Local save already done, continue even if sync fails
+        }
+      } else if (isDemoMode || !isSyncInitialized) {
+        // Demo mode fallback: simulate partner message after delay
+        // This allows solo testing without a real partner
+        setTimeout(() => {
+          const partnerMessage = '너와 함께여서 행복해 💕';
+          setUser2Message(partnerMessage);
+          saveInProgressMission({
+            missionId: mission.id,
+            user2Message: partnerMessage,
+          });
+        }, 2000);
+      }
     }
   };
 
@@ -474,8 +571,15 @@ export default function MissionDetailScreen() {
     if (!memorySavedRef.current && capturedPhoto && user1Message && user2Message) {
       memorySavedRef.current = true;
 
-      // Use actual location if available, otherwise fallback to mission location type
-      const finalLocation = currentLocation || locationText;
+      // Use actual location if available
+      const finalLocation = currentLocation || '위치 정보 없음';
+
+      // Determine message order based on couple relationship
+      // Always save in couple order: user1_message = couple.user1's message, user2_message = couple.user2's message
+      // Current state: user1Message = current user's message, user2Message = partner's message
+      const isCurrentUserCoupleUser1 = user?.id === couple?.user1Id;
+      const messageForCoupleUser1 = isCurrentUserCoupleUser1 ? user1Message : user2Message;
+      const messageForCoupleUser2 = isCurrentUserCoupleUser1 ? user2Message : user1Message;
 
       const newMemory: CompletedMission = {
         id: `memory-${Date.now()}`,
@@ -483,8 +587,8 @@ export default function MissionDetailScreen() {
         missionId: mission.id,
         mission: mission,
         photoUrl: capturedPhoto,
-        user1Message: user1Message,
-        user2Message: user2Message,
+        user1Message: messageForCoupleUser1,
+        user2Message: messageForCoupleUser2,
         location: finalLocation,
         completedAt: new Date(),
       };
@@ -498,21 +602,19 @@ export default function MissionDetailScreen() {
           // Upload photo to storage first
           const uploadedPhotoUrl = await db.storage.uploadPhoto(couple.id, capturedPhoto);
 
-          // Save to completed_missions table
+          // Save to completed_missions table (in couple order)
           await db.completedMissions.create({
             couple_id: couple.id,
             photo_url: uploadedPhotoUrl || capturedPhoto,
-            user1_message: user1Message,
-            user2_message: user2Message,
+            user1_message: messageForCoupleUser1,
+            user2_message: messageForCoupleUser2,
             location: finalLocation,
             mission_data: {
               id: mission.id,
               title: mission.title,
               description: mission.description,
               category: mission.category,
-              icon: mission.icon,
               imageUrl: mission.imageUrl,
-              difficulty: mission.difficulty,
               tags: mission.tags,
             },
           });
@@ -742,16 +844,6 @@ export default function MissionDetailScreen() {
 
               {/* Description */}
               <Text style={styles.missionDescription}>{mission.description}</Text>
-
-              {/* Meta Info */}
-              <View style={styles.missionMeta}>
-                <View style={styles.metaItem}>
-                  <MapPin color="rgba(255,255,255,0.8)" size={20} />
-                  <Text style={styles.metaText}>
-                    {isLoadingLocation ? '위치 확인 중...' : (currentLocation || locationText)}
-                  </Text>
-                </View>
-              </View>
 
               {/* Tags */}
               {mission.tags.length > 0 && (
@@ -1018,8 +1110,12 @@ const styles = StyleSheet.create({
   },
   backgroundImage: {
     position: 'absolute',
-    width: width,
-    height: height,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
   },
   overlay: {
     flex: 1,
@@ -1088,20 +1184,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.9)',
     lineHeight: 24,
     marginBottom: SPACING.lg,
-  },
-  missionMeta: {
-    flexDirection: 'row',
-    marginBottom: SPACING.lg,
-    gap: SPACING.xl,
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  metaText: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
   },
   tagsContainer: {
     flexDirection: 'row',

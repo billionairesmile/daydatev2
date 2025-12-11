@@ -37,6 +37,7 @@ import { COLORS, SPACING, RADIUS } from '@/constants/design';
 import { useBackground } from '@/contexts';
 import { useMemoryStore, SAMPLE_MEMORIES } from '@/stores/memoryStore';
 import { useAuthStore } from '@/stores/authStore';
+import { useCoupleSyncStore, type SyncedTodo } from '@/stores/coupleSyncStore';
 import { isDemoMode } from '@/lib/supabase';
 
 const { width, height } = Dimensions.get('window');
@@ -66,12 +67,16 @@ const HOLIDAYS_2025: Record<string, string> = {
   '2025-12-25': '크리스마스',
 };
 
-interface Todo {
+// Local Todo type for fallback when not synced
+interface LocalTodo {
   id: string;
   date: string;
   text: string;
   completed: boolean;
 }
+
+// Union type to support both local and synced todos
+type Todo = LocalTodo | SyncedTodo;
 
 // Swipeable Todo Item Component
 function SwipeableTodoItem({
@@ -286,20 +291,33 @@ export default function CalendarScreen() {
   const { couple } = useAuthStore();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<number | null>(null);
-  const [todos, setTodos] = useState<Todo[]>([]);
+  const [localTodos, setLocalTodos] = useState<LocalTodo[]>([]); // Fallback for non-synced mode
   const [isAddTodoOpen, setIsAddTodoOpen] = useState(false);
   const [todoText, setTodoText] = useState('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [menstrualTrackingEnabled, setMenstrualTrackingEnabled] = useState(false);
   const [tempMenstrualEnabled, setTempMenstrualEnabled] = useState(false);
   const [isPeriodSettingsOpen, setIsPeriodSettingsOpen] = useState(false);
-  const [hasPeriodData, setHasPeriodData] = useState(false);
-  const [lastPeriodDate, setLastPeriodDate] = useState<Date | null>(null);
-  const [cycleLength, setCycleLength] = useState(28);
-  const [tempCycleLength, setTempCycleLength] = useState('28');
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [tempLastPeriodDate, setTempLastPeriodDate] = useState(new Date());
+  const [tempCycleLength, setTempCycleLength] = useState('28');
   const [pickerMonth, setPickerMonth] = useState(new Date());
+
+  // Couple sync state for todos and menstrual settings
+  const {
+    sharedTodos,
+    menstrualSettings,
+    isInitialized: isSyncInitialized,
+    addTodo,
+    toggleTodo,
+    deleteTodo: deleteSyncedTodo,
+    updateMenstrualSettings,
+  } = useCoupleSyncStore();
+
+  // Derived menstrual state from sync
+  const menstrualTrackingEnabled = menstrualSettings?.enabled ?? false;
+  const lastPeriodDate = menstrualSettings?.last_period_date ? new Date(menstrualSettings.last_period_date) : null;
+  const cycleLength = menstrualSettings?.cycle_length ?? 28;
+  const hasPeriodData = menstrualSettings?.last_period_date !== null;
 
   // Keyboard animation for modals
   const keyboardOffset = useRef(new Animated.Value(0)).current;
@@ -320,14 +338,15 @@ export default function CalendarScreen() {
     }).start();
   };
 
-  const closeSettingsModal = (saveChanges = false) => {
+  const closeSettingsModal = async (saveChanges = false) => {
     Animated.timing(settingsOpacity, {
       toValue: 0,
       duration: 150,
       useNativeDriver: true,
-    }).start(() => {
+    }).start(async () => {
       if (saveChanges) {
-        setMenstrualTrackingEnabled(tempMenstrualEnabled);
+        // Update via sync store
+        await updateMenstrualSettings({ enabled: tempMenstrualEnabled });
       }
       setIsSettingsOpen(false);
     });
@@ -365,20 +384,25 @@ export default function CalendarScreen() {
     }).start();
   };
 
-  const closePeriodModal = (save = false) => {
+  const closePeriodModal = async (save = false) => {
     Keyboard.dismiss();
     Animated.timing(periodOpacity, {
       toValue: 0,
       duration: 150,
       useNativeDriver: true,
-    }).start(() => {
+    }).start(async () => {
       if (save) {
         const parsedCycle = parseInt(tempCycleLength, 10);
-        if (!isNaN(parsedCycle) && parsedCycle >= 21 && parsedCycle <= 35) {
-          setCycleLength(parsedCycle);
-        }
-        setLastPeriodDate(tempLastPeriodDate);
-        setHasPeriodData(true);
+        const validCycle = !isNaN(parsedCycle) && parsedCycle >= 21 && parsedCycle <= 35 ? parsedCycle : 28;
+
+        // Format date as YYYY-MM-DD for DB
+        const formattedDate = `${tempLastPeriodDate.getFullYear()}-${String(tempLastPeriodDate.getMonth() + 1).padStart(2, '0')}-${String(tempLastPeriodDate.getDate()).padStart(2, '0')}`;
+
+        // Update via sync store
+        await updateMenstrualSettings({
+          last_period_date: formattedDate,
+          cycle_length: validCycle,
+        });
       }
       setIsPeriodSettingsOpen(false);
     });
@@ -581,9 +605,12 @@ export default function CalendarScreen() {
 
   const periodInfo = calculatePeriodInfo();
 
-  // Todo functions
+  // Todo functions - use synced todos if available
+  const todos: Todo[] = isSyncInitialized ? sharedTodos : localTodos;
+
   const getTodosForDate = (day: number) => {
-    const dateKey = `${year}-${month + 1}-${day}`;
+    // Format date as YYYY-MM-DD to match DB format
+    const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     return todos.filter((todo) => todo.date === dateKey);
   };
 
@@ -593,32 +620,54 @@ export default function CalendarScreen() {
     return getTodosForDate(targetDay);
   };
 
-  const handleAddTodo = () => {
+  const handleAddTodo = async () => {
     if (todoText.trim()) {
       const today = new Date();
       const targetDay = selectedDate || today.getDate();
-      const newTodo: Todo = {
-        id: Date.now().toString(),
-        date: `${year}-${month + 1}-${targetDay}`,
-        text: todoText,
-        completed: false,
-      };
-      setTodos([...todos, newTodo]);
+      // Format date as YYYY-MM-DD
+      const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(targetDay).padStart(2, '0')}`;
+
+      if (isSyncInitialized) {
+        // Use synced todo
+        await addTodo(dateKey, todoText.trim());
+      } else {
+        // Fallback to local
+        const newTodo: LocalTodo = {
+          id: Date.now().toString(),
+          date: dateKey,
+          text: todoText.trim(),
+          completed: false,
+        };
+        setLocalTodos([...localTodos, newTodo]);
+      }
+
       setTodoText('');
-      setIsAddTodoOpen(false);
+      closeTodoModal();
     }
   };
 
-  const toggleTodoComplete = (id: string) => {
-    setTodos(
-      todos.map((todo) =>
-        todo.id === id ? { ...todo, completed: !todo.completed } : todo
-      )
-    );
+  const handleToggleTodo = async (todo: Todo) => {
+    if (isSyncInitialized && 'couple_id' in todo) {
+      // Synced todo
+      await toggleTodo(todo.id, !todo.completed);
+    } else {
+      // Local todo
+      setLocalTodos(
+        localTodos.map((t) =>
+          t.id === todo.id ? { ...t, completed: !t.completed } : t
+        )
+      );
+    }
   };
 
-  const deleteTodo = (id: string) => {
-    setTodos(todos.filter((todo) => todo.id !== id));
+  const handleDeleteTodo = async (todo: Todo) => {
+    if (isSyncInitialized && 'couple_id' in todo) {
+      // Synced todo
+      await deleteSyncedTodo(todo.id);
+    } else {
+      // Local todo
+      setLocalTodos(localTodos.filter((t) => t.id !== todo.id));
+    }
   };
 
   // Date Picker helpers
@@ -847,8 +896,8 @@ export default function CalendarScreen() {
                 <SwipeableTodoItem
                   key={todo.id}
                   todo={todo}
-                  onToggle={() => toggleTodoComplete(todo.id)}
-                  onDelete={() => deleteTodo(todo.id)}
+                  onToggle={() => handleToggleTodo(todo)}
+                  onDelete={() => handleDeleteTodo(todo)}
                 />
               ))
             )}
@@ -1295,8 +1344,12 @@ const styles = StyleSheet.create({
   },
   backgroundImage: {
     position: 'absolute',
-    width: width,
-    height: height,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
   },
   backgroundImageStyle: {
     transform: [{ scale: 1.0 }],

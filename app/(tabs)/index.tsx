@@ -27,7 +27,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '@/constants/design';
 import { useBackground } from '@/contexts';
-import { useOnboardingStore } from '@/stores';
+import { useOnboardingStore, useAuthStore } from '@/stores';
 import KoreanLunarCalendar from 'korean-lunar-calendar';
 
 // Lunar to Solar date conversion utility
@@ -283,6 +283,18 @@ const swipeStyles = StyleSheet.create({
 export default function HomeScreen() {
   const { backgroundImage, setBackgroundImage, resetToDefault } = useBackground();
   const { data: onboardingData } = useOnboardingStore();
+  const { user, partner, couple } = useAuthStore();
+
+  // Determine nicknames based on couple order (user1 on left, user2 on right)
+  // This ensures consistent display regardless of who's viewing
+  const isCurrentUserCoupleUser1 = user?.id === couple?.user1Id;
+  const user1Nickname = isCurrentUserCoupleUser1
+    ? (user?.nickname || onboardingData.nickname || '나')
+    : (partner?.nickname || '파트너');
+  const user2Nickname = isCurrentUserCoupleUser1
+    ? (partner?.nickname || '파트너')
+    : (user?.nickname || onboardingData.nickname || '나');
+
   const [showAnniversaryModal, setShowAnniversaryModal] = useState(false);
   const [showImagePickerModal, setShowImagePickerModal] = useState(false);
   const [showAddAnniversary, setShowAddAnniversary] = useState(false);
@@ -375,10 +387,13 @@ export default function HomeScreen() {
     });
   };
 
-  // Calculate D-day using onboarding anniversaryDate
-  const anniversaryDate = onboardingData.anniversaryDate
-    ? new Date(onboardingData.anniversaryDate)
-    : new Date(2022, 3, 15); // Fallback to April 15, 2022
+  // Calculate D-day using couple's datingStartDate (synced from DB) or fallback to onboarding data
+  // Priority: couple.datingStartDate (database) > onboardingData.anniversaryDate (local) > fallback
+  const anniversaryDate = couple?.datingStartDate
+    ? new Date(couple.datingStartDate)
+    : onboardingData.anniversaryDate
+      ? new Date(onboardingData.anniversaryDate)
+      : new Date(2022, 3, 15); // Fallback to April 15, 2022
   const today = new Date();
   const diffTime = today.getTime() - anniversaryDate.getTime();
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to count from day 1
@@ -433,7 +448,7 @@ export default function HomeScreen() {
         }
       }
     } else {
-      // For dating/friendship: 100-day intervals up to 1000, then 500-day intervals
+      // For dating: 100-day intervals up to 1000, then 500-day intervals
       // Calculate days passed since anniversary
       const daysPassed = Math.floor((today.getTime() - anniversaryDate.getTime()) / (24 * 60 * 60 * 1000)) + 1;
 
@@ -464,21 +479,62 @@ export default function HomeScreen() {
           gradientColors: nextMilestone >= 1000 ? ['#A855F7', '#EC4899'] as const : ['#FBBF24', '#F59E0B'] as const,
         });
       }
+
+      // Add yearly dating anniversary (연애 n주년)
+      for (let year = 1; year <= 50; year++) {
+        const yearlyDate = new Date(anniversaryDate);
+        yearlyDate.setFullYear(anniversaryDate.getFullYear() + year);
+        if (yearlyDate > today) {
+          baseAnniversaries.push({
+            id: idCounter++,
+            label: `연애 ${year}주년`,
+            targetDate: yearlyDate,
+            icon: year === 1 ? '💕' : '💖',
+            bgColor: 'rgba(236, 72, 153, 0.25)',
+            gradientColors: ['#EC4899', '#F43F5E'] as const,
+            isYearly: true,
+          });
+          break; // Only add the nearest upcoming anniversary
+        }
+      }
     }
 
-    // Add birthday if birthDate exists
+    // Add birthday if birthDate exists (current user)
     if (onboardingData.birthDate) {
       const birthDate = new Date(onboardingData.birthDate);
       const isLunar = onboardingData.birthDateCalendarType === 'lunar';
       const nextBirthday = getNextBirthdayDate(birthDate, isLunar, today);
 
+      // Use couple-order nickname for current user's birthday label
+      const myNicknameInCoupleOrder = isCurrentUserCoupleUser1 ? user1Nickname : user2Nickname;
+
       baseAnniversaries.push({
         id: idCounter++,
-        label: `내 생일${isLunar ? ' (음력)' : ''}`,
+        label: `${myNicknameInCoupleOrder} 생일${isLunar ? ' (음력)' : ''}`,
         targetDate: nextBirthday,
         icon: '🎂',
         bgColor: 'rgba(251, 191, 36, 0.25)',
         gradientColors: ['#FBBF24', '#F59E0B'] as const,
+        isYearly: true,
+      });
+    }
+
+    // Add partner's birthday if exists
+    if (partner?.birthDate) {
+      const partnerBirthDate = new Date(partner.birthDate);
+      // Partner's calendar type not stored in User, assume solar
+      const nextPartnerBirthday = getNextBirthdayDate(partnerBirthDate, false, today);
+
+      // Use couple-order nickname for partner's birthday label
+      const partnerNicknameInCoupleOrder = isCurrentUserCoupleUser1 ? user2Nickname : user1Nickname;
+
+      baseAnniversaries.push({
+        id: idCounter++,
+        label: `${partnerNicknameInCoupleOrder} 생일`,
+        targetDate: nextPartnerBirthday,
+        icon: '🎂',
+        bgColor: 'rgba(251, 191, 36, 0.25)',
+        gradientColors: ['#F59E0B', '#FBBF24'] as const,
         isYearly: true,
       });
     }
@@ -667,11 +723,11 @@ export default function HomeScreen() {
         <View style={styles.anniversarySection}>
           <View style={styles.coupleNamesRow}>
             <Text style={[styles.coupleNameText, styles.coupleNameLeft]} numberOfLines={1}>
-              {onboardingData.nickname || '나'}
+              {user1Nickname}
             </Text>
             <Text style={styles.heartEmoji}>❤️</Text>
             <Text style={[styles.coupleNameText, styles.coupleNameRight]} numberOfLines={1}>
-              파트너
+              {user2Nickname}
             </Text>
           </View>
           <Pressable
@@ -700,24 +756,14 @@ export default function HomeScreen() {
               <View style={styles.vignetteOverlay} />
             </View>
 
-            {/* Bottom text area with highlighter effect */}
+            {/* Bottom area with logo */}
             <View style={styles.polaroidBottom}>
-              {/* First line - with highlighter, each word tilted differently */}
-              <View style={styles.sloganStrip}>
-                <View style={styles.highlighterSlogan} />
-                <View style={styles.sloganWords}>
-                  <Text style={[styles.polaroidSlogan, styles.word1]}>Everyday,</Text>
-                  <Text style={[styles.polaroidSlogan, styles.word2]}> a</Text>
-                  <Text style={[styles.polaroidSlogan, styles.word3]}> new</Text>
-                  <Text style={[styles.polaroidSlogan, styles.word4]}> date</Text>
-                </View>
-              </View>
-              {/* Second line - Daydate with highlighter */}
               <View style={styles.brandRow}>
-                <View style={styles.brandStrip}>
-                  <View style={styles.highlighter} />
-                  <Text style={styles.polaroidBrand}>Daydate</Text>
-                </View>
+                <Image
+                  source={require('@/assets/images/daydate-logo.png')}
+                  style={styles.polaroidLogo}
+                  resizeMode="contain"
+                />
                 {/* Image Change Button */}
                 <Pressable
                   ref={imageButtonRef}
@@ -1199,8 +1245,12 @@ const styles = StyleSheet.create({
   },
   backgroundImage: {
     position: 'absolute',
-    width: width,
-    height: height,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
   },
   backgroundImageStyle: {
     transform: [{ scale: 1.0 }],
@@ -1361,6 +1411,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  polaroidLogo: {
+    width: 110,
+    height: 40,
+    marginLeft: 5,
+    marginBottom: 7
   },
   brandStrip: {
     position: 'relative',

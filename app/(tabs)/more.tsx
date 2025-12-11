@@ -18,6 +18,7 @@ import {
   Megaphone,
   Headphones,
   LogOut,
+  Trash2,
 } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
@@ -26,6 +27,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, SPACING } from '@/constants/design';
 import { useBackground } from '@/contexts';
 import { useAuthStore, useOnboardingStore, useMissionStore } from '@/stores';
+import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
 
 const { width, height } = Dimensions.get('window');
 
@@ -47,6 +49,8 @@ export default function MoreScreen() {
   const resetOnboarding = useOnboardingStore((state) => state.reset);
   const setIsOnboardingComplete = useAuthStore((state) => state.setIsOnboardingComplete);
   const resetAllTodayMissions = useMissionStore((state) => state.resetAllTodayMissions);
+  const resetAuth = useAuthStore((state) => state.reset);
+  const coupleSyncCleanup = useCoupleSyncStore((state) => state.cleanup);
 
   const handleDevReset = () => {
     Alert.alert(
@@ -84,6 +88,43 @@ export default function MoreScreen() {
               '리셋 완료',
               '미션이 초기화되었습니다. 미션 탭으로 이동하여 새로운 미션을 생성하세요.',
               [{ text: '확인' }]
+            );
+          },
+        },
+      ]
+    );
+  };
+
+  const handleFullReset = () => {
+    Alert.alert(
+      '⚠️ 완전 리셋',
+      '모든 데이터를 초기화합니다.\n\n• 온보딩 데이터\n• 페어링 정보\n• 커플 동기화 데이터\n• 미션 데이터\n• 모든 로컬 저장소\n\n정말 초기화하시겠습니까?',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '완전 초기화',
+          style: 'destructive',
+          onPress: async () => {
+            // 1. 커플 동기화 정리
+            coupleSyncCleanup();
+            // 2. 온보딩 리셋
+            resetOnboarding();
+            // 3. 미션 리셋
+            resetAllTodayMissions();
+            // 4. Auth 리셋
+            resetAuth();
+            // 5. AsyncStorage 완전 삭제
+            await AsyncStorage.clear();
+
+            Alert.alert(
+              '초기화 완료',
+              '모든 데이터가 초기화되었습니다. 앱을 다시 시작합니다.',
+              [
+                {
+                  text: '확인',
+                  onPress: () => router.replace('/(auth)/onboarding'),
+                },
+              ]
             );
           },
         },
@@ -137,6 +178,7 @@ export default function MoreScreen() {
       items: [
         { icon: RotateCcw, label: '온보딩 리셋', onPress: handleDevReset },
         { icon: RotateCcw, label: '미션 리셋', onPress: handleMissionReset },
+        { icon: Trash2, label: '완전 리셋', onPress: handleFullReset },
       ],
     },
   ];
@@ -219,8 +261,12 @@ const styles = StyleSheet.create({
   },
   backgroundImage: {
     position: 'absolute',
-    width: width,
-    height: height,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
   },
   backgroundImageStyle: {
     transform: [{ scale: 1.0 }],

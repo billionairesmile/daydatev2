@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import { Jua_400Regular } from '@expo-google-fonts/jua';
@@ -6,12 +6,14 @@ import { JustMeAgainDownHere_400Regular } from '@expo-google-fonts/just-me-again
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, AppState, AppStateStatus } from 'react-native';
 import 'react-native-reanimated';
 
 import { useAuthStore } from '@/stores';
+import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
 import { BackgroundProvider, useBackground } from '@/contexts';
 import { preloadCharacterAssets } from '@/utils';
+import { db, isDemoMode } from '@/lib/supabase';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -19,20 +21,27 @@ export const unstable_settings = {
   initialRouteName: '(tabs)',
 };
 
-// Safe SplashScreen helper to handle hot reload and edge cases
+// Safe SplashScreen singleton to prevent multiple hide calls
+let splashScreenHidden = false;
+let splashScreenPrevented = false;
+
 const safeSplashScreen = {
   preventAutoHide: async () => {
+    if (splashScreenPrevented) return;
     try {
       await SplashScreen.preventAutoHideAsync();
+      splashScreenPrevented = true;
     } catch {
       // Silently ignore - splash screen may not be available
     }
   },
   hide: async () => {
+    if (splashScreenHidden || !splashScreenPrevented) return;
+    splashScreenHidden = true;
     try {
       await SplashScreen.hideAsync();
     } catch {
-      // Silently ignore - splash screen may already be hidden
+      // Silently ignore - splash screen may already be hidden or not registered
     }
   },
 };
@@ -100,8 +109,109 @@ function BackgroundLoadedHandler({ setBackgroundLoaded }: { setBackgroundLoaded:
 function RootLayoutNav() {
   const router = useRouter();
   const segments = useSegments();
-  const { isAuthenticated, isOnboardingComplete } = useAuthStore();
+  const { isAuthenticated, isOnboardingComplete, couple, user, setCouple, setPartner, partner } = useAuthStore();
+  const { initializeSync, cleanup: cleanupSync } = useCoupleSyncStore();
   const [isNavigationReady, setIsNavigationReady] = useState(false);
+  const appState = useRef(AppState.currentState);
+  const lastFetchTime = useRef<number>(0);
+
+  // Reusable function to fetch couple and partner data
+  const fetchCoupleAndPartnerData = useCallback(async () => {
+    if (!isOnboardingComplete || !couple?.id || !user?.id || isDemoMode) return;
+
+    // Throttle fetches to at most once every 5 seconds
+    const now = Date.now();
+    if (now - lastFetchTime.current < 5000) return;
+    lastFetchTime.current = now;
+
+    try {
+      // Fetch latest couple data from DB
+      const { data: coupleData, error: coupleError } = await db.couples.get(couple.id);
+
+      if (coupleError) {
+        console.error('Error fetching couple:', coupleError);
+        return;
+      }
+
+      if (coupleData) {
+        // Update couple in authStore with DB data
+        setCouple({
+          ...couple,
+          user1Id: coupleData.user1_id,
+          user2Id: coupleData.user2_id,
+          anniversaryDate: coupleData.dating_start_date ? new Date(coupleData.dating_start_date) : couple.anniversaryDate,
+          datingStartDate: coupleData.dating_start_date ? new Date(coupleData.dating_start_date) : undefined,
+          weddingDate: coupleData.wedding_date ? new Date(coupleData.wedding_date) : undefined,
+          status: coupleData.status || 'active',
+        });
+
+        // Determine partner's user_id
+        const partnerId = coupleData.user1_id === user.id
+          ? coupleData.user2_id
+          : coupleData.user1_id;
+
+        // Fetch partner profile if partner exists
+        if (partnerId) {
+          const { data: partnerData, error: partnerError } = await db.profiles.get(partnerId);
+
+          if (!partnerError && partnerData) {
+            setPartner({
+              id: partnerData.id,
+              email: partnerData.email || '',
+              nickname: partnerData.nickname || '',
+              inviteCode: partnerData.invite_code || '',
+              preferences: partnerData.preferences || {},
+              createdAt: partnerData.created_at ? new Date(partnerData.created_at) : new Date(),
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching couple/partner data:', error);
+    }
+  }, [isOnboardingComplete, couple, user?.id, setCouple, setPartner]);
+
+  // Fetch couple and partner data when onboarding is complete
+  useEffect(() => {
+    fetchCoupleAndPartnerData();
+  }, [fetchCoupleAndPartnerData]);
+
+  // Refresh partner data when app comes to foreground
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+        // App has come to the foreground, refresh partner data
+        fetchCoupleAndPartnerData();
+      }
+      appState.current = nextAppState;
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [fetchCoupleAndPartnerData]);
+
+  // Also refresh if partner nickname is empty (partner might have completed onboarding)
+  useEffect(() => {
+    if (isOnboardingComplete && partner && !partner.nickname) {
+      // Partner profile exists but nickname is empty, try refetching after a delay
+      const timer = setTimeout(() => {
+        fetchCoupleAndPartnerData();
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [isOnboardingComplete, partner?.nickname, fetchCoupleAndPartnerData]);
+
+  // Initialize couple sync when user and couple are available
+  useEffect(() => {
+    if (couple?.id && user?.id) {
+      initializeSync(couple.id, user.id);
+    }
+
+    return () => {
+      cleanupSync();
+    };
+  }, [couple?.id, user?.id, initializeSync, cleanupSync]);
 
   // Wait for navigation to be ready before redirecting
   useEffect(() => {

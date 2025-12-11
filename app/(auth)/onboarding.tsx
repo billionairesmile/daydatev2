@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -21,7 +21,9 @@ import {
   Check,
   Calendar,
   Gift,
+  Copy,
 } from 'lucide-react-native';
+import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 
 import { COLORS, SPACING, RADIUS } from '@/constants/design';
@@ -41,18 +43,27 @@ import {
   type Gender,
 } from '@/stores/onboardingStore';
 import { useBackground } from '@/contexts';
-import { db, isDemoMode } from '@/lib/supabase';
+import { db, isDemoMode, supabase } from '@/lib/supabase';
 
 const { width, height } = Dimensions.get('window');
 
+// UUID v4 generator function
+const generateUUID = (): string => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
+
 // Step configuration for progress bar
-const STEP_A = ['terms', 'basic_info', 'pairing', 'couple_info'];
+const STEP_A = ['terms', 'pairing', 'basic_info', 'couple_info'];
 const STEP_B = ['mbti', 'activity_type', 'date_worries', 'constraints'];
 
 export default function OnboardingScreen() {
   const router = useRouter();
   const { backgroundImage } = useBackground();
-  const { setIsOnboardingComplete, updateNickname } = useAuthStore();
+  const { setIsOnboardingComplete, updateNickname, setCouple, setUser, setPartner } = useAuthStore();
   const {
     currentStep,
     data,
@@ -63,7 +74,7 @@ export default function OnboardingScreen() {
   } = useOnboardingStore();
 
   // Local state
-  const [generatedCode] = useState(() => generatePairingCode());
+  const [generatedCode, setGeneratedCode] = useState(() => generatePairingCode());
 
   // Animation
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -94,12 +105,22 @@ export default function OnboardingScreen() {
   const handleComplete = useCallback(async () => {
     updateNickname(data.nickname);
 
+    // Get current auth state
+    const currentUser = useAuthStore.getState().user;
+    const currentCouple = useAuthStore.getState().couple;
+
+    // Update user nickname in authStore
+    if (currentUser) {
+      setUser({
+        ...currentUser,
+        nickname: data.nickname,
+      });
+    }
+
     // Save onboarding data to Supabase if not in demo mode
     if (!isDemoMode) {
       try {
-        const user = useAuthStore.getState().user;
-
-        if (user?.id) {
+        if (currentUser?.id) {
           // Prepare preferences object for DB storage
           const preferences = {
             mbti: data.mbti,
@@ -111,31 +132,28 @@ export default function OnboardingScreen() {
             relationshipType: data.relationshipType,
           };
 
-          // Update profile with birth date and preferences
-          await db.profiles.update(user.id, {
+          // Upsert profile with birth date and preferences
+          await db.profiles.upsert({
+            id: currentUser.id,
+            nickname: data.nickname,
             birth_date: data.birthDate ? data.birthDate.toISOString().split('T')[0] : undefined,
             preferences,
           });
 
-          // Create or update couple with dating start date
-          if (data.anniversaryDate) {
-            // Check if user already has a couple
-            const { data: existingCouple } = await db.couples.getByUserId(user.id);
+          // Update couple with anniversary date (couple was already created in pairing step)
+          if (data.anniversaryDate && currentCouple?.id) {
+            await db.couples.update(currentCouple.id, {
+              dating_start_date: data.anniversaryDate.toISOString().split('T')[0],
+              wedding_date: data.relationshipType === 'married' ? data.anniversaryDate.toISOString().split('T')[0] : undefined,
+            });
 
-            if (existingCouple?.id) {
-              // Update existing couple with anniversary dates
-              await db.couples.update(existingCouple.id, {
-                dating_start_date: data.anniversaryDate.toISOString().split('T')[0],
-                wedding_date: data.relationshipType === 'married' ? data.anniversaryDate.toISOString().split('T')[0] : undefined,
-              });
-            } else if (data.isCreatingCode) {
-              // Create new couple if user is creating a pairing code
-              await db.couples.create({
-                user1_id: user.id,
-                dating_start_date: data.anniversaryDate.toISOString().split('T')[0],
-                wedding_date: data.relationshipType === 'married' ? data.anniversaryDate.toISOString().split('T')[0] : undefined,
-              });
-            }
+            // Update couple in authStore with anniversary
+            setCouple({
+              ...currentCouple,
+              anniversaryDate: data.anniversaryDate,
+              datingStartDate: data.anniversaryDate,
+              weddingDate: data.relationshipType === 'married' ? data.anniversaryDate : undefined,
+            });
           }
         }
       } catch (error) {
@@ -146,11 +164,21 @@ export default function OnboardingScreen() {
           [{ text: '확인' }]
         );
       }
+    } else {
+      // Demo mode: update couple in authStore with anniversary
+      if (data.anniversaryDate && currentCouple) {
+        setCouple({
+          ...currentCouple,
+          anniversaryDate: data.anniversaryDate,
+          datingStartDate: data.anniversaryDate,
+          weddingDate: data.relationshipType === 'married' ? data.anniversaryDate : undefined,
+        });
+      }
     }
 
     setIsOnboardingComplete(true);
     router.replace('/(tabs)');
-  }, [data.nickname, data.birthDate, data.anniversaryDate, data.relationshipType, data.isCreatingCode, updateNickname, setIsOnboardingComplete, router]);
+  }, [data.nickname, data.birthDate, data.anniversaryDate, data.relationshipType, updateNickname, setIsOnboardingComplete, router, setUser, setCouple]);
 
   // Progress calculation
   const getProgress = () => {
@@ -185,6 +213,7 @@ export default function OnboardingScreen() {
       <ImageBackground
         source={backgroundImage}
         style={styles.backgroundImage}
+        resizeMode="cover"
         blurRadius={40}
       />
       <View style={styles.overlay} />
@@ -224,6 +253,12 @@ export default function OnboardingScreen() {
               pairingCode={data.pairingCode}
               setPairingCode={(code) => updateData({ pairingCode: code })}
               generatedCode={generatedCode}
+              setGeneratedCode={setGeneratedCode}
+              isPairingConnected={data.isPairingConnected}
+              setIsPairingConnected={(value) => updateData({ isPairingConnected: value })}
+              setCouple={setCouple}
+              setUser={setUser}
+              setPartner={setPartner}
               onNext={handleNext}
               onBack={handleBack}
             />
@@ -238,7 +273,15 @@ export default function OnboardingScreen() {
               setBirthDate={(date) => updateData({ birthDate: date })}
               calendarType={data.birthDateCalendarType}
               setCalendarType={(type) => updateData({ birthDateCalendarType: type })}
-              onNext={handleNext}
+              onNext={() => {
+                // Creator (isCreatingCode): Skip couple_info, go directly to preferences_intro
+                // Joiner (!isCreatingCode): Go to couple_info to enter anniversary date
+                if (data.isCreatingCode) {
+                  animateTransition(() => setStep('preferences_intro'));
+                } else {
+                  handleNext(); // Goes to couple_info
+                }
+              }}
               onBack={handleBack}
             />
           )}
@@ -631,6 +674,12 @@ function PairingStep({
   pairingCode,
   setPairingCode,
   generatedCode,
+  setGeneratedCode,
+  isPairingConnected,
+  setIsPairingConnected,
+  setCouple,
+  setUser,
+  setPartner,
   onNext,
   onBack,
 }: {
@@ -639,10 +688,430 @@ function PairingStep({
   pairingCode: string;
   setPairingCode: (code: string) => void;
   generatedCode: string;
+  setGeneratedCode: (code: string) => void;
+  isPairingConnected: boolean;
+  setIsPairingConnected: (value: boolean) => void;
+  setCouple: (couple: import('@/types').Couple | null) => void;
+  setUser: (user: import('@/types').User | null) => void;
+  setPartner: (partner: import('@/types').User | null) => void;
   onNext: () => void;
   onBack: () => void;
 }) {
-  const isValid = isCreatingCode || pairingCode.length >= 4;
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [isCodeSaved, setIsCodeSaved] = React.useState(false);
+  const [copied, setCopied] = React.useState(false);
+  const [timeRemaining, setTimeRemaining] = React.useState('24:00:00');
+  const [codeExpiresAt, setCodeExpiresAt] = React.useState<Date | null>(null);
+  const channelRef = React.useRef<ReturnType<typeof db.pairingCodes.subscribeToCode> | null>(null);
+  const timerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollingRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Format time remaining
+  const formatTimeRemaining = React.useCallback((expiresAt: Date) => {
+    const now = new Date();
+    const diff = expiresAt.getTime() - now.getTime();
+
+    if (diff <= 0) {
+      return '00:00:00';
+    }
+
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  }, []);
+
+  // Timer effect for countdown
+  React.useEffect(() => {
+    if (codeExpiresAt && isCreatingCode) {
+      // Update immediately
+      setTimeRemaining(formatTimeRemaining(codeExpiresAt));
+
+      // Set up interval
+      timerRef.current = setInterval(() => {
+        const remaining = formatTimeRemaining(codeExpiresAt);
+        setTimeRemaining(remaining);
+
+        // If expired, reset code
+        if (remaining === '00:00:00') {
+          setIsCodeSaved(false);
+          if (timerRef.current) {
+            clearInterval(timerRef.current);
+          }
+        }
+      }, 1000);
+    }
+
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, [codeExpiresAt, isCreatingCode, formatTimeRemaining]);
+
+  // For code creator: Save code to DB, create couple, and subscribe to changes
+  React.useEffect(() => {
+    if (isCreatingCode && !isDemoMode && !isCodeSaved) {
+      const setupPairing = async (codeToUse: string, retryCount = 0) => {
+        try {
+          const tempUserId = generateUUID();
+
+          // Save code to DB
+          const { data: createdCode, error: createError } = await db.pairingCodes.create(codeToUse, tempUserId);
+          if (createError) {
+            // Handle duplicate key error by generating a new code
+            if (createError.code === '23505' && retryCount < 3) {
+              const newCode = generatePairingCode();
+              setGeneratedCode(newCode);
+              // Retry with new code
+              setupPairing(newCode, retryCount + 1);
+              return;
+            }
+            console.error('Error creating pairing code:', createError);
+            return;
+          }
+
+          // Create profile for creator in DB
+          const { error: profileError } = await db.profiles.create({
+            id: tempUserId,
+            nickname: '', // Will be updated in handleComplete
+            invite_code: codeToUse,
+          });
+
+          if (profileError) {
+            console.error('Error creating profile:', profileError);
+          }
+
+          // Create couple for this user (creator is user1)
+          const { data: newCouple, error: coupleError } = await db.couples.create({
+            user1_id: tempUserId,
+          });
+
+          if (coupleError) {
+            console.error('Error creating couple:', coupleError);
+          } else if (newCouple) {
+            // Link couple_id to pairing code
+            await db.pairingCodes.setCoupleId(codeToUse, newCouple.id);
+
+            // Set couple in authStore
+            setCouple({
+              id: newCouple.id,
+              user1Id: tempUserId,
+              anniversaryDate: new Date(),
+              anniversaryType: '연애 시작일',
+              status: 'pending',
+              createdAt: new Date(),
+            });
+
+            // Set user in authStore
+            setUser({
+              id: tempUserId,
+              email: '',
+              nickname: '',
+              inviteCode: codeToUse,
+              preferences: {
+                weekendActivity: '',
+                dateEnergy: '',
+                dateTypes: [],
+                adventureLevel: '',
+                photoPreference: '',
+                dateStyle: '',
+                planningStyle: '',
+                foodStyles: [],
+                preferredTimes: [],
+                budgetStyle: '',
+              },
+              createdAt: new Date(),
+            });
+          }
+
+          setIsCodeSaved(true);
+
+          // Set expiration time (24 hours from now)
+          const expiresAt = new Date();
+          expiresAt.setHours(expiresAt.getHours() + 24);
+          setCodeExpiresAt(expiresAt);
+
+          // Subscribe to changes (realtime)
+          channelRef.current = db.pairingCodes.subscribeToCode(codeToUse, (payload) => {
+            if (payload.status === 'connected') {
+              setIsPairingConnected(true);
+            }
+          });
+        } catch (err) {
+          console.error('Pairing setup error:', err);
+        }
+      };
+
+      setupPairing(generatedCode);
+    } else if (isCreatingCode && isDemoMode && !codeExpiresAt) {
+      // Demo mode: set fake expiration and create demo couple
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 24);
+      setCodeExpiresAt(expiresAt);
+
+      // Set demo couple in authStore
+      const demoUserId = generateUUID();
+      const demoCoupleId = generateUUID();
+      setUser({
+        id: demoUserId,
+        email: '',
+        nickname: '',
+        inviteCode: generatedCode,
+        preferences: {
+          weekendActivity: '',
+          dateEnergy: '',
+          dateTypes: [],
+          adventureLevel: '',
+          photoPreference: '',
+          dateStyle: '',
+          planningStyle: '',
+          foodStyles: [],
+          preferredTimes: [],
+          budgetStyle: '',
+        },
+        createdAt: new Date(),
+      });
+      setCouple({
+        id: demoCoupleId,
+        user1Id: demoUserId,
+        anniversaryDate: new Date(),
+        anniversaryType: '연애 시작일',
+        status: 'pending',
+        createdAt: new Date(),
+      });
+    }
+
+    // Cleanup subscription on unmount
+    return () => {
+      if (channelRef.current) {
+        db.pairingCodes.unsubscribe(channelRef.current);
+      }
+    };
+  }, [isCreatingCode, generatedCode, isCodeSaved, setIsPairingConnected, setGeneratedCode, codeExpiresAt, setCouple, setUser]);
+
+  // Separate useEffect for polling - runs when code is saved but not yet connected
+  React.useEffect(() => {
+    if (isCreatingCode && !isDemoMode && isCodeSaved && !isPairingConnected && generatedCode) {
+      // Start polling as fallback (every 1.5 seconds)
+      pollingRef.current = setInterval(async () => {
+        try {
+          if (supabase) {
+            const { data: checkData } = await supabase
+              .from('pairing_codes')
+              .select('status')
+              .eq('code', generatedCode)
+              .single();
+
+            if (checkData?.status === 'connected') {
+              setIsPairingConnected(true);
+            }
+          }
+        } catch (pollErr) {
+          console.error('Polling error:', pollErr);
+        }
+      }, 1500);
+    }
+
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, [isCreatingCode, isCodeSaved, isPairingConnected, generatedCode, setIsPairingConnected]);
+
+  // Copy code to clipboard
+  const handleCopyCode = async () => {
+    try {
+      await Clipboard.setStringAsync(generatedCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
+  // Handle join (for code enterer)
+  const handleJoin = async () => {
+    if (isDemoMode) {
+      // Demo mode: create demo joiner and couple
+      const demoJoinerId = generateUUID();
+      const demoCoupleId = generateUUID();
+      setUser({
+        id: demoJoinerId,
+        email: '',
+        nickname: '',
+        inviteCode: '',
+        preferences: {
+          weekendActivity: '',
+          dateEnergy: '',
+          dateTypes: [],
+          adventureLevel: '',
+          photoPreference: '',
+          dateStyle: '',
+          planningStyle: '',
+          foodStyles: [],
+          preferredTimes: [],
+          budgetStyle: '',
+        },
+        createdAt: new Date(),
+      });
+      setCouple({
+        id: demoCoupleId,
+        user1Id: generateUUID(),
+        user2Id: demoJoinerId,
+        anniversaryDate: new Date(),
+        anniversaryType: '연애 시작일',
+        status: 'active',
+        createdAt: new Date(),
+      });
+      setIsPairingConnected(true);
+      onNext();
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Get pairing code with couple_id
+      const { data: existingCode, error: findError } = await db.pairingCodes.getWithCouple(pairingCode);
+
+      if (findError || !existingCode) {
+        setError('유효하지 않은 코드입니다. 코드를 확인해주세요.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Check if code already used
+      if (existingCode.status === 'connected') {
+        setError('이미 사용된 코드입니다.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Check if couple_id exists
+      if (!existingCode.couple_id) {
+        setError('파트너가 아직 준비되지 않았습니다. 잠시 후 다시 시도해주세요.');
+        setIsLoading(false);
+        return;
+      }
+
+      const joinerId = generateUUID();
+
+      // Update pairing code status
+      const { error: joinError } = await db.pairingCodes.join(pairingCode, joinerId);
+
+      if (joinError) {
+        setError('연결 중 오류가 발생했습니다. 다시 시도해주세요.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Create profile for joiner in DB
+      const { error: profileError } = await db.profiles.create({
+        id: joinerId,
+        nickname: '', // Will be updated in handleComplete
+        invite_code: '',
+      });
+
+      if (profileError) {
+        console.error('Error creating joiner profile:', profileError);
+      }
+
+      // Add joiner to couple as user2
+      const { data: updatedCouple, error: coupleJoinError } = await db.couples.joinCouple(existingCode.couple_id, joinerId);
+
+      if (coupleJoinError) {
+        console.error('Error joining couple:', coupleJoinError);
+        setError('커플 연결 중 오류가 발생했습니다.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Set user in authStore
+      setUser({
+        id: joinerId,
+        email: '',
+        nickname: '',
+        inviteCode: '',
+        preferences: {
+          weekendActivity: '',
+          dateEnergy: '',
+          dateTypes: [],
+          adventureLevel: '',
+          photoPreference: '',
+          dateStyle: '',
+          planningStyle: '',
+          foodStyles: [],
+          preferredTimes: [],
+          budgetStyle: '',
+        },
+        createdAt: new Date(),
+      });
+
+      // Set couple in authStore
+      if (updatedCouple) {
+        setCouple({
+          id: updatedCouple.id,
+          user1Id: updatedCouple.user1_id,
+          user2Id: joinerId,
+          anniversaryDate: updatedCouple.dating_start_date ? new Date(updatedCouple.dating_start_date) : new Date(),
+          anniversaryType: '연애 시작일',
+          status: 'active',
+          createdAt: updatedCouple.created_at ? new Date(updatedCouple.created_at) : new Date(),
+        });
+
+        // Set partner info (creator's info)
+        setPartner({
+          id: updatedCouple.user1_id,
+          email: '',
+          nickname: '',
+          inviteCode: pairingCode,
+          preferences: {
+            weekendActivity: '',
+            dateEnergy: '',
+            dateTypes: [],
+            adventureLevel: '',
+            photoPreference: '',
+            dateStyle: '',
+            planningStyle: '',
+            foodStyles: [],
+            preferredTimes: [],
+            budgetStyle: '',
+          },
+          createdAt: new Date(),
+        });
+      }
+
+      setIsPairingConnected(true);
+      onNext();
+    } catch (err) {
+      console.error('Join error:', err);
+      setError('연결 중 오류가 발생했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle connect button press
+  const handleConnect = () => {
+    if (isCreatingCode) {
+      if (isPairingConnected || isDemoMode) {
+        onNext();
+      }
+    } else {
+      handleJoin();
+    }
+  };
+
+  // Validation
+  const isValid = isCreatingCode
+    ? (isPairingConnected || isDemoMode)
+    : pairingCode.length >= 4;
 
   return (
     <View style={styles.centeredStepContainer}>
@@ -660,7 +1129,10 @@ function PairingStep({
         <View style={[styles.toggleRow, { marginBottom: SPACING.xl }]}>
           <Pressable
             style={[styles.toggleButton, isCreatingCode && styles.toggleButtonActive]}
-            onPress={() => setIsCreatingCode(true)}
+            onPress={() => {
+              setIsCreatingCode(true);
+              setError(null);
+            }}
           >
             <Text style={[styles.toggleButtonText, isCreatingCode && styles.toggleButtonTextActive]}>
               코드 생성
@@ -668,7 +1140,10 @@ function PairingStep({
           </Pressable>
           <Pressable
             style={[styles.toggleButton, !isCreatingCode && styles.toggleButtonActive]}
-            onPress={() => setIsCreatingCode(false)}
+            onPress={() => {
+              setIsCreatingCode(false);
+              setError(null);
+            }}
           >
             <Text style={[styles.toggleButtonText, !isCreatingCode && styles.toggleButtonTextActive]}>
               코드 입력
@@ -680,24 +1155,50 @@ function PairingStep({
         <View style={styles.pairingContentArea}>
           {isCreatingCode ? (
             <View style={styles.codeDisplayContainer}>
-              <Text style={styles.codeLabel}>파트너에게 공유할 코드</Text>
-              <Text style={styles.codeText}>{generatedCode}</Text>
-              <Text style={styles.codeHint}>
-                파트너가 이 코드를 입력하면{'\n'}자동으로 연결됩니다
-              </Text>
+              <View style={styles.codeLabelRow}>
+                <Text style={styles.codeLabel}>파트너에게 공유할 코드</Text>
+                <Text style={styles.codeTimer}>({timeRemaining})</Text>
+              </View>
+              <View style={styles.codeBoxRow}>
+                <View style={styles.codeBoxSpacer} />
+                <Text style={styles.codeText}>{generatedCode}</Text>
+                <Pressable
+                  style={styles.copyButton}
+                  onPress={handleCopyCode}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Copy size={20} color="rgba(255,255,255,0.7)" />
+                </Pressable>
+              </View>
+              {isPairingConnected ? (
+                <Text style={[styles.codeHint, { color: '#4CAF50' }]}>
+                  파트너와 연결되었습니다!{'\n'}다음으로 진행하세요
+                </Text>
+              ) : (
+                <Text style={styles.codeHint}>
+                  파트너가 이 코드를 입력하면{'\n'}자동으로 연결됩니다
+                </Text>
+              )}
             </View>
           ) : (
             <View style={styles.codeInputArea}>
               <TextInput
                 style={[styles.textInput, styles.codeInput]}
-                placeholder="DYXXXX"
-                placeholderTextColor="rgba(255, 255, 255, 0.4)"
                 value={pairingCode}
-                onChangeText={(text) => setPairingCode(text.toUpperCase())}
+                onChangeText={(text) => {
+                  setPairingCode(text.toUpperCase());
+                  setError(null);
+                }}
                 autoCapitalize="characters"
-                maxLength={8}
+                maxLength={6}
+                editable={!isLoading}
               />
               <Text style={styles.codeInputHint}>파트너가 생성한 코드를 입력하세요</Text>
+              {error && (
+                <Text style={[styles.codeInputHint, { color: '#FF6B6B', marginTop: 8 }]}>
+                  {error}
+                </Text>
+              )}
             </View>
           )}
         </View>
@@ -705,17 +1206,28 @@ function PairingStep({
 
       {/* Buttons fixed at bottom */}
       <View style={styles.buttonRow}>
-        <Pressable style={styles.secondaryButton} onPress={onBack}>
+        <Pressable style={styles.secondaryButton} onPress={onBack} disabled={isLoading}>
           <Text style={styles.secondaryButtonText}>이전</Text>
         </Pressable>
         <Pressable
           style={[styles.primaryButton, styles.buttonFlex, !isValid && styles.primaryButtonDisabled]}
-          onPress={onNext}
-          disabled={!isValid}
+          onPress={handleConnect}
+          disabled={!isValid || isLoading}
         >
-          <Text style={styles.primaryButtonText}>연결</Text>
+          <Text style={styles.primaryButtonText}>
+            {isLoading ? '연결 중...' : (isCreatingCode && !isPairingConnected && !isDemoMode) ? '연결 대기중' : '연결'}
+          </Text>
         </Pressable>
       </View>
+
+      {/* Copy Toast */}
+      {copied && (
+        <View style={styles.copyToastOverlay}>
+          <View style={styles.copyToastBox}>
+            <Text style={styles.copyToastText}>복사되었습니다</Text>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -776,7 +1288,7 @@ function CoupleInfoStep({
     switch (relationshipType) {
       case 'dating': return '사귄 날';
       case 'married': return '결혼 기념일';
-      case 'friendship': return '친구 된 날';
+      default: return '사귄 날';
     }
   };
 
@@ -813,14 +1325,6 @@ function CoupleInfoStep({
             >
               <Text style={[styles.relationshipTypeButtonText, relationshipType === 'married' && styles.relationshipTypeButtonTextActive]}>
                 결혼
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[styles.relationshipTypeButton, relationshipType === 'friendship' && styles.relationshipTypeButtonActive]}
-              onPress={() => setRelationshipType('friendship')}
-            >
-              <Text style={[styles.relationshipTypeButtonText, relationshipType === 'friendship' && styles.relationshipTypeButtonTextActive]}>
-                우정
               </Text>
             </Pressable>
           </View>
@@ -1270,8 +1774,12 @@ const styles = StyleSheet.create({
   },
   backgroundImage: {
     position: 'absolute',
-    width: width,
-    height: height,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
   },
   overlay: {
     position: 'absolute',
@@ -1468,7 +1976,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '700',
     textAlign: 'center',
-    letterSpacing: 4,
+    letterSpacing: 1,
   },
   codeInputHint: {
     fontSize: 12,
@@ -1603,21 +2111,67 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: 'rgba(255, 255, 255, 0.6)',
     fontWeight: '500',
+  },
+  codeLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: SPACING.md,
-    marginLeft: SPACING.xs,
+    gap: SPACING.sm,
+  },
+  codeTimer: {
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontWeight: '400',
+  },
+  codeBoxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.sm,
+  },
+  codeBoxSpacer: {
+    width: 30,
   },
   codeText: {
     fontSize: 32,
     color: COLORS.white,
     fontWeight: '700',
     letterSpacing: 8,
-    marginBottom: SPACING.md,
+  },
+  copyButton: {
+    width: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: SPACING.sm,
+  },
+  copyToastOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    pointerEvents: 'none',
+  },
+  copyToastBox: {
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.md,
+    borderRadius: RADIUS.lg,
+  },
+  copyToastText: {
+    fontSize: 15,
+    color: COLORS.white,
+    fontWeight: '500',
   },
   codeHint: {
     fontSize: 12,
     color: 'rgba(255, 255, 255, 0.5)',
     textAlign: 'center',
     lineHeight: 18,
+    marginTop: SPACING.sm,
   },
   termsContainer: {
     width: '100%',

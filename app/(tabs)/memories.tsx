@@ -43,7 +43,9 @@ import { COLORS, SPACING } from '@/constants/design';
 import { useMemoryStore, SAMPLE_MEMORIES } from '@/stores/memoryStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useOnboardingStore } from '@/stores/onboardingStore';
+import { useCoupleSyncStore, CoupleAlbum, AlbumPhoto } from '@/stores/coupleSyncStore';
 import { useBackground } from '@/contexts';
+import { isDemoMode } from '@/lib/supabase';
 import type { CompletedMission } from '@/types';
 import { RansomText } from '@/components/ransom';
 
@@ -87,6 +89,19 @@ export default function MemoriesScreen() {
   const { backgroundImage } = useBackground();
   const { memories, deleteMemory } = useMemoryStore();
   const { user, partner } = useAuthStore();
+
+  // Album sync store
+  const {
+    isInitialized: isSyncInitialized,
+    coupleAlbums: syncedAlbums,
+    albumPhotosMap: syncedAlbumPhotosMap,
+    createAlbum: syncCreateAlbum,
+    updateAlbum: syncUpdateAlbum,
+    deleteAlbum: syncDeleteAlbum,
+    addPhotoToAlbum: syncAddPhotoToAlbum,
+    removePhotoFromAlbum: syncRemovePhotoFromAlbum,
+  } = useCoupleSyncStore();
+
   const [selectedMonth, setSelectedMonth] = useState<MonthData | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<MemoryType | null>(null);
   const [showYearPicker, setShowYearPicker] = useState<string | null>(null);
@@ -96,11 +111,54 @@ export default function MemoriesScreen() {
     Jua_400Regular,
   });
 
+  // Local albums state (for demo mode fallback)
+  const [localAlbums, setLocalAlbums] = useState<Album[]>([]);
+  const [localAlbumPhotos, setLocalAlbumPhotos] = useState<{ [albumId: string]: MemoryType[] }>({});
+
+  // Convert synced CoupleAlbum to local Album format
+  const convertSyncedAlbumToLocal = useCallback((syncedAlbum: CoupleAlbum): Album => ({
+    id: syncedAlbum.id,
+    name: syncedAlbum.name,
+    coverPhoto: syncedAlbum.cover_photo_url,
+    createdAt: new Date(syncedAlbum.created_at),
+    namePosition: syncedAlbum.name_position || { x: 30, y: 16 },
+    textScale: syncedAlbum.text_scale || 1.0,
+    fontStyle: (syncedAlbum.font_style as FontStyleType) || 'basic',
+    ransomSeed: syncedAlbum.ransom_seed ?? undefined,
+  }), []);
+
+  // Get album photos from synced data joined with memories
+  const getSyncedAlbumPhotosForAlbum = useCallback((albumId: string): MemoryType[] => {
+    const photoRefs = syncedAlbumPhotosMap[albumId] || [];
+    return photoRefs
+      .map((ref: AlbumPhoto) => memories.find(m => m.id === ref.memory_id))
+      .filter((m): m is MemoryType => m !== undefined);
+  }, [syncedAlbumPhotosMap, memories]);
+
+  // Use synced albums if available, otherwise fallback to local
+  const albums: Album[] = React.useMemo(() => {
+    if (isSyncInitialized && !isDemoMode) {
+      return syncedAlbums.map(convertSyncedAlbumToLocal);
+    }
+    return localAlbums;
+  }, [isSyncInitialized, syncedAlbums, localAlbums, convertSyncedAlbumToLocal]);
+
+  // Use synced album photos if available, otherwise fallback to local
+  const albumPhotos: { [albumId: string]: MemoryType[] } = React.useMemo(() => {
+    if (isSyncInitialized && !isDemoMode) {
+      const result: { [albumId: string]: MemoryType[] } = {};
+      syncedAlbums.forEach((album: CoupleAlbum) => {
+        result[album.id] = getSyncedAlbumPhotosForAlbum(album.id);
+      });
+      return result;
+    }
+    return localAlbumPhotos;
+  }, [isSyncInitialized, syncedAlbums, syncedAlbumPhotosMap, localAlbumPhotos, getSyncedAlbumPhotosForAlbum]);
+
   // Album creation states
   const [showAlbumModal, setShowAlbumModal] = useState(false);
   const [albumName, setAlbumName] = useState('');
   const [albumCoverPhoto, setAlbumCoverPhoto] = useState<string | null>(null);
-  const [albums, setAlbums] = useState<Album[]>([]);
   const [albumStep, setAlbumStep] = useState<'fontStyle' | 'name' | 'cover'>('fontStyle'); // Start with font selection
   const [namePosition, setNamePosition] = useState({ x: 30, y: 16 }); // Default position (past 24px book spine)
   const [textScale, setTextScale] = useState(1.0); // Overall text scale (0.5 - 1.5)
@@ -112,7 +170,6 @@ export default function MemoriesScreen() {
   const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
   const [showAlbumDetailModal, setShowAlbumDetailModal] = useState(false);
   const [showAlbumMenu, setShowAlbumMenu] = useState(false);
-  const [albumPhotos, setAlbumPhotos] = useState<{ [albumId: string]: MemoryType[] }>({}); // Photos added to each album (full mission objects)
 
   // Album photo selection states
   const [isSelectingAlbumPhotos, setIsSelectingAlbumPhotos] = useState(false);
@@ -518,7 +575,7 @@ export default function MemoriesScreen() {
   };
 
   // Create album with closing animation
-  const handleCreateAlbum = () => {
+  const handleCreateAlbum = async () => {
     if (albumName.trim()) {
       const newAlbum: Album = {
         id: Date.now().toString(),
@@ -530,7 +587,27 @@ export default function MemoriesScreen() {
         fontStyle: fontStyle,
         ransomSeed: ransomSeed, // Save the ransom seed for consistent rendering
       };
-      setAlbums([...albums, newAlbum]);
+
+      // Sync or local save based on mode
+      if (isSyncInitialized && !isDemoMode) {
+        try {
+          await syncCreateAlbum(
+            albumName.trim(),
+            albumCoverPhoto,
+            { ...namePosition },
+            textScale,
+            fontStyle || 'basic',
+            ransomSeed
+          );
+        } catch (error) {
+          console.error('Error syncing album:', error);
+          // Fallback to local if sync fails
+          setLocalAlbums([...localAlbums, newAlbum]);
+        }
+      } else {
+        // Demo mode: save locally
+        setLocalAlbums([...localAlbums, newAlbum]);
+      }
 
       // Animate out then reset modal state
       Animated.parallel([
@@ -766,7 +843,7 @@ export default function MemoriesScreen() {
   };
 
   // Save edited album
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (selectedAlbum && editAlbumName.trim()) {
       const updatedAlbum: Album = {
         ...selectedAlbum,
@@ -777,9 +854,32 @@ export default function MemoriesScreen() {
         fontStyle: editFontStyle,
         ransomSeed: editRansomSeed,
       };
-      setAlbums(albums.map(album =>
-        album.id === selectedAlbum.id ? updatedAlbum : album
-      ));
+
+      // Sync or local update based on mode
+      if (isSyncInitialized && !isDemoMode) {
+        try {
+          await syncUpdateAlbum(selectedAlbum.id, {
+            name: editAlbumName.trim(),
+            cover_photo_url: editCoverPhoto,
+            name_position: { ...editTextPosition },
+            text_scale: editTextScale,
+            font_style: editFontStyle || 'basic',
+            ransom_seed: editRansomSeed,
+          });
+        } catch (error) {
+          console.error('Error syncing album update:', error);
+          // Fallback to local if sync fails
+          setLocalAlbums(localAlbums.map(album =>
+            album.id === selectedAlbum.id ? updatedAlbum : album
+          ));
+        }
+      } else {
+        // Demo mode: update locally
+        setLocalAlbums(localAlbums.map(album =>
+          album.id === selectedAlbum.id ? updatedAlbum : album
+        ));
+      }
+
       setSelectedAlbum(updatedAlbum);
       setShowCoverEditModal(false);
     }
@@ -1616,7 +1716,7 @@ export default function MemoriesScreen() {
                             {
                               text: '삭제',
                               style: 'destructive',
-                              onPress: () => {
+                              onPress: async () => {
                                 if (selectedAlbum) {
                                   const albumIdToDelete = selectedAlbum.id;
                                   // Reset all modal states first
@@ -1627,14 +1727,31 @@ export default function MemoriesScreen() {
                                   setSelectedAlbumPhotoIndices(new Set());
                                   setSelectedAlbumPhoto(null);
                                   setShowMissionPhotosPicker(false);
-                                  // Then delete the album
-                                  setAlbums(albums.filter(a => a.id !== albumIdToDelete));
-                                  // Also delete album photos
-                                  setAlbumPhotos(prev => {
-                                    const newPhotos = { ...prev };
-                                    delete newPhotos[albumIdToDelete];
-                                    return newPhotos;
-                                  });
+
+                                  // Delete album via sync or locally
+                                  if (isSyncInitialized && !isDemoMode) {
+                                    try {
+                                      await syncDeleteAlbum(albumIdToDelete);
+                                      // Album photos are deleted via CASCADE in DB
+                                    } catch (error) {
+                                      console.error('Error syncing album delete:', error);
+                                      // Fallback to local
+                                      setLocalAlbums(localAlbums.filter(a => a.id !== albumIdToDelete));
+                                      setLocalAlbumPhotos(prev => {
+                                        const newPhotos = { ...prev };
+                                        delete newPhotos[albumIdToDelete];
+                                        return newPhotos;
+                                      });
+                                    }
+                                  } else {
+                                    // Demo mode: delete locally
+                                    setLocalAlbums(localAlbums.filter(a => a.id !== albumIdToDelete));
+                                    setLocalAlbumPhotos(prev => {
+                                      const newPhotos = { ...prev };
+                                      delete newPhotos[albumIdToDelete];
+                                      return newPhotos;
+                                    });
+                                  }
                                 }
                               }
                             }
@@ -1738,14 +1855,35 @@ export default function MemoriesScreen() {
                                       {
                                         text: '삭제',
                                         style: 'destructive',
-                                        onPress: () => {
+                                        onPress: async () => {
                                           if (selectedAlbum) {
                                             const currentPhotos = albumPhotos[selectedAlbum.id] || [];
+                                            const photosToRemove = currentPhotos.filter((_, idx) => selectedAlbumPhotoIndices.has(idx));
                                             const newPhotos = currentPhotos.filter((_, idx) => !selectedAlbumPhotoIndices.has(idx));
-                                            setAlbumPhotos(prev => ({
-                                              ...prev,
-                                              [selectedAlbum.id]: newPhotos
-                                            }));
+
+                                            // Remove photos via sync or locally
+                                            if (isSyncInitialized && !isDemoMode) {
+                                              try {
+                                                // Remove each photo from the album in sync store
+                                                for (const photo of photosToRemove) {
+                                                  await syncRemovePhotoFromAlbum(selectedAlbum.id, photo.id);
+                                                }
+                                              } catch (error) {
+                                                console.error('Error syncing photo removal:', error);
+                                                // Fallback to local
+                                                setLocalAlbumPhotos(prev => ({
+                                                  ...prev,
+                                                  [selectedAlbum.id]: newPhotos
+                                                }));
+                                              }
+                                            } else {
+                                              // Demo mode: remove locally
+                                              setLocalAlbumPhotos(prev => ({
+                                                ...prev,
+                                                [selectedAlbum.id]: newPhotos
+                                              }));
+                                            }
+
                                             setSelectedAlbumPhotoIndices(new Set());
                                             setIsSelectingAlbumPhotos(false);
                                           }
@@ -1872,12 +2010,26 @@ export default function MemoriesScreen() {
               missions={albumPhotos[selectedAlbum.id] || []}
               initialPhoto={selectedAlbumPhoto}
               onClose={() => setSelectedAlbumPhoto(null)}
-              onDelete={(memoryId) => {
+              onDelete={async (memoryId) => {
                 // Delete from album photos
-                setAlbumPhotos(prev => ({
-                  ...prev,
-                  [selectedAlbum.id]: (prev[selectedAlbum.id] || []).filter(p => p.id !== memoryId)
-                }));
+                if (isSyncInitialized && !isDemoMode) {
+                  try {
+                    await syncRemovePhotoFromAlbum(selectedAlbum.id, memoryId);
+                  } catch (error) {
+                    console.error('Error syncing photo removal:', error);
+                    // Fallback to local
+                    setLocalAlbumPhotos(prev => ({
+                      ...prev,
+                      [selectedAlbum.id]: (prev[selectedAlbum.id] || []).filter(p => p.id !== memoryId)
+                    }));
+                  }
+                } else {
+                  // Demo mode: remove locally
+                  setLocalAlbumPhotos(prev => ({
+                    ...prev,
+                    [selectedAlbum.id]: (prev[selectedAlbum.id] || []).filter(p => p.id !== memoryId)
+                  }));
+                }
                 // Also delete from memories store
                 deleteMemory(memoryId);
               }}
@@ -1909,13 +2061,32 @@ export default function MemoriesScreen() {
                   <Text style={styles.missionPickerTitle}>사진 선택</Text>
                   <Pressable
                     style={styles.missionPickerHeaderButton}
-                    onPress={() => {
+                    onPress={async () => {
                       if (selectedAlbum && selectedMissionPhotos.size > 0) {
                         const photosToAdd = completedMemories.filter(m => selectedMissionPhotos.has(m.id));
-                        setAlbumPhotos(prev => ({
-                          ...prev,
-                          [selectedAlbum.id]: [...(prev[selectedAlbum.id] || []), ...photosToAdd]
-                        }));
+
+                        // Add photos via sync or locally
+                        if (isSyncInitialized && !isDemoMode) {
+                          try {
+                            // Add each photo to the album in sync store
+                            for (const photo of photosToAdd) {
+                              await syncAddPhotoToAlbum(selectedAlbum.id, photo.id);
+                            }
+                          } catch (error) {
+                            console.error('Error syncing photo addition:', error);
+                            // Fallback to local
+                            setLocalAlbumPhotos(prev => ({
+                              ...prev,
+                              [selectedAlbum.id]: [...(prev[selectedAlbum.id] || []), ...photosToAdd]
+                            }));
+                          }
+                        } else {
+                          // Demo mode: add locally
+                          setLocalAlbumPhotos(prev => ({
+                            ...prev,
+                            [selectedAlbum.id]: [...(prev[selectedAlbum.id] || []), ...photosToAdd]
+                          }));
+                        }
                       }
                       closeMissionPicker();
                     }}
@@ -2348,7 +2519,7 @@ function FlipCardItem({
   mission: MemoryType;
   isActive: boolean;
 }) {
-  const { user, partner } = useAuthStore();
+  const { user, partner, couple } = useAuthStore();
   const { data: onboardingData } = useOnboardingStore();
   const [isFlipped, setIsFlipped] = useState(false);
   const flipAnim = useRef(new Animated.Value(0)).current;
@@ -2370,6 +2541,16 @@ function FlipCardItem({
     .getMinutes()
     .toString()
     .padStart(2, '0')}`;
+
+  // Determine nicknames based on couple order (user1Message is always from couple.user1)
+  // This ensures consistent display order regardless of who's viewing
+  const isCurrentUserCoupleUser1 = user?.id === couple?.user1Id;
+  const user1Nickname = isCurrentUserCoupleUser1
+    ? (user?.nickname || onboardingData.nickname || '나')
+    : (partner?.nickname || '상대방');
+  const user2Nickname = isCurrentUserCoupleUser1
+    ? (partner?.nickname || '상대방')
+    : (user?.nickname || onboardingData.nickname || '나');
 
   // Handle flip
   const handleFlip = () => {
@@ -2445,7 +2626,7 @@ function FlipCardItem({
                 {mission.user1Message && (
                   <View style={styles.flipCardMessageItem}>
                     <Text style={styles.flipCardMessageLabel} allowFontScaling={false}>
-                      {user?.nickname || onboardingData.nickname || '나'}
+                      {user1Nickname}
                     </Text>
                     <Text style={styles.flipCardMessageText} allowFontScaling={false}>
                       {mission.user1Message}
@@ -2455,7 +2636,7 @@ function FlipCardItem({
                 {mission.user2Message && (
                   <View style={styles.flipCardMessageItem}>
                     <Text style={styles.flipCardMessageLabel} allowFontScaling={false}>
-                      {partner?.nickname || '상대방'}
+                      {user2Nickname}
                     </Text>
                     <Text style={styles.flipCardMessageText} allowFontScaling={false}>
                       {mission.user2Message}
@@ -2805,8 +2986,12 @@ const styles = StyleSheet.create({
   },
   backgroundImage: {
     position: 'absolute',
-    width: width,
-    height: height,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
   },
   backgroundImageStyle: {
     transform: [{ scale: 1.0 }],

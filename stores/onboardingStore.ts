@@ -54,6 +54,7 @@ export interface OnboardingData {
   termsAgreed: boolean;
   pairingCode: string;
   isCreatingCode: boolean;
+  isPairingConnected: boolean; // True when pairing is successfully established
   relationshipType: RelationshipType;
   anniversaryDate: Date | null;
 
@@ -105,6 +106,7 @@ const initialData: OnboardingData = {
   termsAgreed: false,
   pairingCode: '',
   isCreatingCode: true,
+  isPairingConnected: false,
   relationshipType: 'dating',
   anniversaryDate: null,
   mbti: '',
@@ -125,8 +127,8 @@ const stepOrderA: OnboardingStep[] = [
   'welcome',
   'login',
   'terms',
-  'basic_info',
   'pairing',
+  'basic_info',
   'couple_info',
   'preferences_intro',
 ];
@@ -186,7 +188,12 @@ export const useOnboardingStore = create<OnboardingState & OnboardingActions>()(
 
 // Helper functions
 export const generatePairingCode = (): string => {
-  return 'DY' + Math.random().toString(36).substring(2, 6).toUpperCase();
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
 };
 
 export const MBTI_OPTIONS = [
