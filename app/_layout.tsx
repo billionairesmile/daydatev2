@@ -161,6 +161,7 @@ function RootLayoutNav() {
               nickname: partnerData.nickname || '',
               inviteCode: partnerData.invite_code || '',
               preferences: partnerData.preferences || {},
+              birthDate: partnerData.birth_date ? new Date(partnerData.birth_date) : undefined,
               createdAt: partnerData.created_at ? new Date(partnerData.created_at) : new Date(),
             });
           }

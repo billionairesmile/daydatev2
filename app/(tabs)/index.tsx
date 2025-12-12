@@ -285,15 +285,14 @@ export default function HomeScreen() {
   const { data: onboardingData } = useOnboardingStore();
   const { user, partner, couple } = useAuthStore();
 
-  // Determine nicknames based on couple order (user1 on left, user2 on right)
-  // This ensures consistent display regardless of who's viewing
+  // Determine nicknames - always show "나 ❤️ 파트너" from current user's perspective
   const isCurrentUserCoupleUser1 = user?.id === couple?.user1Id;
-  const user1Nickname = isCurrentUserCoupleUser1
-    ? (user?.nickname || onboardingData.nickname || '나')
-    : (partner?.nickname || '파트너');
-  const user2Nickname = isCurrentUserCoupleUser1
-    ? (partner?.nickname || '파트너')
-    : (user?.nickname || onboardingData.nickname || '나');
+  const myNickname = user?.nickname || onboardingData.nickname || '나';
+  const partnerNickname = partner?.nickname || '파트너';
+
+  // For couple-order display (used in birthday labels etc.)
+  const user1Nickname = isCurrentUserCoupleUser1 ? myNickname : partnerNickname;
+  const user2Nickname = isCurrentUserCoupleUser1 ? partnerNickname : myNickname;
 
   const [showAnniversaryModal, setShowAnniversaryModal] = useState(false);
   const [showImagePickerModal, setShowImagePickerModal] = useState(false);
@@ -505,12 +504,9 @@ export default function HomeScreen() {
       const isLunar = onboardingData.birthDateCalendarType === 'lunar';
       const nextBirthday = getNextBirthdayDate(birthDate, isLunar, today);
 
-      // Use couple-order nickname for current user's birthday label
-      const myNicknameInCoupleOrder = isCurrentUserCoupleUser1 ? user1Nickname : user2Nickname;
-
       baseAnniversaries.push({
         id: idCounter++,
-        label: `${myNicknameInCoupleOrder} 생일${isLunar ? ' (음력)' : ''}`,
+        label: `${myNickname} 생일${isLunar ? ' (음력)' : ''}`,
         targetDate: nextBirthday,
         icon: '🎂',
         bgColor: 'rgba(251, 191, 36, 0.25)',
@@ -525,12 +521,9 @@ export default function HomeScreen() {
       // Partner's calendar type not stored in User, assume solar
       const nextPartnerBirthday = getNextBirthdayDate(partnerBirthDate, false, today);
 
-      // Use couple-order nickname for partner's birthday label
-      const partnerNicknameInCoupleOrder = isCurrentUserCoupleUser1 ? user2Nickname : user1Nickname;
-
       baseAnniversaries.push({
         id: idCounter++,
-        label: `${partnerNicknameInCoupleOrder} 생일`,
+        label: `${partnerNickname} 생일`,
         targetDate: nextPartnerBirthday,
         icon: '🎂',
         bgColor: 'rgba(251, 191, 36, 0.25)',
@@ -723,11 +716,11 @@ export default function HomeScreen() {
         <View style={styles.anniversarySection}>
           <View style={styles.coupleNamesRow}>
             <Text style={[styles.coupleNameText, styles.coupleNameLeft]} numberOfLines={1}>
-              {user1Nickname}
+              {myNickname}
             </Text>
             <Text style={styles.heartEmoji}>❤️</Text>
             <Text style={[styles.coupleNameText, styles.coupleNameRight]} numberOfLines={1}>
-              {user2Nickname}
+              {partnerNickname}
             </Text>
           </View>
           <Pressable
