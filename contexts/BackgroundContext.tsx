@@ -75,18 +75,30 @@ export function BackgroundProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!isSyncInitialized) return;
 
-    // If there's a synced background URL that's different from current
-    if (syncedBackgroundUrl) {
+    // Validate URL before using
+    const isValidUrl = (url: string | null | undefined): boolean => {
+      if (!url || typeof url !== 'string' || url.trim() === '') return false;
+      try {
+        // Check if it's a valid URL (http/https) or file path
+        return url.startsWith('http://') || url.startsWith('https://') || url.startsWith('file://');
+      } catch {
+        return false;
+      }
+    };
+
+    // If there's a valid synced background URL that's different from current
+    if (isValidUrl(syncedBackgroundUrl)) {
       const currentUri = backgroundImage?.uri;
       if (currentUri !== syncedBackgroundUrl) {
         // Partner changed the background - update ours
         const updateFromSync = async () => {
           try {
-            await Image.prefetch(syncedBackgroundUrl);
+            await Image.prefetch(syncedBackgroundUrl!);
             setBackgroundImageState({ uri: syncedBackgroundUrl });
-            await AsyncStorage.setItem(BACKGROUND_STORAGE_KEY, syncedBackgroundUrl);
+            await AsyncStorage.setItem(BACKGROUND_STORAGE_KEY, syncedBackgroundUrl!);
           } catch (error) {
             console.error('Error loading synced background:', error);
+            // Don't crash - just keep current background
           }
         };
         updateFromSync();

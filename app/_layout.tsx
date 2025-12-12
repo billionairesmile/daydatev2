@@ -116,12 +116,12 @@ function RootLayoutNav() {
   const lastFetchTime = useRef<number>(0);
 
   // Reusable function to fetch couple and partner data
-  const fetchCoupleAndPartnerData = useCallback(async () => {
+  const fetchCoupleAndPartnerData = useCallback(async (forceRefresh = false) => {
     if (!isOnboardingComplete || !couple?.id || !user?.id || isDemoMode) return;
 
-    // Throttle fetches to at most once every 5 seconds
+    // Throttle fetches to at most once every 5 seconds (unless force refresh)
     const now = Date.now();
-    if (now - lastFetchTime.current < 5000) return;
+    if (!forceRefresh && now - lastFetchTime.current < 5000) return;
     lastFetchTime.current = now;
 
     try {
@@ -192,14 +192,18 @@ function RootLayoutNav() {
     };
   }, [fetchCoupleAndPartnerData]);
 
-  // Also refresh if partner nickname is empty (partner might have completed onboarding)
+  // Also refresh if partner data is incomplete (partner might have completed onboarding)
   useEffect(() => {
     if (isOnboardingComplete && partner && !partner.nickname) {
-      // Partner profile exists but nickname is empty, try refetching after a delay
-      const timer = setTimeout(() => {
-        fetchCoupleAndPartnerData();
+      // Partner profile exists but nickname is missing, poll until we get it
+      const pollInterval = setInterval(() => {
+        fetchCoupleAndPartnerData(true); // Force refresh
       }, 3000);
-      return () => clearTimeout(timer);
+
+      // Also try immediately
+      fetchCoupleAndPartnerData(true);
+
+      return () => clearInterval(pollInterval);
     }
   }, [isOnboardingComplete, partner?.nickname, fetchCoupleAndPartnerData]);
 

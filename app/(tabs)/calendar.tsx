@@ -317,7 +317,7 @@ export default function CalendarScreen() {
   const menstrualTrackingEnabled = menstrualSettings?.enabled ?? false;
   const lastPeriodDate = menstrualSettings?.last_period_date ? new Date(menstrualSettings.last_period_date) : null;
   const cycleLength = menstrualSettings?.cycle_length ?? 28;
-  const hasPeriodData = menstrualSettings?.last_period_date !== null;
+  const hasPeriodData = !!menstrualSettings?.last_period_date;
 
   // Keyboard animation for modals
   const keyboardOffset = useRef(new Animated.Value(0)).current;
@@ -884,13 +884,13 @@ export default function CalendarScreen() {
           {/* Todo List */}
           <View style={styles.todoList}>
             {getCurrentDateTodos().length === 0 ? (
-              <View style={styles.emptyTodoCard}>
+              <Pressable style={styles.emptyTodoCard} onPress={openTodoModal}>
                 <Text style={styles.emptyTodoText}>할 일이 없습니다</Text>
                 <View style={styles.emptyTodoHint}>
                   <Pen color="rgba(255,255,255,0.5)" size={16} strokeWidth={2} />
                   <Text style={styles.emptyTodoHintText}>버튼을 눌러 추가해보세요</Text>
                 </View>
-              </View>
+              </Pressable>
             ) : (
               getCurrentDateTodos().map((todo) => (
                 <SwipeableTodoItem
@@ -919,7 +919,7 @@ export default function CalendarScreen() {
             <View style={styles.divider} />
 
             {!hasPeriodData ? (
-              <View style={styles.emptyPeriodCard}>
+              <Pressable style={styles.emptyPeriodCard} onPress={openPeriodModal}>
                 <LinearGradient
                   colors={['#ef4444', '#ec4899']}
                   start={{ x: 0, y: 0 }}
@@ -929,7 +929,7 @@ export default function CalendarScreen() {
                   <Droplet color={COLORS.white} size={32} strokeWidth={2} />
                 </LinearGradient>
                 <Text style={styles.emptyPeriodTitle}>월경 정보를 입력해주세요</Text>
-              </View>
+              </Pressable>
             ) : (
               <View style={styles.periodDataContainer}>
                 {/* Next Period Card */}
@@ -1130,87 +1130,87 @@ export default function CalendarScreen() {
           <Animated.View style={[styles.modalOverlay, { opacity: periodOpacity }]}>
             <BlurView intensity={60} tint="dark" style={styles.blurOverlay}>
               <Animated.View style={[styles.modalContent, { transform: [{ translateY: keyboardOffset }] }]}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>월경 정보 설정</Text>
-                <Pressable
-                  onPress={() => closePeriodModal(false)}
-                  style={styles.modalCloseButton}
-                >
-                  <X color="rgba(255,255,255,0.8)" size={20} strokeWidth={2} />
-                </Pressable>
-              </View>
-              <View style={styles.modalHeaderDivider} />
-
-              <View style={styles.modalBody}>
-                {/* Last Period Date */}
-                <View style={styles.periodSettingSection}>
-                  <Text style={styles.periodSettingLabel}>생리 시작일</Text>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>월경 정보 설정</Text>
                   <Pressable
-                    style={styles.periodSettingButton}
-                    onPress={() => {
-                      Keyboard.dismiss();
-                      setPickerMonth(tempLastPeriodDate);
-                      setIsPeriodSettingsOpen(false);
-                      setIsDatePickerOpen(true);
-                    }}
+                    onPress={() => closePeriodModal(false)}
+                    style={styles.modalCloseButton}
                   >
-                    <LinearGradient
-                      colors={['#ef4444', '#ec4899']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.settingIconRound}
-                    >
-                      <CalendarIcon color={COLORS.white} size={18} strokeWidth={2} />
-                    </LinearGradient>
-                    <View style={styles.periodSettingInfo}>
-                      <Text style={styles.periodSettingHint}>마지막 생리 시작일</Text>
-                      <Text style={styles.periodSettingValue}>
-                        {tempLastPeriodDate.getFullYear()}년 {tempLastPeriodDate.getMonth() + 1}월 {tempLastPeriodDate.getDate()}일
-                      </Text>
-                    </View>
-                    <ChevronRight color="rgba(255,255,255,0.4)" size={20} strokeWidth={2} />
+                    <X color="rgba(255,255,255,0.8)" size={20} strokeWidth={2} />
                   </Pressable>
                 </View>
+                <View style={styles.modalHeaderDivider} />
 
-                {/* Cycle Length */}
-                <View style={[styles.periodSettingSection, { marginTop: -8, marginBottom: 4 }]}>
-                  <Text style={styles.periodSettingLabel}>평균 주기</Text>
-                  <Pressable
-                    style={styles.cycleInputContainer}
-                    onPress={Keyboard.dismiss}
-                  >
-                    <LinearGradient
-                      colors={['#ef4444', '#ec4899']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.settingIconRound}
+                <View style={styles.modalBody}>
+                  {/* Last Period Date */}
+                  <View style={styles.periodSettingSection}>
+                    <Text style={styles.periodSettingLabel}>생리 시작일</Text>
+                    <Pressable
+                      style={styles.periodSettingButton}
+                      onPress={() => {
+                        Keyboard.dismiss();
+                        setPickerMonth(tempLastPeriodDate);
+                        setIsPeriodSettingsOpen(false);
+                        setIsDatePickerOpen(true);
+                      }}
                     >
-                      <Clock color={COLORS.white} size={18} strokeWidth={2} />
-                    </LinearGradient>
-                    <TextInput
-                      style={styles.cycleInput}
-                      value={tempCycleLength}
-                      onChangeText={setTempCycleLength}
-                      keyboardType="numeric"
-                      maxLength={2}
-                    />
-                    <Text style={styles.cycleUnit}>일</Text>
-                  </Pressable>
-                  <View style={styles.infoTextContainer}>
-                    <Info color="rgba(255, 255, 255, 0.5)" size={14} strokeWidth={2} />
-                    <Text style={styles.infoText}>일반적인 생리 주기는 21~35일입니다</Text>
+                      <LinearGradient
+                        colors={['#ef4444', '#ec4899']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.settingIconRound}
+                      >
+                        <CalendarIcon color={COLORS.white} size={18} strokeWidth={2} />
+                      </LinearGradient>
+                      <View style={styles.periodSettingInfo}>
+                        <Text style={styles.periodSettingHint}>마지막 생리 시작일</Text>
+                        <Text style={styles.periodSettingValue}>
+                          {tempLastPeriodDate.getFullYear()}년 {tempLastPeriodDate.getMonth() + 1}월 {tempLastPeriodDate.getDate()}일
+                        </Text>
+                      </View>
+                      <ChevronRight color="rgba(255,255,255,0.4)" size={20} strokeWidth={2} />
+                    </Pressable>
+                  </View>
+
+                  {/* Cycle Length */}
+                  <View style={[styles.periodSettingSection, { marginTop: -8, marginBottom: 4 }]}>
+                    <Text style={styles.periodSettingLabel}>평균 주기</Text>
+                    <Pressable
+                      style={styles.cycleInputContainer}
+                      onPress={Keyboard.dismiss}
+                    >
+                      <LinearGradient
+                        colors={['#ef4444', '#ec4899']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.settingIconRound}
+                      >
+                        <Clock color={COLORS.white} size={18} strokeWidth={2} />
+                      </LinearGradient>
+                      <TextInput
+                        style={styles.cycleInput}
+                        value={tempCycleLength}
+                        onChangeText={setTempCycleLength}
+                        keyboardType="numeric"
+                        maxLength={2}
+                      />
+                      <Text style={styles.cycleUnit}>일</Text>
+                    </Pressable>
+                    <View style={styles.infoTextContainer}>
+                      <Info color="rgba(255, 255, 255, 0.5)" size={14} strokeWidth={2} />
+                      <Text style={styles.infoText}>일반적인 생리 주기는 21~35일입니다</Text>
+                    </View>
                   </View>
                 </View>
-              </View>
 
-              <View style={styles.modalFooter}>
-                <Pressable
-                  style={styles.modalSaveButton}
-                  onPress={() => closePeriodModal(true)}
-                >
-                  <Text style={styles.modalSaveButtonText}>저장하기</Text>
-                </Pressable>
-              </View>
+                <View style={styles.modalFooter}>
+                  <Pressable
+                    style={styles.modalSaveButton}
+                    onPress={() => closePeriodModal(true)}
+                  >
+                    <Text style={styles.modalSaveButtonText}>저장하기</Text>
+                  </Pressable>
+                </View>
               </Animated.View>
             </BlurView>
           </Animated.View>
@@ -1244,90 +1244,90 @@ export default function CalendarScreen() {
               </View>
               <View style={styles.modalHeaderDivider} />
 
-            <View style={styles.modalBody}>
-              {/* Month Navigation */}
-              <View style={styles.pickerMonthNav}>
-                <Pressable
-                  onPress={() => setPickerMonth(new Date(pickerMonth.getFullYear(), pickerMonth.getMonth() - 1, 1))}
-                  style={styles.pickerNavButton}
-                >
-                  <ChevronLeft color={COLORS.foreground} size={18} />
-                </Pressable>
-                <Text style={styles.pickerMonthText}>
-                  {pickerMonth.getFullYear()}년 {pickerMonth.getMonth() + 1}월
-                </Text>
-                <Pressable
-                  onPress={() => setPickerMonth(new Date(pickerMonth.getFullYear(), pickerMonth.getMonth() + 1, 1))}
-                  style={styles.pickerNavButton}
-                >
-                  <ChevronRight color={COLORS.foreground} size={18} />
-                </Pressable>
-              </View>
-
-              {/* Day Names */}
-              <View style={styles.pickerDayNames}>
-                {DAY_NAMES.map((day, idx) => (
-                  <Text
-                    key={day}
-                    style={[
-                      styles.pickerDayName,
-                      idx === 0 && { color: '#ef4444' },
-                    ]}
+              <View style={styles.modalBody}>
+                {/* Month Navigation */}
+                <View style={styles.pickerMonthNav}>
+                  <Pressable
+                    onPress={() => setPickerMonth(new Date(pickerMonth.getFullYear(), pickerMonth.getMonth() - 1, 1))}
+                    style={styles.pickerNavButton}
                   >
-                    {day}
+                    <ChevronLeft color={COLORS.foreground} size={18} />
+                  </Pressable>
+                  <Text style={styles.pickerMonthText}>
+                    {pickerMonth.getFullYear()}년 {pickerMonth.getMonth() + 1}월
                   </Text>
-                ))}
-              </View>
+                  <Pressable
+                    onPress={() => setPickerMonth(new Date(pickerMonth.getFullYear(), pickerMonth.getMonth() + 1, 1))}
+                    style={styles.pickerNavButton}
+                  >
+                    <ChevronRight color={COLORS.foreground} size={18} />
+                  </Pressable>
+                </View>
 
-              {/* Calendar Grid */}
-              <View style={styles.pickerGrid}>
-                {getPickerDaysArray().map((day, index) => {
-                  if (day === null) {
-                    return <View key={`empty-${index}`} style={styles.pickerDayCell} />;
-                  }
-
-                  const isSelected = isPickerDateSelected(day);
-                  const dayOfWeek = (new Date(pickerMonth.getFullYear(), pickerMonth.getMonth(), day)).getDay();
-                  const isSunday = dayOfWeek === 0;
-
-                  return (
-                    <Pressable
+                {/* Day Names */}
+                <View style={styles.pickerDayNames}>
+                  {DAY_NAMES.map((day, idx) => (
+                    <Text
                       key={day}
-                      style={styles.pickerDayCell}
-                      onPress={() => {
-                        setTempLastPeriodDate(new Date(pickerMonth.getFullYear(), pickerMonth.getMonth(), day));
-                        setIsDatePickerOpen(false);
-                        openPeriodModal();
-                      }}
+                      style={[
+                        styles.pickerDayName,
+                        idx === 0 && { color: '#ef4444' },
+                      ]}
                     >
-                      {isSelected ? (
-                        <LinearGradient
-                          colors={['#ef4444', '#ec4899']}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 1 }}
-                          style={styles.pickerDayCellInner}
-                        >
-                          <Text style={styles.pickerDayTextSelected}>
-                            {day}
-                          </Text>
-                        </LinearGradient>
-                      ) : (
-                        <View style={styles.pickerDayCellInner}>
-                          <Text
-                            style={[
-                              styles.pickerDayText,
-                              isSunday && { color: '#ef4444' },
-                            ]}
+                      {day}
+                    </Text>
+                  ))}
+                </View>
+
+                {/* Calendar Grid */}
+                <View style={styles.pickerGrid}>
+                  {getPickerDaysArray().map((day, index) => {
+                    if (day === null) {
+                      return <View key={`empty-${index}`} style={styles.pickerDayCell} />;
+                    }
+
+                    const isSelected = isPickerDateSelected(day);
+                    const dayOfWeek = (new Date(pickerMonth.getFullYear(), pickerMonth.getMonth(), day)).getDay();
+                    const isSunday = dayOfWeek === 0;
+
+                    return (
+                      <Pressable
+                        key={day}
+                        style={styles.pickerDayCell}
+                        onPress={() => {
+                          setTempLastPeriodDate(new Date(pickerMonth.getFullYear(), pickerMonth.getMonth(), day));
+                          setIsDatePickerOpen(false);
+                          openPeriodModal();
+                        }}
+                      >
+                        {isSelected ? (
+                          <LinearGradient
+                            colors={['#ef4444', '#ec4899']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={styles.pickerDayCellInner}
                           >
-                            {day}
-                          </Text>
-                        </View>
-                      )}
-                    </Pressable>
-                  );
-                })}
+                            <Text style={styles.pickerDayTextSelected}>
+                              {day}
+                            </Text>
+                          </LinearGradient>
+                        ) : (
+                          <View style={styles.pickerDayCellInner}>
+                            <Text
+                              style={[
+                                styles.pickerDayText,
+                                isSunday && { color: '#ef4444' },
+                              ]}
+                            >
+                              {day}
+                            </Text>
+                          </View>
+                        )}
+                      </Pressable>
+                    );
+                  })}
+                </View>
               </View>
-            </View>
             </View>
           </BlurView>
         </View>

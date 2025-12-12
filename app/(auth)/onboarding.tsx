@@ -132,20 +132,35 @@ export default function OnboardingScreen() {
             relationshipType: data.relationshipType,
           };
 
-          // Upsert profile with birth date and preferences
-          await db.profiles.upsert({
-            id: currentUser.id,
+          // Update profile with birth date and preferences (profile already exists from pairing step)
+          const { error: profileError } = await db.profiles.update(currentUser.id, {
             nickname: data.nickname,
-            birth_date: data.birthDate ? data.birthDate.toISOString().split('T')[0] : undefined,
+            birth_date: data.birthDate ? data.birthDate.toISOString().split('T')[0] : null,
             preferences,
           });
 
+          if (profileError) {
+            console.error('Profile update error:', profileError);
+          }
+
           // Update couple with anniversary date (couple was already created in pairing step)
+          console.log('Checking couple update conditions:', {
+            hasAnniversaryDate: !!data.anniversaryDate,
+            coupleId: currentCouple?.id,
+            anniversaryDate: data.anniversaryDate?.toISOString(),
+          });
+
           if (data.anniversaryDate && currentCouple?.id) {
-            await db.couples.update(currentCouple.id, {
+            const { data: updateData, error: coupleError } = await db.couples.update(currentCouple.id, {
               dating_start_date: data.anniversaryDate.toISOString().split('T')[0],
-              wedding_date: data.relationshipType === 'married' ? data.anniversaryDate.toISOString().split('T')[0] : undefined,
+              wedding_date: data.relationshipType === 'married' ? data.anniversaryDate.toISOString().split('T')[0] : null,
             });
+
+            console.log('Couple update result:', { updateData, coupleError });
+
+            if (coupleError) {
+              console.error('Couple update error:', coupleError);
+            }
 
             // Update couple in authStore with anniversary
             setCouple({
@@ -154,15 +169,17 @@ export default function OnboardingScreen() {
               datingStartDate: data.anniversaryDate,
               weddingDate: data.relationshipType === 'married' ? data.anniversaryDate : undefined,
             });
+          } else {
+            console.warn('Skipping couple update - missing data:', {
+              anniversaryDate: data.anniversaryDate,
+              coupleId: currentCouple?.id,
+            });
           }
         }
       } catch (error) {
         console.error('Error saving onboarding data to Supabase:', error);
-        Alert.alert(
-          '저장 오류',
-          '온보딩 정보를 저장하는 중 문제가 발생했습니다. 나중에 프로필에서 수정할 수 있습니다.',
-          [{ text: '확인' }]
-        );
+        // Don't show alert - just log and continue
+        // The data can be synced later
       }
     } else {
       // Demo mode: update couple in authStore with anniversary
@@ -178,7 +195,7 @@ export default function OnboardingScreen() {
 
     setIsOnboardingComplete(true);
     router.replace('/(tabs)');
-  }, [data.nickname, data.birthDate, data.anniversaryDate, data.relationshipType, updateNickname, setIsOnboardingComplete, router, setUser, setCouple]);
+  }, [data, updateNickname, setIsOnboardingComplete, router, setUser, setCouple]);
 
   // Progress calculation
   const getProgress = () => {
@@ -835,8 +852,51 @@ function PairingStep({
           setCodeExpiresAt(expiresAt);
 
           // Subscribe to changes (realtime)
-          channelRef.current = db.pairingCodes.subscribeToCode(codeToUse, (payload) => {
-            if (payload.status === 'connected') {
+          channelRef.current = db.pairingCodes.subscribeToCode(codeToUse, async (payload) => {
+            if (payload.status === 'connected' && payload.joiner_id) {
+              // Fetch updated couple data
+              const { data: pairingData } = await db.pairingCodes.getWithCouple(codeToUse);
+              if (pairingData?.couple_id) {
+                const { data: coupleData } = await db.couples.get(pairingData.couple_id);
+                if (coupleData) {
+                  // Update couple with user2Id
+                  setCouple({
+                    id: coupleData.id,
+                    user1Id: coupleData.user1_id,
+                    user2Id: coupleData.user2_id,
+                    anniversaryDate: coupleData.dating_start_date ? new Date(coupleData.dating_start_date) : new Date(),
+                    datingStartDate: coupleData.dating_start_date ? new Date(coupleData.dating_start_date) : undefined,
+                    anniversaryType: '연애 시작일',
+                    status: 'active',
+                    createdAt: coupleData.created_at ? new Date(coupleData.created_at) : new Date(),
+                  });
+
+                  // Fetch joiner's profile
+                  if (coupleData.user2_id) {
+                    const { data: joinerProfile } = await db.profiles.get(coupleData.user2_id);
+                    setPartner({
+                      id: coupleData.user2_id,
+                      email: joinerProfile?.email || '',
+                      nickname: joinerProfile?.nickname || '',
+                      inviteCode: '',
+                      birthDate: joinerProfile?.birth_date ? new Date(joinerProfile.birth_date) : undefined,
+                      preferences: joinerProfile?.preferences || {
+                        weekendActivity: '',
+                        dateEnergy: '',
+                        dateTypes: [],
+                        adventureLevel: '',
+                        photoPreference: '',
+                        dateStyle: '',
+                        planningStyle: '',
+                        foodStyles: [],
+                        preferredTimes: [],
+                        budgetStyle: '',
+                      },
+                      createdAt: joinerProfile?.created_at ? new Date(joinerProfile.created_at) : new Date(),
+                    });
+                  }
+                }
+              }
               setIsPairingConnected(true);
             }
           });
@@ -1011,11 +1071,12 @@ function PairingStep({
         return;
       }
 
-      // Create profile for joiner in DB
+      // Create profile for joiner in DB with unique invite code
+      const joinerInviteCode = generateUUID().slice(0, 8).toUpperCase();
       const { error: profileError } = await db.profiles.create({
         id: joinerId,
         nickname: '', // Will be updated in handleComplete
-        invite_code: '',
+        invite_code: joinerInviteCode,
       });
 
       if (profileError) {
@@ -1037,7 +1098,7 @@ function PairingStep({
         id: joinerId,
         email: '',
         nickname: '',
-        inviteCode: '',
+        inviteCode: joinerInviteCode,
         preferences: {
           weekendActivity: '',
           dateEnergy: '',
@@ -1060,18 +1121,22 @@ function PairingStep({
           user1Id: updatedCouple.user1_id,
           user2Id: joinerId,
           anniversaryDate: updatedCouple.dating_start_date ? new Date(updatedCouple.dating_start_date) : new Date(),
+          datingStartDate: updatedCouple.dating_start_date ? new Date(updatedCouple.dating_start_date) : undefined,
           anniversaryType: '연애 시작일',
           status: 'active',
           createdAt: updatedCouple.created_at ? new Date(updatedCouple.created_at) : new Date(),
         });
 
-        // Set partner info (creator's info)
+        // Fetch partner (creator) profile from DB to get their nickname and birthDate
+        const { data: creatorProfile } = await db.profiles.get(updatedCouple.user1_id);
+
         setPartner({
           id: updatedCouple.user1_id,
-          email: '',
-          nickname: '',
+          email: creatorProfile?.email || '',
+          nickname: creatorProfile?.nickname || '',
           inviteCode: pairingCode,
-          preferences: {
+          birthDate: creatorProfile?.birth_date ? new Date(creatorProfile.birth_date) : undefined,
+          preferences: creatorProfile?.preferences || {
             weekendActivity: '',
             dateEnergy: '',
             dateTypes: [],
@@ -1083,7 +1148,7 @@ function PairingStep({
             preferredTimes: [],
             budgetStyle: '',
           },
-          createdAt: new Date(),
+          createdAt: creatorProfile?.created_at ? new Date(creatorProfile.created_at) : new Date(),
         });
       }
 

@@ -1288,7 +1288,7 @@ export const db = {
     async upsert(
       coupleId: string,
       settings: {
-        enabled: boolean;
+        enabled?: boolean;
         last_period_date?: string;
         cycle_length?: number;
         period_length?: number;
@@ -1298,11 +1298,15 @@ export const db = {
       const client = getSupabase();
       const { data, error } = await client
         .from('menstrual_settings')
-        .upsert({
-          couple_id: coupleId,
-          ...settings,
-          updated_by: userId,
-        })
+        .upsert(
+          {
+            couple_id: coupleId,
+            enabled: settings.enabled ?? true, // Default to true when saving period data
+            ...settings,
+            updated_by: userId,
+          },
+          { onConflict: 'couple_id' }
+        )
         .select()
         .single();
       return { data, error };

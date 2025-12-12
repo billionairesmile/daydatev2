@@ -716,11 +716,11 @@ export default function HomeScreen() {
         <View style={styles.anniversarySection}>
           <View style={styles.coupleNamesRow}>
             <Text style={[styles.coupleNameText, styles.coupleNameLeft]} numberOfLines={1}>
-              {myNickname}
+              {user1Nickname}
             </Text>
             <Text style={styles.heartEmoji}>❤️</Text>
             <Text style={[styles.coupleNameText, styles.coupleNameRight]} numberOfLines={1}>
-              {partnerNickname}
+              {user2Nickname}
             </Text>
           </View>
           <Pressable

@@ -315,6 +315,8 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     todoChannel = db.coupleTodos.subscribeToTodos(coupleId, (payload) => {
       const todo = payload.todo as SyncedTodo;
 
+      console.log('[Todo Realtime]', payload.eventType, 'todo:', todo);
+
       if (payload.eventType === 'INSERT') {
         set((state) => ({
           sharedTodos: [...state.sharedTodos, todo].sort(
@@ -326,9 +328,13 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
           sharedTodos: state.sharedTodos.map((t) => (t.id === todo.id ? todo : t)),
         }));
       } else if (payload.eventType === 'DELETE') {
-        set((state) => ({
-          sharedTodos: state.sharedTodos.filter((t) => t.id !== todo.id),
-        }));
+        // For DELETE, payload.old might only contain id if REPLICA IDENTITY is not FULL
+        const todoId = todo?.id;
+        if (todoId) {
+          set((state) => ({
+            sharedTodos: state.sharedTodos.filter((t) => t.id !== todoId),
+          }));
+        }
       }
     });
 
@@ -672,14 +678,17 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
   deleteTodo: async (todoId: string) => {
     const { sharedTodos } = get();
 
+    // Optimistic delete - update local state immediately
+    set({
+      sharedTodos: sharedTodos.filter((t) => t.id !== todoId),
+    });
+
     if (isDemoMode) {
-      // Demo mode: delete locally
-      set({
-        sharedTodos: sharedTodos.filter((t) => t.id !== todoId),
-      });
+      // Demo mode: already deleted locally
       return;
     }
 
+    // Delete from DB (real-time subscription will also fire, but we've already updated locally)
     await db.coupleTodos.delete(todoId);
   },
 

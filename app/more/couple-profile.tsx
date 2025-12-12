@@ -37,9 +37,15 @@ export default function CoupleProfileScreen() {
 
   const [viewMode, setViewMode] = useState<ViewMode>('main');
   const [tempRelationshipType, setTempRelationshipType] = useState<RelationshipType>(data.relationshipType);
-  const [tempAnniversaryDate, setTempAnniversaryDate] = useState<Date | null>(
-    data.anniversaryDate ? new Date(data.anniversaryDate) : null
-  );
+
+  // Use synced couple data as source of truth, fallback to local onboarding data
+  const syncedAnniversaryDate = couple?.datingStartDate
+    ? new Date(couple.datingStartDate)
+    : data.anniversaryDate
+      ? new Date(data.anniversaryDate)
+      : null;
+
+  const [tempAnniversaryDate, setTempAnniversaryDate] = useState<Date | null>(syncedAnniversaryDate);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Get the user's and partner's nicknames
@@ -96,7 +102,7 @@ export default function CoupleProfileScreen() {
         style={styles.menuItem}
         onPress={() => {
           setTempRelationshipType(data.relationshipType);
-          setTempAnniversaryDate(data.anniversaryDate ? new Date(data.anniversaryDate) : null);
+          setTempAnniversaryDate(syncedAnniversaryDate);
           setViewMode('anniversary');
         }}
       >
@@ -106,7 +112,7 @@ export default function CoupleProfileScreen() {
           </View>
           <View style={styles.menuItemContent}>
             <Text style={styles.menuItemLabel}>{getDateLabel(data.relationshipType)}</Text>
-            <Text style={styles.menuItemValue}>{formatDate(data.anniversaryDate)}</Text>
+            <Text style={styles.menuItemValue}>{formatDate(syncedAnniversaryDate)}</Text>
           </View>
         </View>
         <ChevronRight color="#999" size={20} />
