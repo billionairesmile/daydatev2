@@ -1,6 +1,8 @@
 import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { File as ExpoFile } from 'expo-file-system';
+import { decode } from 'base64-arraybuffer';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -457,11 +459,59 @@ export const db = {
     // Delete memory
     async delete(id: string) {
       const client = getSupabase();
+      console.log('[Supabase] Deleting completed_mission:', id);
       const { error } = await client
         .from('completed_missions')
         .delete()
         .eq('id', id);
+      if (error) {
+        console.error('[Supabase] Delete error:', error);
+      } else {
+        console.log('[Supabase] Delete successful');
+      }
       return { error };
+    },
+
+    // Subscribe to completed missions changes for real-time sync
+    subscribeToCompletedMissions(
+      coupleId: string,
+      callback: (payload: { eventType: string; memory: unknown }) => void
+    ) {
+      const client = getSupabase();
+      console.log('[Supabase] Setting up completed_missions subscription for coupleId:', coupleId);
+      const channel = client
+        .channel(`completed_missions:${coupleId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'completed_missions',
+            filter: `couple_id=eq.${coupleId}`,
+          },
+          (payload) => {
+            console.log('[Supabase] completed_missions event received:', payload.eventType);
+            if (payload.eventType === 'DELETE') {
+              console.log('[Supabase] completed_missions DELETE payload.old:', JSON.stringify(payload.old));
+            }
+            callback({
+              eventType: payload.eventType,
+              memory: payload.eventType === 'DELETE' ? payload.old : payload.new,
+            });
+          }
+        )
+        .subscribe((status, err) => {
+          console.log('[Supabase] completed_missions subscription status:', status);
+          if (err) {
+            console.error('[Supabase] completed_missions subscription error:', err);
+          }
+        });
+      return channel;
+    },
+
+    unsubscribeFromCompletedMissions(channel: ReturnType<SupabaseClient['channel']>) {
+      const client = getSupabase();
+      client.removeChannel(channel);
     },
   },
 
@@ -964,6 +1014,17 @@ export const db = {
       return { error };
     },
 
+    // Delete all active missions for a couple (for reset)
+    async deleteActive(coupleId: string) {
+      const client = getSupabase();
+      const { error } = await client
+        .from('couple_missions')
+        .delete()
+        .eq('couple_id', coupleId)
+        .eq('status', 'active');
+      return { error };
+    },
+
     subscribeToMissions(
       coupleId: string,
       callback: (payload: { missions: unknown[]; generated_by: string }) => void
@@ -1365,15 +1426,20 @@ export const db = {
       userId: string
     ) {
       const client = getSupabase();
+      console.log('[CoupleSettings] Upserting:', { coupleId, settings, userId });
       const { data, error } = await client
         .from('couple_settings')
-        .upsert({
-          couple_id: coupleId,
-          ...settings,
-          updated_by: userId,
-        })
+        .upsert(
+          {
+            couple_id: coupleId,
+            ...settings,
+            updated_by: userId,
+          },
+          { onConflict: 'couple_id' }
+        )
         .select()
         .single();
+      console.log('[CoupleSettings] Upsert result:', { data, error });
       return { data, error };
     },
 
@@ -1528,6 +1594,18 @@ export const db = {
         .from('mission_progress')
         .delete()
         .eq('id', progressId);
+      return { error };
+    },
+
+    // Delete all mission progress for today (for reset)
+    async deleteToday(coupleId: string) {
+      const client = getSupabase();
+      const today = new Date().toISOString().split('T')[0];
+      const { error } = await client
+        .from('mission_progress')
+        .delete()
+        .eq('couple_id', coupleId)
+        .eq('date', today);
       return { error };
     },
 
@@ -1700,11 +1778,17 @@ export const db = {
 
     async remove(albumId: string, memoryId: string) {
       const client = getSupabase();
+      console.log('[Supabase] Removing album_photo:', { albumId, memoryId });
       const { error } = await client
         .from('album_photos')
         .delete()
         .eq('album_id', albumId)
         .eq('memory_id', memoryId);
+      if (error) {
+        console.error('[Supabase] album_photos remove error:', error);
+      } else {
+        console.log('[Supabase] album_photos remove successful');
+      }
       return { error };
     },
 
@@ -1724,6 +1808,7 @@ export const db = {
       const client = getSupabase();
       // Subscribe to all album_photos changes for albums belonging to this couple
       // Note: Filtered at application level since we can't filter by couple_id directly
+      console.log('[Supabase] Setting up album_photos subscription for coupleId:', coupleId);
       const channel = client
         .channel(`album_photos:${coupleId}`)
         .on(
@@ -1734,13 +1819,22 @@ export const db = {
             table: 'album_photos',
           },
           (payload) => {
+            console.log('[Supabase] album_photos event received:', payload.eventType);
+            if (payload.eventType === 'DELETE') {
+              console.log('[Supabase] album_photos DELETE payload.old:', JSON.stringify(payload.old));
+            }
             callback({
               eventType: payload.eventType,
               albumPhoto: payload.eventType === 'DELETE' ? payload.old : payload.new,
             });
           }
         )
-        .subscribe();
+        .subscribe((status, err) => {
+          console.log('[Supabase] album_photos subscription status:', status);
+          if (err) {
+            console.error('[Supabase] album_photos subscription error:', err);
+          }
+        });
       return channel;
     },
 
@@ -1755,13 +1849,16 @@ export const db = {
     async uploadPhoto(coupleId: string, uri: string): Promise<string | null> {
       try {
         const client = getSupabase();
-        const response = await fetch(uri);
-        const blob = await response.blob();
+
+        // Read file as base64 using expo-file-system API (React Native compatible)
+        const file = new ExpoFile(uri);
+        const base64 = await file.base64();
+
         const fileName = `${coupleId}/${Date.now()}.jpg`;
 
         const { data, error } = await client.storage
           .from('memories')
-          .upload(fileName, blob, {
+          .upload(fileName, decode(base64), {
             contentType: 'image/jpeg',
           });
 
@@ -1777,6 +1874,72 @@ export const db = {
         return urlData.publicUrl;
       } catch (error) {
         console.error('Upload error:', error);
+        return null;
+      }
+    },
+
+    async uploadBackground(coupleId: string, uri: string): Promise<string | null> {
+      try {
+        const client = getSupabase();
+
+        // Read file as base64 using new expo-file-system API
+        const file = new ExpoFile(uri);
+        const base64 = await file.base64();
+
+        const fileName = `backgrounds/${coupleId}/${Date.now()}.jpg`;
+
+        const { data, error } = await client.storage
+          .from('memories')
+          .upload(fileName, decode(base64), {
+            contentType: 'image/jpeg',
+            upsert: true,
+          });
+
+        if (error) {
+          console.error('Background upload error:', error);
+          return null;
+        }
+
+        const { data: urlData } = client.storage
+          .from('memories')
+          .getPublicUrl(data.path);
+
+        return urlData.publicUrl;
+      } catch (error) {
+        console.error('Background upload error:', error);
+        return null;
+      }
+    },
+
+    async uploadAlbumCover(coupleId: string, uri: string): Promise<string | null> {
+      try {
+        const client = getSupabase();
+
+        // Read file as base64 using new expo-file-system API
+        const file = new ExpoFile(uri);
+        const base64 = await file.base64();
+
+        const fileName = `album-covers/${coupleId}/${Date.now()}.jpg`;
+
+        const { data, error } = await client.storage
+          .from('memories')
+          .upload(fileName, decode(base64), {
+            contentType: 'image/jpeg',
+            upsert: true,
+          });
+
+        if (error) {
+          console.error('Album cover upload error:', error);
+          return null;
+        }
+
+        const { data: urlData } = client.storage
+          .from('memories')
+          .getPublicUrl(data.path);
+
+        return urlData.publicUrl;
+      } catch (error) {
+        console.error('Album cover upload error:', error);
         return null;
       }
     },

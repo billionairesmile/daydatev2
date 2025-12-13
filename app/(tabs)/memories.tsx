@@ -45,7 +45,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useOnboardingStore } from '@/stores/onboardingStore';
 import { useCoupleSyncStore, CoupleAlbum, AlbumPhoto } from '@/stores/coupleSyncStore';
 import { useBackground } from '@/contexts';
-import { isDemoMode } from '@/lib/supabase';
+import { isDemoMode, db } from '@/lib/supabase';
 import type { CompletedMission } from '@/types';
 import { RansomText } from '@/components/ransom';
 
@@ -93,6 +93,7 @@ export default function MemoriesScreen() {
   // Album sync store
   const {
     isInitialized: isSyncInitialized,
+    coupleId,
     coupleAlbums: syncedAlbums,
     albumPhotosMap: syncedAlbumPhotosMap,
     createAlbum: syncCreateAlbum,
@@ -115,6 +116,17 @@ export default function MemoriesScreen() {
   const [localAlbums, setLocalAlbums] = useState<Album[]>([]);
   const [localAlbumPhotos, setLocalAlbumPhotos] = useState<{ [albumId: string]: MemoryType[] }>({});
 
+  // Combine store memories with SAMPLE_MEMORIES (store memories take priority)
+  // This needs to be defined early for album photo lookups
+  const allMemories = React.useMemo(() => {
+    // Get IDs of memories from store that are NOT from SAMPLE_MEMORIES
+    const storeOnlyMemories = memories.filter(
+      (m) => !SAMPLE_MEMORIES.some((s) => s.id === m.id)
+    );
+    // Combine: store-only memories first, then SAMPLE_MEMORIES
+    return [...storeOnlyMemories, ...SAMPLE_MEMORIES];
+  }, [memories]);
+
   // Convert synced CoupleAlbum to local Album format
   const convertSyncedAlbumToLocal = useCallback((syncedAlbum: CoupleAlbum): Album => ({
     id: syncedAlbum.id,
@@ -127,14 +139,6 @@ export default function MemoriesScreen() {
     ransomSeed: syncedAlbum.ransom_seed ?? undefined,
   }), []);
 
-  // Get album photos from synced data joined with memories
-  const getSyncedAlbumPhotosForAlbum = useCallback((albumId: string): MemoryType[] => {
-    const photoRefs = syncedAlbumPhotosMap[albumId] || [];
-    return photoRefs
-      .map((ref: AlbumPhoto) => memories.find(m => m.id === ref.memory_id))
-      .filter((m): m is MemoryType => m !== undefined);
-  }, [syncedAlbumPhotosMap, memories]);
-
   // Use synced albums if available, otherwise fallback to local
   const albums: Album[] = React.useMemo(() => {
     if (isSyncInitialized && !isDemoMode) {
@@ -144,16 +148,31 @@ export default function MemoriesScreen() {
   }, [isSyncInitialized, syncedAlbums, localAlbums, convertSyncedAlbumToLocal]);
 
   // Use synced album photos if available, otherwise fallback to local
+  // Uses allMemories to ensure both store and sample memories are included
   const albumPhotos: { [albumId: string]: MemoryType[] } = React.useMemo(() => {
     if (isSyncInitialized && !isDemoMode) {
       const result: { [albumId: string]: MemoryType[] } = {};
       syncedAlbums.forEach((album: CoupleAlbum) => {
-        result[album.id] = getSyncedAlbumPhotosForAlbum(album.id);
+        const photoRefs = syncedAlbumPhotosMap[album.id] || [];
+        result[album.id] = photoRefs
+          .map((ref: AlbumPhoto) => allMemories.find(m => m.id === ref.memory_id))
+          .filter((m): m is MemoryType => m !== undefined);
       });
       return result;
     }
     return localAlbumPhotos;
-  }, [isSyncInitialized, syncedAlbums, syncedAlbumPhotosMap, localAlbumPhotos, getSyncedAlbumPhotosForAlbum]);
+  }, [isSyncInitialized, syncedAlbums, syncedAlbumPhotosMap, localAlbumPhotos, allMemories]);
+
+  // Prefetch album cover photos for instant display
+  useEffect(() => {
+    albums.forEach(album => {
+      if (album.coverPhoto) {
+        Image.prefetch(album.coverPhoto).catch(() => {
+          // Ignore prefetch errors silently
+        });
+      }
+    });
+  }, [albums]);
 
   // Album creation states
   const [showAlbumModal, setShowAlbumModal] = useState(false);
@@ -196,16 +215,6 @@ export default function MemoriesScreen() {
   const editAlbumNameRef = useRef(editAlbumName);
   const editFontStyleRef = useRef(editFontStyle);
   const editTextScaleRef = useRef(editTextScale);
-
-  // Combine store memories with SAMPLE_MEMORIES (store memories take priority)
-  const allMemories = React.useMemo(() => {
-    // Get IDs of memories from store that are NOT from SAMPLE_MEMORIES
-    const storeOnlyMemories = memories.filter(
-      (m) => !SAMPLE_MEMORIES.some((s) => s.id === m.id)
-    );
-    // Combine: store-only memories first, then SAMPLE_MEMORIES
-    return [...storeOnlyMemories, ...SAMPLE_MEMORIES];
-  }, [memories]);
 
   // Keep refs in sync with state
   useEffect(() => { albumNameRef.current = albumName; }, [albumName]);
@@ -577,10 +586,28 @@ export default function MemoriesScreen() {
   // Create album with closing animation
   const handleCreateAlbum = async () => {
     if (albumName.trim()) {
+      let finalCoverPhotoUrl = albumCoverPhoto;
+
+      // If syncing and we have a cover photo, upload it first
+      if (isSyncInitialized && !isDemoMode && albumCoverPhoto && coupleId) {
+        try {
+          console.log('[Album] Uploading cover photo to Supabase Storage...');
+          const uploadedUrl = await db.storage.uploadAlbumCover(coupleId, albumCoverPhoto);
+          if (uploadedUrl) {
+            console.log('[Album] Cover photo uploaded:', uploadedUrl);
+            finalCoverPhotoUrl = uploadedUrl;
+          } else {
+            console.warn('[Album] Cover photo upload failed, using local URI');
+          }
+        } catch (error) {
+          console.error('[Album] Cover photo upload error:', error);
+        }
+      }
+
       const newAlbum: Album = {
         id: Date.now().toString(),
         name: albumName.trim(),
-        coverPhoto: albumCoverPhoto,
+        coverPhoto: finalCoverPhotoUrl,
         createdAt: new Date(),
         namePosition: { ...namePosition },
         textScale: textScale,
@@ -593,7 +620,7 @@ export default function MemoriesScreen() {
         try {
           await syncCreateAlbum(
             albumName.trim(),
-            albumCoverPhoto,
+            finalCoverPhotoUrl,
             { ...namePosition },
             textScale,
             fontStyle || 'basic',
@@ -1070,7 +1097,7 @@ export default function MemoriesScreen() {
                       <View style={styles.hardcoverBook}>
                         {/* Full Photo Background */}
                         {album.coverPhoto ? (
-                          <Image source={{ uri: album.coverPhoto }} style={styles.bookFullPhoto} resizeMode="cover" />
+                          <Image source={{ uri: album.coverPhoto }} style={styles.bookFullPhoto} resizeMode="cover" fadeDuration={0} />
                         ) : (
                           <View style={styles.bookPlaceholder}>
                             <ImageIcon color="rgba(255,255,255,0.3)" size={24} />
@@ -1207,8 +1234,33 @@ export default function MemoriesScreen() {
               missions={selectedMonth.missions}
               initialPhoto={selectedPhoto}
               onClose={() => setSelectedPhoto(null)}
-              onDelete={(memoryId) => {
+              onDelete={async (memoryId) => {
+                console.log('[Delete] Starting deletion for memoryId:', memoryId);
+                console.log('[Delete] isSyncInitialized:', isSyncInitialized, 'isDemoMode:', isDemoMode);
+
+                // UUID validation - skip DB delete for sample memories
+                const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(memoryId);
+
+                // Delete from database if synced and valid UUID
+                if (isSyncInitialized && !isDemoMode && isValidUUID) {
+                  try {
+                    console.log('[Delete] Calling db.completedMissions.delete...');
+                    const { error } = await db.completedMissions.delete(memoryId);
+                    if (error) {
+                      console.error('[Delete] Error deleting memory from DB:', error);
+                    } else {
+                      console.log('[Delete] Successfully deleted from DB');
+                    }
+                  } catch (error) {
+                    console.error('[Delete] Exception during deletion:', error);
+                  }
+                } else if (!isValidUUID) {
+                  console.log('[Delete] Sample memory - skipping DB delete');
+                }
+                // Delete from local state
+                console.log('[Delete] Deleting from local state...');
                 deleteMemory(memoryId);
+                console.log('[Delete] Deletion complete');
               }}
             />
           )}
@@ -1786,7 +1838,7 @@ export default function MemoriesScreen() {
                         style={styles.albumDetailSpine}
                       />
                       {selectedAlbum.coverPhoto ? (
-                        <Image source={{ uri: selectedAlbum.coverPhoto }} style={styles.albumDetailCoverImage} />
+                        <Image source={{ uri: selectedAlbum.coverPhoto }} style={styles.albumDetailCoverImage} fadeDuration={0} />
                       ) : (
                         <View style={styles.albumDetailCoverPlaceholder}>
                           <ImageIcon color="rgba(255,255,255,0.3)" size={40} />
@@ -1861,27 +1913,36 @@ export default function MemoriesScreen() {
                                             const photosToRemove = currentPhotos.filter((_, idx) => selectedAlbumPhotoIndices.has(idx));
                                             const newPhotos = currentPhotos.filter((_, idx) => !selectedAlbumPhotoIndices.has(idx));
 
-                                            // Remove photos via sync or locally
-                                            if (isSyncInitialized && !isDemoMode) {
+                                            // UUID validation helper
+                                            const isValidUUID = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+                                            // Separate real and sample photos
+                                            const realPhotos = photosToRemove.filter(p => isValidUUID(p.id));
+                                            const samplePhotos = photosToRemove.filter(p => !isValidUUID(p.id));
+
+                                            // Remove real photos via sync
+                                            if (isSyncInitialized && !isDemoMode && realPhotos.length > 0) {
                                               try {
-                                                // Remove each photo from the album in sync store
-                                                for (const photo of photosToRemove) {
+                                                // Remove each real photo from the album in sync store
+                                                for (const photo of realPhotos) {
                                                   await syncRemovePhotoFromAlbum(selectedAlbum.id, photo.id);
                                                 }
                                               } catch (error) {
                                                 console.error('Error syncing photo removal:', error);
-                                                // Fallback to local
-                                                setLocalAlbumPhotos(prev => ({
-                                                  ...prev,
-                                                  [selectedAlbum.id]: newPhotos
-                                                }));
                                               }
-                                            } else {
-                                              // Demo mode: remove locally
+                                            }
+
+                                            // Always update local state for all photos (including samples)
+                                            if (samplePhotos.length > 0 || !isSyncInitialized || isDemoMode) {
                                               setLocalAlbumPhotos(prev => ({
                                                 ...prev,
                                                 [selectedAlbum.id]: newPhotos
                                               }));
+                                            }
+
+                                            // Delete sample photos from local memory store
+                                            for (const photo of samplePhotos) {
+                                              deleteMemory(photo.id);
                                             }
 
                                             setSelectedAlbumPhotoIndices(new Set());
@@ -2011,27 +2072,40 @@ export default function MemoriesScreen() {
               initialPhoto={selectedAlbumPhoto}
               onClose={() => setSelectedAlbumPhoto(null)}
               onDelete={async (memoryId) => {
-                // Delete from album photos
-                if (isSyncInitialized && !isDemoMode) {
-                  try {
-                    await syncRemovePhotoFromAlbum(selectedAlbum.id, memoryId);
-                  } catch (error) {
-                    console.error('Error syncing photo removal:', error);
-                    // Fallback to local
-                    setLocalAlbumPhotos(prev => ({
-                      ...prev,
-                      [selectedAlbum.id]: (prev[selectedAlbum.id] || []).filter(p => p.id !== memoryId)
-                    }));
-                  }
-                } else {
-                  // Demo mode: remove locally
-                  setLocalAlbumPhotos(prev => ({
-                    ...prev,
-                    [selectedAlbum.id]: (prev[selectedAlbum.id] || []).filter(p => p.id !== memoryId)
-                  }));
-                }
-                // Also delete from memories store
+                console.log('[AlbumPhotoDelete] Starting deletion for memoryId:', memoryId);
+                // UUID validation - check if it's a sample memory
+                const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(memoryId);
+                console.log('[AlbumPhotoDelete] isValidUUID:', isValidUUID, 'isSyncInitialized:', isSyncInitialized, 'isDemoMode:', isDemoMode);
+
+                // Always update local state immediately for instant UI feedback
+                setLocalAlbumPhotos(prev => ({
+                  ...prev,
+                  [selectedAlbum.id]: (prev[selectedAlbum.id] || []).filter(p => p.id !== memoryId)
+                }));
+                // Also delete from local memories store immediately
                 deleteMemory(memoryId);
+
+                // Delete from album photos AND completed_missions if synced
+                if (isSyncInitialized && !isDemoMode && isValidUUID) {
+                  try {
+                    // 1. Remove from album_photos table
+                    console.log('[AlbumPhotoDelete] Calling syncRemovePhotoFromAlbum...');
+                    await syncRemovePhotoFromAlbum(selectedAlbum.id, memoryId);
+                    console.log('[AlbumPhotoDelete] Album removal successful');
+
+                    // 2. Delete from completed_missions table (for full sync to partner)
+                    console.log('[AlbumPhotoDelete] Calling db.completedMissions.delete...');
+                    const { error: deleteError } = await db.completedMissions.delete(memoryId);
+                    if (deleteError) {
+                      console.error('[AlbumPhotoDelete] DB delete error:', deleteError);
+                    } else {
+                      console.log('[AlbumPhotoDelete] DB delete successful');
+                    }
+                  } catch (error) {
+                    console.error('[AlbumPhotoDelete] Error during deletion:', error);
+                  }
+                }
+                console.log('[AlbumPhotoDelete] Deletion complete');
               }}
             />
           )}
@@ -2743,13 +2817,23 @@ function PhotoDetailView({
   missions: MemoryType[];
   initialPhoto: MemoryType;
   onClose: () => void;
-  onDelete: (memoryId: string) => void;
+  onDelete: (memoryId: string) => void | Promise<void>;
 }) {
   const initialIndex = missions.findIndex((m) => m.id === initialPhoto.id);
   const [currentIndex, setCurrentIndex] = useState(
     initialIndex >= 0 ? initialIndex : 0
   );
+  const [localMissions, setLocalMissions] = useState<MemoryType[]>(missions);
   const scrollViewRef = useRef<any>(null);
+
+  // Update local missions when parent missions change
+  useEffect(() => {
+    setLocalMissions(missions);
+    // Adjust currentIndex if it's now out of bounds
+    if (currentIndex >= missions.length && missions.length > 0) {
+      setCurrentIndex(missions.length - 1);
+    }
+  }, [missions]);
 
   // Track current flip state for instruction text
   const [isFlipped, setIsFlipped] = useState(false);
@@ -2779,7 +2863,7 @@ function PhotoDetailView({
 
   // Handle download photo to gallery
   const handleDownload = useCallback(async () => {
-    const currentMission = missions[currentIndex];
+    const currentMission = localMissions[currentIndex];
     if (!currentMission?.photoUrl) return;
 
     try {
@@ -2807,7 +2891,7 @@ function PhotoDetailView({
       console.log('Download error:', error);
       Alert.alert('저장 실패', '사진을 저장하는 중 오류가 발생했습니다.');
     }
-  }, [currentIndex, missions]);
+  }, [currentIndex, localMissions]);
 
   // Animated scroll handler (direct value without spring for better text rendering)
   const onScrollHandler = useAnimatedScrollHandler({
@@ -2839,12 +2923,12 @@ function PhotoDetailView({
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       const offsetX = event.nativeEvent.contentOffset.x;
       const newIndex = Math.round(offsetX / width);
-      if (newIndex !== currentIndex && newIndex >= 0 && newIndex < missions.length) {
+      if (newIndex !== currentIndex && newIndex >= 0 && newIndex < localMissions.length) {
         setCurrentIndex(newIndex);
         setIsFlipped(false);
       }
     },
-    [currentIndex, missions.length]
+    [currentIndex, localMissions.length]
   );
 
   return (
@@ -2856,7 +2940,7 @@ function PhotoDetailView({
       <ReanimatedModule.View style={[StyleSheet.absoluteFill, backgroundFadeStyle]}>
         {/* Animated Background Images with Blur */}
         <View style={StyleSheet.absoluteFill}>
-          {missions.map((mission, index) => (
+          {localMissions.map((mission, index) => (
             <CarouselBackgroundImage
               key={`background_${mission.id}`}
               image={mission.photoUrl}
@@ -2904,7 +2988,7 @@ function PhotoDetailView({
               style={[styles.photoDetailMenuItem, styles.photoDetailMenuItemDanger]}
               onPress={() => {
                 setShowPhotoDetailMenu(false);
-                const currentMission = missions[currentIndex];
+                const currentMission = localMissions[currentIndex];
                 Alert.alert(
                   '사진 삭제',
                   '이 사진을 삭제하시겠습니까?',
@@ -2913,10 +2997,39 @@ function PhotoDetailView({
                     {
                       text: '삭제',
                       style: 'destructive',
-                      onPress: () => {
-                        // Delete the photo and close the view
-                        onDelete(currentMission.id);
-                        onClose();
+                      onPress: async () => {
+                        // Calculate remaining photos after deletion
+                        const remainingPhotos = localMissions.length - 1;
+
+                        if (remainingPhotos <= 0) {
+                          // No photos left after deletion - close the view
+                          await onDelete(currentMission.id);
+                          onClose();
+                        } else {
+                          // Remove photo from local state immediately for smooth UX
+                          const newMissions = localMissions.filter(m => m.id !== currentMission.id);
+                          setLocalMissions(newMissions);
+
+                          // Navigate to previous photo if available, otherwise stay at current (shows next)
+                          // User requested: "그 이전 사진으로 돌아가줘. 이전 사진이 없다면 바로 다음 사진을 띄워주고"
+                          if (currentIndex > 0) {
+                            // Go to previous photo
+                            const newIndex = currentIndex - 1;
+                            setCurrentIndex(newIndex);
+                            if (scrollViewRef.current) {
+                              scrollViewRef.current?.scrollTo({
+                                x: newIndex * width,
+                                animated: true,
+                              });
+                            }
+                          } else {
+                            // Already at index 0 - stay here (which now shows what was the next photo)
+                            // No scroll needed, the array just shifted left
+                          }
+
+                          // Delete from DB in background
+                          await onDelete(currentMission.id);
+                        }
                       }
                     }
                   ]
@@ -2955,7 +3068,7 @@ function PhotoDetailView({
           alwaysBounceHorizontal={true}
           contentContainerStyle={styles.carouselScrollContent}
         >
-          {missions.map((mission, index) => (
+          {localMissions.map((mission, index) => (
             <CarouselCardWrapper
               key={`card_${mission.id}`}
               mission={mission}
@@ -2970,7 +3083,7 @@ function PhotoDetailView({
         <View style={styles.photoCounterContainer}>
           <View style={styles.photoCounterBadge}>
             <Text style={styles.photoCounterText}>
-              {currentIndex + 1} / {missions.length}
+              {currentIndex + 1} / {localMissions.length}
             </Text>
           </View>
         </View>

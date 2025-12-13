@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -24,10 +24,21 @@ import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Swipeable } from 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Asset } from 'expo-asset';
+
+// Pre-load static images (outside component to avoid re-creation)
+const LOGO_IMAGE = require('@/assets/images/daydate-logo.png');
+const DEFAULT_BACKGROUND_IMAGE = require('@/assets/images/backgroundimage.png');
+
+// Preload images at module level
+Asset.fromModule(LOGO_IMAGE).downloadAsync();
+Asset.fromModule(DEFAULT_BACKGROUND_IMAGE).downloadAsync();
 
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '@/constants/design';
 import { useBackground } from '@/contexts';
 import { useOnboardingStore, useAuthStore } from '@/stores';
+import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
+import { db } from '@/lib/supabase';
 import KoreanLunarCalendar from 'korean-lunar-calendar';
 
 // Lunar to Solar date conversion utility
@@ -284,6 +295,7 @@ export default function HomeScreen() {
   const { backgroundImage, setBackgroundImage, resetToDefault } = useBackground();
   const { data: onboardingData } = useOnboardingStore();
   const { user, partner, couple } = useAuthStore();
+  const { coupleId } = useCoupleSyncStore();
 
   // Determine nicknames - always show "나 ❤️ 파트너" from current user's perspective
   const isCurrentUserCoupleUser1 = user?.id === couple?.user1Id;
@@ -296,6 +308,7 @@ export default function HomeScreen() {
 
   const [showAnniversaryModal, setShowAnniversaryModal] = useState(false);
   const [showImagePickerModal, setShowImagePickerModal] = useState(false);
+  const [isUploadingBackground, setIsUploadingBackground] = useState(false);
   const [showAddAnniversary, setShowAddAnniversary] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -588,15 +601,37 @@ export default function HomeScreen() {
 
   const handlePickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [3, 4],
-      quality: 1,
+      quality: 0.8,
     });
 
     if (!result.canceled && result.assets[0]) {
-      setBackgroundImage({ uri: result.assets[0].uri });
+      const localUri = result.assets[0].uri;
+
+      // Show local image immediately for better UX
+      setBackgroundImage({ uri: localUri });
       setShowImagePickerModal(false);
+
+      // Upload to Supabase Storage if coupleId exists
+      if (coupleId) {
+        setIsUploadingBackground(true);
+        try {
+          const uploadedUrl = await db.storage.uploadBackground(coupleId, localUri);
+          if (uploadedUrl) {
+            // Update with the remote URL for syncing
+            setBackgroundImage({ uri: uploadedUrl });
+          } else {
+            Alert.alert('업로드 실패', '이미지 업로드에 실패했습니다. 다시 시도해주세요.');
+          }
+        } catch (error) {
+          console.error('Background upload error:', error);
+          Alert.alert('업로드 실패', '이미지 업로드 중 오류가 발생했습니다.');
+        } finally {
+          setIsUploadingBackground(false);
+        }
+      }
     }
   };
 
@@ -705,7 +740,7 @@ export default function HomeScreen() {
       {/* Background Image - No blur like Figma */}
       <ImageBackground
         source={backgroundImage}
-        defaultSource={require('@/assets/images/backgroundimage.png')}
+        defaultSource={DEFAULT_BACKGROUND_IMAGE}
         style={styles.backgroundImage}
         imageStyle={styles.backgroundImageStyle}
       />
@@ -753,9 +788,10 @@ export default function HomeScreen() {
             <View style={styles.polaroidBottom}>
               <View style={styles.brandRow}>
                 <Image
-                  source={require('@/assets/images/daydate-logo.png')}
+                  source={LOGO_IMAGE}
                   style={styles.polaroidLogo}
                   resizeMode="contain"
+                  fadeDuration={0}
                 />
                 {/* Image Change Button */}
                 <Pressable

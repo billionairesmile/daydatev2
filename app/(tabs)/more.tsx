@@ -51,6 +51,7 @@ export default function MoreScreen() {
   const resetAllTodayMissions = useMissionStore((state) => state.resetAllTodayMissions);
   const resetAuth = useAuthStore((state) => state.reset);
   const coupleSyncCleanup = useCoupleSyncStore((state) => state.cleanup);
+  const resetAllMissions = useCoupleSyncStore((state) => state.resetAllMissions);
 
   const handleDevReset = () => {
     Alert.alert(
@@ -82,8 +83,11 @@ export default function MoreScreen() {
         {
           text: '리셋',
           style: 'destructive',
-          onPress: () => {
+          onPress: async () => {
+            // Reset local mission store
             resetAllTodayMissions();
+            // Reset synced missions (coupleSyncStore + database)
+            await resetAllMissions();
             Alert.alert(
               '리셋 완료',
               '미션이 초기화되었습니다. 미션 탭으로 이동하여 새로운 미션을 생성하세요.',

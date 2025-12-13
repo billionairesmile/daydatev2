@@ -13,6 +13,8 @@ import {
   Platform,
   Modal,
   Alert,
+  Image,
+  ActivityIndicator,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import {
@@ -24,7 +26,9 @@ import {
   Copy,
 } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
+import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
+import { signInWithGoogle, signInWithKakao, onAuthStateChange } from '@/lib/socialAuth';
 
 import { COLORS, SPACING, RADIUS } from '@/constants/design';
 import { useAuthStore } from '@/stores';
@@ -101,6 +105,83 @@ export default function OnboardingScreen() {
   const handleBack = useCallback(() => {
     animateTransition(() => prevStep());
   }, [animateTransition, prevStep]);
+
+  // Social Login Handler
+  const handleSocialLogin = useCallback(async (provider: 'google' | 'kakao') => {
+    try {
+      console.log(`[Onboarding] Starting ${provider} login...`);
+
+      let session = null;
+      if (provider === 'google') {
+        session = await signInWithGoogle();
+      } else {
+        session = await signInWithKakao();
+      }
+
+      if (session && session.user) {
+        console.log(`[Onboarding] ${provider} login successful:`, session.user.id);
+
+        // Extract user info from session
+        const userMetadata = (session.user.user_metadata || {}) as Record<string, string | undefined>;
+        const email = session.user.email || userMetadata.email || '';
+        const name = userMetadata.full_name || userMetadata.name || '';
+        const avatarUrl = userMetadata.avatar_url || userMetadata.picture || '';
+
+        // Create a basic user object
+        const newUser = {
+          id: session.user.id,
+          email,
+          nickname: name || email.split('@')[0] || '사용자',
+          avatarUrl,
+          inviteCode: generatePairingCode(),
+          preferences: {} as any,
+          createdAt: new Date(),
+        };
+
+        // Set user in auth store
+        setUser(newUser);
+
+        // Update nickname in onboarding data
+        if (name) {
+          updateData({ nickname: name });
+        }
+
+        // Create or update profile in Supabase
+        try {
+          const { error: profileError } = await db.profiles.upsert({
+            id: session.user.id,
+            nickname: newUser.nickname,
+            invite_code: newUser.inviteCode,
+          });
+
+          if (profileError) {
+            console.error('[Onboarding] Profile upsert error:', profileError);
+          }
+        } catch (dbError) {
+          console.error('[Onboarding] DB error:', dbError);
+        }
+
+        // Move to terms step
+        Alert.alert(
+          '로그인 성공',
+          `${provider === 'google' ? '구글' : '카카오'} 계정으로 로그인되었습니다.`,
+          [
+            {
+              text: '계속하기',
+              onPress: () => animateTransition(() => setStep('terms')),
+            },
+          ]
+        );
+      }
+    } catch (error: any) {
+      console.error(`[Onboarding] ${provider} login failed:`, error);
+      Alert.alert(
+        '로그인 실패',
+        error.message || '로그인 중 오류가 발생했습니다. 다시 시도해주세요.',
+        [{ text: '확인' }]
+      );
+    }
+  }, [animateTransition, setStep, setUser, updateData]);
 
   const handleComplete = useCallback(async () => {
     updateNickname(data.nickname);
@@ -255,7 +336,10 @@ export default function OnboardingScreen() {
       >
         <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
           {currentStep === 'welcome' && (
-            <WelcomeStep onNext={() => animateTransition(() => setStep('terms'))} />
+            <WelcomeStep
+              onNext={() => animateTransition(() => setStep('terms'))}
+              onSocialLogin={handleSocialLogin}
+            />
           )}
           {currentStep === 'terms' && (
             <TermsStep
@@ -365,7 +449,36 @@ export default function OnboardingScreen() {
 // ========== STEP COMPONENTS ==========
 
 // Welcome Step
-function WelcomeStep({ onNext }: { onNext: () => void }) {
+function WelcomeStep({ onNext, onSocialLogin }: { onNext: () => void; onSocialLogin: (provider: 'google' | 'kakao') => void }) {
+  const [isLoading, setIsLoading] = useState<'google' | 'kakao' | null>(null);
+
+  const handleSocialLogin = async (provider: 'google' | 'kakao') => {
+    if (isLoading) return;
+
+    setIsLoading(provider);
+    try {
+      if (isDemoMode) {
+        Alert.alert(
+          '데모 모드',
+          '소셜 로그인은 데모 모드에서 사용할 수 없습니다.\n\n환경 변수를 설정하여 Supabase를 연결해주세요.',
+          [{ text: '확인' }]
+        );
+        return;
+      }
+
+      onSocialLogin(provider);
+    } catch (error) {
+      console.error(`[WelcomeStep] ${provider} login error:`, error);
+      Alert.alert(
+        '로그인 실패',
+        `${provider === 'google' ? '구글' : '카카오'} 로그인에 실패했습니다. 다시 시도해주세요.`,
+        [{ text: '확인' }]
+      );
+    } finally {
+      setIsLoading(null);
+    }
+  };
+
   return (
     <View style={styles.centeredStepContainer}>
       <View style={styles.welcomeCenteredContent}>
@@ -382,6 +495,52 @@ function WelcomeStep({ onNext }: { onNext: () => void }) {
         <Text style={styles.welcomeDescription}>
           두 사람의 특별한 순간들을{'\n'}함께 기록하고 공유해보세요
         </Text>
+      </View>
+
+      <View style={styles.socialLoginContainer}>
+        {/* Google Login Button */}
+        <Pressable
+          style={[styles.socialButton, styles.googleButton]}
+          onPress={() => handleSocialLogin('google')}
+          disabled={isLoading !== null}
+        >
+          {isLoading === 'google' ? (
+            <ActivityIndicator size="small" color="#757575" />
+          ) : (
+            <>
+              <Image
+                source={{ uri: 'https://developers.google.com/identity/images/g-logo.png' }}
+                style={styles.socialIcon}
+              />
+              <Text style={styles.googleButtonText}>Google로 로그인</Text>
+            </>
+          )}
+        </Pressable>
+
+        {/* Kakao Login Button */}
+        <Pressable
+          style={[styles.socialButton, styles.kakaoButton]}
+          onPress={() => handleSocialLogin('kakao')}
+          disabled={isLoading !== null}
+        >
+          {isLoading === 'kakao' ? (
+            <ActivityIndicator size="small" color="#3C1E1E" />
+          ) : (
+            <>
+              <Image
+                source={{ uri: 'https://developers.kakao.com/assets/img/about/logos/kakaolink/kakaolink_btn_medium.png' }}
+                style={styles.kakaoIcon}
+              />
+              <Text style={styles.kakaoButtonText}>카카오로 로그인</Text>
+            </>
+          )}
+        </Pressable>
+
+        <View style={styles.dividerContainer}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>또는</Text>
+          <View style={styles.dividerLine} />
+        </View>
       </View>
 
       <Pressable style={styles.primaryButton} onPress={onNext}>
@@ -2094,6 +2253,65 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.white,
     fontWeight: '600',
+  },
+  // Social Login Styles
+  socialLoginContainer: {
+    width: '100%',
+    marginBottom: SPACING.lg,
+  },
+  socialButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    paddingVertical: 14,
+    borderRadius: RADIUS.lg,
+    marginBottom: SPACING.sm,
+  },
+  googleButton: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#dbdbdb',
+  },
+  kakaoButton: {
+    backgroundColor: '#FEE500',
+  },
+  socialIcon: {
+    width: 20,
+    height: 20,
+    marginRight: 10,
+  },
+  kakaoIcon: {
+    width: 20,
+    height: 20,
+    marginRight: 10,
+    borderRadius: 4,
+  },
+  googleButtonText: {
+    fontSize: 15,
+    color: '#757575',
+    fontWeight: '500',
+  },
+  kakaoButtonText: {
+    fontSize: 15,
+    color: '#3C1E1E',
+    fontWeight: '500',
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: SPACING.md,
+    marginBottom: SPACING.sm,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  dividerText: {
+    paddingHorizontal: SPACING.md,
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.5)',
   },
   skipButton: {
     marginTop: SPACING.lg,

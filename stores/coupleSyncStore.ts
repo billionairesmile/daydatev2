@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { db, isDemoMode, supabase } from '@/lib/supabase';
 import type { Mission } from '@/types';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { useMemoryStore, dbToCompletedMission } from './memoryStore';
 
 // Types
 export interface SyncedTodo {
@@ -155,6 +156,7 @@ interface CoupleSyncActions {
   releaseMissionLock: (status?: 'completed' | 'idle') => Promise<void>;
   saveSharedMissions: (missions: Mission[], answers: unknown) => Promise<void>;
   loadSharedMissions: () => Promise<Mission[] | null>;
+  resetAllMissions: () => Promise<void>;
 
   // Bookmark sync
   addBookmark: (mission: Mission) => Promise<boolean>;
@@ -221,6 +223,7 @@ let settingsChannel: ReturnType<SupabaseClient['channel']> | null = null;
 let progressChannel: ReturnType<SupabaseClient['channel']> | null = null;
 let albumsChannel: ReturnType<SupabaseClient['channel']> | null = null;
 let albumPhotosChannel: ReturnType<SupabaseClient['channel']> | null = null;
+let completedMissionsChannel: ReturnType<SupabaseClient['channel']> | null = null;
 
 const initialState: CoupleSyncState = {
   isInitialized: false,
@@ -349,6 +352,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
 
     // 6. Couple settings subscription (background image)
     settingsChannel = db.coupleSettings.subscribeToSettings(coupleId, (payload) => {
+      console.log('[CoupleSettings Realtime] Received update:', payload);
       set({
         backgroundImageUrl: payload.background_image_url,
         coupleSettings: {
@@ -370,13 +374,24 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     });
 
     // 8. Albums subscription
-    albumsChannel = db.coupleAlbums.subscribeToAlbums(coupleId, (payload) => {
+    albumsChannel = db.coupleAlbums.subscribeToAlbums(coupleId, async (payload) => {
       const album = payload.album as CoupleAlbum;
 
       if (payload.eventType === 'INSERT') {
         set((state) => ({
           coupleAlbums: [album, ...state.coupleAlbums],
         }));
+        // Load photos for the new album
+        console.log('[Albums] New album received, loading photos for:', album.id);
+        const { data: photosData } = await db.albumPhotos.getByAlbum(album.id);
+        if (photosData) {
+          set((state) => ({
+            albumPhotosMap: {
+              ...state.albumPhotosMap,
+              [album.id]: photosData as AlbumPhoto[],
+            },
+          }));
+        }
       } else if (payload.eventType === 'UPDATE') {
         set((state) => ({
           coupleAlbums: state.coupleAlbums.map((a) => (a.id === album.id ? album : a)),
@@ -389,31 +404,169 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     });
 
     // 9. Album photos subscription
-    albumPhotosChannel = db.albumPhotos.subscribeToAlbumPhotos(coupleId, (payload) => {
+    console.log('[AlbumPhotos] Setting up subscription for coupleId:', coupleId);
+    // Track processed events to prevent duplicates
+    const processedAlbumPhotoEvents = new Set<string>();
+
+    albumPhotosChannel = db.albumPhotos.subscribeToAlbumPhotos(coupleId, async (payload) => {
       const albumPhoto = payload.albumPhoto as AlbumPhoto;
+      let { coupleAlbums, albumPhotosMap } = get();
+
+      // Deduplicate events using event id + type
+      const eventKey = `${payload.eventType}-${albumPhoto.id}`;
+      if (processedAlbumPhotoEvents.has(eventKey)) {
+        console.log('[AlbumPhotos] Skipping duplicate event:', eventKey);
+        return;
+      }
+      processedAlbumPhotoEvents.add(eventKey);
+      // Clean up old entries after 5 seconds
+      setTimeout(() => processedAlbumPhotoEvents.delete(eventKey), 5000);
+
+      console.log('[AlbumPhotos] Realtime event received:', payload.eventType, JSON.stringify(albumPhoto));
+
+      // Handle DELETE specially - album_id may not be in payload
+      if (payload.eventType === 'DELETE') {
+        console.log('[AlbumPhotos] DELETE event processing started');
+        console.log('[AlbumPhotos] DELETE albumPhoto.id:', albumPhoto.id);
+        console.log('[AlbumPhotos] DELETE albumPhoto.memory_id:', albumPhoto.memory_id);
+        console.log('[AlbumPhotos] Current albumPhotosMap keys:', Object.keys(albumPhotosMap));
+
+        // Search for the photo in all albums to find its album_id
+        let targetAlbumId: string | undefined;
+        for (const [albumId, photos] of Object.entries(albumPhotosMap)) {
+          console.log(`[AlbumPhotos] DELETE: Checking album ${albumId} with ${photos.length} photos`);
+          const matchingPhoto = photos.find(p => p.id === albumPhoto.id || p.memory_id === albumPhoto.memory_id);
+          if (matchingPhoto) {
+            console.log('[AlbumPhotos] DELETE: Found matching photo:', matchingPhoto.id);
+            targetAlbumId = albumId;
+            break;
+          }
+        }
+
+        if (!targetAlbumId) {
+          console.log('[AlbumPhotos] DELETE: Photo not found in local state (already removed or never loaded)');
+          return;
+        }
+
+        console.log('[AlbumPhotos] DELETE: Removing from album:', targetAlbumId);
+        const photoId = albumPhoto.id;
+        const memoryId = albumPhoto.memory_id;
+        set((state) => ({
+          albumPhotosMap: {
+            ...state.albumPhotosMap,
+            [targetAlbumId!]: (state.albumPhotosMap[targetAlbumId!] || []).filter(
+              (p) => p.id !== photoId && p.memory_id !== memoryId
+            ),
+          },
+        }));
+        console.log('[AlbumPhotos] DELETE: Successfully removed from local state');
+        return;
+      }
+
+      // For INSERT events, check album ownership
+      console.log('[AlbumPhotos] Current coupleAlbums count:', coupleAlbums.length);
+      let albumBelongsToCouple = coupleAlbums.some(album => album.id === albumPhoto.album_id);
+
+      // Race condition fix: if album not found locally, try to fetch it from database
+      if (!albumBelongsToCouple && albumPhoto.album_id) {
+        console.log('[AlbumPhotos] Album not found locally, fetching from database:', albumPhoto.album_id);
+        const { data: fetchedAlbum } = await db.coupleAlbums.getById(albumPhoto.album_id);
+
+        if (fetchedAlbum && (fetchedAlbum as CoupleAlbum).couple_id === coupleId) {
+          console.log('[AlbumPhotos] Found album from database, adding to local state');
+          const album = fetchedAlbum as CoupleAlbum;
+          set((state) => ({
+            coupleAlbums: [album, ...state.coupleAlbums.filter(a => a.id !== album.id)],
+          }));
+          albumBelongsToCouple = true;
+          albumPhotosMap = get().albumPhotosMap;
+        }
+      }
+
+      if (!albumBelongsToCouple) {
+        console.log('[AlbumPhotos] Ignoring INSERT for album not owned by couple');
+        return;
+      }
 
       if (payload.eventType === 'INSERT') {
-        set((state) => {
-          const albumId = albumPhoto.album_id;
-          const existingPhotos = state.albumPhotosMap[albumId] || [];
-          return {
+        // Check if photo already exists (avoid duplicates from optimistic update)
+        const existingPhotos = albumPhotosMap[albumPhoto.album_id] || [];
+        const alreadyExists = existingPhotos.some(p =>
+          p.id === albumPhoto.id ||
+          (p.memory_id === albumPhoto.memory_id && p.id.startsWith('temp-'))
+        );
+
+        if (alreadyExists) {
+          // Replace temp photo with real one from server
+          set((state) => ({
             albumPhotosMap: {
               ...state.albumPhotosMap,
-              [albumId]: [albumPhoto, ...existingPhotos],
+              [albumPhoto.album_id]: state.albumPhotosMap[albumPhoto.album_id]?.map(p =>
+                (p.memory_id === albumPhoto.memory_id && p.id.startsWith('temp-')) ? albumPhoto : p
+              ) || [albumPhoto],
             },
-          };
-        });
+          }));
+        } else {
+          set((state) => ({
+            albumPhotosMap: {
+              ...state.albumPhotosMap,
+              [albumPhoto.album_id]: [albumPhoto, ...(state.albumPhotosMap[albumPhoto.album_id] || [])],
+            },
+          }));
+        }
+      }
+    });
+
+    // 10. Completed missions subscription (for memory sync between devices)
+    console.log('[CompletedMissions] Setting up subscription for coupleId:', coupleId);
+    // Track processed events to prevent duplicates
+    const processedMemoryEvents = new Set<string>();
+
+    completedMissionsChannel = db.completedMissions.subscribeToCompletedMissions(coupleId, (payload) => {
+      const memoryData = payload.memory as Record<string, unknown>;
+      const memoryId = memoryData?.id as string;
+
+      // Deduplicate events
+      const eventKey = `${payload.eventType}-${memoryId}`;
+      if (processedMemoryEvents.has(eventKey)) {
+        console.log('[CompletedMissions] Skipping duplicate event:', eventKey);
+        return;
+      }
+      processedMemoryEvents.add(eventKey);
+      setTimeout(() => processedMemoryEvents.delete(eventKey), 5000);
+
+      console.log('[CompletedMissions] Realtime event received:', payload.eventType, memoryId);
+
+      const memoryStore = useMemoryStore.getState();
+
+      if (payload.eventType === 'INSERT') {
+        // Convert DB format to CompletedMission format using shared converter
+        const newMemory = dbToCompletedMission(memoryData);
+        console.log('[CompletedMissions] Adding new memory:', newMemory.id);
+
+        // Check if memory already exists (avoid duplicates)
+        const existingMemories = memoryStore.memories;
+        if (!existingMemories.some(m => m.id === newMemory.id)) {
+          memoryStore.addMemory(newMemory);
+        } else {
+          console.log('[CompletedMissions] Memory already exists, skipping');
+        }
       } else if (payload.eventType === 'DELETE') {
-        set((state) => {
-          const albumId = albumPhoto.album_id;
-          const existingPhotos = state.albumPhotosMap[albumId] || [];
-          return {
-            albumPhotosMap: {
-              ...state.albumPhotosMap,
-              [albumId]: existingPhotos.filter((p) => p.id !== albumPhoto.id),
-            },
-          };
-        });
+        console.log('[CompletedMissions] DELETE event processing started');
+        console.log('[CompletedMissions] DELETE memoryId:', memoryId);
+        console.log('[CompletedMissions] DELETE full payload:', JSON.stringify(memoryData));
+
+        const existingMemories = memoryStore.memories;
+        const memoryExists = existingMemories.some(m => m.id === memoryId);
+        console.log('[CompletedMissions] Memory exists in local store:', memoryExists);
+        console.log('[CompletedMissions] Current memories count:', existingMemories.length);
+
+        if (memoryId) {
+          memoryStore.deleteMemory(memoryId);
+          console.log('[CompletedMissions] DELETE: Successfully removed from local store');
+        } else {
+          console.log('[CompletedMissions] DELETE: No memoryId in payload, cannot delete');
+        }
       }
     });
 
@@ -458,6 +611,10 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     if (albumPhotosChannel) {
       db.albumPhotos.unsubscribe(albumPhotosChannel);
       albumPhotosChannel = null;
+    }
+    if (completedMissionsChannel) {
+      db.completedMissions.unsubscribeFromCompletedMissions(completedMissionsChannel);
+      completedMissionsChannel = null;
     }
 
     set(initialState);
@@ -547,6 +704,35 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
 
   setMissionGenerationStatus: (status: MissionGenerationStatus, userId: string | null = null) => {
     set({ missionGenerationStatus: status, generatingUserId: userId });
+  },
+
+  // Reset all missions (for manual reset from settings)
+  resetAllMissions: async () => {
+    const { coupleId } = get();
+
+    // Clear local state first
+    set({
+      sharedMissions: [],
+      missionGenerationStatus: 'idle',
+      activeMissionProgress: null,
+      generatingUserId: null,
+    });
+
+    // If synced, also delete from database
+    if (coupleId && !isDemoMode) {
+      try {
+        // Delete active missions from couple_missions table
+        await db.coupleMissions.deleteActive(coupleId);
+
+        // Delete today's mission progress
+        await db.missionProgress.deleteToday(coupleId);
+
+        // Release any mission lock
+        await db.missionLock.release(coupleId);
+      } catch (error) {
+        console.error('Error resetting missions in database:', error);
+      }
+    }
   },
 
   // ============================================
@@ -764,13 +950,17 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
   updateBackgroundImage: async (imageUrl: string | null) => {
     const { coupleId, userId } = get();
 
+    console.log('[CoupleSyncStore] updateBackgroundImage:', { coupleId, userId, imageUrl, isDemoMode });
+
     if (!coupleId || !userId || isDemoMode) {
       // Demo mode: update locally only
+      console.log('[CoupleSyncStore] Skipping sync - no coupleId/userId or demo mode');
       set({ backgroundImageUrl: imageUrl });
       return;
     }
 
     const { error } = await db.coupleSettings.upsert(coupleId, { background_image_url: imageUrl }, userId);
+    console.log('[CoupleSyncStore] Upsert result:', { error });
     if (!error) {
       set({ backgroundImageUrl: imageUrl });
     }
@@ -1063,15 +1253,42 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     set({ isLoadingAlbums: false });
 
     if (!error && data) {
-      set({ coupleAlbums: data as CoupleAlbum[] });
+      const albums = data as CoupleAlbum[];
+      set({ coupleAlbums: albums });
+
+      // Load photos for all albums
+      console.log('[Albums] Loading photos for', albums.length, 'albums');
+      const photosMap: { [albumId: string]: AlbumPhoto[] } = {};
+      await Promise.all(
+        albums.map(async (album) => {
+          const { data: photosData } = await db.albumPhotos.getByAlbum(album.id);
+          if (photosData) {
+            photosMap[album.id] = photosData as AlbumPhoto[];
+          }
+        })
+      );
+      set((state) => ({
+        albumPhotosMap: { ...state.albumPhotosMap, ...photosMap },
+      }));
     }
   },
 
   addPhotoToAlbum: async (albumId: string, memoryId: string) => {
     const { userId, albumPhotosMap } = get();
 
-    if (!userId || isDemoMode) {
-      // Demo mode: add locally
+    console.log('[AlbumPhotos] addPhotoToAlbum called:', { albumId, memoryId, userId, isDemoMode });
+
+    // UUID validation regex
+    const isValidUUID = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+    // Check if memoryId is a valid UUID (sample memories have non-UUID IDs like '1', '2', etc.)
+    const isSampleMemory = !isValidUUID(memoryId);
+
+    if (!userId || isDemoMode || isSampleMemory) {
+      // Demo mode or sample memory: add locally only
+      if (isSampleMemory && !isDemoMode) {
+        console.log('[AlbumPhotos] Sample memory detected, adding locally only:', memoryId);
+      }
       const newPhoto: AlbumPhoto = {
         id: `local-${Date.now()}`,
         album_id: albumId,
@@ -1089,25 +1306,85 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       return;
     }
 
-    await db.albumPhotos.add(albumId, memoryId, userId);
+    // Optimistic update: add to local state immediately
+    const optimisticPhoto: AlbumPhoto = {
+      id: `temp-${Date.now()}`,
+      album_id: albumId,
+      memory_id: memoryId,
+      added_by: userId,
+      added_at: new Date().toISOString(),
+    };
+    const existingPhotos = albumPhotosMap[albumId] || [];
+    set({
+      albumPhotosMap: {
+        ...albumPhotosMap,
+        [albumId]: [optimisticPhoto, ...existingPhotos],
+      },
+    });
+
+    // Perform database insert
+    const { data, error } = await db.albumPhotos.add(albumId, memoryId, userId);
+
+    if (error) {
+      console.error('[AlbumPhotos] Error adding photo to album:', error);
+      // Rollback optimistic update on error
+      set((state) => ({
+        albumPhotosMap: {
+          ...state.albumPhotosMap,
+          [albumId]: (state.albumPhotosMap[albumId] || []).filter(p => p.id !== optimisticPhoto.id),
+        },
+      }));
+      return;
+    }
+
+    console.log('[AlbumPhotos] Photo added successfully:', data);
+
+    // Replace optimistic photo with real data from server
+    if (data) {
+      set((state) => ({
+        albumPhotosMap: {
+          ...state.albumPhotosMap,
+          [albumId]: (state.albumPhotosMap[albumId] || []).map(p =>
+            p.id === optimisticPhoto.id ? (data as AlbumPhoto) : p
+          ),
+        },
+      }));
+    }
   },
 
   removePhotoFromAlbum: async (albumId: string, memoryId: string) => {
     const { albumPhotosMap } = get();
 
+    console.log('[AlbumPhotos] removePhotoFromAlbum called:', { albumId, memoryId, isDemoMode });
+
+    // Optimistic update: remove from local state immediately
+    const existingPhotos = albumPhotosMap[albumId] || [];
+    set({
+      albumPhotosMap: {
+        ...albumPhotosMap,
+        [albumId]: existingPhotos.filter((p) => p.memory_id !== memoryId),
+      },
+    });
+
     if (isDemoMode) {
-      // Demo mode: remove locally
-      const existingPhotos = albumPhotosMap[albumId] || [];
-      set({
-        albumPhotosMap: {
-          ...albumPhotosMap,
-          [albumId]: existingPhotos.filter((p) => p.memory_id !== memoryId),
-        },
-      });
+      console.log('[AlbumPhotos] Demo mode - local removal only');
       return;
     }
 
-    await db.albumPhotos.remove(albumId, memoryId);
+    // Perform database delete
+    const { error } = await db.albumPhotos.remove(albumId, memoryId);
+    if (error) {
+      console.error('[AlbumPhotos] Error removing photo from album:', error);
+      // Rollback optimistic update on error
+      set({
+        albumPhotosMap: {
+          ...get().albumPhotosMap,
+          [albumId]: existingPhotos,
+        },
+      });
+    } else {
+      console.log('[AlbumPhotos] Successfully removed photo from album');
+    }
   },
 
   loadAlbumPhotos: async (albumId: string) => {

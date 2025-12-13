@@ -28,6 +28,12 @@ export function BackgroundProvider({ children }: { children: ReactNode }) {
     updateBackgroundImage: syncBackgroundImage,
   } = useCoupleSyncStore();
 
+  // Helper to check if URL is a valid remote URL (not local file://)
+  const isValidRemoteUrl = (url: string | null | undefined): boolean => {
+    if (!url || typeof url !== 'string' || url.trim() === '') return false;
+    return url.startsWith('http://') || url.startsWith('https://');
+  };
+
   // Preload default background image and check for saved/synced backgrounds
   useEffect(() => {
     const preloadImages = async () => {
@@ -36,13 +42,13 @@ export function BackgroundProvider({ children }: { children: ReactNode }) {
         const asset = Asset.fromModule(DEFAULT_BACKGROUND);
         await asset.downloadAsync();
 
-        // First priority: Check for synced background from partner
-        if (isSyncInitialized && syncedBackgroundUrl) {
+        // First priority: Check for synced background from partner (only remote URLs)
+        if (isSyncInitialized && isValidRemoteUrl(syncedBackgroundUrl)) {
           try {
-            await Image.prefetch(syncedBackgroundUrl);
+            await Image.prefetch(syncedBackgroundUrl!);
             setBackgroundImageState({ uri: syncedBackgroundUrl });
             // Also save to local storage as fallback
-            await AsyncStorage.setItem(BACKGROUND_STORAGE_KEY, syncedBackgroundUrl);
+            await AsyncStorage.setItem(BACKGROUND_STORAGE_KEY, syncedBackgroundUrl!);
           } catch {
             console.warn('Failed to load synced background, falling back to local');
           }
@@ -50,11 +56,10 @@ export function BackgroundProvider({ children }: { children: ReactNode }) {
           // Fallback: Check for locally saved custom background
           const savedBackground = await AsyncStorage.getItem(BACKGROUND_STORAGE_KEY);
 
-          if (savedBackground) {
-            const uri = savedBackground;
+          if (savedBackground && isValidRemoteUrl(savedBackground)) {
             try {
-              await Image.prefetch(uri);
-              setBackgroundImageState({ uri });
+              await Image.prefetch(savedBackground);
+              setBackgroundImageState({ uri: savedBackground });
             } catch {
               console.warn('Failed to load saved background');
             }
@@ -75,19 +80,8 @@ export function BackgroundProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!isSyncInitialized) return;
 
-    // Validate URL before using
-    const isValidUrl = (url: string | null | undefined): boolean => {
-      if (!url || typeof url !== 'string' || url.trim() === '') return false;
-      try {
-        // Check if it's a valid URL (http/https) or file path
-        return url.startsWith('http://') || url.startsWith('https://') || url.startsWith('file://');
-      } catch {
-        return false;
-      }
-    };
-
     // If there's a valid synced background URL that's different from current
-    if (isValidUrl(syncedBackgroundUrl)) {
+    if (isValidRemoteUrl(syncedBackgroundUrl)) {
       const currentUri = backgroundImage?.uri;
       if (currentUri !== syncedBackgroundUrl) {
         // Partner changed the background - update ours
@@ -112,6 +106,7 @@ export function BackgroundProvider({ children }: { children: ReactNode }) {
 
   const setBackgroundImage = useCallback(async (image: any) => {
     try {
+      console.log('[Background] setBackgroundImage called:', { uri: image?.uri, isSyncInitialized });
       setBackgroundImageState(image);
 
       // Save custom background URI to AsyncStorage
@@ -120,9 +115,12 @@ export function BackgroundProvider({ children }: { children: ReactNode }) {
         // Preload the new image
         await Image.prefetch(image.uri);
 
-        // Sync to partner via coupleSyncStore
-        if (isSyncInitialized) {
+        // Sync to partner via coupleSyncStore (only remote URLs)
+        if (isSyncInitialized && isValidRemoteUrl(image.uri)) {
+          console.log('[Background] Syncing to partner:', image.uri);
           await syncBackgroundImage(image.uri);
+        } else {
+          console.log('[Background] Not syncing - local file or not initialized');
         }
       }
     } catch (error) {

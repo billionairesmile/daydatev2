@@ -24,7 +24,7 @@ const initialState: MemoryState = {
 };
 
 // Convert DB record to CompletedMission type
-const dbToCompletedMission = (record: Record<string, unknown>): CompletedMission => {
+export const dbToCompletedMission = (record: Record<string, unknown>): CompletedMission => {
   const missionData = record.mission_data as Record<string, unknown> | null;
 
   const mission: Mission = missionData
@@ -68,9 +68,16 @@ export const useMemoryStore = create<MemoryState & MemoryActions>()(
       setMemories: (memories) => set({ memories }),
 
       addMemory: (memory) =>
-        set((state) => ({
-          memories: [memory, ...state.memories],
-        })),
+        set((state) => {
+          // Check for duplicates - skip if memory with same ID already exists
+          if (state.memories.some((m) => m.id === memory.id)) {
+            console.log('[MemoryStore] Skipping duplicate memory:', memory.id);
+            return state;
+          }
+          return {
+            memories: [memory, ...state.memories],
+          };
+        }),
 
       deleteMemory: (memoryId) =>
         set((state) => ({

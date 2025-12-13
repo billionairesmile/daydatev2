@@ -56,6 +56,9 @@ export default function MissionDetailScreen() {
   const [facing, setFacing] = useState<'front' | 'back'>('back');
   const [isCapturing, setIsCapturing] = useState(false);
 
+  // Track if current user is the photo taker (user1 in mission progress)
+  const [isPhotoTaker, setIsPhotoTaker] = useState(true);
+
   // Zoom state for pinch-to-zoom (0 = 1x default, 1 = max zoom ~4x)
   const [zoom, setZoom] = useState(0);
   const lastPinchDistance = useRef<number | null>(null);
@@ -87,6 +90,7 @@ export default function MissionDetailScreen() {
     uploadMissionPhoto,
     submitMissionMessage,
     updateMissionLocation,
+    cancelMissionProgress,
     isUserMessage1Submitter,
     hasUserSubmittedMessage,
     hasPartnerSubmittedMessage,
@@ -117,31 +121,35 @@ export default function MissionDetailScreen() {
     // Only sync if this is the same mission
     if (activeMissionProgress.mission_id !== mission.id) return;
 
-    // Sync photo
+    // Determine if current user is the photo taker (user1 = the one who started/took photo)
+    const isUser1 = user?.id === activeMissionProgress.user1_id;
+    setIsPhotoTaker(isUser1);
+
+    // Sync photo - this shows the photo to both users
     if (activeMissionProgress.photo_url && !capturedPhoto) {
       setCapturedPhoto(activeMissionProgress.photo_url);
       setPhotoTaken(true);
     }
 
     // Sync messages based on user role
-    const isUser1 = user?.id === activeMissionProgress.user1_id;
-
+    // user1Message = "내 메시지", user2Message = "상대방 메시지"
+    // Always update partner's message when it arrives (remove the !user2Message check to force update)
     if (isUser1) {
-      // User is user1 - their message is user1_message
+      // User is user1 (photo taker) - their message is user1_message
       if (activeMissionProgress.user1_message && !user1Message) {
         setUser1Message(activeMissionProgress.user1_message);
       }
-      // Partner's message is user2_message
-      if (activeMissionProgress.user2_message && !user2Message) {
+      // Partner's message is user2_message - always sync when available
+      if (activeMissionProgress.user2_message) {
         setUser2Message(activeMissionProgress.user2_message);
       }
     } else {
-      // User is user2 - their message is user2_message
+      // User is user2 (partner) - their message is user2_message
       if (activeMissionProgress.user2_message && !user1Message) {
         setUser1Message(activeMissionProgress.user2_message);
       }
-      // Partner's message (user1) goes to user2Message display
-      if (activeMissionProgress.user1_message && !user2Message) {
+      // Partner's message (user1) goes to user2Message display - always sync when available
+      if (activeMissionProgress.user1_message) {
         setUser2Message(activeMissionProgress.user1_message);
       }
     }
@@ -157,7 +165,6 @@ export default function MissionDetailScreen() {
     user?.id,
     capturedPhoto,
     user1Message,
-    user2Message,
     currentLocation,
   ]);
 
@@ -470,9 +477,17 @@ export default function MissionDetailScreen() {
           const uploadedPhotoUrl = await db.storage.uploadPhoto(couple.id, previewPhoto);
 
           if (uploadedPhotoUrl) {
-            // Check if there's already an active mission progress for today
-            if (!activeMissionProgress) {
-              // Start new mission progress
+            // Check if there's already an active mission progress for THIS mission
+            const isThisMissionProgress = activeMissionProgress?.mission_id === mission.id;
+
+            if (!activeMissionProgress || !isThisMissionProgress) {
+              // No progress or different mission - start new mission progress for this mission
+              // If there was a different mission progress, cancel it first
+              if (activeMissionProgress && !isThisMissionProgress) {
+                console.log('[MissionSync] Different mission progress exists, starting new one for:', mission.id);
+                await cancelMissionProgress();
+              }
+
               const progress = await startMissionProgress(mission.id, mission);
               if (progress) {
                 // Upload photo to the progress
@@ -483,7 +498,7 @@ export default function MissionDetailScreen() {
                 }
               }
             } else {
-              // Mission already started (maybe by partner), just upload photo
+              // Same mission already started (maybe by partner), just upload photo
               await uploadMissionPhoto(uploadedPhotoUrl);
               if (locationName && locationName !== '위치 정보 없음') {
                 await updateMissionLocation(locationName);
@@ -567,8 +582,9 @@ export default function MissionDetailScreen() {
   };
 
   const handleCompleteAndClose = async () => {
-    // Save to memory album (only once)
-    if (!memorySavedRef.current && capturedPhoto && user1Message && user2Message) {
+    // Save to memory album (only once, only by photo taker to prevent duplicates)
+    // Partner should not save - only photo taker saves to avoid duplicate entries
+    if (!memorySavedRef.current && capturedPhoto && user1Message && user2Message && isPhotoTaker) {
       memorySavedRef.current = true;
 
       // Use actual location if available
@@ -593,19 +609,24 @@ export default function MissionDetailScreen() {
         completedAt: new Date(),
       };
 
-      // Save to local store
-      addMemory(newMemory);
-
-      // Save to database (if not in demo mode and couple exists)
+      // Save to database first (if not in demo mode and couple exists)
+      // This ensures we use the database-generated ID for album photo references
       if (!isDemoMode && couple?.id) {
         try {
-          // Upload photo to storage first
-          const uploadedPhotoUrl = await db.storage.uploadPhoto(couple.id, capturedPhoto);
+          // Check if photo is already a remote URL (synced from partner)
+          const isRemoteUrl = capturedPhoto.startsWith('http://') || capturedPhoto.startsWith('https://');
+
+          // Only upload if it's a local file, otherwise use the existing URL
+          let finalPhotoUrl = capturedPhoto;
+          if (!isRemoteUrl) {
+            const uploadedPhotoUrl = await db.storage.uploadPhoto(couple.id, capturedPhoto);
+            finalPhotoUrl = uploadedPhotoUrl || capturedPhoto;
+          }
 
           // Save to completed_missions table (in couple order)
-          await db.completedMissions.create({
+          const { data: dbMemory, error: dbError } = await db.completedMissions.create({
             couple_id: couple.id,
-            photo_url: uploadedPhotoUrl || capturedPhoto,
+            photo_url: finalPhotoUrl,
             user1_message: messageForCoupleUser1,
             user2_message: messageForCoupleUser2,
             location: finalLocation,
@@ -618,11 +639,20 @@ export default function MissionDetailScreen() {
               tags: mission.tags,
             },
           });
+
+          // Use database ID if available, otherwise use local ID
+          if (dbMemory && !dbError) {
+            newMemory.id = dbMemory.id;
+            newMemory.photoUrl = finalPhotoUrl;
+          }
         } catch (error) {
           console.error('Error saving memory to DB:', error);
-          // Local save already done, so continue even if DB fails
+          // Continue with local ID if DB fails
         }
       }
+
+      // Save to local store (with database ID if available)
+      addMemory(newMemory);
     }
 
     // Clear in-progress data since mission is now fully completed
@@ -634,14 +664,95 @@ export default function MissionDetailScreen() {
 
   const isComplete = photoTaken && user1Message && user2Message;
   const isWaitingForPartner = photoTaken && user1Message && !user2Message;
+  // Partner waiting for photo (partner joined but photo not taken yet)
+  const isWaitingForPhoto = !photoTaken && !isPhotoTaker && isSyncInitialized && activeMissionProgress;
 
-  // Mark mission as completed when all steps are done
+  // Mark mission as completed and auto-save when all steps are done
   useEffect(() => {
     if (isComplete && !hasCompletedRef.current && !hasTodayCompletedMission()) {
       hasCompletedRef.current = true;
       completeTodayMission(mission.id);
+
+      // Auto-save to memory when completed via realtime sync
+      // Only photo taker (isPhotoTaker) saves to avoid duplicates
+      if (!memorySavedRef.current && capturedPhoto && user1Message && user2Message && isPhotoTaker) {
+        memorySavedRef.current = true;
+
+        const autoSave = async () => {
+          const finalLocation = currentLocation || '위치 정보 없음';
+          const isCurrentUserCoupleUser1 = user?.id === couple?.user1Id;
+          const messageForCoupleUser1 = isCurrentUserCoupleUser1 ? user1Message : user2Message;
+          const messageForCoupleUser2 = isCurrentUserCoupleUser1 ? user2Message : user1Message;
+
+          const newMemory: CompletedMission = {
+            id: `memory-${Date.now()}`,
+            coupleId: couple?.id || 'sample-couple',
+            missionId: mission.id,
+            mission: mission,
+            photoUrl: capturedPhoto,
+            user1Message: messageForCoupleUser1,
+            user2Message: messageForCoupleUser2,
+            location: finalLocation,
+            completedAt: new Date(),
+          };
+
+          if (!isDemoMode && couple?.id) {
+            try {
+              const isRemoteUrl = capturedPhoto.startsWith('http://') || capturedPhoto.startsWith('https://');
+              let finalPhotoUrl = capturedPhoto;
+              if (!isRemoteUrl) {
+                const uploadedPhotoUrl = await db.storage.uploadPhoto(couple.id, capturedPhoto);
+                finalPhotoUrl = uploadedPhotoUrl || capturedPhoto;
+              }
+
+              const { data: dbMemory, error: dbError } = await db.completedMissions.create({
+                couple_id: couple.id,
+                photo_url: finalPhotoUrl,
+                user1_message: messageForCoupleUser1,
+                user2_message: messageForCoupleUser2,
+                location: finalLocation,
+                mission_data: {
+                  id: mission.id,
+                  title: mission.title,
+                  description: mission.description,
+                  category: mission.category,
+                  imageUrl: mission.imageUrl,
+                  tags: mission.tags,
+                },
+              });
+
+              if (dbMemory && !dbError) {
+                newMemory.id = dbMemory.id;
+                newMemory.photoUrl = finalPhotoUrl;
+              }
+            } catch (error) {
+              console.error('Error auto-saving memory to DB:', error);
+            }
+          }
+
+          addMemory(newMemory);
+          clearInProgressMission(mission.id);
+          console.log('[MissionComplete] Auto-saved memory on completion');
+        };
+
+        autoSave();
+      }
     }
-  }, [isComplete, mission.id, completeTodayMission, hasTodayCompletedMission]);
+  }, [
+    isComplete,
+    mission,
+    completeTodayMission,
+    hasTodayCompletedMission,
+    capturedPhoto,
+    user1Message,
+    user2Message,
+    isPhotoTaker,
+    currentLocation,
+    user?.id,
+    couple,
+    addMemory,
+    clearInProgressMission,
+  ]);
 
   // Camera UI
   if (showCamera) {
@@ -899,7 +1010,8 @@ export default function MissionDetailScreen() {
                         style={[styles.photoPreview, { aspectRatio: photoAspectRatio }]}
                         resizeMode="contain"
                       />
-                      {!isComplete && (
+                      {/* Only show retake button to the photo taker, not the partner */}
+                      {!isComplete && isPhotoTaker && (
                         <Pressable
                           onPress={handleRetakeFromDetail}
                           style={styles.detailRetakeButton}
@@ -1006,19 +1118,19 @@ export default function MissionDetailScreen() {
           <Pressable
             style={[
               styles.ctaButton,
-              isWaitingForPartner && styles.ctaButtonDisabled,
+              (isWaitingForPartner || isWaitingForPhoto) && styles.ctaButtonDisabled,
               isComplete && styles.ctaButtonComplete,
             ]}
             onPress={
               isComplete
                 ? handleCompleteAndClose
-                : isWaitingForPartner
+                : isWaitingForPartner || isWaitingForPhoto
                   ? undefined
                   : photoTaken
                     ? handleOpenMessageModal
                     : handleTakePhoto
             }
-            disabled={!!isWaitingForPartner}
+            disabled={!!(isWaitingForPartner || isWaitingForPhoto)}
           >
             {isComplete ? (
               <View style={styles.ctaButtonCompleteContent}>
@@ -1028,13 +1140,15 @@ export default function MissionDetailScreen() {
             ) : (
               <Text style={[
                 styles.ctaButtonText,
-                isWaitingForPartner && styles.ctaButtonTextDisabled,
+                (isWaitingForPartner || isWaitingForPhoto) && styles.ctaButtonTextDisabled,
               ]}>
                 {isWaitingForPartner
                   ? '상대방 대기 중...'
-                  : photoTaken
-                    ? '서로에게 한마디 작성'
-                    : '사진 촬영'}
+                  : isWaitingForPhoto
+                    ? '사진 대기 중...'
+                    : photoTaken
+                      ? '서로에게 한마디 작성'
+                      : '사진 촬영'}
               </Text>
             )}
           </Pressable>

@@ -274,7 +274,7 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
           const acquired = await syncStore.acquireMissionLock();
           if (!acquired) {
             // Partner is generating
-            return { status: 'locked' as const, message: '파트너가 미션을 생성 중입니다...' };
+            return { status: 'locked' as const, message: '미션 생성 중입니다...' };
           }
         }
 

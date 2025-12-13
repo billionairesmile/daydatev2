@@ -161,7 +161,7 @@ export default function MissionScreen() {
     if (isSyncInitialized && missionGenerationStatus === 'generating') {
       // Partner is generating - show loading state
       setIsGenerating(true);
-      setPartnerGeneratingMessage('파트너가 미션을 생성 중입니다...');
+      setPartnerGeneratingMessage('미션 생성 중입니다...');
     } else if (missionGenerationStatus === 'completed' && sharedMissions.length > 0) {
       // Missions were generated (by partner or self) - hide loading
       setIsGenerating(false);
@@ -259,7 +259,7 @@ export default function MissionScreen() {
     // Handle different generation statuses
     if (result && result.status === 'locked') {
       // Partner is already generating - show their message
-      setPartnerGeneratingMessage(result.message || '파트너가 미션을 생성 중입니다...');
+      setPartnerGeneratingMessage(result.message || '미션 생성 중입니다...');
       // Don't hide loading - wait for sync update
       return;
     }
@@ -491,7 +491,7 @@ export default function MissionScreen() {
                   {partnerGeneratingMessage ? '미션 생성 중...' : '미션을 생성하고 있어요'}
                 </Text>
                 <Text style={styles.loadingAnimationSubtext}>
-                  {partnerGeneratingMessage || '잠시만 기다려주세요'}
+                  잠시만 기다려주세요
                 </Text>
               </View>
             ) : (

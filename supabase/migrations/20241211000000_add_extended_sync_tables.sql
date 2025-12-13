@@ -239,6 +239,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE couple_settings;
 ALTER PUBLICATION supabase_realtime ADD TABLE mission_progress;
 ALTER PUBLICATION supabase_realtime ADD TABLE couple_albums;
 ALTER PUBLICATION supabase_realtime ADD TABLE album_photos;
+ALTER PUBLICATION supabase_realtime ADD TABLE completed_missions;
 
 -- ============================================
 -- 6. UPDATED_AT TRIGGERS
