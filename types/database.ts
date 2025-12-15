@@ -13,6 +13,13 @@ export interface Profile {
   location_longitude?: number;
   location_city?: string;
   location_district?: string;
+  // User consent fields
+  age_verified?: boolean;
+  terms_agreed?: boolean;
+  location_terms_agreed?: boolean;
+  privacy_agreed?: boolean;
+  marketing_agreed?: boolean;
+  consent_given_at?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -25,7 +32,9 @@ export interface Couple {
   anniversary_type?: string; // Legacy field
   dating_start_date?: string; // ISO date string - when they started dating
   wedding_date?: string; // ISO date string - wedding anniversary
-  status?: string;
+  status?: string; // 'pending' | 'active' | 'disconnected'
+  disconnected_at?: string; // ISO date string - when disconnected (for 30-day recovery)
+  disconnected_by?: string; // user_id who initiated disconnect
   created_at?: string;
   updated_at?: string;
 }

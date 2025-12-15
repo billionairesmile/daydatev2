@@ -3,6 +3,7 @@ import { db, isDemoMode, supabase } from '@/lib/supabase';
 import type { Mission } from '@/types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { useMemoryStore, dbToCompletedMission } from './memoryStore';
+import { formatDateToLocal } from '@/lib/dateUtils';
 
 // Types
 export interface SyncedTodo {
@@ -318,8 +319,6 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     todoChannel = db.coupleTodos.subscribeToTodos(coupleId, (payload) => {
       const todo = payload.todo as SyncedTodo;
 
-      console.log('[Todo Realtime]', payload.eventType, 'todo:', todo);
-
       if (payload.eventType === 'INSERT') {
         set((state) => ({
           sharedTodos: [...state.sharedTodos, todo].sort(
@@ -352,7 +351,6 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
 
     // 6. Couple settings subscription (background image)
     settingsChannel = db.coupleSettings.subscribeToSettings(coupleId, (payload) => {
-      console.log('[CoupleSettings Realtime] Received update:', payload);
       set({
         backgroundImageUrl: payload.background_image_url,
         coupleSettings: {
@@ -382,7 +380,6 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
           coupleAlbums: [album, ...state.coupleAlbums],
         }));
         // Load photos for the new album
-        console.log('[Albums] New album received, loading photos for:', album.id);
         const { data: photosData } = await db.albumPhotos.getByAlbum(album.id);
         if (photosData) {
           set((state) => ({
@@ -404,7 +401,6 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     });
 
     // 9. Album photos subscription
-    console.log('[AlbumPhotos] Setting up subscription for coupleId:', coupleId);
     // Track processed events to prevent duplicates
     const processedAlbumPhotoEvents = new Set<string>();
 
@@ -415,40 +411,27 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       // Deduplicate events using event id + type
       const eventKey = `${payload.eventType}-${albumPhoto.id}`;
       if (processedAlbumPhotoEvents.has(eventKey)) {
-        console.log('[AlbumPhotos] Skipping duplicate event:', eventKey);
         return;
       }
       processedAlbumPhotoEvents.add(eventKey);
       // Clean up old entries after 5 seconds
       setTimeout(() => processedAlbumPhotoEvents.delete(eventKey), 5000);
 
-      console.log('[AlbumPhotos] Realtime event received:', payload.eventType, JSON.stringify(albumPhoto));
-
       // Handle DELETE specially - album_id may not be in payload
       if (payload.eventType === 'DELETE') {
-        console.log('[AlbumPhotos] DELETE event processing started');
-        console.log('[AlbumPhotos] DELETE albumPhoto.id:', albumPhoto.id);
-        console.log('[AlbumPhotos] DELETE albumPhoto.memory_id:', albumPhoto.memory_id);
-        console.log('[AlbumPhotos] Current albumPhotosMap keys:', Object.keys(albumPhotosMap));
-
         // Search for the photo in all albums to find its album_id
         let targetAlbumId: string | undefined;
         for (const [albumId, photos] of Object.entries(albumPhotosMap)) {
-          console.log(`[AlbumPhotos] DELETE: Checking album ${albumId} with ${photos.length} photos`);
           const matchingPhoto = photos.find(p => p.id === albumPhoto.id || p.memory_id === albumPhoto.memory_id);
           if (matchingPhoto) {
-            console.log('[AlbumPhotos] DELETE: Found matching photo:', matchingPhoto.id);
             targetAlbumId = albumId;
             break;
           }
         }
 
         if (!targetAlbumId) {
-          console.log('[AlbumPhotos] DELETE: Photo not found in local state (already removed or never loaded)');
           return;
         }
-
-        console.log('[AlbumPhotos] DELETE: Removing from album:', targetAlbumId);
         const photoId = albumPhoto.id;
         const memoryId = albumPhoto.memory_id;
         set((state) => ({
@@ -459,21 +442,17 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
             ),
           },
         }));
-        console.log('[AlbumPhotos] DELETE: Successfully removed from local state');
         return;
       }
 
       // For INSERT events, check album ownership
-      console.log('[AlbumPhotos] Current coupleAlbums count:', coupleAlbums.length);
       let albumBelongsToCouple = coupleAlbums.some(album => album.id === albumPhoto.album_id);
 
       // Race condition fix: if album not found locally, try to fetch it from database
       if (!albumBelongsToCouple && albumPhoto.album_id) {
-        console.log('[AlbumPhotos] Album not found locally, fetching from database:', albumPhoto.album_id);
         const { data: fetchedAlbum } = await db.coupleAlbums.getById(albumPhoto.album_id);
 
         if (fetchedAlbum && (fetchedAlbum as CoupleAlbum).couple_id === coupleId) {
-          console.log('[AlbumPhotos] Found album from database, adding to local state');
           const album = fetchedAlbum as CoupleAlbum;
           set((state) => ({
             coupleAlbums: [album, ...state.coupleAlbums.filter(a => a.id !== album.id)],
@@ -484,7 +463,6 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       }
 
       if (!albumBelongsToCouple) {
-        console.log('[AlbumPhotos] Ignoring INSERT for album not owned by couple');
         return;
       }
 
@@ -518,7 +496,6 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     });
 
     // 10. Completed missions subscription (for memory sync between devices)
-    console.log('[CompletedMissions] Setting up subscription for coupleId:', coupleId);
     // Track processed events to prevent duplicates
     const processedMemoryEvents = new Set<string>();
 
@@ -529,43 +506,25 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       // Deduplicate events
       const eventKey = `${payload.eventType}-${memoryId}`;
       if (processedMemoryEvents.has(eventKey)) {
-        console.log('[CompletedMissions] Skipping duplicate event:', eventKey);
         return;
       }
       processedMemoryEvents.add(eventKey);
       setTimeout(() => processedMemoryEvents.delete(eventKey), 5000);
-
-      console.log('[CompletedMissions] Realtime event received:', payload.eventType, memoryId);
 
       const memoryStore = useMemoryStore.getState();
 
       if (payload.eventType === 'INSERT') {
         // Convert DB format to CompletedMission format using shared converter
         const newMemory = dbToCompletedMission(memoryData);
-        console.log('[CompletedMissions] Adding new memory:', newMemory.id);
 
         // Check if memory already exists (avoid duplicates)
         const existingMemories = memoryStore.memories;
         if (!existingMemories.some(m => m.id === newMemory.id)) {
           memoryStore.addMemory(newMemory);
-        } else {
-          console.log('[CompletedMissions] Memory already exists, skipping');
         }
       } else if (payload.eventType === 'DELETE') {
-        console.log('[CompletedMissions] DELETE event processing started');
-        console.log('[CompletedMissions] DELETE memoryId:', memoryId);
-        console.log('[CompletedMissions] DELETE full payload:', JSON.stringify(memoryData));
-
-        const existingMemories = memoryStore.memories;
-        const memoryExists = existingMemories.some(m => m.id === memoryId);
-        console.log('[CompletedMissions] Memory exists in local store:', memoryExists);
-        console.log('[CompletedMissions] Current memories count:', existingMemories.length);
-
         if (memoryId) {
           memoryStore.deleteMemory(memoryId);
-          console.log('[CompletedMissions] DELETE: Successfully removed from local store');
-        } else {
-          console.log('[CompletedMissions] DELETE: No memoryId in payload, cannot delete');
         }
       }
     });
@@ -950,17 +909,13 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
   updateBackgroundImage: async (imageUrl: string | null) => {
     const { coupleId, userId } = get();
 
-    console.log('[CoupleSyncStore] updateBackgroundImage:', { coupleId, userId, imageUrl, isDemoMode });
-
     if (!coupleId || !userId || isDemoMode) {
       // Demo mode: update locally only
-      console.log('[CoupleSyncStore] Skipping sync - no coupleId/userId or demo mode');
       set({ backgroundImageUrl: imageUrl });
       return;
     }
 
     const { error } = await db.coupleSettings.upsert(coupleId, { background_image_url: imageUrl }, userId);
-    console.log('[CoupleSyncStore] Upsert result:', { error });
     if (!error) {
       set({ backgroundImageUrl: imageUrl });
     }
@@ -1012,7 +967,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
         completed_at: null,
         status: 'photo_pending',
         location: null,
-        date: new Date().toISOString().split('T')[0],
+        date: formatDateToLocal(new Date()),
       };
       set({ activeMissionProgress: progress });
       return progress;
@@ -1257,7 +1212,6 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       set({ coupleAlbums: albums });
 
       // Load photos for all albums
-      console.log('[Albums] Loading photos for', albums.length, 'albums');
       const photosMap: { [albumId: string]: AlbumPhoto[] } = {};
       await Promise.all(
         albums.map(async (album) => {
@@ -1276,8 +1230,6 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
   addPhotoToAlbum: async (albumId: string, memoryId: string) => {
     const { userId, albumPhotosMap } = get();
 
-    console.log('[AlbumPhotos] addPhotoToAlbum called:', { albumId, memoryId, userId, isDemoMode });
-
     // UUID validation regex
     const isValidUUID = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
@@ -1286,9 +1238,6 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
 
     if (!userId || isDemoMode || isSampleMemory) {
       // Demo mode or sample memory: add locally only
-      if (isSampleMemory && !isDemoMode) {
-        console.log('[AlbumPhotos] Sample memory detected, adding locally only:', memoryId);
-      }
       const newPhoto: AlbumPhoto = {
         id: `local-${Date.now()}`,
         album_id: albumId,
@@ -1326,7 +1275,6 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     const { data, error } = await db.albumPhotos.add(albumId, memoryId, userId);
 
     if (error) {
-      console.error('[AlbumPhotos] Error adding photo to album:', error);
       // Rollback optimistic update on error
       set((state) => ({
         albumPhotosMap: {
@@ -1336,8 +1284,6 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       }));
       return;
     }
-
-    console.log('[AlbumPhotos] Photo added successfully:', data);
 
     // Replace optimistic photo with real data from server
     if (data) {
@@ -1355,8 +1301,6 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
   removePhotoFromAlbum: async (albumId: string, memoryId: string) => {
     const { albumPhotosMap } = get();
 
-    console.log('[AlbumPhotos] removePhotoFromAlbum called:', { albumId, memoryId, isDemoMode });
-
     // Optimistic update: remove from local state immediately
     const existingPhotos = albumPhotosMap[albumId] || [];
     set({
@@ -1367,14 +1311,12 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     });
 
     if (isDemoMode) {
-      console.log('[AlbumPhotos] Demo mode - local removal only');
       return;
     }
 
     // Perform database delete
     const { error } = await db.albumPhotos.remove(albumId, memoryId);
     if (error) {
-      console.error('[AlbumPhotos] Error removing photo from album:', error);
       // Rollback optimistic update on error
       set({
         albumPhotosMap: {
@@ -1382,8 +1324,6 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
           [albumId]: existingPhotos,
         },
       });
-    } else {
-      console.log('[AlbumPhotos] Successfully removed photo from album');
     }
   },
 

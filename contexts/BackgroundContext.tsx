@@ -6,7 +6,7 @@ import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
 
 interface BackgroundContextType {
   backgroundImage: any;
-  setBackgroundImage: (image: any) => void;
+  setBackgroundImage: (image: any, skipPrefetch?: boolean) => Promise<void>;
   resetToDefault: () => void;
   isLoaded: boolean;
 }
@@ -104,21 +104,30 @@ export function BackgroundProvider({ children }: { children: ReactNode }) {
     }
   }, [isSyncInitialized, syncedBackgroundUrl, backgroundImage?.uri]);
 
-  const setBackgroundImage = useCallback(async (image: any) => {
+  const setBackgroundImage = useCallback(async (image: any, skipPrefetch: boolean = false) => {
     try {
-      console.log('[Background] setBackgroundImage called:', { uri: image?.uri, isSyncInitialized });
+      console.log('[Background] setBackgroundImage called:', { uri: image?.uri, isSyncInitialized, skipPrefetch });
+
+      // Prefetch image BEFORE setting state for instant display
+      if (image?.uri && !skipPrefetch) {
+        try {
+          await Image.prefetch(image.uri);
+        } catch (prefetchError) {
+          console.warn('[Background] Prefetch failed, continuing anyway:', prefetchError);
+        }
+      }
+
+      // Now set state - image is already cached, so it will display instantly
       setBackgroundImageState(image);
 
-      // Save custom background URI to AsyncStorage
+      // Save custom background URI to AsyncStorage (non-blocking)
       if (image?.uri) {
-        await AsyncStorage.setItem(BACKGROUND_STORAGE_KEY, image.uri);
-        // Preload the new image
-        await Image.prefetch(image.uri);
+        AsyncStorage.setItem(BACKGROUND_STORAGE_KEY, image.uri).catch(console.error);
 
-        // Sync to partner via coupleSyncStore (only remote URLs)
+        // Sync to partner via coupleSyncStore (only remote URLs, non-blocking)
         if (isSyncInitialized && isValidRemoteUrl(image.uri)) {
           console.log('[Background] Syncing to partner:', image.uri);
-          await syncBackgroundImage(image.uri);
+          syncBackgroundImage(image.uri).catch(console.error);
         } else {
           console.log('[Background] Not syncing - local file or not initialized');
         }

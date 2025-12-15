@@ -10,6 +10,7 @@ export interface User {
   coupleId?: string;
   preferences: UserPreferences;
   birthDate?: Date; // For age-based mission recommendations
+  birthDateCalendarType?: 'solar' | 'lunar'; // Solar or Lunar calendar for birthdate
   locationLatitude?: number;
   locationLongitude?: number;
   locationCity?: string;
@@ -39,12 +40,15 @@ export interface Couple {
   anniversaryType: AnniversaryType; // Legacy field
   datingStartDate?: Date; // For 100-day anniversary calculation
   weddingDate?: Date; // For wedding anniversary (if married)
+  relationshipType?: 'dating' | 'married'; // Relationship type for anniversary display
   status: CoupleStatus;
+  disconnectedAt?: Date; // For 30-day recovery period
+  disconnectedBy?: string; // user_id who initiated disconnect
   createdAt: Date;
 }
 
 export type AnniversaryType = '연애 시작일' | '결혼 기념일' | '첫 만남' | '아이 출생일';
-export type CoupleStatus = 'pending' | 'active';
+export type CoupleStatus = 'pending' | 'active' | 'disconnected';
 
 // Mission
 export interface Mission {

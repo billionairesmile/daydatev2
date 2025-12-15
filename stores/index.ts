@@ -6,7 +6,6 @@ export type {
   OnboardingData,
   OnboardingStep,
   RelationshipType,
-  TimePreference,
   ActivityType,
   DateWorry,
   Constraint,

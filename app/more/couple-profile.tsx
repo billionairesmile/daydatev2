@@ -25,6 +25,8 @@ import { useRouter } from 'expo-router';
 import { COLORS, SPACING, RADIUS } from '@/constants/design';
 import { useOnboardingStore, useAuthStore } from '@/stores';
 import type { RelationshipType } from '@/stores/onboardingStore';
+import { db, isDemoMode } from '@/lib/supabase';
+import { formatDateToLocal } from '@/lib/dateUtils';
 
 const { width } = Dimensions.get('window');
 
@@ -36,14 +38,16 @@ export default function CoupleProfileScreen() {
   const { user, partner, couple, updateAnniversary } = useAuthStore();
 
   const [viewMode, setViewMode] = useState<ViewMode>('main');
-  const [tempRelationshipType, setTempRelationshipType] = useState<RelationshipType>(data.relationshipType);
 
   // Use synced couple data as source of truth, fallback to local onboarding data
+  const syncedRelationshipType: RelationshipType = couple?.relationshipType || data.relationshipType || 'dating';
   const syncedAnniversaryDate = couple?.datingStartDate
     ? new Date(couple.datingStartDate)
     : data.anniversaryDate
       ? new Date(data.anniversaryDate)
       : null;
+
+  const [tempRelationshipType, setTempRelationshipType] = useState<RelationshipType>(syncedRelationshipType);
 
   const [tempAnniversaryDate, setTempAnniversaryDate] = useState<Date | null>(syncedAnniversaryDate);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -52,15 +56,37 @@ export default function CoupleProfileScreen() {
   const myNickname = data.nickname || user?.nickname || '나';
   const partnerNickname = partner?.nickname || '파트너';
 
-  const handleSaveAnniversary = () => {
+  const handleSaveAnniversary = async () => {
     updateData({
       relationshipType: tempRelationshipType,
       anniversaryDate: tempAnniversaryDate,
     });
+
     if (tempAnniversaryDate && couple) {
-      const typeLabel = tempRelationshipType === 'dating' ? '연애 시작일' :
-                        tempRelationshipType === 'married' ? '결혼 기념일' : '첫 만남';
+      const typeLabel = tempRelationshipType === 'dating' ? '연애 시작일' : '결혼 기념일';
       updateAnniversary(tempAnniversaryDate, typeLabel);
+
+      // Update couple in authStore with new dates
+      const updatedCouple = {
+        ...couple,
+        datingStartDate: tempAnniversaryDate,
+        weddingDate: tempRelationshipType === 'married' ? tempAnniversaryDate : undefined,
+        relationshipType: tempRelationshipType as 'dating' | 'married',
+      };
+      useAuthStore.getState().setCouple(updatedCouple);
+
+      // Save to database
+      if (!isDemoMode && couple.id) {
+        try {
+          await db.couples.update(couple.id, {
+            relationship_type: tempRelationshipType,
+            dating_start_date: formatDateToLocal(tempAnniversaryDate),
+            wedding_date: tempRelationshipType === 'married' ? formatDateToLocal(tempAnniversaryDate) : null,
+          });
+        } catch (error) {
+          console.error('Error updating anniversary:', error);
+        }
+      }
     }
     setViewMode('main');
   };
@@ -78,7 +104,7 @@ export default function CoupleProfileScreen() {
     switch (type) {
       case 'dating': return '연인';
       case 'married': return '부부';
-      case 'friendship': return '친구';
+      default: return '연인';
     }
   };
 
@@ -86,7 +112,7 @@ export default function CoupleProfileScreen() {
     switch (type) {
       case 'dating': return '사귄 날';
       case 'married': return '결혼기념일';
-      case 'friendship': return '친구가 된 날';
+      default: return '사귄 날';
     }
   };
 
@@ -101,7 +127,7 @@ export default function CoupleProfileScreen() {
       <Pressable
         style={styles.menuItem}
         onPress={() => {
-          setTempRelationshipType(data.relationshipType);
+          setTempRelationshipType(syncedRelationshipType);
           setTempAnniversaryDate(syncedAnniversaryDate);
           setViewMode('anniversary');
         }}
@@ -111,7 +137,7 @@ export default function CoupleProfileScreen() {
             <Calendar color={COLORS.black} size={20} />
           </View>
           <View style={styles.menuItemContent}>
-            <Text style={styles.menuItemLabel}>{getDateLabel(data.relationshipType)}</Text>
+            <Text style={styles.menuItemLabel}>{getDateLabel(syncedRelationshipType)}</Text>
             <Text style={styles.menuItemValue}>{formatDate(syncedAnniversaryDate)}</Text>
           </View>
         </View>
@@ -162,7 +188,7 @@ export default function CoupleProfileScreen() {
       {/* Relationship Type */}
       <Text style={styles.fieldLabel}>관계 유형</Text>
       <View style={styles.relationshipRow}>
-        {(['dating', 'married', 'friendship'] as RelationshipType[]).map((type) => (
+        {(['dating', 'married'] as RelationshipType[]).map((type) => (
           <Pressable
             key={type}
             style={[styles.relationshipButton, tempRelationshipType === type && styles.relationshipButtonActive]}
@@ -206,6 +232,8 @@ export default function CoupleProfileScreen() {
                 onChange={(_, date) => date && setTempAnniversaryDate(date)}
                 maximumDate={new Date()}
                 locale="ko-KR"
+                textColor={COLORS.black}
+                themeVariant="light"
                 style={styles.datePicker}
               />
             </View>
@@ -434,6 +462,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.black,
     marginBottom: SPACING.sm,
+    height: 20, // Fixed height to prevent layout shift when text changes
   },
   relationshipRow: {
     flexDirection: 'row',

@@ -4,7 +4,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Types
 export type RelationshipType = 'dating' | 'married' | 'friendship';
-export type TimePreference = 'weekday_evening' | 'weekday_day' | 'weekend_day' | 'weekend_night';
 
 export type ActivityType =
   | 'home'
@@ -51,16 +50,21 @@ export interface OnboardingData {
   gender: Gender | null;
   birthDate: Date | null;
   birthDateCalendarType: CalendarType;
-  termsAgreed: boolean;
   pairingCode: string;
   isCreatingCode: boolean;
   isPairingConnected: boolean; // True when pairing is successfully established
   relationshipType: RelationshipType;
   anniversaryDate: Date | null;
 
+  // Terms & Consent
+  ageVerified: boolean; // 만 14세 이상 확인
+  termsAgreed: boolean; // 서비스 이용약관
+  locationTermsAgreed: boolean; // 위치기반 서비스 이용약관
+  privacyAgreed: boolean; // 개인정보 수집 및 이용
+  marketingAgreed: boolean; // 광고성 알림 수신 (선택)
+
   // Step B - Preferences (Skippable)
   mbti: string;
-  timePreferences: TimePreference[];
   activityTypes: ActivityType[];
   dateWorries: DateWorry[];
   constraints: Constraint[];
@@ -103,14 +107,19 @@ const initialData: OnboardingData = {
   gender: null,
   birthDate: null,
   birthDateCalendarType: 'solar',
-  termsAgreed: false,
   pairingCode: '',
   isCreatingCode: true,
   isPairingConnected: false,
   relationshipType: 'dating',
   anniversaryDate: null,
+  // Terms & Consent
+  ageVerified: false,
+  termsAgreed: false,
+  locationTermsAgreed: false,
+  privacyAgreed: false,
+  marketingAgreed: false,
+  // Preferences
   mbti: '',
-  timePreferences: [],
   activityTypes: [],
   dateWorries: [],
   constraints: [],
@@ -201,13 +210,6 @@ export const MBTI_OPTIONS = [
   'INFJ', 'INFP', 'ENFJ', 'ENFP',
   'ISTJ', 'ISFJ', 'ESTJ', 'ESFJ',
   'ISTP', 'ISFP', 'ESTP', 'ESFP',
-];
-
-export const TIME_PREFERENCE_OPTIONS: { id: TimePreference; label: string }[] = [
-  { id: 'weekday_evening', label: '평일 저녁' },
-  { id: 'weekday_day', label: '평일 낮' },
-  { id: 'weekend_day', label: '주말 낮' },
-  { id: 'weekend_night', label: '주말 밤' },
 ];
 
 export const ACTIVITY_TYPE_OPTIONS: { id: ActivityType; label: string; icon: string }[] = [

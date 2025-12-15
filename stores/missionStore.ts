@@ -3,8 +3,21 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { DailyMission, Mission, MissionState, KeptMission, TodayCompletedMission } from '@/types';
 import { generateMissionsWithAI, generateMissionsFallback } from '@/services/missionGenerator';
-import { useOnboardingStore } from '@/stores/onboardingStore';
+import {
+  useOnboardingStore,
+  type OnboardingData,
+  type ActivityType,
+  type DateWorry,
+  type Constraint,
+} from '@/stores/onboardingStore';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
+import { useAuthStore } from '@/stores/authStore';
+import {
+  checkCoupleLocationStatus,
+  showLocationRequiredAlert,
+  updateUserLocationInDB,
+  type UserLocation,
+} from '@/lib/locationUtils';
 
 // Helper to get today's date string in YYYY-MM-DD format
 const getTodayDateString = (): string => {
@@ -74,7 +87,7 @@ interface MissionActions {
   getTodayCompletedMissionId: () => string | null;
   isTodayCompletedMission: (missionId: string) => boolean;
   // Mission generation actions
-  generateTodayMissions: (answers: MissionGenerationAnswers) => Promise<{ status: 'success' | 'locked' | 'exists'; message?: string }>;
+  generateTodayMissions: (answers: MissionGenerationAnswers) => Promise<{ status: 'success' | 'locked' | 'exists' | 'location_required'; message?: string }>;
   hasTodayMissions: () => boolean;
   getTodayMissions: () => Mission[];
   checkAndResetMissions: () => void;
@@ -249,10 +262,30 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
       },
 
       // Generate today's missions based on user answers (with AI)
-      // Returns: { status: 'success' | 'locked' | 'error', message?: string }
+      // Returns: { status: 'success' | 'locked' | 'error' | 'location_required', message?: string }
       generateTodayMissions: async (answers) => {
         const today = getTodayDateString();
         const syncStore = useCoupleSyncStore.getState();
+        const { user, partner } = useAuthStore.getState();
+
+        // Check location status for both users (required)
+        if (user?.id && partner?.id) {
+          const locationStatus = await checkCoupleLocationStatus(user.id, partner.id);
+
+          if (!locationStatus.bothEnabled) {
+            // Show alert and block mission generation
+            showLocationRequiredAlert(locationStatus.missingUsers);
+            return {
+              status: 'location_required' as const,
+              message: `위치 정보가 필요합니다: ${locationStatus.missingUsers.join(', ')}`,
+            };
+          }
+
+          // Update current user's location in DB
+          if (user.id) {
+            await updateUserLocationInDB(user.id);
+          }
+        }
 
         // Check if couple sync is initialized
         if (syncStore.isInitialized && syncStore.coupleId) {
@@ -282,9 +315,30 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
           // Get user preferences from onboarding store for personalization
           const onboardingData = useOnboardingStore.getState().data;
 
+          // Get partner preferences from authStore
+          const { partner, couple } = useAuthStore.getState();
+          let partnerPreferences: Partial<OnboardingData> | undefined;
+
+          if (partner?.preferences) {
+            // Extract relevant preference fields from partner's preferences
+            // The preferences stored in DB follow OnboardingData structure
+            const prefs = partner.preferences as unknown as Record<string, unknown>;
+            partnerPreferences = {
+              mbti: (prefs.mbti as string) || '',
+              activityTypes: (prefs.activityTypes as ActivityType[]) || [],
+              dateWorries: (prefs.dateWorries as DateWorry[]) || [],
+              constraints: (prefs.constraints as Constraint[]) || [],
+              birthDate: partner.birthDate || null,
+              birthDateCalendarType: partner.birthDateCalendarType || 'solar',
+              relationshipType: (prefs.relationshipType as 'dating' | 'married') || couple?.relationshipType || 'dating',
+              anniversaryDate: couple?.datingStartDate || null,
+            };
+          }
+
           // Try to generate missions with AI
           const aiMissions = await generateMissionsWithAI({
             userAPreferences: onboardingData,
+            userBPreferences: partnerPreferences as OnboardingData | undefined,
             todayAnswers: answers,
           });
 

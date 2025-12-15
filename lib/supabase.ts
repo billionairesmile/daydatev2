@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { File as ExpoFile } from 'expo-file-system';
 import { decode } from 'base64-arraybuffer';
+import { formatDateToLocal } from './dateUtils';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -93,7 +94,7 @@ export const db = {
     },
 
     // Subscribe to pairing code changes (for creator to know when joiner connects)
-    subscribeToCode(code: string, callback: (payload: { status: string; joiner_id: string | null }) => void) {
+    subscribeToCode(code: string, callback: (payload: { status: string; joiner_id: string | null; joiner_proceeded_at: string | null }) => void) {
       const client = getSupabase();
       const channel = client
         .channel(`pairing:${code}`)
@@ -106,8 +107,8 @@ export const db = {
             filter: `code=eq.${code}`,
           },
           (payload) => {
-            const newRecord = payload.new as { status: string; joiner_id: string | null };
-            callback({ status: newRecord.status, joiner_id: newRecord.joiner_id });
+            const newRecord = payload.new as { status: string; joiner_id: string | null; joiner_proceeded_at: string | null };
+            callback({ status: newRecord.status, joiner_id: newRecord.joiner_id, joiner_proceeded_at: newRecord.joiner_proceeded_at });
           }
         )
         .subscribe();
@@ -152,6 +153,18 @@ export const db = {
         .single();
       return { data, error };
     },
+
+    // Mark that joiner has proceeded to next screen
+    async markJoinerProceeded(code: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('pairing_codes')
+        .update({ joiner_proceeded_at: new Date().toISOString() })
+        .eq('code', code)
+        .select()
+        .single();
+      return { data, error };
+    },
   },
 
   // Profiles
@@ -170,6 +183,7 @@ export const db = {
       id: string;
       nickname: string;
       invite_code: string;
+      email?: string;
       preferences?: Record<string, unknown>;
       birth_date?: string; // ISO date string
       location_latitude?: number;
@@ -201,6 +215,7 @@ export const db = {
       id: string;
       nickname?: string;
       invite_code?: string;
+      email?: string;
       preferences?: Record<string, unknown>;
       birth_date?: string;
       location_latitude?: number;
@@ -287,6 +302,71 @@ export const db = {
         .single();
       return { data, error };
     },
+
+    // Soft delete - disconnect couple (30-day recovery period)
+    async disconnect(coupleId: string, userId: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('couples')
+        .update({
+          status: 'disconnected',
+          disconnected_at: new Date().toISOString(),
+          disconnected_by: userId,
+        })
+        .eq('id', coupleId)
+        .select()
+        .single();
+      return { data, error };
+    },
+
+    // Find disconnected couple for recovery (within 30 days, same user pair)
+    async findDisconnectedCouple(userId1: string, userId2: string) {
+      const client = getSupabase();
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      // Check both combinations (user1+user2 or user2+user1)
+      const { data, error } = await client
+        .from('couples')
+        .select('*')
+        .eq('status', 'disconnected')
+        .gte('disconnected_at', thirtyDaysAgo.toISOString())
+        .or(
+          `and(user1_id.eq.${userId1},user2_id.eq.${userId2}),and(user1_id.eq.${userId2},user2_id.eq.${userId1})`
+        )
+        .order('disconnected_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return { data, error };
+    },
+
+    // Restore a disconnected couple
+    async restoreCouple(coupleId: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('couples')
+        .update({
+          status: 'active',
+          disconnected_at: null,
+          disconnected_by: null,
+        })
+        .eq('id', coupleId)
+        .select()
+        .single();
+      return { data, error };
+    },
+
+    // Get active couple by user ID (excludes disconnected)
+    async getActiveByUserId(userId: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('couples')
+        .select('*')
+        .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
+        .neq('status', 'disconnected')
+        .maybeSingle();
+      return { data, error };
+    },
   },
 
   // Missions
@@ -323,7 +403,7 @@ export const db = {
   dailyMissions: {
     async getToday(coupleId: string) {
       const client = getSupabase();
-      const today = new Date().toISOString().split('T')[0];
+      const today = formatDateToLocal(new Date());
       const { data, error } = await client
         .from('daily_missions')
         .select('*, mission:missions(*)')
@@ -459,16 +539,10 @@ export const db = {
     // Delete memory
     async delete(id: string) {
       const client = getSupabase();
-      console.log('[Supabase] Deleting completed_mission:', id);
       const { error } = await client
         .from('completed_missions')
         .delete()
         .eq('id', id);
-      if (error) {
-        console.error('[Supabase] Delete error:', error);
-      } else {
-        console.log('[Supabase] Delete successful');
-      }
       return { error };
     },
 
@@ -478,7 +552,6 @@ export const db = {
       callback: (payload: { eventType: string; memory: unknown }) => void
     ) {
       const client = getSupabase();
-      console.log('[Supabase] Setting up completed_missions subscription for coupleId:', coupleId);
       const channel = client
         .channel(`completed_missions:${coupleId}`)
         .on(
@@ -490,22 +563,13 @@ export const db = {
             filter: `couple_id=eq.${coupleId}`,
           },
           (payload) => {
-            console.log('[Supabase] completed_missions event received:', payload.eventType);
-            if (payload.eventType === 'DELETE') {
-              console.log('[Supabase] completed_missions DELETE payload.old:', JSON.stringify(payload.old));
-            }
             callback({
               eventType: payload.eventType,
               memory: payload.eventType === 'DELETE' ? payload.old : payload.new,
             });
           }
         )
-        .subscribe((status, err) => {
-          console.log('[Supabase] completed_missions subscription status:', status);
-          if (err) {
-            console.error('[Supabase] completed_missions subscription error:', err);
-          }
-        });
+        .subscribe();
       return channel;
     },
 
@@ -691,7 +755,7 @@ export const db = {
   featuredMissions: {
     async getActiveForToday() {
       const client = getSupabase();
-      const today = new Date().toISOString().split('T')[0];
+      const today = formatDateToLocal(new Date());
 
       const { data, error } = await client
         .from('featured_missions')
@@ -1426,7 +1490,6 @@ export const db = {
       userId: string
     ) {
       const client = getSupabase();
-      console.log('[CoupleSettings] Upserting:', { coupleId, settings, userId });
       const { data, error } = await client
         .from('couple_settings')
         .upsert(
@@ -1439,7 +1502,6 @@ export const db = {
         )
         .select()
         .single();
-      console.log('[CoupleSettings] Upsert result:', { data, error });
       return { data, error };
     },
 
@@ -1477,7 +1539,7 @@ export const db = {
   missionProgress: {
     async getToday(coupleId: string) {
       const client = getSupabase();
-      const today = new Date().toISOString().split('T')[0];
+      const today = formatDateToLocal(new Date());
       const { data, error } = await client
         .from('mission_progress')
         .select('*')
@@ -1504,7 +1566,7 @@ export const db = {
       userId: string
     ) {
       const client = getSupabase();
-      const today = new Date().toISOString().split('T')[0];
+      const today = formatDateToLocal(new Date());
       const { data, error } = await client
         .from('mission_progress')
         .insert({
@@ -1600,7 +1662,7 @@ export const db = {
     // Delete all mission progress for today (for reset)
     async deleteToday(coupleId: string) {
       const client = getSupabase();
-      const today = new Date().toISOString().split('T')[0];
+      const today = formatDateToLocal(new Date());
       const { error } = await client
         .from('mission_progress')
         .delete()
@@ -1778,17 +1840,11 @@ export const db = {
 
     async remove(albumId: string, memoryId: string) {
       const client = getSupabase();
-      console.log('[Supabase] Removing album_photo:', { albumId, memoryId });
       const { error } = await client
         .from('album_photos')
         .delete()
         .eq('album_id', albumId)
         .eq('memory_id', memoryId);
-      if (error) {
-        console.error('[Supabase] album_photos remove error:', error);
-      } else {
-        console.log('[Supabase] album_photos remove successful');
-      }
       return { error };
     },
 
@@ -1808,7 +1864,6 @@ export const db = {
       const client = getSupabase();
       // Subscribe to all album_photos changes for albums belonging to this couple
       // Note: Filtered at application level since we can't filter by couple_id directly
-      console.log('[Supabase] Setting up album_photos subscription for coupleId:', coupleId);
       const channel = client
         .channel(`album_photos:${coupleId}`)
         .on(
@@ -1819,22 +1874,13 @@ export const db = {
             table: 'album_photos',
           },
           (payload) => {
-            console.log('[Supabase] album_photos event received:', payload.eventType);
-            if (payload.eventType === 'DELETE') {
-              console.log('[Supabase] album_photos DELETE payload.old:', JSON.stringify(payload.old));
-            }
             callback({
               eventType: payload.eventType,
               albumPhoto: payload.eventType === 'DELETE' ? payload.old : payload.new,
             });
           }
         )
-        .subscribe((status, err) => {
-          console.log('[Supabase] album_photos subscription status:', status);
-          if (err) {
-            console.error('[Supabase] album_photos subscription error:', err);
-          }
-        });
+        .subscribe();
       return channel;
     },
 
@@ -1942,6 +1988,345 @@ export const db = {
         console.error('Album cover upload error:', error);
         return null;
       }
+    },
+  },
+
+  // Account Management
+  account: {
+    /**
+     * Completely delete a user's account and all associated data
+     * This is a hard delete - data cannot be recovered
+     */
+    async deleteAccount(userId: string, coupleId: string | null) {
+      const client = getSupabase();
+      const errors: string[] = [];
+
+      try {
+        // 1. Delete mission completions (depends on daily_missions)
+        if (coupleId) {
+          const { error: mcError } = await client
+            .from('mission_completions')
+            .delete()
+            .eq('user_id', userId);
+          if (mcError) errors.push(`mission_completions: ${mcError.message}`);
+        }
+
+        // 2. Delete daily missions for the couple
+        if (coupleId) {
+          const { error: dmError } = await client
+            .from('daily_missions')
+            .delete()
+            .eq('couple_id', coupleId);
+          if (dmError) errors.push(`daily_missions: ${dmError.message}`);
+        }
+
+        // 3. Delete completed missions for the couple
+        if (coupleId) {
+          const { error: cmError } = await client
+            .from('completed_missions')
+            .delete()
+            .eq('couple_id', coupleId);
+          if (cmError) errors.push(`completed_missions: ${cmError.message}`);
+        }
+
+        // 4. Delete anniversaries for the couple
+        if (coupleId) {
+          const { error: annError } = await client
+            .from('anniversaries')
+            .delete()
+            .eq('couple_id', coupleId);
+          if (annError) errors.push(`anniversaries: ${annError.message}`);
+        }
+
+        // 5. Delete todos for the couple
+        if (coupleId) {
+          const { error: todoError } = await client
+            .from('todos')
+            .delete()
+            .eq('couple_id', coupleId);
+          if (todoError) errors.push(`todos: ${todoError.message}`);
+        }
+
+        // 6. Delete couple sync data
+        if (coupleId) {
+          const { error: syncError } = await client
+            .from('couple_sync')
+            .delete()
+            .eq('couple_id', coupleId);
+          if (syncError) errors.push(`couple_sync: ${syncError.message}`);
+        }
+
+        // 7. Delete albums and album photos for the couple
+        if (coupleId) {
+          // First delete album photos
+          const { data: albums } = await client
+            .from('albums')
+            .select('id')
+            .eq('couple_id', coupleId);
+
+          if (albums && albums.length > 0) {
+            const albumIds = albums.map(a => a.id);
+            const { error: photoError } = await client
+              .from('album_photos')
+              .delete()
+              .in('album_id', albumIds);
+            if (photoError) errors.push(`album_photos: ${photoError.message}`);
+          }
+
+          // Then delete albums
+          const { error: albumError } = await client
+            .from('albums')
+            .delete()
+            .eq('couple_id', coupleId);
+          if (albumError) errors.push(`albums: ${albumError.message}`);
+        }
+
+        // 8. Delete pairing codes created by this user
+        const { error: pcError } = await client
+          .from('pairing_codes')
+          .delete()
+          .eq('creator_id', userId);
+        if (pcError) errors.push(`pairing_codes: ${pcError.message}`);
+
+        // 9. Delete onboarding answers
+        const { error: oaError } = await client
+          .from('onboarding_answers')
+          .delete()
+          .eq('user_id', userId);
+        if (oaError) errors.push(`onboarding_answers: ${oaError.message}`);
+
+        // 10. Delete the couple record
+        if (coupleId) {
+          const { error: coupleError } = await client
+            .from('couples')
+            .delete()
+            .eq('id', coupleId);
+          if (coupleError) errors.push(`couples: ${coupleError.message}`);
+        }
+
+        // 11. Delete user profile
+        const { error: profileError } = await client
+          .from('profiles')
+          .delete()
+          .eq('id', userId);
+        if (profileError) errors.push(`profiles: ${profileError.message}`);
+
+        // 12. Delete storage files (photos, backgrounds, etc.)
+        if (coupleId) {
+          try {
+            // Delete memories folder
+            const { data: memoryFiles } = await client.storage
+              .from('memories')
+              .list(`${coupleId}`);
+            if (memoryFiles && memoryFiles.length > 0) {
+              const filePaths = memoryFiles.map(f => `${coupleId}/${f.name}`);
+              await client.storage.from('memories').remove(filePaths);
+            }
+
+            // Delete backgrounds folder
+            const { data: bgFiles } = await client.storage
+              .from('memories')
+              .list(`backgrounds/${coupleId}`);
+            if (bgFiles && bgFiles.length > 0) {
+              const bgPaths = bgFiles.map(f => `backgrounds/${coupleId}/${f.name}`);
+              await client.storage.from('memories').remove(bgPaths);
+            }
+
+            // Delete album covers folder
+            const { data: coverFiles } = await client.storage
+              .from('memories')
+              .list(`album-covers/${coupleId}`);
+            if (coverFiles && coverFiles.length > 0) {
+              const coverPaths = coverFiles.map(f => `album-covers/${coupleId}/${f.name}`);
+              await client.storage.from('memories').remove(coverPaths);
+            }
+          } catch (storageError) {
+            console.error('Storage cleanup error:', storageError);
+            errors.push(`storage: ${String(storageError)}`);
+          }
+        }
+
+        // 13. Sign out from Supabase Auth (this invalidates the session)
+        const { error: signOutError } = await client.auth.signOut();
+        if (signOutError) errors.push(`auth.signOut: ${signOutError.message}`);
+
+        // Return result
+        if (errors.length > 0) {
+          console.error('[Account Delete] Partial errors:', errors);
+          return { success: true, errors }; // Still consider success if main data deleted
+        }
+
+        return { success: true, errors: [] };
+      } catch (error) {
+        console.error('[Account Delete] Fatal error:', error);
+        return { success: false, errors: [String(error)] };
+      }
+    },
+
+    /**
+     * Clear all AsyncStorage data
+     */
+    async clearLocalStorage() {
+      try {
+        await AsyncStorage.clear();
+        return { success: true };
+      } catch (error) {
+        console.error('[Account Delete] AsyncStorage clear error:', error);
+        return { success: false, error: String(error) };
+      }
+    },
+  },
+
+  // ============================================
+  // Admin - Couple Cleanup Operations
+  // ============================================
+  admin: {
+    /**
+     * Preview disconnected couples that would be cleaned up
+     * Shows couples that have been disconnected for any period
+     */
+    async previewCleanup() {
+      const client = getSupabase();
+      const { data, error } = await client.rpc('preview_cleanup_disconnected_couples');
+      return { data, error };
+    },
+
+    /**
+     * Run cleanup manually (deletes couples disconnected > 30 days)
+     * @param trigger - Source of cleanup: 'manual' or 'user_request'
+     */
+    async runCleanup(trigger: 'manual' | 'user_request' = 'manual') {
+      const client = getSupabase();
+      const { data, error } = await client.rpc('cleanup_disconnected_couples_with_log', {
+        p_trigger: trigger,
+      });
+      return { data, error };
+    },
+
+    /**
+     * Get cleanup history/audit log
+     * @param limit - Number of records to fetch
+     */
+    async getCleanupLog(limit: number = 50) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('couple_cleanup_log')
+        .select('*')
+        .order('cleaned_up_at', { ascending: false })
+        .limit(limit);
+      return { data, error };
+    },
+
+    /**
+     * Get all disconnected couples (for admin dashboard)
+     */
+    async getDisconnectedCouples() {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('couples')
+        .select(`
+          id,
+          user1_id,
+          user2_id,
+          status,
+          disconnected_at,
+          disconnected_by,
+          created_at
+        `)
+        .eq('status', 'disconnected')
+        .order('disconnected_at', { ascending: true });
+      return { data, error };
+    },
+
+    /**
+     * Clean up storage files for a specific couple
+     * Call this before or after deleting couple data
+     */
+    async cleanupCoupleStorage(coupleId: string) {
+      const client = getSupabase();
+      const errors: string[] = [];
+
+      try {
+        // Delete memories folder
+        const { data: memoryFiles } = await client.storage
+          .from('memories')
+          .list(`${coupleId}`);
+        if (memoryFiles && memoryFiles.length > 0) {
+          const filePaths = memoryFiles.map(f => `${coupleId}/${f.name}`);
+          const { error } = await client.storage.from('memories').remove(filePaths);
+          if (error) errors.push(`memories: ${error.message}`);
+        }
+
+        // Delete backgrounds folder
+        const { data: bgFiles } = await client.storage
+          .from('memories')
+          .list(`backgrounds/${coupleId}`);
+        if (bgFiles && bgFiles.length > 0) {
+          const bgPaths = bgFiles.map(f => `backgrounds/${coupleId}/${f.name}`);
+          const { error } = await client.storage.from('memories').remove(bgPaths);
+          if (error) errors.push(`backgrounds: ${error.message}`);
+        }
+
+        // Delete album covers folder
+        const { data: coverFiles } = await client.storage
+          .from('memories')
+          .list(`album-covers/${coupleId}`);
+        if (coverFiles && coverFiles.length > 0) {
+          const coverPaths = coverFiles.map(f => `album-covers/${coupleId}/${f.name}`);
+          const { error } = await client.storage.from('memories').remove(coverPaths);
+          if (error) errors.push(`album-covers: ${error.message}`);
+        }
+
+        return {
+          success: errors.length === 0,
+          errors,
+        };
+      } catch (error) {
+        return {
+          success: false,
+          errors: [...errors, String(error)],
+        };
+      }
+    },
+
+    /**
+     * Run full cleanup via Edge Function (includes Storage cleanup)
+     * @param dryRun - If true, only preview without deleting
+     */
+    async runFullCleanup(dryRun: boolean = false) {
+      const client = getSupabase();
+      const projectUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+
+      if (!projectUrl) {
+        return {
+          success: false,
+          error: 'Supabase URL not configured',
+        };
+      }
+
+      try {
+        const { data, error } = await client.functions.invoke('cleanup-couples', {
+          body: {
+            trigger: 'manual',
+            dry_run: dryRun,
+          },
+        });
+
+        if (error) {
+          return { success: false, error: error.message, data: null };
+        }
+
+        return { success: true, error: null, data };
+      } catch (error) {
+        return { success: false, error: String(error), data: null };
+      }
+    },
+
+    /**
+     * Preview cleanup (dry run) - shows what would be deleted
+     */
+    async previewFullCleanup() {
+      return this.runFullCleanup(true);
     },
   },
 };

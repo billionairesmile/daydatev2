@@ -16,6 +16,7 @@ import {
   Image,
   ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import {
   Heart,
@@ -24,9 +25,13 @@ import {
   Calendar,
   Gift,
   Copy,
+  X,
 } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as Linking from 'expo-linking';
+import * as Notifications from 'expo-notifications';
+import * as Location from 'expo-location';
+import { WebView } from 'react-native-webview';
 import { useRouter } from 'expo-router';
 import { signInWithGoogle, signInWithKakao, onAuthStateChange } from '@/lib/socialAuth';
 
@@ -157,11 +162,61 @@ export default function OnboardingScreen() {
           if (profileError) {
             console.error('[Onboarding] Profile upsert error:', profileError);
           }
+
+          // Check if user already has a completed couple (already paired)
+          const { data: existingCouple } = await db.couples.getActiveByUserId(session.user.id);
+
+          if (existingCouple && existingCouple.user1_id && existingCouple.user2_id) {
+            console.log('[Onboarding] User already paired, skipping to basic_info');
+
+            // Set couple in auth store
+            setCouple({
+              id: existingCouple.id,
+              user1Id: existingCouple.user1_id,
+              user2Id: existingCouple.user2_id,
+              anniversaryDate: existingCouple.dating_start_date ? new Date(existingCouple.dating_start_date) : new Date(),
+              datingStartDate: existingCouple.dating_start_date ? new Date(existingCouple.dating_start_date) : undefined,
+              anniversaryType: '연애 시작일',
+              status: 'active',
+              createdAt: existingCouple.created_at ? new Date(existingCouple.created_at) : new Date(),
+            });
+
+            // Fetch partner profile
+            const partnerId = existingCouple.user1_id === session.user.id
+              ? existingCouple.user2_id
+              : existingCouple.user1_id;
+
+            const { data: partnerProfile } = await db.profiles.get(partnerId);
+            if (partnerProfile) {
+              setPartner({
+                id: partnerId,
+                email: partnerProfile.email || '',
+                nickname: partnerProfile.nickname || '',
+                inviteCode: '',
+                birthDate: partnerProfile.birth_date ? new Date(partnerProfile.birth_date) : undefined,
+                preferences: partnerProfile.preferences || {},
+                createdAt: partnerProfile.created_at ? new Date(partnerProfile.created_at) : new Date(),
+              });
+            }
+
+            // Skip to basic_info step (after pairing)
+            Alert.alert(
+              '다시 오셨군요!',
+              '이미 파트너와 연결되어 있습니다. 기본정보 입력부터 계속합니다.',
+              [
+                {
+                  text: '계속하기',
+                  onPress: () => animateTransition(() => setStep('basic_info')),
+                },
+              ]
+            );
+            return;
+          }
         } catch (dbError) {
           console.error('[Onboarding] DB error:', dbError);
         }
 
-        // Move to terms step
+        // Move to terms step (for new users)
         Alert.alert(
           '로그인 성공',
           `${provider === 'google' ? '구글' : '카카오'} 계정으로 로그인되었습니다.`,
@@ -345,6 +400,7 @@ export default function OnboardingScreen() {
             <TermsStep
               onNext={handleNext}
               onBack={() => animateTransition(() => setStep('welcome'))}
+              updateData={updateData}
             />
           )}
           {currentStep === 'pairing' && (
@@ -757,33 +813,146 @@ function BasicInfoStep({
 function TermsStep({
   onNext,
   onBack,
+  updateData,
 }: {
   onNext: () => void;
   onBack: () => void;
+  updateData: (data: Partial<import('@/stores/onboardingStore').OnboardingData>) => void;
 }) {
-  const [serviceTerms, setServiceTerms] = useState(false);
-  const [privacyTerms, setPrivacyTerms] = useState(false);
+  const [ageVerified, setAgeVerified] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(false);
+  const [locationTermsAgreed, setLocationTermsAgreed] = useState(false);
+  const [privacyAgreed, setPrivacyAgreed] = useState(false);
+  const [marketingAgreed, setMarketingAgreed] = useState(false);
 
-  const allAgreed = serviceTerms && privacyTerms;
+  const [policyModalVisible, setPolicyModalVisible] = useState(false);
+  const [policyUrl, setPolicyUrl] = useState('');
+  const [policyTitle, setPolicyTitle] = useState('');
+  const [webViewLoading, setWebViewLoading] = useState(true);
 
-  const handleAgreeAll = () => {
+  const requiredAgreed = ageVerified && termsAgreed && locationTermsAgreed && privacyAgreed;
+  const allAgreed = requiredAgreed && marketingAgreed;
+
+  const handleAgreeAll = async () => {
     const newValue = !allAgreed;
-    setServiceTerms(newValue);
-    setPrivacyTerms(newValue);
+
+    if (newValue) {
+      // Request location permission first (required)
+      const locationGranted = await requestLocationPermission();
+      if (!locationGranted) {
+        // Don't toggle if location permission is not granted
+        return;
+      }
+
+      // Request notification permission (optional)
+      await requestNotificationPermission();
+    }
+
+    setAgeVerified(newValue);
+    setTermsAgreed(newValue);
+    setLocationTermsAgreed(newValue);
+    setPrivacyAgreed(newValue);
+    setMarketingAgreed(newValue);
+  };
+
+  const requestNotificationPermission = async () => {
+    try {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+
+      // Permission not granted - handled silently
+    } catch (error) {
+      // Error handled silently
+    }
+  };
+
+  const requestLocationPermission = async () => {
+    try {
+      const { status: existingStatus } = await Location.getForegroundPermissionsAsync();
+      let finalStatus = existingStatus;
+
+      if (existingStatus !== 'granted') {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        finalStatus = status;
+      }
+
+      if (finalStatus !== 'granted') {
+        Alert.alert(
+          '위치 권한 필요',
+          '위치기반 서비스를 이용하려면 위치 권한이 필요합니다. 설정에서 위치 권한을 허용해주세요.',
+          [
+            { text: '취소', style: 'cancel' },
+            { text: '설정으로 이동', onPress: () => Linking.openSettings() },
+          ]
+        );
+        return false;
+      }
+      return true;
+    } catch (error) {
+      return false;
+    }
+  };
+
+  const handleLocationTermsToggle = async () => {
+    const newValue = !locationTermsAgreed;
+
+    if (newValue) {
+      // Request location permission when agreeing
+      const granted = await requestLocationPermission();
+      if (granted) {
+        setLocationTermsAgreed(true);
+      }
+      // If not granted, don't toggle the checkbox
+    } else {
+      setLocationTermsAgreed(false);
+    }
+  };
+
+  const handleMarketingToggle = async () => {
+    const newValue = !marketingAgreed;
+    setMarketingAgreed(newValue);
+
+    if (newValue) {
+      await requestNotificationPermission();
+    }
+  };
+
+  const openPolicyModal = (url: string, title: string) => {
+    setPolicyUrl(url);
+    setPolicyTitle(title);
+    setWebViewLoading(true);
+    setPolicyModalVisible(true);
+  };
+
+  const handleNext = () => {
+    // Save consent data
+    updateData({
+      ageVerified,
+      termsAgreed,
+      locationTermsAgreed,
+      privacyAgreed,
+      marketingAgreed,
+    });
+    onNext();
   };
 
   return (
-    <View style={styles.centeredStepContainer}>
+    <View style={styles.termsStepContainer}>
       {/* Title fixed at top */}
-      <View style={styles.nicknameTitleContainer}>
+      <View style={styles.termsTitleContainer}>
         <Text style={[styles.stepTitle, { minHeight: 36 }]}>이용약관 동의</Text>
         <Text style={styles.stepDescription}>
           서비스 이용을 위해 약관에 동의해주세요
         </Text>
       </View>
 
-      {/* Content centered in remaining space */}
-      <View style={styles.nicknameCenterArea}>
+      {/* Content area */}
+      <View style={styles.termsContentArea}>
         <View style={styles.termsContainer}>
           <Pressable style={styles.termsAllButton} onPress={handleAgreeAll}>
             <View style={[styles.checkbox, allAgreed && styles.checkboxChecked]}>
@@ -794,37 +963,102 @@ function TermsStep({
 
           <View style={styles.termsDivider} />
 
+          {/* 1. Age Verification */}
+          <View style={styles.termsItemWrapper}>
+            <View style={styles.termsItem}>
+              <Pressable
+                style={styles.termsCheckboxArea}
+                onPress={() => setAgeVerified(!ageVerified)}
+              >
+                <View style={[styles.checkbox, ageVerified && styles.checkboxChecked]}>
+                  {ageVerified && <Check color={COLORS.black} size={16} />}
+                </View>
+              </Pressable>
+              <View style={styles.termsTextArea}>
+                <Text style={styles.termsItemText}>[필수] 만 14세 이상입니다</Text>
+              </View>
+            </View>
+            <View style={styles.termsDescriptionBox}>
+              <Text style={styles.termsDescriptionText}>
+                서비스 이용을 위해서는 만 14세 이상이 되어야 합니다. 만 14세 미만의 이용자의 경우 서비스 이용이 제한됩니다.
+              </Text>
+            </View>
+          </View>
+
+          {/* 2. Service Terms */}
           <View style={styles.termsItem}>
             <Pressable
               style={styles.termsCheckboxArea}
-              onPress={() => setServiceTerms(!serviceTerms)}
+              onPress={() => setTermsAgreed(!termsAgreed)}
             >
-              <View style={[styles.checkbox, serviceTerms && styles.checkboxChecked]}>
-                {serviceTerms && <Check color={COLORS.black} size={16} />}
+              <View style={[styles.checkbox, termsAgreed && styles.checkboxChecked]}>
+                {termsAgreed && <Check color={COLORS.black} size={16} />}
               </View>
             </Pressable>
-            <Pressable style={styles.termsTextArea} onPress={() => { }}>
-              <Text style={styles.termsItemText}>[필수] 서비스 이용약관</Text>
+            <Pressable
+              style={styles.termsTextArea}
+              onPress={() => openPolicyModal('https://daydate.my/policy/terms', '서비스 이용약관')}
+            >
+              <Text style={styles.termsItemText}>[필수] 서비스 이용약관 동의</Text>
               <ChevronRight color="rgba(255,255,255,0.4)" size={20} />
             </Pressable>
           </View>
 
+          {/* 3. Location Terms */}
           <View style={styles.termsItem}>
             <Pressable
               style={styles.termsCheckboxArea}
-              onPress={() => setPrivacyTerms(!privacyTerms)}
+              onPress={handleLocationTermsToggle}
             >
-              <View style={[styles.checkbox, privacyTerms && styles.checkboxChecked]}>
-                {privacyTerms && <Check color={COLORS.black} size={16} />}
+              <View style={[styles.checkbox, locationTermsAgreed && styles.checkboxChecked]}>
+                {locationTermsAgreed && <Check color={COLORS.black} size={16} />}
               </View>
             </Pressable>
-            <Pressable style={styles.termsTextArea} onPress={() => { }}>
-              <Text style={styles.termsItemText}>[필수] 개인정보처리방침</Text>
+            <Pressable
+              style={styles.termsTextArea}
+              onPress={() => openPolicyModal('https://daydate.my/policy/location', '위치기반 서비스 이용약관')}
+            >
+              <Text style={styles.termsItemText}>[필수] 위치기반 서비스 이용약관 동의</Text>
               <ChevronRight color="rgba(255,255,255,0.4)" size={20} />
+            </Pressable>
+          </View>
+
+          {/* 4. Privacy Policy */}
+          <View style={styles.termsItem}>
+            <Pressable
+              style={styles.termsCheckboxArea}
+              onPress={() => setPrivacyAgreed(!privacyAgreed)}
+            >
+              <View style={[styles.checkbox, privacyAgreed && styles.checkboxChecked]}>
+                {privacyAgreed && <Check color={COLORS.black} size={16} />}
+              </View>
+            </Pressable>
+            <Pressable
+              style={styles.termsTextArea}
+              onPress={() => openPolicyModal('https://daydate.my/policy/privacy', '개인정보 수집 및 이용')}
+            >
+              <Text style={styles.termsItemText}>[필수] 개인정보 수집 및 이용 동의</Text>
+              <ChevronRight color="rgba(255,255,255,0.4)" size={20} />
+            </Pressable>
+          </View>
+
+          {/* 5. Marketing (Optional) */}
+          <View style={styles.termsItem}>
+            <Pressable
+              style={styles.termsCheckboxArea}
+              onPress={handleMarketingToggle}
+            >
+              <View style={[styles.checkbox, marketingAgreed && styles.checkboxChecked]}>
+                {marketingAgreed && <Check color={COLORS.black} size={16} />}
+              </View>
+            </Pressable>
+            <Pressable style={styles.termsTextArea} onPress={handleMarketingToggle}>
+              <Text style={styles.termsItemText}>[선택] 광고성 알림 수신 동의</Text>
             </Pressable>
           </View>
         </View>
       </View>
+
 
       {/* Buttons fixed at bottom */}
       <View style={styles.buttonRow}>
@@ -832,13 +1066,45 @@ function TermsStep({
           <Text style={styles.secondaryButtonText}>이전</Text>
         </Pressable>
         <Pressable
-          style={[styles.primaryButton, styles.buttonFlex, !allAgreed && styles.primaryButtonDisabled]}
-          onPress={onNext}
-          disabled={!allAgreed}
+          style={[styles.primaryButton, styles.buttonFlex, !requiredAgreed && styles.primaryButtonDisabled]}
+          onPress={handleNext}
+          disabled={!requiredAgreed}
         >
           <Text style={styles.primaryButtonText}>다음</Text>
         </Pressable>
       </View>
+
+      {/* Policy Modal with WebView */}
+      <Modal
+        visible={policyModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setPolicyModalVisible(false)}
+      >
+        <SafeAreaView style={styles.policyModalContainer}>
+          <View style={styles.policyModalHeader}>
+            <Text style={styles.policyModalTitle}>{policyTitle}</Text>
+            <Pressable
+              style={styles.policyModalCloseButton}
+              onPress={() => setPolicyModalVisible(false)}
+            >
+              <X color={COLORS.black} size={24} />
+            </Pressable>
+          </View>
+          {webViewLoading && (
+            <View style={styles.webViewLoading}>
+              <ActivityIndicator size="large" color={COLORS.black} />
+            </View>
+          )}
+          <WebView
+            source={{ uri: policyUrl }}
+            style={styles.webView}
+            onLoadStart={() => setWebViewLoading(true)}
+            onLoadEnd={() => setWebViewLoading(false)}
+            startInLoadingState={true}
+          />
+        </SafeAreaView>
+      </Modal>
     </View>
   );
 }
@@ -1012,6 +1278,12 @@ function PairingStep({
 
           // Subscribe to changes (realtime)
           channelRef.current = db.pairingCodes.subscribeToCode(codeToUse, async (payload) => {
+            // When joiner proceeds to next screen, auto-follow
+            if (payload.joiner_proceeded_at) {
+              onNext();
+              return;
+            }
+
             if (payload.status === 'connected' && payload.joiner_id) {
               // Fetch updated couple data
               const { data: pairingData } = await db.pairingCodes.getWithCouple(codeToUse);
@@ -1312,6 +1584,10 @@ function PairingStep({
       }
 
       setIsPairingConnected(true);
+
+      // Mark that joiner has proceeded (for creator to auto-follow)
+      await db.pairingCodes.markJoinerProceeded(pairingCode);
+
       onNext();
     } catch (err) {
       console.error('Join error:', err);
@@ -1338,7 +1614,7 @@ function PairingStep({
     : pairingCode.length >= 4;
 
   return (
-    <View style={styles.centeredStepContainer}>
+    <View style={[styles.centeredStepContainer]}>
       {/* Title fixed at top */}
       <View style={styles.nicknameTitleContainer}>
         <Text style={styles.stepTitle}>파트너와{'\n'}연결해주세요</Text>
@@ -1348,7 +1624,7 @@ function PairingStep({
       </View>
 
       {/* Content centered in remaining space */}
-      <View style={[styles.nicknameCenterArea, { paddingTop: 60 }]}>
+      <View style={[styles.nicknameCenterArea, { paddingTop: 40 }]}>
         {/* Toggle */}
         <View style={[styles.toggleRow, { marginBottom: SPACING.xl }]}>
           <Pressable
@@ -2221,7 +2497,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
-    paddingVertical: 16,
+    height: 52,
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.full,
   },
@@ -2514,6 +2790,85 @@ const styles = StyleSheet.create({
   checkboxChecked: {
     backgroundColor: COLORS.white,
     borderColor: COLORS.white,
+  },
+  termsStepContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  termsTitleContainer: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.xxxl,
+    height: 140,
+  },
+  termsContentArea: {
+    flex: 1,
+    width: '100%',
+    paddingBottom: 7,
+  },
+  termsScrollView: {
+    flex: 1,
+    width: '100%',
+  },
+  termsScrollContent: {
+    paddingBottom: SPACING.md,
+  },
+  termsItemWrapper: {
+    width: '100%',
+  },
+  termsDescriptionBox: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: RADIUS.sm,
+    padding: SPACING.md,
+    marginLeft: SPACING.lg + 24 + SPACING.md,
+    marginRight: SPACING.lg,
+    marginBottom: SPACING.sm,
+  },
+  termsDescriptionText: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.6)',
+    lineHeight: 18,
+  },
+  policyModalContainer: {
+    flex: 1,
+    backgroundColor: COLORS.white,
+  },
+  policyModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    position: 'relative',
+  },
+  policyModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.black,
+  },
+  policyModalCloseButton: {
+    position: 'absolute',
+    right: SPACING.md,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  webViewLoading: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginLeft: -20,
+    marginTop: -20,
+    zIndex: 10,
+  },
+  webView: {
+    flex: 1,
   },
   relationshipRow: {
     flexDirection: 'row',

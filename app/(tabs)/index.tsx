@@ -438,14 +438,22 @@ export default function HomeScreen() {
   // Generate dynamic anniversaries based on relationship type
   const generateDefaultAnniversaries = (): Anniversary[] => {
     const baseAnniversaries: Anniversary[] = [];
-    const isMarried = onboardingData.relationshipType === 'married';
+    // Use couple.relationshipType from DB, fallback to onboardingData for local-only data
+    const isMarried = couple?.relationshipType === 'married' ||
+      (!couple?.relationshipType && onboardingData.relationshipType === 'married') ||
+      !!couple?.weddingDate;
     let idCounter = 1;
 
     if (isMarried) {
-      // For married couples: only show the nearest upcoming wedding anniversary
+      // For married couples: use wedding date for anniversary calculation
+      const weddingDate = couple?.weddingDate
+        ? new Date(couple.weddingDate)
+        : anniversaryDate; // Fallback to anniversary date
+
+      // Only show the nearest upcoming wedding anniversary
       for (let year = 1; year <= 50; year++) {
-        const yearlyDate = new Date(anniversaryDate);
-        yearlyDate.setFullYear(anniversaryDate.getFullYear() + year);
+        const yearlyDate = new Date(weddingDate);
+        yearlyDate.setFullYear(weddingDate.getFullYear() + year);
         if (yearlyDate > today) {
           baseAnniversaries.push({
             id: idCounter++,
@@ -531,12 +539,13 @@ export default function HomeScreen() {
     // Add partner's birthday if exists
     if (partner?.birthDate) {
       const partnerBirthDate = new Date(partner.birthDate);
-      // Partner's calendar type not stored in User, assume solar
-      const nextPartnerBirthday = getNextBirthdayDate(partnerBirthDate, false, today);
+      // Use partner's birthDateCalendarType (default to solar if not set)
+      const isPartnerLunar = partner.birthDateCalendarType === 'lunar';
+      const nextPartnerBirthday = getNextBirthdayDate(partnerBirthDate, isPartnerLunar, today);
 
       baseAnniversaries.push({
         id: idCounter++,
-        label: `${partnerNickname} 생일`,
+        label: `${partnerNickname} 생일${isPartnerLunar ? ' (음력)' : ''}`,
         targetDate: nextPartnerBirthday,
         icon: '🎂',
         bgColor: 'rgba(251, 191, 36, 0.25)',
@@ -610,9 +619,12 @@ export default function HomeScreen() {
     if (!result.canceled && result.assets[0]) {
       const localUri = result.assets[0].uri;
 
-      // Show local image immediately for better UX
-      setBackgroundImage({ uri: localUri });
+      // Close modal first for instant feedback
       setShowImagePickerModal(false);
+
+      // Show local image immediately - skip prefetch for local files (file://)
+      // Local files don't need prefetch and it can cause delays
+      await setBackgroundImage({ uri: localUri }, true);
 
       // Upload to Supabase Storage if coupleId exists
       if (coupleId) {
@@ -620,8 +632,8 @@ export default function HomeScreen() {
         try {
           const uploadedUrl = await db.storage.uploadBackground(coupleId, localUri);
           if (uploadedUrl) {
-            // Update with the remote URL for syncing
-            setBackgroundImage({ uri: uploadedUrl });
+            // Update with the remote URL for syncing (prefetch this one)
+            await setBackgroundImage({ uri: uploadedUrl }, false);
           } else {
             Alert.alert('업로드 실패', '이미지 업로드에 실패했습니다. 다시 시도해주세요.');
           }
@@ -743,6 +755,7 @@ export default function HomeScreen() {
         defaultSource={DEFAULT_BACKGROUND_IMAGE}
         style={styles.backgroundImage}
         imageStyle={styles.backgroundImageStyle}
+        fadeDuration={0}
       />
 
       {/* Content */}
@@ -779,6 +792,7 @@ export default function HomeScreen() {
                 source={backgroundImage}
                 style={styles.polaroidImage}
                 resizeMode="cover"
+                fadeDuration={0}
               />
               {/* Subtle vignette overlay */}
               <View style={styles.vignetteOverlay} />

@@ -13,7 +13,8 @@ import { useAuthStore } from '@/stores';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
 import { BackgroundProvider, useBackground } from '@/contexts';
 import { preloadCharacterAssets } from '@/utils';
-import { db, isDemoMode } from '@/lib/supabase';
+import { db, isDemoMode, supabase } from '@/lib/supabase';
+import { updateUserLocationInDB, checkLocationPermission } from '@/lib/locationUtils';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -134,6 +135,9 @@ function RootLayoutNav() {
       }
 
       if (coupleData) {
+        // Determine relationship type from wedding_date
+        const relationshipType = coupleData.wedding_date ? 'married' : 'dating';
+
         // Update couple in authStore with DB data
         setCouple({
           ...couple,
@@ -142,6 +146,7 @@ function RootLayoutNav() {
           anniversaryDate: coupleData.dating_start_date ? new Date(coupleData.dating_start_date) : couple.anniversaryDate,
           datingStartDate: coupleData.dating_start_date ? new Date(coupleData.dating_start_date) : undefined,
           weddingDate: coupleData.wedding_date ? new Date(coupleData.wedding_date) : undefined,
+          relationshipType,
           status: coupleData.status || 'active',
         });
 
@@ -155,13 +160,18 @@ function RootLayoutNav() {
           const { data: partnerData, error: partnerError } = await db.profiles.get(partnerId);
 
           if (!partnerError && partnerData) {
+            // Extract birthDateCalendarType from preferences
+            const partnerPreferences = partnerData.preferences || {};
+            const birthDateCalendarType = (partnerPreferences as Record<string, unknown>).birthDateCalendarType as 'solar' | 'lunar' | undefined;
+
             setPartner({
               id: partnerData.id,
               email: partnerData.email || '',
               nickname: partnerData.nickname || '',
               inviteCode: partnerData.invite_code || '',
-              preferences: partnerData.preferences || {},
+              preferences: partnerPreferences,
               birthDate: partnerData.birth_date ? new Date(partnerData.birth_date) : undefined,
+              birthDateCalendarType: birthDateCalendarType || 'solar',
               createdAt: partnerData.created_at ? new Date(partnerData.created_at) : new Date(),
             });
           }
@@ -172,17 +182,38 @@ function RootLayoutNav() {
     }
   }, [isOnboardingComplete, couple, user?.id, setCouple, setPartner]);
 
+  // Update user location in DB (silently, no alerts)
+  const updateUserLocation = useCallback(async () => {
+    if (!isOnboardingComplete || !user?.id || isDemoMode) return;
+
+    try {
+      const hasPermission = await checkLocationPermission();
+      if (hasPermission) {
+        await updateUserLocationInDB(user.id);
+        console.log('[Location] User location updated on app start/foreground');
+      }
+    } catch (error) {
+      console.error('[Location] Error updating user location:', error);
+    }
+  }, [isOnboardingComplete, user?.id]);
+
   // Fetch couple and partner data when onboarding is complete
   useEffect(() => {
     fetchCoupleAndPartnerData();
   }, [fetchCoupleAndPartnerData]);
 
-  // Refresh partner data when app comes to foreground
+  // Update user location when onboarding is complete
+  useEffect(() => {
+    updateUserLocation();
+  }, [updateUserLocation]);
+
+  // Refresh partner data and location when app comes to foreground
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
       if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
-        // App has come to the foreground, refresh partner data
+        // App has come to the foreground, refresh partner data and location
         fetchCoupleAndPartnerData();
+        updateUserLocation();
       }
       appState.current = nextAppState;
     });
@@ -190,7 +221,7 @@ function RootLayoutNav() {
     return () => {
       subscription.remove();
     };
-  }, [fetchCoupleAndPartnerData]);
+  }, [fetchCoupleAndPartnerData, updateUserLocation]);
 
   // Also refresh if partner data is incomplete (partner might have completed onboarding)
   useEffect(() => {
@@ -217,6 +248,109 @@ function RootLayoutNav() {
       cleanupSync();
     };
   }, [couple?.id, user?.id, initializeSync, cleanupSync]);
+
+  // Subscribe to partner profile changes for real-time sync
+  useEffect(() => {
+    if (!isOnboardingComplete || !couple?.id || !user?.id || isDemoMode || !supabase) return;
+
+    // Determine partner's user_id
+    const partnerId = couple.user1Id === user.id ? couple.user2Id : couple.user1Id;
+    if (!partnerId) return;
+
+    // Subscribe to partner's profile changes
+    const channel = supabase
+      .channel(`partner-profile-${partnerId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${partnerId}`,
+        },
+        (payload) => {
+          // Partner profile was updated, refresh the data
+          const partnerData = payload.new as {
+            id: string;
+            email?: string;
+            nickname?: string;
+            invite_code?: string;
+            preferences?: Record<string, unknown>;
+            birth_date?: string;
+            created_at?: string;
+          };
+
+          if (partnerData) {
+            const prefs = partnerData.preferences || {};
+            const birthDateCalendarType = prefs.birthDateCalendarType as 'solar' | 'lunar' | undefined;
+
+            setPartner({
+              id: partnerData.id,
+              email: partnerData.email || '',
+              nickname: partnerData.nickname || '',
+              inviteCode: partnerData.invite_code || '',
+              preferences: prefs as unknown as import('@/types').UserPreferences,
+              birthDate: partnerData.birth_date ? new Date(partnerData.birth_date) : undefined,
+              birthDateCalendarType: birthDateCalendarType || 'solar',
+              createdAt: partnerData.created_at ? new Date(partnerData.created_at) : new Date(),
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase?.removeChannel(channel);
+    };
+  }, [isOnboardingComplete, couple?.id, couple?.user1Id, couple?.user2Id, user?.id, setPartner]);
+
+  // Subscribe to couple data changes for real-time sync (anniversary updates)
+  useEffect(() => {
+    if (!isOnboardingComplete || !couple?.id || isDemoMode || !supabase) return;
+
+    const channel = supabase
+      .channel(`couple-${couple.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'couples',
+          filter: `id=eq.${couple.id}`,
+        },
+        (payload) => {
+          // Couple data was updated, refresh the data
+          const coupleData = payload.new as {
+            id: string;
+            user1_id: string;
+            user2_id?: string;
+            dating_start_date?: string;
+            wedding_date?: string;
+            status?: string;
+          };
+
+          if (coupleData) {
+            const relationshipType = coupleData.wedding_date ? 'married' : 'dating';
+
+            setCouple({
+              ...couple,
+              user1Id: coupleData.user1_id,
+              user2Id: coupleData.user2_id,
+              anniversaryDate: coupleData.dating_start_date ? new Date(coupleData.dating_start_date) : couple.anniversaryDate,
+              datingStartDate: coupleData.dating_start_date ? new Date(coupleData.dating_start_date) : undefined,
+              weddingDate: coupleData.wedding_date ? new Date(coupleData.wedding_date) : undefined,
+              relationshipType,
+              status: (coupleData.status as 'pending' | 'active') || 'active',
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase?.removeChannel(channel);
+    };
+  }, [isOnboardingComplete, couple?.id, setCouple]);
 
   // Wait for navigation to be ready before redirecting
   useEffect(() => {

@@ -30,13 +30,15 @@ import { useRouter } from 'expo-router';
 
 import { COLORS, SPACING, RADIUS } from '@/constants/design';
 import { useOnboardingStore, useAuthStore, useMemoryStore } from '@/stores';
+import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
+import { db, isDemoMode } from '@/lib/supabase';
 
 const { width } = Dimensions.get('window');
 
 export default function SettingsScreen() {
   const router = useRouter();
   const { data } = useOnboardingStore();
-  const { signOut } = useAuthStore();
+  const { signOut, couple } = useAuthStore();
   const { memories } = useMemoryStore();
 
   // Notification settings
@@ -51,9 +53,15 @@ export default function SettingsScreen() {
   const [showUnpairConfirmModal, setShowUnpairConfirmModal] = useState(false);
   const [unpairConfirmText, setUnpairConfirmText] = useState('');
 
+  // Account deletion modal
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const calculateDaysTogether = () => {
-    if (!data.anniversaryDate) return 0;
-    const start = new Date(data.anniversaryDate);
+    // 온보딩 완료 후 커플 생성 시점(couple.createdAt)부터 현재까지 계산
+    if (!couple?.createdAt) return 0;
+    const start = new Date(couple.createdAt);
     const now = new Date();
     const diffTime = Math.abs(now.getTime() - start.getTime());
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -76,32 +84,102 @@ export default function SettingsScreen() {
   };
 
   const handleAccountDeletion = () => {
-    Alert.alert(
-      '계정 탈퇴',
-      '정말로 계정을 탈퇴하시겠습니까? 이 작업은 되돌릴 수 없습니다.',
-      [
-        { text: '취소', style: 'cancel' },
-        {
-          text: '탈퇴',
-          style: 'destructive',
-          onPress: () => {
-            signOut();
-            router.replace('/(auth)/onboarding');
-          },
-        },
-      ]
-    );
+    setShowDeleteAccountModal(true);
   };
 
-  const handleUnpairConfirm = () => {
+  const handleDeleteAccountConfirm = async () => {
+    if (deleteConfirmText !== '계정탈퇴') return;
+
+    setIsDeleting(true);
+    const { user } = useAuthStore.getState();
+    const { cleanup: cleanupSync } = useCoupleSyncStore.getState();
+
+    try {
+      // Cleanup realtime subscriptions first
+      cleanupSync();
+
+      // Delete all data from database
+      if (!isDemoMode && user?.id) {
+        const result = await db.account.deleteAccount(user.id, couple?.id || null);
+        if (!result.success) {
+          console.error('[Settings] Account deletion errors:', result.errors);
+        }
+      }
+
+      // Clear all local storage
+      await db.account.clearLocalStorage();
+
+      // Clear Zustand stores
+      signOut();
+
+      setShowDeleteAccountModal(false);
+      setDeleteConfirmText('');
+      setIsDeleting(false);
+
+      Alert.alert(
+        '계정 탈퇴 완료',
+        '모든 데이터가 삭제되었습니다.\n이용해 주셔서 감사합니다.',
+        [
+          {
+            text: '확인',
+            onPress: () => router.replace('/(auth)/onboarding'),
+          },
+        ]
+      );
+    } catch (error) {
+      console.error('[Settings] Account deletion error:', error);
+      setIsDeleting(false);
+      Alert.alert('오류', '계정 탈퇴 중 오류가 발생했습니다.');
+    }
+  };
+
+  const handleUnpairConfirm = async () => {
     if (unpairConfirmText === '페어링끊기') {
       setShowUnpairConfirmModal(false);
       setShowUnpairModal(false);
       setUnpairConfirmText('');
-      // Perform unpair action
-      Alert.alert('페어링 해제', '페어링이 해제되었습니다.');
-      signOut();
-      router.replace('/(auth)/onboarding');
+
+      const { user, setCouple, setPartner, setIsOnboardingComplete } = useAuthStore.getState();
+      const { cleanup: cleanupSync } = useCoupleSyncStore.getState();
+
+      try {
+        // Soft delete - disconnect couple in database (30-day recovery period)
+        if (!isDemoMode && couple?.id && user?.id) {
+          const { error } = await db.couples.disconnect(couple.id, user.id);
+          if (error) {
+            console.error('[Settings] Error disconnecting couple:', error);
+            Alert.alert('오류', '페어링 해제 중 오류가 발생했습니다.');
+            return;
+          }
+        }
+
+        // Cleanup realtime subscriptions
+        cleanupSync();
+
+        // Clear couple and partner from local state (but keep user logged in)
+        setCouple(null);
+        setPartner(null);
+
+        // Set onboarding incomplete to show pairing screen
+        setIsOnboardingComplete(false);
+
+        Alert.alert(
+          '페어링 해제',
+          '페어링이 해제되었습니다.\n30일 이내에 같은 파트너와 재연결하면 기존 데이터가 복구됩니다.',
+          [
+            {
+              text: '확인',
+              onPress: () => {
+                // Navigate to pairing screen
+                router.replace('/(auth)/onboarding');
+              },
+            },
+          ]
+        );
+      } catch (error) {
+        console.error('[Settings] Unpair error:', error);
+        Alert.alert('오류', '페어링 해제 중 오류가 발생했습니다.');
+      }
     }
   };
 
@@ -438,6 +516,78 @@ export default function SettingsScreen() {
       {/* Modals */}
       {renderUnpairInfoModal()}
       {renderUnpairConfirmModal()}
+
+      {/* Account Deletion Confirmation Modal */}
+      <Modal
+        visible={showDeleteAccountModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!isDeleting) {
+            setShowDeleteAccountModal(false);
+            setDeleteConfirmText('');
+          }
+        }}
+      >
+        <View style={styles.confirmModalOverlay}>
+          <View style={styles.confirmModalContent}>
+            <View style={styles.deleteWarningIcon}>
+              <AlertTriangle color="#f44336" size={32} />
+            </View>
+            <Text style={styles.confirmModalTitle}>계정 탈퇴</Text>
+            <Text style={styles.confirmModalDescription}>
+              계정을 탈퇴하면 모든 데이터가{'\n'}
+              <Text style={styles.deleteWarningText}>영구적으로 삭제</Text>됩니다.{'\n\n'}
+              삭제되는 데이터:{'\n'}
+              • 프로필 정보{'\n'}
+              • 커플 연결 정보{'\n'}
+              • 완료한 미션 기록{'\n'}
+              • 앨범 및 사진{'\n'}
+              • 모든 설정
+            </Text>
+            <Text style={styles.deleteConfirmHint}>
+              계속하려면 아래에 '계정탈퇴'를 입력해주세요
+            </Text>
+
+            <TextInput
+              style={styles.confirmInput}
+              value={deleteConfirmText}
+              onChangeText={setDeleteConfirmText}
+              placeholder="계정탈퇴"
+              placeholderTextColor="#ccc"
+              autoFocus
+              editable={!isDeleting}
+            />
+
+            <View style={styles.confirmButtonRow}>
+              <Pressable
+                style={styles.confirmCancelButton}
+                onPress={() => {
+                  setShowDeleteAccountModal(false);
+                  setDeleteConfirmText('');
+                }}
+                disabled={isDeleting}
+              >
+                <Text style={styles.confirmCancelButtonText}>취소</Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.confirmDeleteButton,
+                  (deleteConfirmText !== '계정탈퇴' || isDeleting) && styles.confirmDeleteButtonDisabled,
+                ]}
+                onPress={handleDeleteAccountConfirm}
+                disabled={deleteConfirmText !== '계정탈퇴' || isDeleting}
+              >
+                {isDeleting ? (
+                  <Text style={styles.confirmDeleteButtonText}>삭제 중...</Text>
+                ) : (
+                  <Text style={styles.confirmDeleteButtonText}>계정 탈퇴</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -781,6 +931,42 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffcdd2',
   },
   confirmUnpairButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: COLORS.white,
+  },
+  // Account Deletion Modal Styles
+  deleteWarningIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#ffebee',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.md,
+  },
+  deleteWarningText: {
+    color: '#f44336',
+    fontWeight: '700',
+  },
+  deleteConfirmHint: {
+    fontSize: 13,
+    color: '#999',
+    textAlign: 'center',
+    marginBottom: SPACING.md,
+  },
+  confirmDeleteButton: {
+    flex: 1,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f44336',
+    borderRadius: RADIUS.full,
+  },
+  confirmDeleteButtonDisabled: {
+    backgroundColor: '#ffcdd2',
+  },
+  confirmDeleteButtonText: {
     fontSize: 15,
     fontWeight: '600',
     color: COLORS.white,

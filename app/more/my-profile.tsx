@@ -35,6 +35,7 @@ import {
   type CalendarType,
 } from '@/stores/onboardingStore';
 import { db, isDemoMode } from '@/lib/supabase';
+import { formatDateToLocal } from '@/lib/dateUtils';
 
 const { width } = Dimensions.get('window');
 
@@ -81,6 +82,16 @@ export default function MyProfileScreen() {
     if (tempBirthday) {
       updateData({ birthDate: tempBirthday, birthDateCalendarType: tempCalendarType });
 
+      // Also update authStore user for immediate UI update
+      if (user) {
+        const updatedUser = {
+          ...user,
+          birthDate: tempBirthday,
+          birthDateCalendarType: tempCalendarType,
+        };
+        useAuthStore.getState().setUser(updatedUser);
+      }
+
       // Save to database
       if (!isDemoMode && user?.id) {
         try {
@@ -95,7 +106,7 @@ export default function MyProfileScreen() {
           };
 
           await db.profiles.update(user.id, {
-            birth_date: tempBirthday.toISOString().split('T')[0],
+            birth_date: formatDateToLocal(tempBirthday),
             preferences,
           });
         } catch (error) {
@@ -339,6 +350,8 @@ export default function MyProfileScreen() {
                 maximumDate={new Date()}
                 locale="ko-KR"
                 style={styles.datePicker}
+                textColor="#000000"
+                themeVariant="light"
               />
             </View>
           </View>

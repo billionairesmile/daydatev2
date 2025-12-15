@@ -1,18 +1,22 @@
 import { makeRedirectUri } from 'expo-auth-session';
 import * as QueryParams from 'expo-auth-session/build/QueryParams';
 import * as WebBrowser from 'expo-web-browser';
-import * as Linking from 'expo-linking';
 import { supabase, isDemoMode } from './supabase';
-import { Platform } from 'react-native';
 
 // Required for web only
 WebBrowser.maybeCompleteAuthSession();
 
 // Redirect URI for OAuth
+// Expo Go uses exp:// scheme, standalone apps use custom scheme
 const redirectTo = makeRedirectUri({
-  scheme: 'daydate',
+  // For Expo Go development, don't specify scheme (uses exp://)
+  // For production builds, specify your custom scheme
+  ...(process.env.NODE_ENV === 'development' ? {} : { scheme: 'daydate' }),
   path: 'auth/callback',
 });
+
+// Log the redirect URI for debugging
+console.log('[SocialAuth] Redirect URI:', redirectTo);
 
 export type SocialProvider = 'google' | 'kakao';
 
