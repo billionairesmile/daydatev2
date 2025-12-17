@@ -15,15 +15,17 @@ import {
   Shield,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 import { COLORS, SPACING, RADIUS } from '@/constants/design';
 
 export default function OthersScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
 
   const menuItems = [
-    { icon: FileText, label: '서비스 이용약관', onPress: () => {} },
-    { icon: Shield, label: '개인정보처리방침', onPress: () => {} },
+    { icon: FileText, label: t('more.others.termsOfService'), onPress: () => {} },
+    { icon: Shield, label: t('more.others.privacyPolicy'), onPress: () => {} },
   ];
 
   return (
@@ -35,7 +37,7 @@ export default function OthersScreen() {
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <ChevronLeft color={COLORS.black} size={24} />
         </Pressable>
-        <Text style={styles.headerTitle}>기타</Text>
+        <Text style={styles.headerTitle}>{t('more.others.title')}</Text>
         <View style={styles.headerSpacer} />
       </View>
 

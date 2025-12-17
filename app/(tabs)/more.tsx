@@ -8,6 +8,7 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Image as ExpoImage } from 'expo-image';
 import {
   User,
@@ -44,6 +45,7 @@ type MenuSectionType = {
 };
 
 export default function MoreScreen() {
+  const { t } = useTranslation();
   const { backgroundImage } = useBackground();
   const router = useRouter();
   const resetOnboarding = useOnboardingStore((state) => state.reset);
@@ -55,12 +57,12 @@ export default function MoreScreen() {
 
   const handleDevReset = () => {
     Alert.alert(
-      '개발자 리셋',
-      '온보딩 상태를 초기화하고 처음부터 다시 시작하시겠습니까?',
+      t('more.alerts.devReset'),
+      t('more.alerts.devResetMessage'),
       [
-        { text: '취소', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: '초기화',
+          text: t('common.reset'),
           style: 'destructive',
           onPress: async () => {
             resetOnboarding();
@@ -76,12 +78,12 @@ export default function MoreScreen() {
 
   const handleMissionReset = () => {
     Alert.alert(
-      '미션 리셋',
-      '오늘의 미션과 완료 상태를 모두 초기화하시겠습니까?',
+      t('more.alerts.missionReset'),
+      t('more.alerts.missionResetMessage'),
       [
-        { text: '취소', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: '리셋',
+          text: t('common.reset'),
           style: 'destructive',
           onPress: async () => {
             // Reset local mission store
@@ -89,9 +91,9 @@ export default function MoreScreen() {
             // Reset synced missions (coupleSyncStore + database)
             await resetAllMissions();
             Alert.alert(
-              '리셋 완료',
-              '미션이 초기화되었습니다. 미션 탭으로 이동하여 새로운 미션을 생성하세요.',
-              [{ text: '확인' }]
+              t('more.alerts.missionResetComplete'),
+              t('more.alerts.missionResetCompleteMessage'),
+              [{ text: t('common.confirm') }]
             );
           },
         },
@@ -101,12 +103,12 @@ export default function MoreScreen() {
 
   const handleFullReset = () => {
     Alert.alert(
-      '⚠️ 완전 리셋',
-      '모든 데이터를 초기화합니다.\n\n• 온보딩 데이터\n• 페어링 정보\n• 커플 동기화 데이터\n• 미션 데이터\n• 모든 로컬 저장소\n\n정말 초기화하시겠습니까?',
+      t('more.alerts.fullReset'),
+      t('more.alerts.fullResetMessage'),
       [
-        { text: '취소', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: '완전 초기화',
+          text: t('common.reset'),
           style: 'destructive',
           onPress: async () => {
             // 1. 커플 동기화 정리
@@ -121,11 +123,11 @@ export default function MoreScreen() {
             await AsyncStorage.clear();
 
             Alert.alert(
-              '초기화 완료',
-              '모든 데이터가 초기화되었습니다. 앱을 다시 시작합니다.',
+              t('more.alerts.fullResetComplete'),
+              t('more.alerts.fullResetCompleteMessage'),
               [
                 {
-                  text: '확인',
+                  text: t('common.confirm'),
                   onPress: () => router.replace('/(auth)/onboarding'),
                 },
               ]
@@ -138,12 +140,12 @@ export default function MoreScreen() {
 
   const handleLogout = () => {
     Alert.alert(
-      '로그아웃',
-      '정말 로그아웃 하시겠습니까?',
+      t('more.alerts.logout'),
+      t('more.alerts.logoutMessage'),
       [
-        { text: '취소', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: '로그아웃',
+          text: t('more.menu.logout'),
           style: 'destructive',
           onPress: async () => {
             resetOnboarding();
@@ -158,31 +160,31 @@ export default function MoreScreen() {
 
   const menuSections: MenuSectionType[] = [
     {
-      title: '프로필',
+      title: t('more.sections.profile'),
       items: [
-        { icon: User, label: '내 프로필', onPress: () => router.push('/more/my-profile') },
-        { icon: Heart, label: '커플 프로필', onPress: () => router.push('/more/couple-profile') },
+        { icon: User, label: t('more.menu.myProfile'), onPress: () => router.push('/more/my-profile') },
+        { icon: Heart, label: t('more.menu.coupleProfile'), onPress: () => router.push('/more/couple-profile') },
       ],
     },
     {
-      title: '설정',
+      title: t('more.sections.settings'),
       items: [
-        { icon: Settings, label: '설정', onPress: () => router.push('/more/settings') },
+        { icon: Settings, label: t('more.menu.settings'), onPress: () => router.push('/more/settings') },
       ],
     },
     {
-      title: '지원',
+      title: t('more.sections.support'),
       items: [
-        { icon: Megaphone, label: '공지사항', onPress: () => router.push('/more/announcements') },
-        { icon: Headphones, label: '고객센터', onPress: () => router.push('/more/customer-service') },
+        { icon: Megaphone, label: t('more.menu.announcements'), onPress: () => router.push('/more/announcements') },
+        { icon: Headphones, label: t('more.menu.customerService'), onPress: () => router.push('/more/customer-service') },
       ],
     },
     {
-      title: '개발자',
+      title: t('more.sections.developer'),
       items: [
-        { icon: RotateCcw, label: '온보딩 리셋', onPress: handleDevReset },
-        { icon: RotateCcw, label: '미션 리셋', onPress: handleMissionReset },
-        { icon: Trash2, label: '완전 리셋', onPress: handleFullReset },
+        { icon: RotateCcw, label: t('more.menu.onboardingReset'), onPress: handleDevReset },
+        { icon: RotateCcw, label: t('more.menu.missionReset'), onPress: handleMissionReset },
+        { icon: Trash2, label: t('more.menu.fullReset'), onPress: handleFullReset },
       ],
     },
   ];
@@ -235,7 +237,7 @@ export default function MoreScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>더보기</Text>
+          <Text style={styles.headerTitle}>{t('more.title')}</Text>
         </View>
 
         {/* Menu Sections */}
@@ -255,7 +257,7 @@ export default function MoreScreen() {
         <Pressable style={styles.logoutButton} onPress={handleLogout}>
           <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
           <LogOut color="#ff4444" size={20} />
-          <Text style={styles.logoutButtonText}>로그아웃</Text>
+          <Text style={styles.logoutButtonText}>{t('more.menu.logout')}</Text>
         </Pressable>
       </ScrollView>
     </View>

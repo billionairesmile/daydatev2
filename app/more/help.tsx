@@ -15,15 +15,17 @@ import {
   HelpCircle,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 import { COLORS, SPACING, RADIUS } from '@/constants/design';
 
 export default function HelpScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
 
   const menuItems = [
-    { icon: MessageCircle, label: '문의하기', onPress: () => {} },
-    { icon: HelpCircle, label: '자주 묻는 질문', onPress: () => {} },
+    { icon: MessageCircle, label: t('more.help.inquiry'), onPress: () => {} },
+    { icon: HelpCircle, label: t('more.help.faq'), onPress: () => {} },
   ];
 
   return (
@@ -35,7 +37,7 @@ export default function HelpScreen() {
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <ChevronLeft color={COLORS.black} size={24} />
         </Pressable>
-        <Text style={styles.headerTitle}>도움말</Text>
+        <Text style={styles.headerTitle}>{t('more.help.title')}</Text>
         <View style={styles.headerSpacer} />
       </View>
 

@@ -24,6 +24,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { Swipeable } from 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Asset } from 'expo-asset';
+import { useTranslation } from 'react-i18next';
 
 // Pre-load static images (outside component to avoid re-creation)
 const LOGO_IMAGE = require('@/assets/images/daydate-logo.png');
@@ -114,9 +115,10 @@ interface SwipeableCardProps {
   onEdit: () => void;
   onDelete: () => void;
   isCustom: boolean;
+  t: (key: string) => string;
 }
 
-function SwipeableAnniversaryCard({ anniversary, onEdit, onDelete, isCustom }: SwipeableCardProps) {
+function SwipeableAnniversaryCard({ anniversary, onEdit, onDelete, isCustom, t }: SwipeableCardProps) {
   const swipeableRef = useRef<Swipeable>(null);
   const [isOpen, setIsOpen] = useState(false);
 
@@ -162,7 +164,7 @@ function SwipeableAnniversaryCard({ anniversary, onEdit, onDelete, isCustom }: S
           }}
         >
           <Edit2 color="#000000" size={20} />
-          <Text style={swipeStyles.editActionText}>수정</Text>
+          <Text style={swipeStyles.editActionText}>{t('common.edit')}</Text>
         </Pressable>
         <Pressable
           style={swipeStyles.deleteButton}
@@ -172,7 +174,7 @@ function SwipeableAnniversaryCard({ anniversary, onEdit, onDelete, isCustom }: S
           }}
         >
           <Trash2 color="#FFFFFF" size={20} />
-          <Text style={swipeStyles.actionText}>삭제</Text>
+          <Text style={swipeStyles.actionText}>{t('common.delete')}</Text>
         </Pressable>
       </Animated.View>
     );
@@ -311,6 +313,7 @@ const swipeStyles = StyleSheet.create({
 });
 
 export default function HomeScreen() {
+  const { t, i18n } = useTranslation();
   const { backgroundImage, setBackgroundImage, resetToDefault } = useBackground();
   const { data: onboardingData } = useOnboardingStore();
   const { user, partner, couple } = useAuthStore();
@@ -318,8 +321,8 @@ export default function HomeScreen() {
 
   // Determine nicknames - always show "나 ❤️ 파트너" from current user's perspective
   const isCurrentUserCoupleUser1 = user?.id === couple?.user1Id;
-  const myNickname = user?.nickname || onboardingData.nickname || '나';
-  const partnerNickname = partner?.nickname || '파트너';
+  const myNickname = user?.nickname || onboardingData.nickname || t('common.me');
+  const partnerNickname = partner?.nickname || t('common.partner');
 
   // For couple-order display (used in birthday labels etc.)
   const user1Nickname = isCurrentUserCoupleUser1 ? myNickname : partnerNickname;
@@ -438,9 +441,12 @@ export default function HomeScreen() {
     return 'D-Day';
   };
 
-  // Helper function to format date in Korean
-  const formatDateKorean = (date: Date) => {
-    return `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일`;
+  // Helper function to format date based on locale
+  const formatDateLocalized = (date: Date) => {
+    if (i18n.language === 'ko') {
+      return `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일`;
+    }
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   };
 
   // Helper function to get next occurrence of a yearly anniversary
@@ -475,9 +481,12 @@ export default function HomeScreen() {
         const yearlyDate = new Date(weddingDate);
         yearlyDate.setFullYear(weddingDate.getFullYear() + year);
         if (yearlyDate > today) {
+          const weddingLabel = i18n.language === 'ko'
+            ? `${t('home.anniversary.weddingAnniversary')} ${year}주년`
+            : `${year}${year === 1 ? 'st' : year === 2 ? 'nd' : year === 3 ? 'rd' : 'th'} ${t('home.anniversary.weddingAnniversary')}`;
           baseAnniversaries.push({
             id: idCounter++,
-            label: `결혼기념일 ${year}주년`,
+            label: weddingLabel,
             targetDate: yearlyDate,
             icon: year === 1 ? '💍' : '💖',
             bgColor: 'rgba(168, 85, 247, 0.25)',
@@ -510,9 +519,12 @@ export default function HomeScreen() {
       // Only add the next milestone
       const milestoneDate = new Date(anniversaryDate.getTime() + (nextMilestone - 1) * 24 * 60 * 60 * 1000);
       if (milestoneDate > today) {
+        const milestoneLabel = i18n.language === 'ko'
+          ? `${nextMilestone}일`
+          : `${nextMilestone} ${t('common.days')}`;
         baseAnniversaries.push({
           id: idCounter++,
-          label: `${nextMilestone}일`,
+          label: milestoneLabel,
           targetDate: milestoneDate,
           icon: nextMilestone >= 1000 ? '🎉' : '✨',
           bgColor: nextMilestone >= 1000 ? 'rgba(236, 72, 153, 0.25)' : 'rgba(251, 191, 36, 0.25)',
@@ -525,9 +537,12 @@ export default function HomeScreen() {
         const yearlyDate = new Date(anniversaryDate);
         yearlyDate.setFullYear(anniversaryDate.getFullYear() + year);
         if (yearlyDate > today) {
+          const datingLabel = i18n.language === 'ko'
+            ? `${t('home.anniversary.datingAnniversary')} ${year}주년`
+            : `${year}${year === 1 ? 'st' : year === 2 ? 'nd' : year === 3 ? 'rd' : 'th'} ${t('home.anniversary.datingAnniversary')} Anniversary`;
           baseAnniversaries.push({
             id: idCounter++,
-            label: `연애 ${year}주년`,
+            label: datingLabel,
             targetDate: yearlyDate,
             icon: year === 1 ? '💕' : '💖',
             bgColor: 'rgba(236, 72, 153, 0.25)',
@@ -547,7 +562,7 @@ export default function HomeScreen() {
 
       baseAnniversaries.push({
         id: idCounter++,
-        label: `${myNickname} 생일${isLunar ? ' (음력)' : ''}`,
+        label: `${myNickname} ${t('home.anniversary.birthday')}${isLunar ? ` ${t('home.anniversary.lunar')}` : ''}`,
         targetDate: nextBirthday,
         icon: '🎂',
         bgColor: 'rgba(251, 191, 36, 0.25)',
@@ -565,7 +580,7 @@ export default function HomeScreen() {
 
       baseAnniversaries.push({
         id: idCounter++,
-        label: `${partnerNickname} 생일${isPartnerLunar ? ' (음력)' : ''}`,
+        label: `${partnerNickname} ${t('home.anniversary.birthday')}${isPartnerLunar ? ` ${t('home.anniversary.lunar')}` : ''}`,
         targetDate: nextPartnerBirthday,
         icon: '🎂',
         bgColor: 'rgba(251, 191, 36, 0.25)',
@@ -578,7 +593,7 @@ export default function HomeScreen() {
     baseAnniversaries.push(
       {
         id: idCounter++,
-        label: '크리스마스',
+        label: t('home.anniversary.christmas'),
         targetDate: new Date(today.getFullYear(), 11, 25),
         icon: '🎄',
         bgColor: 'rgba(239, 68, 68, 0.25)',
@@ -587,7 +602,7 @@ export default function HomeScreen() {
       },
       {
         id: idCounter++,
-        label: '발렌타인데이',
+        label: t('home.anniversary.valentinesDay'),
         targetDate: new Date(today.getFullYear(), 1, 14),
         icon: '💝',
         bgColor: 'rgba(236, 72, 153, 0.25)',
@@ -596,7 +611,7 @@ export default function HomeScreen() {
       },
       {
         id: idCounter++,
-        label: '화이트데이',
+        label: t('home.anniversary.whiteDay'),
         targetDate: new Date(today.getFullYear(), 2, 14),
         icon: '🤍',
         bgColor: 'rgba(59, 130, 246, 0.25)',
@@ -621,7 +636,7 @@ export default function HomeScreen() {
       return {
         ...ann,
         targetDate: effectiveDate,
-        date: formatDateKorean(effectiveDate),
+        date: formatDateLocalized(effectiveDate),
         dDay: calculateDDay(effectiveDate),
       };
     })
@@ -655,11 +670,11 @@ export default function HomeScreen() {
             // Update with the remote URL for syncing (prefetch this one)
             await setBackgroundImage({ uri: uploadedUrl }, false);
           } else {
-            Alert.alert('업로드 실패', '이미지 업로드에 실패했습니다. 다시 시도해주세요.');
+            Alert.alert(t('home.background.uploadFailed'), t('home.background.uploadFailedMessage'));
           }
         } catch (error) {
           console.error('Background upload error:', error);
-          Alert.alert('업로드 실패', '이미지 업로드 중 오류가 발생했습니다.');
+          Alert.alert(t('home.background.uploadFailed'), t('home.background.uploadError'));
         } finally {
           setIsUploadingBackground(false);
         }
@@ -745,12 +760,12 @@ export default function HomeScreen() {
   // Handle delete anniversary
   const handleDeleteAnniversary = (anniversary: Anniversary) => {
     Alert.alert(
-      '기념일 삭제',
-      `"${anniversary.label}" 기념일을 삭제하시겠습니까?`,
+      t('home.anniversary.delete'),
+      t('home.anniversary.deleteConfirm', { name: anniversary.label }),
       [
-        { text: '취소', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: '삭제',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: () => {
             setCustomAnniversaries((prev) =>
@@ -764,7 +779,10 @@ export default function HomeScreen() {
 
   // Format date for display in date picker
   const formatDisplayDate = (date: Date) => {
-    return `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일`;
+    if (i18n.language === 'ko') {
+      return `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일`;
+    }
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   };
 
   return (
@@ -799,7 +817,7 @@ export default function HomeScreen() {
             {/* Day count in row */}
             <View style={styles.dDayRow}>
               <Text style={styles.dDayNumber}>{diffDays}</Text>
-              <Text style={styles.dDayUnit}>일째</Text>
+              <Text style={styles.dDayUnit}>{t('common.daysCount')}</Text>
             </View>
           </Pressable>
         </View>
@@ -865,7 +883,7 @@ export default function HomeScreen() {
             </TouchableWithoutFeedback>
             <View style={styles.anniversaryModalContent}>
               <View style={styles.anniversaryModalHeader}>
-                <Text style={styles.anniversaryModalTitle}>기념일</Text>
+                <Text style={styles.anniversaryModalTitle}>{t('home.anniversary.title')}</Text>
                 <Pressable
                   onPress={closeAnniversaryModal}
                   style={styles.modalCloseButton}
@@ -887,6 +905,7 @@ export default function HomeScreen() {
                     isCustom={customAnniversaries.some(ca => ca.id === anniversary.id)}
                     onEdit={() => handleEditAnniversary(anniversary)}
                     onDelete={() => handleDeleteAnniversary(anniversary)}
+                    t={t}
                   />
                 ))}
               </ScrollView>
@@ -906,7 +925,7 @@ export default function HomeScreen() {
                     setShowAddAnniversary(true);
                   }}
                 >
-                  <Text style={styles.addAnniversaryText}>기념일 추가</Text>
+                  <Text style={styles.addAnniversaryText}>{t('home.anniversary.add')}</Text>
                 </Pressable>
               </View>
             </View>
@@ -929,7 +948,7 @@ export default function HomeScreen() {
             <Pressable onPress={(e) => e.stopPropagation()}>
               <View style={styles.imagePickerModal}>
                 <View style={styles.imagePickerHeader}>
-                  <Text style={styles.imagePickerTitle}>배경사진 변경</Text>
+                  <Text style={styles.imagePickerTitle}>{t('home.background.title')}</Text>
                   <Pressable
                     onPress={() => setShowImagePickerModal(false)}
                     style={styles.modalCloseButton}
@@ -939,7 +958,7 @@ export default function HomeScreen() {
                 </View>
 
                 <Text style={styles.imagePickerDescription}>
-                  선택한 이미지가 모든 페이지의 배경으로 적용됩니다
+                  {t('home.background.description')}
                 </Text>
 
                 <View style={styles.imagePickerButtons}>
@@ -948,7 +967,7 @@ export default function HomeScreen() {
                     onPress={handlePickImage}
                   >
                     <Text style={styles.imagePickerButtonPrimaryText}>
-                      갤러리에서 선택
+                      {t('home.background.selectFromGallery')}
                     </Text>
                   </Pressable>
                   <Pressable
@@ -956,7 +975,7 @@ export default function HomeScreen() {
                     onPress={handleResetBackground}
                   >
                     <Text style={styles.imagePickerButtonSecondaryText}>
-                      기본 이미지로 변경
+                      {t('home.background.resetToDefault')}
                     </Text>
                   </Pressable>
                 </View>
@@ -984,7 +1003,7 @@ export default function HomeScreen() {
             <View style={styles.addAnniversaryModalContent}>
               {/* Header */}
               <View style={styles.addAnniversaryHeader}>
-                <Text style={styles.addAnniversaryTitle}>기념일 추가</Text>
+                <Text style={styles.addAnniversaryTitle}>{t('home.anniversary.add')}</Text>
                 <Pressable
                   onPress={() => setShowAddAnniversary(false)}
                   style={styles.modalCloseButton}
@@ -1002,7 +1021,7 @@ export default function HomeScreen() {
               >
                 {/* Icon + Name Input Combined */}
                 <View style={styles.formSection}>
-                  <Text style={styles.formLabel}>기념일</Text>
+                  <Text style={styles.formLabel}>{t('home.anniversary.name')}</Text>
                   <View style={styles.iconNameRow}>
                     <Pressable
                       style={styles.iconButton}
@@ -1012,7 +1031,7 @@ export default function HomeScreen() {
                     </Pressable>
                     <TextInput
                       style={styles.nameInput}
-                      placeholder="기념일 이름을 입력하세요"
+                      placeholder={t('home.anniversary.namePlaceholder')}
                       placeholderTextColor="rgba(255,255,255,0.4)"
                       value={newAnniversaryName}
                       onChangeText={setNewAnniversaryName}
@@ -1045,7 +1064,7 @@ export default function HomeScreen() {
 
                 {/* Date Picker */}
                 <View style={styles.formSection}>
-                  <Text style={styles.formLabel}>날짜</Text>
+                  <Text style={styles.formLabel}>{t('home.anniversary.date')}</Text>
                   <Pressable
                     style={styles.datePickerButton}
                     onPress={() => setShowDatePicker(true)}
@@ -1069,7 +1088,7 @@ export default function HomeScreen() {
                       setNewAnniversaryDate(selectedDate);
                     }
                   }}
-                  locale="ko"
+                  locale={i18n.language}
                 />
               )}
 
@@ -1085,7 +1104,7 @@ export default function HomeScreen() {
                   disabled={!newAnniversaryName.trim()}
                 >
                   <View style={styles.submitButtonInner}>
-                    <Text style={styles.submitButtonText}>완료</Text>
+                    <Text style={styles.submitButtonText}>{t('common.done')}</Text>
                   </View>
                 </Pressable>
               </View>
@@ -1118,7 +1137,7 @@ export default function HomeScreen() {
             <View style={styles.addAnniversaryModalContent}>
               {/* Header */}
               <View style={styles.addAnniversaryHeader}>
-                <Text style={styles.addAnniversaryTitle}>기념일 수정</Text>
+                <Text style={styles.addAnniversaryTitle}>{t('home.anniversary.edit')}</Text>
                 <Pressable
                   onPress={() => {
                     setShowEditAnniversary(false);
@@ -1139,7 +1158,7 @@ export default function HomeScreen() {
               >
                 {/* Icon + Name Input Combined */}
                 <View style={styles.formSection}>
-                  <Text style={styles.formLabel}>기념일</Text>
+                  <Text style={styles.formLabel}>{t('home.anniversary.name')}</Text>
                   <View style={styles.iconNameRow}>
                     <Pressable
                       style={styles.iconButton}
@@ -1149,7 +1168,7 @@ export default function HomeScreen() {
                     </Pressable>
                     <TextInput
                       style={styles.nameInput}
-                      placeholder="기념일 이름을 입력하세요"
+                      placeholder={t('home.anniversary.namePlaceholder')}
                       placeholderTextColor="rgba(255,255,255,0.4)"
                       value={editAnniversaryName}
                       onChangeText={setEditAnniversaryName}
@@ -1182,7 +1201,7 @@ export default function HomeScreen() {
 
                 {/* Date Picker */}
                 <View style={styles.formSection}>
-                  <Text style={styles.formLabel}>날짜</Text>
+                  <Text style={styles.formLabel}>{t('home.anniversary.date')}</Text>
                   <Pressable
                     style={styles.datePickerButton}
                     onPress={() => setShowEditDatePicker(true)}
@@ -1206,7 +1225,7 @@ export default function HomeScreen() {
                       setEditAnniversaryDate(selectedDate);
                     }
                   }}
-                  locale="ko"
+                  locale={i18n.language}
                 />
               )}
 
@@ -1222,7 +1241,7 @@ export default function HomeScreen() {
                   disabled={!editAnniversaryName.trim()}
                 >
                   <View style={styles.submitButtonInner}>
-                    <Text style={styles.submitButtonText}>확인</Text>
+                    <Text style={styles.submitButtonText}>{t('common.confirm')}</Text>
                   </View>
                 </Pressable>
               </View>
@@ -1287,9 +1306,9 @@ export default function HomeScreen() {
                 ]}
               >
                 <View style={styles.tutorialMessageBox}>
-                  <Text style={styles.tutorialMessageTitle}>배경사진을 변경해보세요</Text>
+                  <Text style={styles.tutorialMessageTitle}>{t('home.tutorial.title')}</Text>
                   <Text style={styles.tutorialMessageText}>
-                    이 버튼을 눌러 커플 사진으로{'\n'}배경을 꾸밀 수 있어요
+                    {t('home.tutorial.description')}
                   </Text>
                 </View>
               </View>

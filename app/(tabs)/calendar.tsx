@@ -32,6 +32,7 @@ import {
   ChevronLeft,
 } from 'lucide-react-native';
 
+import { useTranslation } from 'react-i18next';
 import { COLORS, SPACING, RADIUS } from '@/constants/design';
 import { useBackground } from '@/contexts';
 import { useMemoryStore, SAMPLE_MEMORIES } from '@/stores/memoryStore';
@@ -300,6 +301,7 @@ function SwipeableTodoItem({
 }
 
 export default function CalendarScreen() {
+  const { t, i18n } = useTranslation();
   const { backgroundImage } = useBackground();
   const { memories, loadFromDB } = useMemoryStore();
   const { couple } = useAuthStore();
@@ -764,8 +766,8 @@ export default function CalendarScreen() {
       {/* Header - Fixed at top */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerTitle}>캘린더</Text>
-          <Text style={styles.headerSubtitle}>우리의 시간을 기록해요</Text>
+          <Text style={styles.headerTitle}>{t('calendar.title')}</Text>
+          <Text style={styles.headerSubtitle}>{t('calendar.subtitle')}</Text>
         </View>
         <Pressable
           style={styles.settingsButton}
@@ -807,7 +809,7 @@ export default function CalendarScreen() {
 
         {/* Day Names */}
         <View style={styles.dayNamesRow}>
-          {DAY_NAMES.map((day, index) => (
+          {(t('calendar.dayNames', { returnObjects: true }) as string[]).map((day: string, index: number) => (
             <View key={day} style={styles.dayNameCell}>
               <Text
                 style={[
@@ -925,7 +927,11 @@ export default function CalendarScreen() {
         <View style={styles.todaySection}>
           <View style={styles.todaySectionHeader}>
             <Text style={styles.todaySectionTitle}>
-              {selectedDate ? `${month + 1}월 ${selectedDate}일` : '오늘'}
+              {selectedDate
+                ? (i18n.language === 'ko'
+                    ? `${month + 1}월 ${selectedDate}일`
+                    : new Date(year, month, selectedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))
+                : t('common.today')}
             </Text>
             <Pressable
               style={styles.iconButtonRound}
@@ -940,10 +946,10 @@ export default function CalendarScreen() {
           <View style={styles.todoList}>
             {getCurrentDateTodos().length === 0 ? (
               <Pressable style={styles.emptyTodoCard} onPress={openTodoModal}>
-                <Text style={styles.emptyTodoText}>할 일이 없습니다</Text>
+                <Text style={styles.emptyTodoText}>{t('calendar.todo.empty')}</Text>
                 <View style={styles.emptyTodoHint}>
                   <Pen color="rgba(255,255,255,0.5)" size={16} strokeWidth={2} />
-                  <Text style={styles.emptyTodoHintText}>버튼을 눌러 추가해보세요</Text>
+                  <Text style={styles.emptyTodoHintText}>{t('calendar.todo.emptyHint')}</Text>
                 </View>
               </Pressable>
             ) : (
@@ -963,7 +969,7 @@ export default function CalendarScreen() {
         {menstrualTrackingEnabled && (
           <View style={styles.periodSection}>
             <View style={styles.periodSectionHeader}>
-              <Text style={styles.periodSectionTitle}>월경 정보</Text>
+              <Text style={styles.periodSectionTitle}>{t('calendar.period.title')}</Text>
               <Pressable
                 style={styles.iconButtonRound}
                 onPress={() => openPeriodModal()}
@@ -983,7 +989,7 @@ export default function CalendarScreen() {
                 >
                   <Droplet color={COLORS.white} size={32} strokeWidth={2} />
                 </LinearGradient>
-                <Text style={styles.emptyPeriodTitle}>월경 정보를 입력해주세요</Text>
+                <Text style={styles.emptyPeriodTitle}>{t('calendar.period.inputTitle')}</Text>
               </Pressable>
             ) : (
               <View style={styles.periodDataContainer}>
@@ -1005,10 +1011,11 @@ export default function CalendarScreen() {
                         <Droplet color={COLORS.white} size={20} strokeWidth={2} />
                       </LinearGradient>
                       <View>
-                        <Text style={styles.nextPeriodLabel}>다음 예정일</Text>
+                        <Text style={styles.nextPeriodLabel}>{t('calendar.period.nextDate')}</Text>
                         <Text style={styles.nextPeriodDate}>
-                          {periodInfo.nextPeriodDate.getMonth() + 1}월{' '}
-                          {periodInfo.nextPeriodDate.getDate()}일
+                          {i18n.language === 'ko'
+                            ? `${periodInfo.nextPeriodDate.getMonth() + 1}월 ${periodInfo.nextPeriodDate.getDate()}일`
+                            : periodInfo.nextPeriodDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         </Text>
                       </View>
                     </View>
@@ -1023,14 +1030,16 @@ export default function CalendarScreen() {
                 {/* Cycle Info Cards */}
                 <View style={styles.cycleInfoRow}>
                   <View style={[styles.cycleInfoCard, { backgroundColor: 'rgba(243, 232, 255, 0.3)' }]}>
-                    <Text style={styles.cycleInfoLabel}>평균 주기</Text>
-                    <Text style={styles.cycleInfoValue}>{cycleLength}일</Text>
+                    <Text style={styles.cycleInfoLabel}>{t('calendar.period.averageCycle')}</Text>
+                    <Text style={styles.cycleInfoValue}>{cycleLength}{t('calendar.period.daysUnit')}</Text>
                   </View>
                   {lastPeriodDate && (
                     <View style={[styles.cycleInfoCard, { backgroundColor: 'rgba(219, 234, 254, 0.3)' }]}>
-                      <Text style={styles.cycleInfoLabel}>지난 시작일</Text>
+                      <Text style={styles.cycleInfoLabel}>{t('calendar.period.lastDate')}</Text>
                       <Text style={styles.cycleInfoValue}>
-                        {lastPeriodDate.getMonth() + 1}월 {lastPeriodDate.getDate()}일
+                        {i18n.language === 'ko'
+                          ? `${lastPeriodDate.getMonth() + 1}월 ${lastPeriodDate.getDate()}일`
+                          : lastPeriodDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                       </Text>
                     </View>
                   )}
@@ -1040,15 +1049,15 @@ export default function CalendarScreen() {
                 <View style={styles.legendRow}>
                   <View style={styles.legendItem}>
                     <View style={[styles.legendDot, { backgroundColor: '#ec4899' }]} />
-                    <Text style={styles.legendText}>월경일</Text>
+                    <Text style={styles.legendText}>{t('calendar.period.legend.period')}</Text>
                   </View>
                   <View style={styles.legendItem}>
                     <View style={[styles.legendDot, { backgroundColor: '#93c5fd' }]} />
-                    <Text style={styles.legendText}>가임기</Text>
+                    <Text style={styles.legendText}>{t('calendar.period.legend.fertile')}</Text>
                   </View>
                   <View style={styles.legendItem}>
                     <View style={[styles.legendDot, { backgroundColor: '#eab308' }]} />
-                    <Text style={styles.legendText}>배란일 예상</Text>
+                    <Text style={styles.legendText}>{t('calendar.period.legend.ovulation')}</Text>
                   </View>
                 </View>
               </View>
@@ -1068,7 +1077,7 @@ export default function CalendarScreen() {
           <BlurView intensity={60} tint="dark" style={styles.blurOverlay}>
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>캘린더 기능 설정</Text>
+                <Text style={styles.modalTitle}>{t('calendar.settings.title')}</Text>
                 <Pressable
                   onPress={() => closeSettingsModal(false)}
                   style={styles.modalCloseButton}
@@ -1079,7 +1088,7 @@ export default function CalendarScreen() {
               <View style={styles.modalHeaderDivider} />
 
               <View style={styles.modalBody}>
-                <Text style={styles.modalDescription}>표시할 기능을 선택하세요</Text>
+                <Text style={styles.modalDescription}>{t('calendar.settings.description')}</Text>
 
                 <Pressable
                   style={[
@@ -1097,9 +1106,9 @@ export default function CalendarScreen() {
                     <Droplet color={COLORS.white} size={24} strokeWidth={2} />
                   </LinearGradient>
                   <View style={styles.featureInfo}>
-                    <Text style={styles.featureTitle}>월경 캘린더</Text>
+                    <Text style={styles.featureTitle}>{t('calendar.period.calendar')}</Text>
                     <Text style={styles.featureDescription}>
-                      월경 주기를 추적하고 예측할 수 있어요
+                      {t('calendar.period.calendarDesc')}
                     </Text>
                   </View>
                   {tempMenstrualEnabled ? (
@@ -1117,7 +1126,7 @@ export default function CalendarScreen() {
                   style={styles.modalDoneButton}
                   onPress={() => closeSettingsModal(true)}
                 >
-                  <Text style={styles.modalDoneButtonText}>완료</Text>
+                  <Text style={styles.modalDoneButtonText}>{t('common.done')}</Text>
                 </Pressable>
               </View>
             </View>
@@ -1137,7 +1146,7 @@ export default function CalendarScreen() {
             <BlurView intensity={60} tint="dark" style={styles.blurOverlay}>
               <Animated.View style={[styles.modalContent, { transform: [{ translateY: keyboardOffset }] }]}>
                 <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>할 일을 입력하세요</Text>
+                  <Text style={styles.modalTitle}>{t('calendar.todo.addTitle')}</Text>
                   <Pressable
                     onPress={closeTodoModal}
                     style={styles.modalCloseButton}
@@ -1151,7 +1160,7 @@ export default function CalendarScreen() {
                   <View style={styles.todoInputContainer}>
                     <TextInput
                       style={styles.todoInput}
-                      placeholder="예: 영화 예매하기"
+                      placeholder={t('calendar.todo.addPlaceholder')}
                       placeholderTextColor="rgba(255,255,255,0.5)"
                       value={todoText}
                       onChangeText={setTodoText}
@@ -1165,7 +1174,7 @@ export default function CalendarScreen() {
 
                 <View style={styles.modalFooter}>
                   <Pressable style={styles.modalAddButtonFull} onPress={handleAddTodo}>
-                    <Text style={styles.modalAddButtonText}>추가</Text>
+                    <Text style={styles.modalAddButtonText}>{t('common.add')}</Text>
                   </Pressable>
                 </View>
               </Animated.View>
@@ -1186,7 +1195,7 @@ export default function CalendarScreen() {
             <BlurView intensity={60} tint="dark" style={styles.blurOverlay}>
               <Animated.View style={[styles.modalContent, { transform: [{ translateY: keyboardOffset }] }]}>
                 <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>월경 정보 설정</Text>
+                  <Text style={styles.modalTitle}>{t('calendar.period.settingsTitle')}</Text>
                   <Pressable
                     onPress={() => closePeriodModal(false)}
                     style={styles.modalCloseButton}
@@ -1199,7 +1208,7 @@ export default function CalendarScreen() {
                 <View style={styles.modalBody}>
                   {/* Last Period Date */}
                   <View style={styles.periodSettingSection}>
-                    <Text style={styles.periodSettingLabel}>생리 시작일</Text>
+                    <Text style={styles.periodSettingLabel}>{t('calendar.period.startDate')}</Text>
                     <Pressable
                       style={styles.periodSettingButton}
                       onPress={() => {
@@ -1218,9 +1227,11 @@ export default function CalendarScreen() {
                         <CalendarIcon color={COLORS.white} size={18} strokeWidth={2} />
                       </LinearGradient>
                       <View style={styles.periodSettingInfo}>
-                        <Text style={styles.periodSettingHint}>마지막 생리 시작일</Text>
+                        <Text style={styles.periodSettingHint}>{t('calendar.period.lastStartDate')}</Text>
                         <Text style={styles.periodSettingValue}>
-                          {tempLastPeriodDate.getFullYear()}년 {tempLastPeriodDate.getMonth() + 1}월 {tempLastPeriodDate.getDate()}일
+                          {i18n.language === 'ko'
+                            ? `${tempLastPeriodDate.getFullYear()}년 ${tempLastPeriodDate.getMonth() + 1}월 ${tempLastPeriodDate.getDate()}일`
+                            : tempLastPeriodDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
                         </Text>
                       </View>
                       <ChevronRight color="rgba(255,255,255,0.4)" size={20} strokeWidth={2} />
@@ -1229,7 +1240,7 @@ export default function CalendarScreen() {
 
                   {/* Cycle Length */}
                   <View style={[styles.periodSettingSection, { marginTop: -8, marginBottom: 4 }]}>
-                    <Text style={styles.periodSettingLabel}>평균 주기</Text>
+                    <Text style={styles.periodSettingLabel}>{t('calendar.period.averageCycle')}</Text>
                     <Pressable
                       style={styles.cycleInputContainer}
                       onPress={Keyboard.dismiss}
@@ -1249,11 +1260,11 @@ export default function CalendarScreen() {
                         keyboardType="numeric"
                         maxLength={2}
                       />
-                      <Text style={styles.cycleUnit}>일</Text>
+                      <Text style={styles.cycleUnit}>{t('calendar.period.daysUnit')}</Text>
                     </Pressable>
                     <View style={styles.infoTextContainer}>
                       <Info color="rgba(255, 255, 255, 0.5)" size={14} strokeWidth={2} />
-                      <Text style={styles.infoText}>일반적인 생리 주기는 21~35일입니다</Text>
+                      <Text style={styles.infoText}>{t('calendar.period.cycleHint')}</Text>
                     </View>
                   </View>
                 </View>
@@ -1263,7 +1274,7 @@ export default function CalendarScreen() {
                     style={styles.modalSaveButton}
                     onPress={() => closePeriodModal(true)}
                   >
-                    <Text style={styles.modalSaveButtonText}>저장하기</Text>
+                    <Text style={styles.modalSaveButtonText}>{t('common.save')}</Text>
                   </Pressable>
                 </View>
               </Animated.View>
@@ -1286,7 +1297,7 @@ export default function CalendarScreen() {
           <BlurView intensity={60} tint="dark" style={styles.blurOverlay}>
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>날짜 선택</Text>
+                <Text style={styles.modalTitle}>{t('calendar.period.selectDate')}</Text>
                 <Pressable
                   onPress={() => {
                     setIsDatePickerOpen(false);
@@ -1309,7 +1320,9 @@ export default function CalendarScreen() {
                     <ChevronLeft color={COLORS.foreground} size={18} />
                   </Pressable>
                   <Text style={styles.pickerMonthText}>
-                    {pickerMonth.getFullYear()}년 {pickerMonth.getMonth() + 1}월
+                    {i18n.language === 'ko'
+                      ? `${pickerMonth.getFullYear()}년 ${pickerMonth.getMonth() + 1}월`
+                      : pickerMonth.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}
                   </Text>
                   <Pressable
                     onPress={() => setPickerMonth(new Date(pickerMonth.getFullYear(), pickerMonth.getMonth() + 1, 1))}
@@ -1321,7 +1334,7 @@ export default function CalendarScreen() {
 
                 {/* Day Names */}
                 <View style={styles.pickerDayNames}>
-                  {DAY_NAMES.map((day, idx) => (
+                  {(t('calendar.dayNames', { returnObjects: true }) as string[]).map((day: string, idx: number) => (
                     <Text
                       key={day}
                       style={[

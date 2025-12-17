@@ -1,0 +1,656 @@
+{
+  "common": {
+    "confirm": "확인",
+    "cancel": "취소",
+    "save": "저장",
+    "delete": "삭제",
+    "edit": "수정",
+    "done": "완료",
+    "add": "추가",
+    "reset": "리셋",
+    "close": "닫기",
+    "next": "다음",
+    "back": "뒤로",
+    "yes": "네",
+    "no": "아니요",
+    "loading": "로딩 중...",
+    "error": "오류",
+    "success": "성공",
+    "today": "오늘",
+    "partner": "파트너",
+    "me": "나",
+    "days": "일",
+    "daysCount": "일째"
+  },
+  "tabs": {
+    "home": "홈",
+    "mission": "미션",
+    "calendar": "캘린더",
+    "memories": "추억",
+    "more": "더보기"
+  },
+  "home": {
+    "anniversary": {
+      "title": "기념일",
+      "add": "기념일 추가",
+      "edit": "기념일 수정",
+      "delete": "기념일 삭제",
+      "deleteConfirm": "\"{{name}}\" 기념일을 삭제하시겠습니까?",
+      "name": "기념일",
+      "namePlaceholder": "기념일 이름을 입력하세요",
+      "date": "날짜",
+      "weddingAnniversary": "결혼기념일",
+      "datingAnniversary": "연애",
+      "birthday": "생일",
+      "lunar": "(음력)",
+      "christmas": "크리스마스",
+      "valentinesDay": "발렌타인데이",
+      "whiteDay": "화이트데이"
+    },
+    "background": {
+      "title": "배경사진 변경",
+      "description": "선택한 이미지가 모든 페이지의 배경으로 적용됩니다",
+      "selectFromGallery": "갤러리에서 선택",
+      "resetToDefault": "기본 이미지로 변경",
+      "uploadFailed": "업로드 실패",
+      "uploadFailedMessage": "이미지 업로드에 실패했습니다. 다시 시도해주세요.",
+      "uploadError": "이미지 업로드 중 오류가 발생했습니다."
+    },
+    "tutorial": {
+      "title": "배경사진을 변경해보세요",
+      "description": "이 버튼을 눌러 커플 사진으로\n배경을 꾸밀 수 있어요"
+    }
+  },
+  "mission": {
+    "title": "오늘의 미션",
+    "subtitle": "오늘은 어떤 순간을 함께할까요?",
+    "generate": "미션 생성하기",
+    "generating": "생성 중...",
+    "generatingMessage": "미션을 생성하고 있어요",
+    "pleaseWait": "잠시만 기다려주세요",
+    "start": "시작하기",
+    "completed": "완료",
+    "kept": "보관됨",
+    "keep": "Keep",
+    "anotherInProgress": "다른 미션 진행 중",
+    "questions": {
+      "canMeetToday": "오늘 만날 수 있나요?",
+      "yesMeet": "네, 만나요",
+      "noMeet": "아니요",
+      "availableTime": "오늘 함께할 시간이 얼마나 되나요?",
+      "todayMood": "오늘 원하는 분위기는? (모두 선택)"
+    },
+    "timeOptions": {
+      "30min": "30분",
+      "1hour": "1시간",
+      "2hour": "2시간 +",
+      "allday": "하루종일"
+    },
+    "moodOptions": {
+      "fun": "웃고 싶어요",
+      "deep_talk": "대화가 필요해",
+      "active": "활동·에너지",
+      "healing": "휴식·힐링",
+      "culture": "문화·감성",
+      "adventure": "새로운 도전",
+      "romantic": "로맨틱"
+    },
+    "alerts": {
+      "locationRequired": "위치 권한 필요",
+      "locationRequiredMessage": "미션을 생성하려면 위치 정보 권한이 필요해요.\n위치 권한을 허용해주세요.",
+      "allowPermission": "권한 허용",
+      "locationDenied": "위치 권한 거부됨",
+      "locationDeniedMessage": "위치 권한이 거부되었어요. 설정에서 위치 권한을 허용해주세요.",
+      "goToSettings": "설정으로 이동",
+      "cannotKeep": "보관 불가",
+      "alreadyCompletedKeep": "이미 완료한 미션은 보관할 수 없어요.",
+      "keepMission": "미션 보관",
+      "keepMissionConfirm": "'{{title}}' 미션을 보관함에 저장할까요?",
+      "keepLimit": "보관 제한",
+      "keepLimitMessage": "미션은 최대 5개까지만 보관할 수 있어요.\n보관된 미션을 삭제한 후 다시 시도해주세요.",
+      "cannotStart": "미션 시작 불가",
+      "anotherInProgressMessage": "이미 다른 미션이 진행 중이에요.\n진행 중인 미션을 완료해주세요!",
+      "dailyLimitMessage": "오늘 가능한 미션을 모두 완료했어요.\n내일 다시 도전해보세요!"
+    }
+  },
+  "missionDetail": {
+    "headerTitle": "미션 상세",
+    "notFound": {
+      "title": "미션을 찾을 수 없습니다",
+      "description": "이 미션은 더 이상 사용할 수 없습니다."
+    },
+    "camera": {
+      "title": "사진 촬영",
+      "confirmTitle": "사진 확인",
+      "permissionRequired": "카메라 권한 필요",
+      "permissionMessage": "사진을 촬영하려면 카메라 권한이 필요합니다.",
+      "photoError": "사진 촬영에 실패했습니다. 다시 시도해주세요.",
+      "usePhoto": "사용하기",
+      "retake": "다시 찍기"
+    },
+    "location": {
+      "noInfo": "위치 정보 없음"
+    },
+    "steps": {
+      "photo": {
+        "title": "사진 촬영하기",
+        "description": "두 분의 특별한 순간을 사진으로 담아주세요.",
+        "hint": "지금 이 순간의 설렘과 행복을 사진에 담아\n추억으로 만들어보세요."
+      },
+      "message": {
+        "title": "서로에게 한마디 작성하기",
+        "description": "이 순간 상대방에게 전하고 싶은 마음을 글로 남겨보세요. 진심이 담긴 메시지가 더 특별한 추억을\n만듭니다.",
+        "written": "작성 완료",
+        "notWritten": "미작성"
+      },
+      "complete": "완료"
+    },
+    "status": {
+      "anotherInProgress": "다른 미션 진행 중",
+      "waitingPartner": "상대방 대기 중...",
+      "waitingPhoto": "사진 대기 중...",
+      "writeMessage": "서로에게 한마디 작성",
+      "takePhoto": "사진 촬영"
+    },
+    "modal": {
+      "title": "서로에게 한마디",
+      "placeholder": "상대방에게 전하고 싶은 말을 적어주세요"
+    },
+    "defaultPartnerMessage": "너와 함께여서 행복해 💕",
+    "completed": "완료됨",
+    "completeButton": "미션 완료! 🎉",
+    "writeMessage": "메시지 작성",
+    "messagePlaceholder": "오늘의 미션을 함께 기록해요",
+    "submitMission": "미션 완료하기",
+    "partnerMessage": "상대방 메시지",
+    "myMessage": "내 메시지",
+    "waitingPartner": "상대방의 메시지를 기다리고 있어요",
+    "viewMemory": "추억 보기"
+  },
+  "bookmark": {
+    "title": "보관함",
+    "empty": "보관한 미션이 없어요",
+    "emptyHint": "마음에 드는 미션을 Keep 해보세요",
+    "deleteMission": "미션 삭제",
+    "deleteConfirm": "'{{title}}' 미션을 삭제하시겠어요?"
+  },
+  "calendar": {
+    "title": "캘린더",
+    "subtitle": "우리의 시간을 기록해요",
+    "dayNames": ["일", "월", "화", "수", "목", "금", "토"],
+    "settings": {
+      "title": "캘린더 기능 설정",
+      "description": "표시할 기능을 선택하세요"
+    },
+    "todo": {
+      "title": "할 일",
+      "empty": "할 일이 없습니다",
+      "emptyHint": "버튼을 눌러 추가해보세요",
+      "addPlaceholder": "예: 영화 예매하기",
+      "addTitle": "할 일을 입력하세요",
+      "add": "할 일 추가"
+    },
+    "period": {
+      "title": "월경 정보",
+      "calendar": "월경 캘린더",
+      "calendarDesc": "월경 주기를 추적하고 예측할 수 있어요",
+      "inputTitle": "월경 정보를 입력해주세요",
+      "settingsTitle": "월경 정보 설정",
+      "startDate": "생리 시작일",
+      "lastStartDate": "마지막 생리 시작일",
+      "averageCycle": "평균 주기",
+      "cycleLength": "주기 길이",
+      "periodLength": "생리 기간",
+      "cycleHint": "일반적인 생리 주기는 21~35일입니다",
+      "nextDate": "다음 예정일",
+      "lastDate": "지난 시작일",
+      "daysUnit": "일",
+      "legend": {
+        "period": "월경일",
+        "fertile": "가임기",
+        "ovulation": "배란일 예상"
+      },
+      "selectDate": "날짜 선택"
+    },
+    "holidays": {
+      "newYear": "신정",
+      "lunarNewYear": "설날",
+      "lunarNewYearHoliday": "설날 연휴",
+      "independenceDay": "삼일절",
+      "childrenDay": "어린이날",
+      "buddhasBirthday": "부처님오신날",
+      "memorialDay": "현충일",
+      "liberationDay": "광복절",
+      "foundationDay": "개천절",
+      "chuseok": "추석",
+      "chuseokHoliday": "추석 연휴",
+      "hangulDay": "한글날",
+      "christmas": "크리스마스"
+    }
+  },
+  "memories": {
+    "title": "추억",
+    "subtitle": "우리가 함께한 순간들",
+    "empty": "완료된 미션이 없습니다",
+    "emptyHint": "미션을 완료하고 서로에게 한마디를 작성해주세요",
+    "viewAll": "전체 보기",
+    "togetherMoment": "함께한 순간",
+    "itemCount": "{{count}}개의 항목",
+    "monthNames": ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"],
+    "yearFormat": "{{year}}년",
+    "yearMonthFormat": "{{year}}년 {{month}}",
+    "filter": {
+      "all": "전체",
+      "thisMonth": "이번 달",
+      "thisYear": "올해"
+    },
+    "album": {
+      "title": "앨범",
+      "subtitle": "기억에 남는 순간을 앨범으로 만들어보세요",
+      "name": "앨범 이름",
+      "coverPhoto": "대표 사진",
+      "fontStyle": "폰트 스타일",
+      "fontStyleDesc": "앨범 제목에 사용할 폰트 스타일을 선택하세요",
+      "basicFont": "기본폰트",
+      "basicFontDesc": "깔끔한 스타일",
+      "ransomStyle": "랜섬노트 스타일",
+      "basicFontHint": "깔끔한 폰트가 적용됩니다",
+      "ransomFontHint": "입력하는 글자마다 특별한 스타일이 적용됩니다",
+      "namePlaceholder": "앨범 이름 입력...",
+      "ransomPlaceholder": "영어만 입력 가능 (A-Z, 0-9)",
+      "selectPhoto": "사진 선택",
+      "dragHint": "문구를 드래그하여 위치를 조정하세요",
+      "coverEditHint": "사진을 선택하고 문구 위치를 드래그해서 조정하세요",
+      "color": "색상",
+      "size": "크기",
+      "textSize": "문구 크기",
+      "addPhoto": "사진 추가",
+      "editCover": "표지 편집",
+      "deleteAlbum": "앨범 삭제",
+      "deleteAlbumConfirm": "이 앨범을 삭제하시겠습니까?"
+    },
+    "photo": {
+      "select": "선택",
+      "delete": "삭제",
+      "deleteTitle": "사진 삭제",
+      "deleteConfirm": "{{count}}개의 사진을 삭제하시겠습니까?",
+      "deleteSingleConfirm": "이 사진을 삭제하시겠습니까?",
+      "save": "사진 저장",
+      "tapToFlip": "탭하여 뒷면 확인",
+      "tapToView": "탭하여 사진 보기"
+    },
+    "permission": {
+      "required": "권한 필요",
+      "photoAccess": "사진첩 접근 권한이 필요합니다.",
+      "saveAccess": "사진을 저장하려면 갤러리 접근 권한이 필요합니다.",
+      "saveSuccess": "저장 완료",
+      "saveSuccessMessage": "사진이 갤러리에 저장되었습니다.",
+      "saveFailed": "저장 실패",
+      "saveFailedMessage": "사진을 저장하는 중 오류가 발생했습니다."
+    }
+  },
+  "more": {
+    "title": "더보기",
+    "sections": {
+      "profile": "프로필",
+      "settings": "설정",
+      "support": "지원",
+      "developer": "개발자"
+    },
+    "menu": {
+      "myProfile": "내 프로필",
+      "coupleProfile": "커플 프로필",
+      "settings": "설정",
+      "announcements": "공지사항",
+      "customerService": "고객센터",
+      "onboardingReset": "온보딩 리셋",
+      "missionReset": "미션 리셋",
+      "fullReset": "완전 리셋",
+      "logout": "로그아웃"
+    },
+    "announcements": {
+      "title": "공지사항",
+      "empty": "공지사항이 없습니다"
+    },
+    "help": {
+      "title": "도움말",
+      "inquiry": "문의하기",
+      "faq": "자주 묻는 질문"
+    },
+    "customerService": {
+      "title": "고객센터",
+      "faqTitle": "자주 묻는 질문",
+      "inquiryTitle": "궁금한 점이 해소되지 않으셨나요?",
+      "inquiryDescription": "카카오톡으로 1:1 문의를 남겨주시면\n빠르게 답변 드리겠습니다.",
+      "kakaoButton": "1:1 문의하기"
+    },
+    "others": {
+      "title": "기타",
+      "termsOfService": "서비스 이용약관",
+      "privacyPolicy": "개인정보처리방침"
+    },
+    "alerts": {
+      "devReset": "개발자 리셋",
+      "devResetMessage": "온보딩 상태를 초기화하고 처음부터 다시 시작하시겠습니까?",
+      "missionReset": "미션 리셋",
+      "missionResetMessage": "오늘의 미션과 완료 상태를 모두 초기화하시겠습니까?",
+      "missionResetComplete": "리셋 완료",
+      "missionResetCompleteMessage": "미션이 초기화되었습니다. 미션 탭으로 이동하여 새로운 미션을 생성하세요.",
+      "fullReset": "⚠️ 완전 리셋",
+      "fullResetMessage": "모든 데이터를 초기화합니다.\n\n• 온보딩 데이터\n• 페어링 정보\n• 커플 동기화 데이터\n• 미션 데이터\n• 모든 로컬 저장소\n\n정말 초기화하시겠습니까?",
+      "fullResetComplete": "초기화 완료",
+      "fullResetCompleteMessage": "모든 데이터가 초기화되었습니다. 앱을 다시 시작합니다.",
+      "logout": "로그아웃",
+      "logoutMessage": "정말 로그아웃 하시겠습니까?"
+    }
+  },
+  "profile": {
+    "myProfile": "내 프로필",
+    "coupleProfile": "커플 프로필",
+    "nickname": "닉네임",
+    "birthDate": "생년월일",
+    "mbti": "MBTI",
+    "anniversaryDate": "기념일",
+    "relationshipType": "관계 유형",
+    "dating": "연애 중",
+    "married": "결혼",
+    "inviteCode": "초대 코드",
+    "copyCode": "코드 복사",
+    "codeCopied": "코드가 복사되었습니다",
+    "disconnect": "연결 해제",
+    "disconnectConfirm": "정말로 연결을 해제하시겠습니까?",
+    "disconnectWarning": "연결 해제 시 모든 커플 데이터가 삭제됩니다.",
+    "notSet": "설정되지 않음",
+    "dateFormat": "{{year}}년 {{month}}월 {{day}}일",
+    "solar": "양력",
+    "lunar": "음력",
+    "preferences": "취향 설정",
+    "preferredActivities": "선호하는 활동",
+    "dateConcerns": "데이트 고민",
+    "constraints": "제약 조건",
+    "activitiesCount": "{{count}}개 활동",
+    "noPreferences": "설정된 취향이 없습니다",
+    "editNickname": {
+      "title": "닉네임 변경",
+      "description": "파트너에게 보여질 이름이에요",
+      "placeholder": "닉네임 입력"
+    },
+    "editBirthday": {
+      "title": "생년월일 수정",
+      "description": "정확한 생년월일을 입력해주세요",
+      "selectDate": "날짜를 선택해주세요"
+    },
+    "editPreferences": {
+      "title": "취향 설정",
+      "editTitle": "취향 설정 수정",
+      "button": "수정하기"
+    },
+    "couple": {
+      "title": "커플 프로필",
+      "anniversary": "기념일",
+      "accountInfo": "계정 정보",
+      "myAccountInfo": "{{nickname}} 계정 정보",
+      "myAccount": "내 계정",
+      "partnerAccountInfo": "{{nickname}} 계정 정보",
+      "partnerAccount": "파트너 계정",
+      "datingLabel": "사귄 날",
+      "marriedLabel": "결혼기념일",
+      "datingType": "연인",
+      "marriedType": "부부",
+      "editAnniversary": {
+        "title": "기념일 변경",
+        "description": "특별한 날을 수정해주세요",
+        "relationshipLabel": "관계 유형",
+        "selectDate": "날짜를 선택해주세요",
+        "datingStart": "연애 시작일",
+        "marriedAnniversary": "결혼 기념일"
+      },
+      "accountDetail": {
+        "me": "나",
+        "partner": "파트너",
+        "nickname": "닉네임",
+        "email": "이메일",
+        "joinDate": "가입일",
+        "noInfo": "정보 없음",
+        "defaultPartnerEmail": "연결된 파트너"
+      }
+    },
+    "me": "나",
+    "partner": "파트너"
+  },
+  "settings": {
+    "title": "설정",
+    "sections": {
+      "notifications": "알림",
+      "marketing": "마케팅",
+      "other": "기타",
+      "account": "계정"
+    },
+    "notifications": {
+      "push": "푸시 알림",
+      "pushDesc": "모든 알림 받기",
+      "mission": "미션 알림",
+      "missionDesc": "새로운 미션이 도착하면 알림",
+      "message": "서로에게 한마디 미작성 알림",
+      "messageDesc": "한마디를 작성하지 않으면 알림"
+    },
+    "marketing": {
+      "news": "소식 알림 받기",
+      "newsDesc": "이벤트 및 업데이트 소식",
+      "info": "마케팅 정보 수신",
+      "infoDesc": "프로모션 및 할인 정보"
+    },
+    "other": {
+      "termsOfService": "서비스 이용약관",
+      "privacyPolicy": "개인정보 처리방침",
+      "version": "버전 {{version}}",
+      "latestVersion": "최신버전"
+    },
+    "account": {
+      "deleteAccount": "계정 탈퇴",
+      "unpair": "페어링 끊기"
+    },
+    "unpair": {
+      "title": "페어링 끊기",
+      "confirmTitle": "페어링 끊기 확인",
+      "warningTitle": "정말 페어링을 끊으시겠어요?",
+      "warningText": "페어링을 끊으면 파트너와의 연결이 해제되고,\n일부 데이터에 접근할 수 없게 됩니다.",
+      "checkTitle": "연결 끊기 전 확인해주세요",
+      "daysTogether": "함께한 기간",
+      "daysUnit": "일",
+      "completedMissions": "함께 완료한 미션",
+      "missionsUnit": "개",
+      "recoveryPeriod": "복구 가능한 기간",
+      "recoveryHint": "최대 30일 동안 복구할 수 있어요",
+      "warningsTitle": "주의사항",
+      "warning1": "상대방에게 페어링 해제 알림이 전송됩니다",
+      "warning2": "미션 히스토리는 개별 계정에 보관됩니다",
+      "warning3": "30일 이내 같은 파트너와 재연결 가능합니다",
+      "confirmPrompt": "계속하려면 아래에 '페어링끊기'를\n정확히 입력해주세요",
+      "confirmText": "페어링끊기",
+      "button": "페어링 끊기",
+      "success": "페어링 해제",
+      "successMessage": "페어링이 해제되었습니다.\n30일 이내에 같은 파트너와 재연결하면 기존 데이터가 복구됩니다.",
+      "error": "페어링 해제 중 오류가 발생했습니다."
+    },
+    "deleteAccount": {
+      "title": "계정 탈퇴",
+      "warningText": "계정을 탈퇴하면 모든 데이터가\n",
+      "permanentDelete": "영구적으로 삭제",
+      "warningEnd": "됩니다.",
+      "dataList": "삭제되는 데이터:\n• 프로필 정보\n• 커플 연결 정보\n• 완료한 미션 기록\n• 앨범 및 사진\n• 모든 설정",
+      "confirmPrompt": "계속하려면 아래에 '계정탈퇴'를 입력해주세요",
+      "confirmText": "계정탈퇴",
+      "button": "계정 탈퇴",
+      "deleting": "삭제 중...",
+      "success": "계정 탈퇴 완료",
+      "successMessage": "모든 데이터가 삭제되었습니다.\n이용해 주셔서 감사합니다.",
+      "error": "계정 탈퇴 중 오류가 발생했습니다."
+    },
+    "language": "언어",
+    "theme": "테마",
+    "darkMode": "다크 모드",
+    "version": "버전",
+    "termsOfService": "서비스 이용약관",
+    "privacyPolicy": "개인정보 처리방침",
+    "licenses": "오픈소스 라이선스"
+  },
+  "onboarding": {
+    "welcome": "환영합니다",
+    "welcomeTitle": "Daydate에\n오신 것을 환영해요",
+    "welcomeSubtitle": "두 사람의 특별한 순간들을\n함께 기록하고 공유해보세요",
+    "start": "시작하기",
+    "skip": "건너뛰기",
+    "complete": "완료",
+    "next": "다음",
+    "previous": "이전",
+    "continue": "계속하기",
+    "confirm": "확인",
+    "defaultUser": "사용자",
+    "login": {
+      "google": "Google로 로그인",
+      "kakao": "카카오로 로그인",
+      "or": "또는",
+      "success": "로그인 성공",
+      "successMessage": "{{provider}} 계정으로 로그인되었습니다.",
+      "failed": "로그인 실패",
+      "failedMessage": "로그인 중 오류가 발생했습니다. 다시 시도해주세요.",
+      "failedProvider": "{{provider}} 로그인에 실패했습니다. 다시 시도해주세요.",
+      "demoMode": "데모 모드",
+      "demoModeMessage": "소셜 로그인은 데모 모드에서 사용할 수 없습니다.\n\n환경 변수를 설정하여 Supabase를 연결해주세요.",
+      "welcomeBack": "다시 오셨군요!",
+      "alreadyConnected": "이미 상대방과 연결되어 있습니다. 기본정보 입력부터 계속합니다."
+    },
+    "basicInfo": {
+      "title": "기본 정보를\n입력해주세요",
+      "nickname": "닉네임",
+      "nicknamePlaceholder": "닉네임 입력",
+      "gender": "성별",
+      "male": "남",
+      "female": "여",
+      "birthDate": "생년월일",
+      "birthDatePlaceholder": "생년월일 선택",
+      "solar": "양력",
+      "lunar": "음력"
+    },
+    "terms": {
+      "title": "이용약관 동의",
+      "subtitle": "서비스 이용을 위해 약관에 동의해주세요",
+      "agreeAll": "전체 동의",
+      "ageRequired": "[필수] 만 14세 이상입니다",
+      "ageRequiredDesc": "서비스 이용을 위해서는 만 14세 이상이 되어야 합니다. 만 14세 미만의 이용자의 경우 서비스 이용이 제한됩니다.",
+      "serviceTerms": "[필수] 서비스 이용약관 동의",
+      "serviceTermsTitle": "서비스 이용약관",
+      "locationTerms": "[필수] 위치기반 서비스 이용약관 동의",
+      "locationTermsTitle": "위치기반 서비스 이용약관",
+      "privacyTerms": "[필수] 개인정보 수집 및 이용 동의",
+      "privacyTermsTitle": "개인정보 수집 및 이용",
+      "marketingTerms": "[선택] 광고성 알림 수신 동의"
+    },
+    "location": {
+      "permissionRequired": "위치 권한 필요",
+      "permissionMessage": "위치기반 서비스를 이용하려면 위치 권한이 필요합니다. 설정에서 위치 권한을 허용해주세요.",
+      "goToSettings": "설정으로 이동"
+    },
+    "nickname": {
+      "title": "닉네임을 입력해주세요",
+      "placeholder": "닉네임",
+      "hint": "상대방에게 보여질 이름이에요"
+    },
+    "birthDate": {
+      "title": "생년월일을 입력해주세요",
+      "solar": "양력",
+      "lunar": "음력"
+    },
+    "mbti": {
+      "title": "MBTI를\n선택해주세요",
+      "skip": "모르겠어요"
+    },
+    "relationship": {
+      "title": "관계 유형을 선택해주세요",
+      "dating": "연애",
+      "married": "결혼"
+    },
+    "coupleInfo": {
+      "title": "커플 정보를\n입력해주세요",
+      "relationship": "관계",
+      "datingLabel": "사귄 날",
+      "marriedLabel": "결혼 기념일",
+      "selectDate": "{{label}} 선택"
+    },
+    "anniversary": {
+      "title": "기념일을 입력해주세요",
+      "datingStart": "연애 시작일",
+      "weddingDate": "결혼기념일"
+    },
+    "pairing": {
+      "title": "파트너와\n연결해주세요",
+      "subtitle": "페어링 코드로 파트너와 데이터를 공유해요",
+      "generateCode": "코드 생성",
+      "enterCode": "코드 입력",
+      "myCode": "파트너에게 공유할 코드",
+      "enterCodePlaceholder": "파트너가 생성한 코드를 입력하세요",
+      "connect": "연결",
+      "connecting": "연결 중...",
+      "waitingConnection": "연결 대기중",
+      "shareCode": "코드 공유하기",
+      "waitingPartner": "파트너가 이 코드를 입력하면\n자동으로 연결됩니다",
+      "connected": "파트너와 연결되었습니다!\n다음으로 진행하세요",
+      "invalidCode": "유효하지 않은 코드입니다. 코드를 확인해주세요.",
+      "alreadyPaired": "이미 사용된 코드입니다.",
+      "partnerNotReady": "파트너가 아직 준비되지 않았습니다. 잠시 후 다시 시도해주세요.",
+      "connectionError": "연결 중 오류가 발생했습니다. 다시 시도해주세요.",
+      "coupleRestoreError": "커플 복구 중 오류가 발생했습니다.",
+      "coupleConnectionError": "커플 연결 중 오류가 발생했습니다.",
+      "copied": "복사되었습니다",
+      "reconnected": "다시 만나서 반가워요! 💕",
+      "reconnectedMessage": "30일 이내 재연결로 기존 데이터가 복구되었습니다."
+    },
+    "preferences": {
+      "title": "선호하는 활동을\n선택해주세요",
+      "subtitle": "여러 개 선택할 수 있어요",
+      "indoor": "실내 활동",
+      "outdoor": "야외 활동",
+      "active": "활동적인",
+      "relaxing": "편안한",
+      "food": "맛집 탐방",
+      "cafe": "카페",
+      "culture": "문화생활",
+      "travel": "여행"
+    },
+    "concerns": {
+      "title": "데이트할 때\n어떤 게 고민이에요?",
+      "subtitle": "여러 개 선택할 수 있어요",
+      "noIdeas": "데이트 아이디어가 없어요",
+      "sameRoutine": "매번 같은 데이트만 해요",
+      "budget": "예산이 부담돼요",
+      "time": "시간이 부족해요",
+      "distance": "거리가 멀어요"
+    },
+    "constraints": {
+      "title": "미션을 줄 때\n참고할 사항은?",
+      "subtitle": "해당하는 것을 모두 선택해주세요"
+    },
+    "preferencesIntro": {
+      "title": "맞춤형 미션을 위해\n취향을 알려주세요",
+      "subtitle": "두 분의 취향을 분석해서\n적절한 데이트 미션을 추천해드릴게요",
+      "hint": "약 1분 정도 소요되며,\n'더보기 > 내 프로필'에서\n언제든 수정할 수 있어요",
+      "startAnalysis": "취향 분석 시작"
+    },
+    "completeStep": {
+      "title": "{{nickname}}님, 환영해요!",
+      "subtitle": "모든 설정이 완료되었어요\n특별한 순간들을 함께 만들어가요!"
+    },
+    "dataRecovery": {
+      "title": "기존 데이터 복구 💕",
+      "message": "이전에 입력하신 선호도 정보가 있어요.\n선호도 입력을 건너뛰고 완료합니다."
+    }
+  },
+  "errors": {
+    "networkError": "네트워크 오류가 발생했습니다",
+    "tryAgain": "다시 시도해주세요",
+    "somethingWrong": "문제가 발생했습니다",
+    "sessionExpired": "세션이 만료되었습니다",
+    "unauthorized": "권한이 없습니다"
+  }
+}

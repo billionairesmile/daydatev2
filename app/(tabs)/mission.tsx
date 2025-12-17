@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   Linking,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -48,6 +49,7 @@ const { colors: blurGradientColors, locations: blurGradientLocations } = easeGra
 });
 
 export default function MissionScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { backgroundImage } = useBackground();
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -482,9 +484,9 @@ export default function MissionScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerTitle}>오늘의 미션</Text>
+          <Text style={styles.headerTitle}>{t('mission.title')}</Text>
           <Text style={styles.headerSubtitle}>
-            오늘은 어떤 순간을 함께할까요?
+            {t('mission.subtitle')}
           </Text>
         </View>
         <Pressable
@@ -557,10 +559,10 @@ export default function MissionScreen() {
               <View style={styles.loadingAnimationWrapper}>
                 <CircularLoadingAnimation size={100} strokeWidth={6} color={COLORS.white} />
                 <Text style={styles.loadingAnimationText}>
-                  {partnerGeneratingMessage ? '미션 생성 중...' : '미션을 생성하고 있어요'}
+                  {partnerGeneratingMessage ? t('mission.generating') : t('mission.generatingMessage')}
                 </Text>
                 <Text style={styles.loadingAnimationSubtext}>
-                  잠시만 기다려주세요
+                  {t('mission.pleaseWait')}
                 </Text>
               </View>
             ) : (
@@ -573,7 +575,7 @@ export default function MissionScreen() {
                   tint="dark"
                   style={StyleSheet.absoluteFill}
                 />
-                <Text style={styles.glassGenerateButtonText}>오늘의 미션</Text>
+                <Text style={styles.glassGenerateButtonText}>{t('mission.title')}</Text>
               </Pressable>
             )}
           </View>
@@ -592,7 +594,7 @@ export default function MissionScreen() {
             {/* Modal Header */}
             <View style={styles.whiteModalHeader}>
               <View style={styles.modalHeaderSpacer} />
-              <Text style={styles.whiteModalTitle}>오늘의 미션</Text>
+              <Text style={styles.whiteModalTitle}>{t('mission.title')}</Text>
               <Pressable
                 style={styles.whiteModalCloseButton}
                 onPress={() => {
@@ -607,7 +609,7 @@ export default function MissionScreen() {
 
             {/* Question 1: Can Meet Today */}
             <View style={styles.whiteQuestionSection}>
-              <Text style={styles.whiteQuestionLabel}>오늘 만날 수 있나요?</Text>
+              <Text style={styles.whiteQuestionLabel}>{t('mission.questions.canMeetToday')}</Text>
               <View style={styles.whiteBinaryOptions}>
                 <Pressable
                   style={[
@@ -620,7 +622,7 @@ export default function MissionScreen() {
                     styles.whiteBinaryOptionText,
                     canMeetToday === true && styles.whiteBinaryOptionTextActive,
                   ]}>
-                    네, 만나요
+                    {t('mission.questions.yesMeet')}
                   </Text>
                 </Pressable>
                 <Pressable
@@ -634,7 +636,7 @@ export default function MissionScreen() {
                     styles.whiteBinaryOptionText,
                     canMeetToday === false && styles.whiteBinaryOptionTextActive,
                   ]}>
-                    아니요
+                    {t('mission.questions.noMeet')}
                   </Text>
                 </Pressable>
               </View>
@@ -642,7 +644,7 @@ export default function MissionScreen() {
 
             {/* Question 2: Available Time */}
             <View style={styles.whiteQuestionSection}>
-              <Text style={styles.whiteQuestionLabel}>오늘 함께할 시간이 얼마나 되나요?</Text>
+              <Text style={styles.whiteQuestionLabel}>{t('mission.questions.availableTime')}</Text>
               <View style={styles.whiteTimeOptions}>
                 {TIME_OPTIONS.map((time) => (
                   <Pressable
@@ -666,7 +668,7 @@ export default function MissionScreen() {
 
             {/* Question 3: Today's Mood */}
             <View style={styles.whiteQuestionSection}>
-              <Text style={styles.whiteQuestionLabel}>오늘 원하는 분위기는? (모두 선택)</Text>
+              <Text style={styles.whiteQuestionLabel}>{t('mission.questions.todayMood')}</Text>
               <View style={styles.whiteMoodOptions}>
                 {MOOD_OPTIONS.map((mood, index) => {
                   // 2-3-2 layout: first 2 buttons 47%, next 3 buttons 30%, last 2 buttons 47%
@@ -707,13 +709,13 @@ export default function MissionScreen() {
                 {isGenerating ? (
                   <View style={styles.generatingContent}>
                     <ActivityIndicator color={COLORS.white} size="small" />
-                    <Text style={styles.whiteModalGenerateButtonText}>생성 중...</Text>
+                    <Text style={styles.whiteModalGenerateButtonText}>{t('mission.generating')}</Text>
                   </View>
                 ) : (
                   <Text style={[
                     styles.whiteModalGenerateButtonText,
                     !isGenerationFormValid && styles.whiteModalGenerateButtonTextDisabled,
-                  ]}>미션 생성하기</Text>
+                  ]}>{t('mission.generate')}</Text>
                 )}
               </Pressable>
             </View>

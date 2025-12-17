@@ -1,0 +1,656 @@
+{
+  "common": {
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "done": "Done",
+    "add": "Add",
+    "reset": "Reset",
+    "close": "Close",
+    "next": "Next",
+    "back": "Back",
+    "yes": "Yes",
+    "no": "No",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "today": "Today",
+    "partner": "Partner",
+    "me": "Me",
+    "days": "days",
+    "daysCount": "days"
+  },
+  "tabs": {
+    "home": "Home",
+    "mission": "Mission",
+    "calendar": "Calendar",
+    "memories": "Memories",
+    "more": "More"
+  },
+  "home": {
+    "anniversary": {
+      "title": "Anniversary",
+      "add": "Add Anniversary",
+      "edit": "Edit Anniversary",
+      "delete": "Delete Anniversary",
+      "deleteConfirm": "Delete \"{{name}}\" anniversary?",
+      "name": "Anniversary",
+      "namePlaceholder": "Enter anniversary name",
+      "date": "Date",
+      "weddingAnniversary": "Wedding Anniversary",
+      "datingAnniversary": "Dating",
+      "birthday": "Birthday",
+      "lunar": "(Lunar)",
+      "christmas": "Christmas",
+      "valentinesDay": "Valentine's Day",
+      "whiteDay": "White Day"
+    },
+    "background": {
+      "title": "Change Background",
+      "description": "The selected image will be applied as the background for all pages",
+      "selectFromGallery": "Select from Gallery",
+      "resetToDefault": "Reset to Default",
+      "uploadFailed": "Upload Failed",
+      "uploadFailedMessage": "Failed to upload image. Please try again.",
+      "uploadError": "An error occurred while uploading the image."
+    },
+    "tutorial": {
+      "title": "Change your background photo",
+      "description": "Tap this button to customize\nthe background with your couple photo"
+    }
+  },
+  "mission": {
+    "title": "Today's Mission",
+    "subtitle": "What moments will you share today?",
+    "generate": "Generate Mission",
+    "generating": "Generating...",
+    "generatingMessage": "Creating your mission",
+    "pleaseWait": "Please wait a moment",
+    "start": "Start",
+    "completed": "Completed",
+    "kept": "Saved",
+    "keep": "Keep",
+    "anotherInProgress": "Another mission in progress",
+    "questions": {
+      "canMeetToday": "Can you meet today?",
+      "yesMeet": "Yes, we can",
+      "noMeet": "No",
+      "availableTime": "How much time do you have together today?",
+      "todayMood": "What mood are you in today? (Select all)"
+    },
+    "timeOptions": {
+      "30min": "30 min",
+      "1hour": "1 hour",
+      "2hour": "2+ hours",
+      "allday": "All day"
+    },
+    "moodOptions": {
+      "fun": "Want to laugh",
+      "deep_talk": "Need to talk",
+      "active": "Active & Energy",
+      "healing": "Rest & Relaxation",
+      "culture": "Culture & Art",
+      "adventure": "New Challenge",
+      "romantic": "Romantic"
+    },
+    "alerts": {
+      "locationRequired": "Location Required",
+      "locationRequiredMessage": "Location permission is needed to generate missions.\nPlease allow location access.",
+      "allowPermission": "Allow",
+      "locationDenied": "Location Denied",
+      "locationDeniedMessage": "Location permission was denied. Please enable it in settings.",
+      "goToSettings": "Go to Settings",
+      "cannotKeep": "Cannot Save",
+      "alreadyCompletedKeep": "Completed missions cannot be saved.",
+      "keepMission": "Save Mission",
+      "keepMissionConfirm": "Save '{{title}}' to your collection?",
+      "keepLimit": "Save Limit",
+      "keepLimitMessage": "You can save up to 5 missions.\nPlease remove some before adding more.",
+      "cannotStart": "Cannot Start Mission",
+      "anotherInProgressMessage": "Another mission is already in progress.\nPlease complete it first!",
+      "dailyLimitMessage": "You've completed today's mission.\nCome back tomorrow!"
+    }
+  },
+  "missionDetail": {
+    "headerTitle": "Mission Details",
+    "notFound": {
+      "title": "Mission not found",
+      "description": "This mission is no longer available."
+    },
+    "camera": {
+      "title": "Take Photo",
+      "confirmTitle": "Confirm Photo",
+      "permissionRequired": "Camera Permission Required",
+      "permissionMessage": "Camera permission is required to take photos.",
+      "photoError": "Failed to take photo. Please try again.",
+      "usePhoto": "Use Photo",
+      "retake": "Retake"
+    },
+    "location": {
+      "noInfo": "Location not available"
+    },
+    "steps": {
+      "photo": {
+        "title": "Take a Photo",
+        "description": "Capture your special moment together.",
+        "hint": "Capture the excitement and happiness of this moment\nand turn it into a memory."
+      },
+      "message": {
+        "title": "Write a Message to Each Other",
+        "description": "Leave a heartfelt message for your partner. A sincere message creates\nmore special memories.",
+        "written": "Written",
+        "notWritten": "Not written"
+      },
+      "complete": "Done"
+    },
+    "status": {
+      "anotherInProgress": "Another mission in progress",
+      "waitingPartner": "Waiting for partner...",
+      "waitingPhoto": "Waiting for photo...",
+      "writeMessage": "Write a message",
+      "takePhoto": "Take Photo"
+    },
+    "modal": {
+      "title": "Message to Each Other",
+      "placeholder": "Write what you want to say to your partner"
+    },
+    "defaultPartnerMessage": "I'm happy to be with you 💕",
+    "completed": "Completed",
+    "completeButton": "Mission Complete! 🎉",
+    "writeMessage": "Write Message",
+    "messagePlaceholder": "Record today's mission together",
+    "submitMission": "Complete Mission",
+    "partnerMessage": "Partner's Message",
+    "myMessage": "My Message",
+    "waitingPartner": "Waiting for partner's message",
+    "viewMemory": "View Memory"
+  },
+  "bookmark": {
+    "title": "Saved Missions",
+    "empty": "No saved missions",
+    "emptyHint": "Keep missions you like",
+    "deleteMission": "Delete Mission",
+    "deleteConfirm": "Delete '{{title}}'?"
+  },
+  "calendar": {
+    "title": "Calendar",
+    "subtitle": "Record our time together",
+    "dayNames": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+    "settings": {
+      "title": "Calendar Settings",
+      "description": "Choose features to display"
+    },
+    "todo": {
+      "title": "To-Do",
+      "empty": "No tasks",
+      "emptyHint": "Tap to add a task",
+      "addPlaceholder": "e.g., Book movie tickets",
+      "addTitle": "Enter your task",
+      "add": "Add Task"
+    },
+    "period": {
+      "title": "Period Info",
+      "calendar": "Period Calendar",
+      "calendarDesc": "Track and predict your menstrual cycle",
+      "inputTitle": "Enter period information",
+      "settingsTitle": "Period Settings",
+      "startDate": "Period Start Date",
+      "lastStartDate": "Last Period Start Date",
+      "averageCycle": "Average Cycle",
+      "cycleLength": "Cycle Length",
+      "periodLength": "Period Length",
+      "cycleHint": "Typical cycle is 21-35 days",
+      "nextDate": "Next Expected Date",
+      "lastDate": "Last Start Date",
+      "daysUnit": "days",
+      "legend": {
+        "period": "Period",
+        "fertile": "Fertile Window",
+        "ovulation": "Ovulation"
+      },
+      "selectDate": "Select Date"
+    },
+    "holidays": {
+      "newYear": "New Year's Day",
+      "lunarNewYear": "Lunar New Year",
+      "lunarNewYearHoliday": "Lunar New Year Holiday",
+      "independenceDay": "Independence Day",
+      "childrenDay": "Children's Day",
+      "buddhasBirthday": "Buddha's Birthday",
+      "memorialDay": "Memorial Day",
+      "liberationDay": "Liberation Day",
+      "foundationDay": "Foundation Day",
+      "chuseok": "Chuseok",
+      "chuseokHoliday": "Chuseok Holiday",
+      "hangulDay": "Hangul Day",
+      "christmas": "Christmas"
+    }
+  },
+  "memories": {
+    "title": "Memories",
+    "subtitle": "Moments we shared together",
+    "empty": "No completed missions",
+    "emptyHint": "Complete missions and write a message to each other",
+    "viewAll": "View All",
+    "togetherMoment": "Moment together",
+    "itemCount": "{{count}} items",
+    "monthNames": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+    "yearFormat": "{{year}}",
+    "yearMonthFormat": "{{month}} {{year}}",
+    "filter": {
+      "all": "All",
+      "thisMonth": "This Month",
+      "thisYear": "This Year"
+    },
+    "album": {
+      "title": "Albums",
+      "subtitle": "Create albums from your memorable moments",
+      "name": "Album Name",
+      "coverPhoto": "Cover Photo",
+      "fontStyle": "Font Style",
+      "fontStyleDesc": "Select a font style for your album title",
+      "basicFont": "Basic Font",
+      "basicFontDesc": "Clean style",
+      "ransomStyle": "Ransom Note Style",
+      "basicFontHint": "A clean font will be applied",
+      "ransomFontHint": "Each character will have a unique style",
+      "namePlaceholder": "Enter album name...",
+      "ransomPlaceholder": "English only (A-Z, 0-9)",
+      "selectPhoto": "Select Photo",
+      "dragHint": "Drag to adjust text position",
+      "coverEditHint": "Select a photo and drag to adjust text position",
+      "color": "Color",
+      "size": "Size",
+      "textSize": "Text Size",
+      "addPhoto": "Add Photo",
+      "editCover": "Edit Cover",
+      "deleteAlbum": "Delete Album",
+      "deleteAlbumConfirm": "Are you sure you want to delete this album?"
+    },
+    "photo": {
+      "select": "Select",
+      "delete": "Delete",
+      "deleteTitle": "Delete Photo",
+      "deleteConfirm": "Are you sure you want to delete {{count}} photos?",
+      "deleteSingleConfirm": "Are you sure you want to delete this photo?",
+      "save": "Save Photo",
+      "tapToFlip": "Tap to see back",
+      "tapToView": "Tap to view photo"
+    },
+    "permission": {
+      "required": "Permission Required",
+      "photoAccess": "Photo library access is required.",
+      "saveAccess": "Gallery access is required to save photos.",
+      "saveSuccess": "Saved",
+      "saveSuccessMessage": "Photo has been saved to gallery.",
+      "saveFailed": "Save Failed",
+      "saveFailedMessage": "An error occurred while saving the photo."
+    }
+  },
+  "more": {
+    "title": "More",
+    "sections": {
+      "profile": "Profile",
+      "settings": "Settings",
+      "support": "Support",
+      "developer": "Developer"
+    },
+    "menu": {
+      "myProfile": "My Profile",
+      "coupleProfile": "Couple Profile",
+      "settings": "Settings",
+      "announcements": "Announcements",
+      "customerService": "Customer Service",
+      "onboardingReset": "Reset Onboarding",
+      "missionReset": "Reset Missions",
+      "fullReset": "Full Reset",
+      "logout": "Logout"
+    },
+    "announcements": {
+      "title": "Announcements",
+      "empty": "No announcements yet"
+    },
+    "help": {
+      "title": "Help",
+      "inquiry": "Contact Us",
+      "faq": "FAQ"
+    },
+    "customerService": {
+      "title": "Customer Service",
+      "faqTitle": "FAQ",
+      "inquiryTitle": "Still have questions?",
+      "inquiryDescription": "Send us a 1:1 inquiry via KakaoTalk\nand we'll respond quickly.",
+      "kakaoButton": "Contact Support"
+    },
+    "others": {
+      "title": "Other",
+      "termsOfService": "Terms of Service",
+      "privacyPolicy": "Privacy Policy"
+    },
+    "alerts": {
+      "devReset": "Developer Reset",
+      "devResetMessage": "Reset onboarding and start from the beginning?",
+      "missionReset": "Reset Missions",
+      "missionResetMessage": "Reset all today's missions and completion status?",
+      "missionResetComplete": "Reset Complete",
+      "missionResetCompleteMessage": "Missions have been reset. Go to the Mission tab to create new missions.",
+      "fullReset": "⚠️ Full Reset",
+      "fullResetMessage": "This will reset all data:\n\n• Onboarding data\n• Pairing info\n• Couple sync data\n• Mission data\n• All local storage\n\nAre you sure?",
+      "fullResetComplete": "Reset Complete",
+      "fullResetCompleteMessage": "All data has been reset. Restarting app.",
+      "logout": "Logout",
+      "logoutMessage": "Are you sure you want to logout?"
+    }
+  },
+  "profile": {
+    "myProfile": "My Profile",
+    "coupleProfile": "Couple Profile",
+    "nickname": "Nickname",
+    "birthDate": "Birth Date",
+    "mbti": "MBTI",
+    "anniversaryDate": "Anniversary",
+    "relationshipType": "Relationship Type",
+    "dating": "Dating",
+    "married": "Married",
+    "inviteCode": "Invite Code",
+    "copyCode": "Copy Code",
+    "codeCopied": "Code copied",
+    "disconnect": "Disconnect",
+    "disconnectConfirm": "Are you sure you want to disconnect?",
+    "disconnectWarning": "All couple data will be deleted when disconnected.",
+    "notSet": "Not set",
+    "dateFormat": "{{month}} {{day}}, {{year}}",
+    "solar": "Solar",
+    "lunar": "Lunar",
+    "preferences": "Preferences",
+    "preferredActivities": "Preferred Activities",
+    "dateConcerns": "Date Concerns",
+    "constraints": "Constraints",
+    "activitiesCount": "{{count}} activities",
+    "noPreferences": "No preferences set",
+    "editNickname": {
+      "title": "Change Nickname",
+      "description": "This is the name your partner will see",
+      "placeholder": "Enter nickname"
+    },
+    "editBirthday": {
+      "title": "Edit Birth Date",
+      "description": "Please enter your exact birth date",
+      "selectDate": "Please select a date"
+    },
+    "editPreferences": {
+      "title": "Preferences",
+      "editTitle": "Edit Preferences",
+      "button": "Edit"
+    },
+    "couple": {
+      "title": "Couple Profile",
+      "anniversary": "Anniversary",
+      "accountInfo": "Account Info",
+      "myAccountInfo": "{{nickname}}'s Account Info",
+      "myAccount": "My Account",
+      "partnerAccountInfo": "{{nickname}}'s Account Info",
+      "partnerAccount": "Partner Account",
+      "datingLabel": "Dating Since",
+      "marriedLabel": "Wedding Anniversary",
+      "datingType": "Partners",
+      "marriedType": "Married",
+      "editAnniversary": {
+        "title": "Change Anniversary",
+        "description": "Edit your special date",
+        "relationshipLabel": "Relationship Type",
+        "selectDate": "Please select a date",
+        "datingStart": "Dating Start Date",
+        "marriedAnniversary": "Wedding Anniversary"
+      },
+      "accountDetail": {
+        "me": "Me",
+        "partner": "Partner",
+        "nickname": "Nickname",
+        "email": "Email",
+        "joinDate": "Join Date",
+        "noInfo": "No info",
+        "defaultPartnerEmail": "Connected partner"
+      }
+    },
+    "me": "Me",
+    "partner": "Partner"
+  },
+  "settings": {
+    "title": "Settings",
+    "sections": {
+      "notifications": "Notifications",
+      "marketing": "Marketing",
+      "other": "Other",
+      "account": "Account"
+    },
+    "notifications": {
+      "push": "Push Notifications",
+      "pushDesc": "Receive all notifications",
+      "mission": "Mission Notifications",
+      "missionDesc": "Get notified when new missions arrive",
+      "message": "Message Reminder",
+      "messageDesc": "Get notified if you haven't written a message"
+    },
+    "marketing": {
+      "news": "News Notifications",
+      "newsDesc": "Events and updates",
+      "info": "Marketing Information",
+      "infoDesc": "Promotions and discounts"
+    },
+    "other": {
+      "termsOfService": "Terms of Service",
+      "privacyPolicy": "Privacy Policy",
+      "version": "Version {{version}}",
+      "latestVersion": "Latest"
+    },
+    "account": {
+      "deleteAccount": "Delete Account",
+      "unpair": "Unpair"
+    },
+    "unpair": {
+      "title": "Unpair",
+      "confirmTitle": "Confirm Unpairing",
+      "warningTitle": "Are you sure you want to unpair?",
+      "warningText": "Unpairing will disconnect you from your partner,\nand some data may become inaccessible.",
+      "checkTitle": "Please check before disconnecting",
+      "daysTogether": "Days Together",
+      "daysUnit": "days",
+      "completedMissions": "Completed Missions",
+      "missionsUnit": "",
+      "recoveryPeriod": "Recovery Period",
+      "recoveryHint": "Data can be recovered within 30 days",
+      "warningsTitle": "Warnings",
+      "warning1": "Your partner will be notified of the disconnection",
+      "warning2": "Mission history is kept in individual accounts",
+      "warning3": "You can reconnect with the same partner within 30 days",
+      "confirmPrompt": "To continue, please type 'unpair'\nexactly as shown below",
+      "confirmText": "unpair",
+      "button": "Unpair",
+      "success": "Unpaired",
+      "successMessage": "You have been unpaired.\nReconnect with the same partner within 30 days to recover your data.",
+      "error": "An error occurred while unpairing."
+    },
+    "deleteAccount": {
+      "title": "Delete Account",
+      "warningText": "Deleting your account will\n",
+      "permanentDelete": "permanently delete",
+      "warningEnd": " all data.",
+      "dataList": "Data to be deleted:\n• Profile information\n• Couple connection info\n• Completed mission records\n• Albums and photos\n• All settings",
+      "confirmPrompt": "To continue, please type 'delete' below",
+      "confirmText": "delete",
+      "button": "Delete Account",
+      "deleting": "Deleting...",
+      "success": "Account Deleted",
+      "successMessage": "All data has been deleted.\nThank you for using our service.",
+      "error": "An error occurred while deleting your account."
+    },
+    "language": "Language",
+    "theme": "Theme",
+    "darkMode": "Dark Mode",
+    "version": "Version",
+    "termsOfService": "Terms of Service",
+    "privacyPolicy": "Privacy Policy",
+    "licenses": "Open Source Licenses"
+  },
+  "onboarding": {
+    "welcome": "Welcome",
+    "welcomeTitle": "Welcome to\nDaydate",
+    "welcomeSubtitle": "Record and share your special moments\ntogether as a couple",
+    "start": "Get Started",
+    "skip": "Skip",
+    "complete": "Complete",
+    "next": "Next",
+    "previous": "Previous",
+    "continue": "Continue",
+    "confirm": "OK",
+    "defaultUser": "User",
+    "login": {
+      "google": "Sign in with Google",
+      "kakao": "Sign in with Kakao",
+      "or": "or",
+      "success": "Login Successful",
+      "successMessage": "Logged in with {{provider}} account.",
+      "failed": "Login Failed",
+      "failedMessage": "An error occurred while logging in. Please try again.",
+      "failedProvider": "{{provider}} login failed. Please try again.",
+      "demoMode": "Demo Mode",
+      "demoModeMessage": "Social login is not available in demo mode.\n\nPlease configure environment variables to connect Supabase.",
+      "welcomeBack": "Welcome back!",
+      "alreadyConnected": "You are already connected with your partner. Continuing from basic info."
+    },
+    "basicInfo": {
+      "title": "Enter your\nbasic information",
+      "nickname": "Nickname",
+      "nicknamePlaceholder": "Enter nickname",
+      "gender": "Gender",
+      "male": "Male",
+      "female": "Female",
+      "birthDate": "Birth Date",
+      "birthDatePlaceholder": "Select birth date",
+      "solar": "Solar",
+      "lunar": "Lunar"
+    },
+    "terms": {
+      "title": "Terms Agreement",
+      "subtitle": "Please agree to the terms to use the service",
+      "agreeAll": "Agree to All",
+      "ageRequired": "[Required] I am 14 years or older",
+      "ageRequiredDesc": "You must be 14 years or older to use this service. Users under 14 years old are restricted from using the service.",
+      "serviceTerms": "[Required] Service Terms Agreement",
+      "serviceTermsTitle": "Service Terms",
+      "locationTerms": "[Required] Location Service Terms Agreement",
+      "locationTermsTitle": "Location Service Terms",
+      "privacyTerms": "[Required] Privacy Policy Agreement",
+      "privacyTermsTitle": "Privacy Policy",
+      "marketingTerms": "[Optional] Marketing Notification Agreement"
+    },
+    "location": {
+      "permissionRequired": "Location Permission Required",
+      "permissionMessage": "Location permission is needed for location-based services. Please allow location access in settings.",
+      "goToSettings": "Go to Settings"
+    },
+    "nickname": {
+      "title": "Enter your nickname",
+      "placeholder": "Nickname",
+      "hint": "This will be shown to your partner"
+    },
+    "birthDate": {
+      "title": "Enter your birth date",
+      "solar": "Solar",
+      "lunar": "Lunar"
+    },
+    "mbti": {
+      "title": "Select your\nMBTI",
+      "skip": "I don't know"
+    },
+    "relationship": {
+      "title": "Select your relationship type",
+      "dating": "Dating",
+      "married": "Married"
+    },
+    "coupleInfo": {
+      "title": "Enter couple\ninformation",
+      "relationship": "Relationship",
+      "datingLabel": "First Date",
+      "marriedLabel": "Wedding Anniversary",
+      "selectDate": "Select {{label}}"
+    },
+    "anniversary": {
+      "title": "Enter your anniversary",
+      "datingStart": "First Date",
+      "weddingDate": "Wedding Date"
+    },
+    "pairing": {
+      "title": "Connect with\nyour partner",
+      "subtitle": "Share data with your partner using a pairing code",
+      "generateCode": "Generate Code",
+      "enterCode": "Enter Code",
+      "myCode": "Code to share with partner",
+      "enterCodePlaceholder": "Enter the code your partner generated",
+      "connect": "Connect",
+      "connecting": "Connecting...",
+      "waitingConnection": "Waiting",
+      "shareCode": "Share Code",
+      "waitingPartner": "Your partner will be connected\nwhen they enter this code",
+      "connected": "Connected with partner!\nProceed to next step",
+      "invalidCode": "Invalid code. Please check the code.",
+      "alreadyPaired": "This code has already been used.",
+      "partnerNotReady": "Partner is not ready yet. Please try again later.",
+      "connectionError": "An error occurred while connecting. Please try again.",
+      "coupleRestoreError": "An error occurred while restoring couple data.",
+      "coupleConnectionError": "An error occurred while connecting couple.",
+      "copied": "Copied",
+      "reconnected": "Nice to see you again! 💕",
+      "reconnectedMessage": "Your data has been restored from reconnection within 30 days."
+    },
+    "preferences": {
+      "title": "Select your preferred\nactivities",
+      "subtitle": "Select all that apply",
+      "indoor": "Indoor",
+      "outdoor": "Outdoor",
+      "active": "Active",
+      "relaxing": "Relaxing",
+      "food": "Food Tours",
+      "cafe": "Cafe",
+      "culture": "Culture",
+      "travel": "Travel"
+    },
+    "concerns": {
+      "title": "What are your\ndate concerns?",
+      "subtitle": "Select all that apply",
+      "noIdeas": "No date ideas",
+      "sameRoutine": "Same routine every time",
+      "budget": "Budget concerns",
+      "time": "Not enough time",
+      "distance": "Long distance"
+    },
+    "constraints": {
+      "title": "Any constraints\nfor missions?",
+      "subtitle": "Select all that apply"
+    },
+    "preferencesIntro": {
+      "title": "Tell us your preferences\nfor personalized missions",
+      "subtitle": "We'll analyze your preferences\nto recommend suitable date missions",
+      "hint": "Takes about 1 minute,\nYou can edit anytime in\n'More > My Profile'",
+      "startAnalysis": "Start Preference Analysis"
+    },
+    "completeStep": {
+      "title": "Welcome, {{nickname}}!",
+      "subtitle": "Setup is complete!\nLet's create special moments together!"
+    },
+    "dataRecovery": {
+      "title": "Data Recovered 💕",
+      "message": "Your previous preference data was found.\nSkipping preference input."
+    }
+  },
+  "errors": {
+    "networkError": "Network error occurred",
+    "tryAgain": "Please try again",
+    "somethingWrong": "Something went wrong",
+    "sessionExpired": "Session expired",
+    "unauthorized": "Unauthorized"
+  }
+}

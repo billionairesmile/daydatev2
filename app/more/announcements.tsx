@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { ChevronLeft, Bell } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 import { COLORS, SPACING, RADIUS } from '@/constants/design';
 import { db } from '@/lib/supabase';
@@ -24,6 +25,7 @@ type Announcement = {
 
 export default function AnnouncementsScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -64,7 +66,7 @@ export default function AnnouncementsScreen() {
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <ChevronLeft color={COLORS.black} size={24} />
         </Pressable>
-        <Text style={styles.headerTitle}>공지사항</Text>
+        <Text style={styles.headerTitle}>{t('more.announcements.title')}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -109,7 +111,7 @@ export default function AnnouncementsScreen() {
             <View style={styles.emptyIconWrapper}>
               <Bell color="#ccc" size={48} />
             </View>
-            <Text style={styles.emptyText}>공지사항이 없습니다</Text>
+            <Text style={styles.emptyText}>{t('more.announcements.empty')}</Text>
           </View>
         )}
       </ScrollView>

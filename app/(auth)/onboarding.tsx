@@ -33,6 +33,7 @@ import * as Notifications from 'expo-notifications';
 import * as Location from 'expo-location';
 import { WebView } from 'react-native-webview';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { signInWithGoogle, signInWithKakao, onAuthStateChange } from '@/lib/socialAuth';
 
 import { COLORS, SPACING, RADIUS } from '@/constants/design';
@@ -88,6 +89,7 @@ const STEP_B = ['mbti', 'activity_type', 'date_worries', 'constraints'];
 
 export default function OnboardingScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { backgroundImage } = useBackground();
   const { setIsOnboardingComplete, updateNickname, setCouple, setUser, setPartner, user: currentUser, couple } = useAuthStore();
   const {
@@ -179,7 +181,7 @@ export default function OnboardingScreen() {
         const newUser = {
           id: session.user.id,
           email,
-          nickname: name || email.split('@')[0] || '사용자',
+          nickname: name || email.split('@')[0] || t('onboarding.defaultUser'),
           avatarUrl,
           inviteCode: generatePairingCode(),
           preferences: {} as any,
@@ -219,7 +221,7 @@ export default function OnboardingScreen() {
               user2Id: existingCouple.user2_id,
               anniversaryDate: existingCouple.dating_start_date ? parseDateAsLocal(existingCouple.dating_start_date) : new Date(),
               datingStartDate: existingCouple.dating_start_date ? parseDateAsLocal(existingCouple.dating_start_date) : undefined,
-              anniversaryType: '연애 시작일',
+              anniversaryType: t('onboarding.anniversary.datingStart'),
               status: 'active',
               createdAt: existingCouple.created_at ? new Date(existingCouple.created_at) : new Date(),
             });
@@ -244,11 +246,11 @@ export default function OnboardingScreen() {
 
             // Skip to basic_info step (after pairing)
             Alert.alert(
-              '다시 오셨군요!',
-              '이미 상대방과 연결되어 있습니다. 기본정보 입력부터 계속합니다.',
+              t('onboarding.login.welcomeBack'),
+              t('onboarding.login.alreadyConnected'),
               [
                 {
-                  text: '계속하기',
+                  text: t('onboarding.continue'),
                   onPress: () => animateTransition(() => setStep('basic_info')),
                 },
               ]
@@ -261,11 +263,11 @@ export default function OnboardingScreen() {
 
         // Move to terms step (for new users)
         Alert.alert(
-          '로그인 성공',
-          `${provider === 'google' ? '구글' : '카카오'} 계정으로 로그인되었습니다.`,
+          t('onboarding.login.success'),
+          t('onboarding.login.successMessage', { provider: provider === 'google' ? 'Google' : 'Kakao' }),
           [
             {
-              text: '계속하기',
+              text: t('onboarding.continue'),
               onPress: () => animateTransition(() => setStep('terms')),
             },
           ]
@@ -274,9 +276,9 @@ export default function OnboardingScreen() {
     } catch (error: any) {
       console.error(`[Onboarding] ${provider} login failed:`, error);
       Alert.alert(
-        '로그인 실패',
-        error.message || '로그인 중 오류가 발생했습니다. 다시 시도해주세요.',
-        [{ text: '확인' }]
+        t('onboarding.login.failed'),
+        error.message || t('onboarding.login.failedMessage'),
+        [{ text: t('onboarding.confirm') }]
       );
     }
   }, [animateTransition, setStep, setUser, updateData]);
@@ -483,9 +485,9 @@ export default function OnboardingScreen() {
                   // If user already has preference data, skip to complete
                   if (hasExistingPreferences) {
                     Alert.alert(
-                      '기존 데이터 복구 💕',
-                      '이전에 입력하신 선호도 정보가 있어요.\n선호도 입력을 건너뛰고 완료합니다.',
-                      [{ text: '확인', onPress: () => animateTransition(() => setStep('complete')) }]
+                      t('onboarding.dataRecovery.title'),
+                      t('onboarding.dataRecovery.message'),
+                      [{ text: t('onboarding.confirm'), onPress: () => animateTransition(() => setStep('complete')) }]
                     );
                   } else {
                     animateTransition(() => setStep('preferences_intro'));
@@ -507,9 +509,9 @@ export default function OnboardingScreen() {
                 // If user already has preference data, skip to complete
                 if (hasExistingPreferences) {
                   Alert.alert(
-                    '기존 데이터 복구 💕',
-                    '이전에 입력하신 선호도 정보가 있어요.\n선호도 입력을 건너뛰고 완료합니다.',
-                    [{ text: '확인', onPress: () => animateTransition(() => setStep('complete')) }]
+                    t('onboarding.dataRecovery.title'),
+                    t('onboarding.dataRecovery.message'),
+                    [{ text: t('onboarding.confirm'), onPress: () => animateTransition(() => setStep('complete')) }]
                   );
                 } else {
                   handleNext(); // Goes to preferences_intro
@@ -581,9 +583,9 @@ function WelcomeStep({ onNext, onSocialLogin }: { onNext: () => void; onSocialLo
     try {
       if (isDemoMode) {
         Alert.alert(
-          '데모 모드',
-          '소셜 로그인은 데모 모드에서 사용할 수 없습니다.\n\n환경 변수를 설정하여 Supabase를 연결해주세요.',
-          [{ text: '확인' }]
+          t('onboarding.login.demoMode'),
+          t('onboarding.login.demoModeMessage'),
+          [{ text: t('onboarding.confirm') }]
         );
         return;
       }
@@ -592,9 +594,9 @@ function WelcomeStep({ onNext, onSocialLogin }: { onNext: () => void; onSocialLo
     } catch (error) {
       console.error(`[WelcomeStep] ${provider} login error:`, error);
       Alert.alert(
-        '로그인 실패',
-        `${provider === 'google' ? '구글' : '카카오'} 로그인에 실패했습니다. 다시 시도해주세요.`,
-        [{ text: '확인' }]
+        t('onboarding.login.failed'),
+        t('onboarding.login.failedProvider', { provider: provider === 'google' ? 'Google' : 'Kakao' }),
+        [{ text: t('onboarding.confirm') }]
       );
     } finally {
       setIsLoading(null);
@@ -611,11 +613,11 @@ function WelcomeStep({ onNext, onSocialLogin }: { onNext: () => void; onSocialLo
         </View>
 
         <Text style={styles.welcomeTitle}>
-          Daydate에{'\n'}오신 것을 환영해요
+          {t('onboarding.welcomeTitle')}
         </Text>
 
         <Text style={styles.welcomeDescription}>
-          두 사람의 특별한 순간들을{'\n'}함께 기록하고 공유해보세요
+          {t('onboarding.welcomeSubtitle')}
         </Text>
       </View>
 
@@ -634,7 +636,7 @@ function WelcomeStep({ onNext, onSocialLogin }: { onNext: () => void; onSocialLo
                 source={{ uri: 'https://developers.google.com/identity/images/g-logo.png' }}
                 style={styles.socialIcon}
               />
-              <Text style={styles.googleButtonText}>Google로 로그인</Text>
+              <Text style={styles.googleButtonText}>{t('onboarding.login.google')}</Text>
             </>
           )}
         </Pressable>
@@ -653,20 +655,20 @@ function WelcomeStep({ onNext, onSocialLogin }: { onNext: () => void; onSocialLo
                 source={{ uri: 'https://developers.kakao.com/assets/img/about/logos/kakaolink/kakaolink_btn_medium.png' }}
                 style={styles.kakaoIcon}
               />
-              <Text style={styles.kakaoButtonText}>카카오로 로그인</Text>
+              <Text style={styles.kakaoButtonText}>{t('onboarding.login.kakao')}</Text>
             </>
           )}
         </Pressable>
 
         <View style={styles.dividerContainer}>
           <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>또는</Text>
+          <Text style={styles.dividerText}>{t('onboarding.login.or')}</Text>
           <View style={styles.dividerLine} />
         </View>
       </View>
 
       <Pressable style={styles.primaryButton} onPress={onNext}>
-        <Text style={styles.primaryButtonText}>시작하기</Text>
+        <Text style={styles.primaryButtonText}>{t('onboarding.start')}</Text>
       </Pressable>
     </View>
   );
@@ -738,7 +740,7 @@ function BasicInfoStep({
     <View style={styles.centeredStepContainer}>
       {/* Title fixed at top */}
       <View style={styles.nicknameTitleContainer}>
-        <Text style={styles.stepTitle}>기본 정보를{'\n'}입력해주세요</Text>
+        <Text style={styles.stepTitle}>{t('onboarding.basicInfo.title')}</Text>
       </View>
 
       {/* Scrollable content */}
@@ -749,11 +751,11 @@ function BasicInfoStep({
       >
         {/* Nickname */}
         <View style={styles.basicInfoSection}>
-          <Text style={styles.basicInfoLabel}>닉네임</Text>
+          <Text style={styles.basicInfoLabel}>{t('onboarding.basicInfo.nickname')}</Text>
           <TextInput
             style={styles.basicInfoInput}
             placeholderTextColor="rgba(255, 255, 255, 0.4)"
-            placeholder="닉네임 입력"
+            placeholder={t('onboarding.basicInfo.nicknamePlaceholder')}
             value={nickname}
             onChangeText={setNickname}
             autoCapitalize="none"
@@ -763,26 +765,26 @@ function BasicInfoStep({
 
         {/* Gender */}
         <View style={styles.basicInfoSection}>
-          <Text style={styles.basicInfoLabel}>성별</Text>
+          <Text style={styles.basicInfoLabel}>{t('onboarding.basicInfo.gender')}</Text>
           <View style={styles.genderButtons}>
             <Pressable
               style={[styles.genderButton, gender === 'male' && styles.genderButtonActive]}
               onPress={() => setGender('male')}
             >
-              <Text style={[styles.genderButtonText, gender === 'male' && styles.genderButtonTextActive]}>남</Text>
+              <Text style={[styles.genderButtonText, gender === 'male' && styles.genderButtonTextActive]}>{t('onboarding.basicInfo.male')}</Text>
             </Pressable>
             <Pressable
               style={[styles.genderButton, gender === 'female' && styles.genderButtonActive]}
               onPress={() => setGender('female')}
             >
-              <Text style={[styles.genderButtonText, gender === 'female' && styles.genderButtonTextActive]}>여</Text>
+              <Text style={[styles.genderButtonText, gender === 'female' && styles.genderButtonTextActive]}>{t('onboarding.basicInfo.female')}</Text>
             </Pressable>
           </View>
         </View>
 
         {/* Birth Date */}
         <View style={styles.basicInfoSection}>
-          <Text style={styles.basicInfoLabel}>생년월일</Text>
+          <Text style={styles.basicInfoLabel}>{t('onboarding.basicInfo.birthDate')}</Text>
           <View style={styles.birthDateRow}>
             {/* Date picker button */}
             <Pressable
@@ -790,7 +792,7 @@ function BasicInfoStep({
               onPress={() => setShowBirthDatePicker(true)}
             >
               <Text style={[styles.basicInfoDateText, birthDate && styles.basicInfoDateTextSelected]}>
-                {birthDate ? formatDate(birthDate) : '생년월일 선택'}
+                {birthDate ? formatDate(birthDate) : t('onboarding.basicInfo.birthDatePlaceholder')}
               </Text>
               <Calendar color={birthDate ? COLORS.white : 'rgba(255, 255, 255, 0.4)'} size={20} />
             </Pressable>
@@ -801,7 +803,7 @@ function BasicInfoStep({
                 onPress={() => setCalendarType('solar')}
               >
                 <Text style={[styles.calendarTypeButtonText, calendarType === 'solar' && styles.calendarTypeButtonTextActive]}>
-                  양력
+                  {t('onboarding.basicInfo.solar')}
                 </Text>
               </Pressable>
               <Pressable
@@ -809,7 +811,7 @@ function BasicInfoStep({
                 onPress={() => setCalendarType('lunar')}
               >
                 <Text style={[styles.calendarTypeButtonText, calendarType === 'lunar' && styles.calendarTypeButtonTextActive]}>
-                  음력
+                  {t('onboarding.basicInfo.lunar')}
                 </Text>
               </Pressable>
             </View>
@@ -828,10 +830,10 @@ function BasicInfoStep({
             <View style={styles.datePickerModalContent}>
               <View style={styles.datePickerHeader}>
                 <Pressable onPress={() => setShowBirthDatePicker(false)}>
-                  <Text style={styles.datePickerCancel}>취소</Text>
+                  <Text style={styles.datePickerCancel}>{t('common.cancel')}</Text>
                 </Pressable>
                 <Pressable onPress={handleConfirmBirthDate}>
-                  <Text style={styles.datePickerConfirm}>확인</Text>
+                  <Text style={styles.datePickerConfirm}>{t('common.confirm')}</Text>
                 </Pressable>
               </View>
               <DateTimePicker
@@ -865,14 +867,14 @@ function BasicInfoStep({
           onPress={onBack}
           disabled={true}
         >
-          <Text style={[styles.secondaryButtonText, styles.secondaryButtonTextDisabled]}>이전</Text>
+          <Text style={[styles.secondaryButtonText, styles.secondaryButtonTextDisabled]}>{t('onboarding.previous')}</Text>
         </Pressable>
         <Pressable
           style={[styles.primaryButton, styles.buttonFlex, !isValid && styles.primaryButtonDisabled]}
           onPress={onNext}
           disabled={!isValid}
         >
-          <Text style={styles.primaryButtonText}>다음</Text>
+          <Text style={styles.primaryButtonText}>{t('onboarding.next')}</Text>
         </Pressable>
       </View>
     </View>
@@ -953,11 +955,11 @@ function TermsStep({
 
       if (finalStatus !== 'granted') {
         Alert.alert(
-          '위치 권한 필요',
-          '위치기반 서비스를 이용하려면 위치 권한이 필요합니다. 설정에서 위치 권한을 허용해주세요.',
+          t('onboarding.location.permissionRequired'),
+          t('onboarding.location.permissionMessage'),
           [
-            { text: '취소', style: 'cancel' },
-            { text: '설정으로 이동', onPress: () => Linking.openSettings() },
+            { text: t('common.cancel'), style: 'cancel' },
+            { text: t('onboarding.location.goToSettings'), onPress: () => Linking.openSettings() },
           ]
         );
         return false;
@@ -1015,9 +1017,9 @@ function TermsStep({
     <View style={styles.termsStepContainer}>
       {/* Title fixed at top */}
       <View style={styles.termsTitleContainer}>
-        <Text style={[styles.stepTitle, { minHeight: 36 }]}>이용약관 동의</Text>
+        <Text style={[styles.stepTitle, { minHeight: 36 }]}>{t('onboarding.terms.title')}</Text>
         <Text style={styles.stepDescription}>
-          서비스 이용을 위해 약관에 동의해주세요
+          {t('onboarding.terms.subtitle')}
         </Text>
       </View>
 
@@ -1028,7 +1030,7 @@ function TermsStep({
             <View style={[styles.checkbox, allAgreed && styles.checkboxChecked]}>
               {allAgreed && <Check color={COLORS.black} size={16} />}
             </View>
-            <Text style={styles.termsAllText}>전체 동의</Text>
+            <Text style={styles.termsAllText}>{t('onboarding.terms.agreeAll')}</Text>
           </Pressable>
 
           <View style={styles.termsDivider} />
@@ -1045,12 +1047,12 @@ function TermsStep({
                 </View>
               </Pressable>
               <View style={styles.termsTextArea}>
-                <Text style={styles.termsItemText}>[필수] 만 14세 이상입니다</Text>
+                <Text style={styles.termsItemText}>{t('onboarding.terms.ageRequired')}</Text>
               </View>
             </View>
             <View style={styles.termsDescriptionBox}>
               <Text style={styles.termsDescriptionText}>
-                서비스 이용을 위해서는 만 14세 이상이 되어야 합니다. 만 14세 미만의 이용자의 경우 서비스 이용이 제한됩니다.
+                {t('onboarding.terms.ageRequiredDesc')}
               </Text>
             </View>
           </View>
@@ -1067,9 +1069,9 @@ function TermsStep({
             </Pressable>
             <Pressable
               style={styles.termsTextArea}
-              onPress={() => openPolicyModal('https://daydate.my/policy/terms', '서비스 이용약관')}
+              onPress={() => openPolicyModal('https://daydate.my/policy/terms', t('onboarding.terms.serviceTermsTitle'))}
             >
-              <Text style={styles.termsItemText}>[필수] 서비스 이용약관 동의</Text>
+              <Text style={styles.termsItemText}>{t('onboarding.terms.serviceTerms')}</Text>
               <ChevronRight color="rgba(255,255,255,0.4)" size={20} />
             </Pressable>
           </View>
@@ -1086,9 +1088,9 @@ function TermsStep({
             </Pressable>
             <Pressable
               style={styles.termsTextArea}
-              onPress={() => openPolicyModal('https://daydate.my/policy/location', '위치기반 서비스 이용약관')}
+              onPress={() => openPolicyModal('https://daydate.my/policy/location', t('onboarding.terms.locationTermsTitle'))}
             >
-              <Text style={styles.termsItemText}>[필수] 위치기반 서비스 이용약관 동의</Text>
+              <Text style={styles.termsItemText}>{t('onboarding.terms.locationTerms')}</Text>
               <ChevronRight color="rgba(255,255,255,0.4)" size={20} />
             </Pressable>
           </View>
@@ -1105,9 +1107,9 @@ function TermsStep({
             </Pressable>
             <Pressable
               style={styles.termsTextArea}
-              onPress={() => openPolicyModal('https://daydate.my/policy/privacy', '개인정보 수집 및 이용')}
+              onPress={() => openPolicyModal('https://daydate.my/policy/privacy', t('onboarding.terms.privacyTermsTitle'))}
             >
-              <Text style={styles.termsItemText}>[필수] 개인정보 수집 및 이용 동의</Text>
+              <Text style={styles.termsItemText}>{t('onboarding.terms.privacyTerms')}</Text>
               <ChevronRight color="rgba(255,255,255,0.4)" size={20} />
             </Pressable>
           </View>
@@ -1123,7 +1125,7 @@ function TermsStep({
               </View>
             </Pressable>
             <Pressable style={styles.termsTextArea} onPress={handleMarketingToggle}>
-              <Text style={styles.termsItemText}>[선택] 광고성 알림 수신 동의</Text>
+              <Text style={styles.termsItemText}>{t('onboarding.terms.marketingTerms')}</Text>
             </Pressable>
           </View>
         </View>
@@ -1133,14 +1135,14 @@ function TermsStep({
       {/* Buttons fixed at bottom */}
       <View style={styles.buttonRow}>
         <Pressable style={styles.secondaryButton} onPress={onBack}>
-          <Text style={styles.secondaryButtonText}>이전</Text>
+          <Text style={styles.secondaryButtonText}>{t('onboarding.previous')}</Text>
         </Pressable>
         <Pressable
           style={[styles.primaryButton, styles.buttonFlex, !requiredAgreed && styles.primaryButtonDisabled]}
           onPress={handleNext}
           disabled={!requiredAgreed}
         >
-          <Text style={styles.primaryButtonText}>다음</Text>
+          <Text style={styles.primaryButtonText}>{t('onboarding.next')}</Text>
         </Pressable>
       </View>
 
@@ -1331,7 +1333,7 @@ function PairingStep({
               id: newCouple.id,
               user1Id: creatorUserId,
               anniversaryDate: new Date(),
-              anniversaryType: '연애 시작일',
+              anniversaryType: t('onboarding.anniversary.datingStart'),
               status: 'pending',
               createdAt: new Date(),
             });
@@ -1388,7 +1390,7 @@ function PairingStep({
                     user2Id: coupleData.user2_id,
                     anniversaryDate: coupleData.dating_start_date ? parseDateAsLocal(coupleData.dating_start_date) : new Date(),
                     datingStartDate: coupleData.dating_start_date ? parseDateAsLocal(coupleData.dating_start_date) : undefined,
-                    anniversaryType: '연애 시작일',
+                    anniversaryType: t('onboarding.anniversary.datingStart'),
                     status: 'active',
                     createdAt: coupleData.created_at ? new Date(coupleData.created_at) : new Date(),
                   });
@@ -1460,7 +1462,7 @@ function PairingStep({
         id: demoCoupleId,
         user1Id: demoUserId,
         anniversaryDate: new Date(),
-        anniversaryType: '연애 시작일',
+        anniversaryType: t('onboarding.anniversary.datingStart'),
         status: 'pending',
         createdAt: new Date(),
       });
@@ -1546,7 +1548,7 @@ function PairingStep({
         user1Id: generateUUID(),
         user2Id: demoJoinerId,
         anniversaryDate: new Date(),
-        anniversaryType: '연애 시작일',
+        anniversaryType: t('onboarding.anniversary.datingStart'),
         status: 'active',
         createdAt: new Date(),
       });
@@ -1563,21 +1565,21 @@ function PairingStep({
       const { data: existingCode, error: findError } = await db.pairingCodes.getWithCouple(pairingCode);
 
       if (findError || !existingCode) {
-        setError('유효하지 않은 코드입니다. 코드를 확인해주세요.');
+        setError(t('onboarding.pairing.invalidCode'));
         setIsLoading(false);
         return;
       }
 
       // Check if code already used
       if (existingCode.status === 'connected') {
-        setError('이미 사용된 코드입니다.');
+        setError(t('onboarding.pairing.alreadyPaired'));
         setIsLoading(false);
         return;
       }
 
       // Check if couple_id exists
       if (!existingCode.couple_id) {
-        setError('파트너가 아직 준비되지 않았습니다. 잠시 후 다시 시도해주세요.');
+        setError(t('onboarding.pairing.partnerNotReady'));
         setIsLoading(false);
         return;
       }
@@ -1602,7 +1604,7 @@ function PairingStep({
 
           if (restoreError) {
             console.error('[PairingStep] Error restoring couple:', restoreError);
-            setError('커플 복구 중 오류가 발생했습니다.');
+            setError(t('onboarding.pairing.coupleRestoreError'));
             setIsLoading(false);
             return;
           }
@@ -1616,7 +1618,7 @@ function PairingStep({
               anniversaryDate: restoredCouple.dating_start_date ? parseDateAsLocal(restoredCouple.dating_start_date) : new Date(),
               datingStartDate: restoredCouple.dating_start_date ? parseDateAsLocal(restoredCouple.dating_start_date) : undefined,
               weddingDate: restoredCouple.wedding_date ? parseDateAsLocal(restoredCouple.wedding_date) : undefined,
-              anniversaryType: '연애 시작일',
+              anniversaryType: t('onboarding.anniversary.datingStart'),
               relationshipType: restoredCouple.wedding_date ? 'married' : 'dating',
               status: 'active',
               createdAt: restoredCouple.created_at ? new Date(restoredCouple.created_at) : new Date(),
@@ -1643,11 +1645,11 @@ function PairingStep({
 
             // 30일 내 재연결: 온보딩 스킵하고 바로 홈으로
             Alert.alert(
-              '다시 만나서 반가워요! 💕',
-              '30일 이내 재연결로 기존 데이터가 복구되었습니다.',
+              t('onboarding.pairing.reconnected'),
+              t('onboarding.pairing.reconnectedMessage'),
               [
                 {
-                  text: '확인',
+                  text: t('onboarding.confirm'),
                   onPress: () => {
                     setIsOnboardingComplete(true);
                     router.replace('/(tabs)');
@@ -1666,7 +1668,7 @@ function PairingStep({
       const { error: joinError } = await db.pairingCodes.join(pairingCode, joinerId);
 
       if (joinError) {
-        setError('연결 중 오류가 발생했습니다. 다시 시도해주세요.');
+        setError(t('onboarding.pairing.connectionError'));
         setIsLoading(false);
         return;
       }
@@ -1695,7 +1697,7 @@ function PairingStep({
 
       if (coupleJoinError) {
         console.error('Error joining couple:', coupleJoinError);
-        setError('커플 연결 중 오류가 발생했습니다.');
+        setError(t('onboarding.pairing.coupleConnectionError'));
         setIsLoading(false);
         return;
       }
@@ -1731,7 +1733,7 @@ function PairingStep({
           user2Id: joinerId,
           anniversaryDate: updatedCouple.dating_start_date ? parseDateAsLocal(updatedCouple.dating_start_date) : new Date(),
           datingStartDate: updatedCouple.dating_start_date ? parseDateAsLocal(updatedCouple.dating_start_date) : undefined,
-          anniversaryType: '연애 시작일',
+          anniversaryType: t('onboarding.anniversary.datingStart'),
           status: 'active',
           createdAt: updatedCouple.created_at ? new Date(updatedCouple.created_at) : new Date(),
         });
@@ -1769,7 +1771,7 @@ function PairingStep({
       // Navigation will be handled by useEffect that detects paired couple
     } catch (err) {
       console.error('Join error:', err);
-      setError('연결 중 오류가 발생했습니다.');
+      setError(t('onboarding.pairing.connectionError'));
     } finally {
       setIsLoading(false);
     }
@@ -1795,9 +1797,9 @@ function PairingStep({
     <View style={[styles.centeredStepContainer]}>
       {/* Title fixed at top */}
       <View style={styles.nicknameTitleContainer}>
-        <Text style={styles.stepTitle}>파트너와{'\n'}연결해주세요</Text>
+        <Text style={styles.stepTitle}>{t('onboarding.pairing.title')}</Text>
         <Text style={styles.stepDescription}>
-          페어링 코드로 파트너와 데이터를 공유해요
+          {t('onboarding.pairing.subtitle')}
         </Text>
       </View>
 
@@ -1813,7 +1815,7 @@ function PairingStep({
             }}
           >
             <Text style={[styles.toggleButtonText, isCreatingCode && styles.toggleButtonTextActive]}>
-              코드 생성
+              {t('onboarding.pairing.generateCode')}
             </Text>
           </Pressable>
           <Pressable
@@ -1824,7 +1826,7 @@ function PairingStep({
             }}
           >
             <Text style={[styles.toggleButtonText, !isCreatingCode && styles.toggleButtonTextActive]}>
-              코드 입력
+              {t('onboarding.pairing.enterCode')}
             </Text>
           </Pressable>
         </View>
@@ -1834,7 +1836,7 @@ function PairingStep({
           {isCreatingCode ? (
             <View style={styles.codeDisplayContainer}>
               <View style={styles.codeLabelRow}>
-                <Text style={styles.codeLabel}>파트너에게 공유할 코드</Text>
+                <Text style={styles.codeLabel}>{t('onboarding.pairing.myCode')}</Text>
                 <Text style={styles.codeTimer}>({timeRemaining})</Text>
               </View>
               <View style={styles.codeBoxRow}>
@@ -1850,11 +1852,11 @@ function PairingStep({
               </View>
               {isPairingConnected ? (
                 <Text style={[styles.codeHint, { color: '#4CAF50' }]}>
-                  파트너와 연결되었습니다!{'\n'}다음으로 진행하세요
+                  {t('onboarding.pairing.connected')}
                 </Text>
               ) : (
                 <Text style={styles.codeHint}>
-                  파트너가 이 코드를 입력하면{'\n'}자동으로 연결됩니다
+                  {t('onboarding.pairing.waitingPartner')}
                 </Text>
               )}
             </View>
@@ -1871,7 +1873,7 @@ function PairingStep({
                 maxLength={6}
                 editable={!isLoading}
               />
-              <Text style={styles.codeInputHint}>파트너가 생성한 코드를 입력하세요</Text>
+              <Text style={styles.codeInputHint}>{t('onboarding.pairing.enterCodePlaceholder')}</Text>
               {error && (
                 <Text style={[styles.codeInputHint, { color: '#FF6B6B', marginTop: 8 }]}>
                   {error}
@@ -1889,7 +1891,7 @@ function PairingStep({
           onPress={onBack}
           disabled={isLoading || isPairingConnected}
         >
-          <Text style={[styles.secondaryButtonText, (isLoading || isPairingConnected) && styles.secondaryButtonTextDisabled]}>이전</Text>
+          <Text style={[styles.secondaryButtonText, (isLoading || isPairingConnected) && styles.secondaryButtonTextDisabled]}>{t('onboarding.previous')}</Text>
         </Pressable>
         <Pressable
           style={[styles.primaryButton, styles.buttonFlex, !isValid && styles.primaryButtonDisabled]}
@@ -1897,7 +1899,7 @@ function PairingStep({
           disabled={!isValid || isLoading}
         >
           <Text style={styles.primaryButtonText}>
-            {isLoading ? '연결 중...' : (isCreatingCode && !isPairingConnected && !isDemoMode) ? '연결 대기중' : '연결'}
+            {isLoading ? t('onboarding.pairing.connecting') : (isCreatingCode && !isPairingConnected && !isDemoMode) ? t('onboarding.pairing.waitingConnection') : t('onboarding.pairing.connect')}
           </Text>
         </Pressable>
       </View>
@@ -1906,7 +1908,7 @@ function PairingStep({
       {copied && (
         <View style={styles.copyToastOverlay}>
           <View style={styles.copyToastBox}>
-            <Text style={styles.copyToastText}>복사되었습니다</Text>
+            <Text style={styles.copyToastText}>{t('onboarding.pairing.copied')}</Text>
           </View>
         </View>
       )}
@@ -1968,9 +1970,9 @@ function CoupleInfoStep({
 
   const getAnniversaryLabel = () => {
     switch (relationshipType) {
-      case 'dating': return '사귄 날';
-      case 'married': return '결혼 기념일';
-      default: return '사귄 날';
+      case 'dating': return t('onboarding.coupleInfo.datingLabel');
+      case 'married': return t('onboarding.coupleInfo.marriedLabel');
+      default: return t('onboarding.coupleInfo.datingLabel');
     }
   };
 
@@ -1980,7 +1982,7 @@ function CoupleInfoStep({
     <View style={styles.centeredStepContainer}>
       {/* Title fixed at top */}
       <View style={styles.nicknameTitleContainer}>
-        <Text style={styles.stepTitle}>커플 정보를{'\n'}입력해주세요</Text>
+        <Text style={styles.stepTitle}>{t('onboarding.coupleInfo.title')}</Text>
       </View>
 
       {/* Scrollable content */}
@@ -1991,14 +1993,14 @@ function CoupleInfoStep({
       >
         {/* Relationship Type Selection */}
         <View style={styles.basicInfoSection}>
-          <Text style={styles.basicInfoLabel}>관계</Text>
+          <Text style={styles.basicInfoLabel}>{t('onboarding.coupleInfo.relationship')}</Text>
           <View style={styles.relationshipTypeRow}>
             <Pressable
               style={[styles.relationshipTypeButton, relationshipType === 'dating' && styles.relationshipTypeButtonActive]}
               onPress={() => setRelationshipType('dating')}
             >
               <Text style={[styles.relationshipTypeButtonText, relationshipType === 'dating' && styles.relationshipTypeButtonTextActive]}>
-                연애
+                {t('onboarding.relationship.dating')}
               </Text>
             </Pressable>
             <Pressable
@@ -2006,7 +2008,7 @@ function CoupleInfoStep({
               onPress={() => setRelationshipType('married')}
             >
               <Text style={[styles.relationshipTypeButtonText, relationshipType === 'married' && styles.relationshipTypeButtonTextActive]}>
-                결혼
+                {t('onboarding.relationship.married')}
               </Text>
             </Pressable>
           </View>
@@ -2020,7 +2022,7 @@ function CoupleInfoStep({
             onPress={() => setShowAnniversaryPicker(true)}
           >
             <Text style={[styles.basicInfoDateText, anniversaryDate && styles.basicInfoDateTextSelected]}>
-              {anniversaryDate ? formatDate(anniversaryDate) : `${getAnniversaryLabel()} 선택`}
+              {anniversaryDate ? formatDate(anniversaryDate) : t('onboarding.coupleInfo.selectDate', { label: getAnniversaryLabel() })}
             </Text>
             <Calendar color={anniversaryDate ? COLORS.white : 'rgba(255, 255, 255, 0.4)'} size={20} />
           </Pressable>
@@ -2038,10 +2040,10 @@ function CoupleInfoStep({
             <View style={styles.datePickerModalContent}>
               <View style={styles.datePickerHeader}>
                 <Pressable onPress={() => setShowAnniversaryPicker(false)}>
-                  <Text style={styles.datePickerCancel}>취소</Text>
+                  <Text style={styles.datePickerCancel}>{t('common.cancel')}</Text>
                 </Pressable>
                 <Pressable onPress={handleConfirmAnniversaryDate}>
-                  <Text style={styles.datePickerConfirm}>확인</Text>
+                  <Text style={styles.datePickerConfirm}>{t('common.confirm')}</Text>
                 </Pressable>
               </View>
               <DateTimePicker
@@ -2071,14 +2073,14 @@ function CoupleInfoStep({
       {/* Buttons fixed at bottom */}
       <View style={styles.buttonRow}>
         <Pressable style={styles.secondaryButton} onPress={onBack}>
-          <Text style={styles.secondaryButtonText}>이전</Text>
+          <Text style={styles.secondaryButtonText}>{t('onboarding.previous')}</Text>
         </Pressable>
         <Pressable
           style={[styles.primaryButton, styles.buttonFlex, !isValid && styles.primaryButtonDisabled]}
           onPress={onNext}
           disabled={!isValid}
         >
-          <Text style={styles.primaryButtonText}>다음</Text>
+          <Text style={styles.primaryButtonText}>{t('onboarding.next')}</Text>
         </Pressable>
       </View>
     </View>
@@ -2098,10 +2100,10 @@ function PreferencesIntroStep({
       {/* Title fixed at top */}
       <View style={[styles.nicknameTitleContainer, { paddingTop: SPACING.xxxl + 60 }]}>
         <Text style={styles.stepTitle}>
-          맞춤형 미션을 위해{'\n'}취향을 알려주세요
+          {t('onboarding.preferencesIntro.title')}
         </Text>
         <Text style={styles.stepDescription}>
-          두 분의 취향을 분석해서{'\n'}적절한 데이트 미션을 추천해드릴게요
+          {t('onboarding.preferencesIntro.subtitle')}
         </Text>
       </View>
 
@@ -2109,9 +2111,7 @@ function PreferencesIntroStep({
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 300, width: '100%', paddingHorizontal: SPACING.xl }}>
         <View style={[styles.preferencesInfoBoxInline, { alignItems: 'center' }]}>
           <Text style={[styles.preferencesInfoText, { textAlign: 'center' }]}>
-            약 1분 정도 소요되며,{'\n'}
-            '더보기 {'>'} 내 프로필'에서{'\n'}
-            언제든 수정할 수 있어요
+            {t('onboarding.preferencesIntro.hint')}
           </Text>
         </View>
       </View>
@@ -2119,7 +2119,7 @@ function PreferencesIntroStep({
       {/* Bottom button */}
       <View style={{ width: '100%', paddingBottom: SPACING.lg, paddingHorizontal: SPACING.xl }}>
         <Pressable style={styles.primaryButton} onPress={onNext}>
-          <Text style={styles.primaryButtonText}>취향 분석 시작</Text>
+          <Text style={styles.primaryButtonText}>{t('onboarding.preferencesIntro.startAnalysis')}</Text>
         </Pressable>
       </View>
     </View>
@@ -2142,7 +2142,7 @@ function MBTIStep({
     <View style={styles.centeredStepContainer}>
       {/* Title at top */}
       <View style={{ width: '100%', paddingHorizontal: SPACING.xl, paddingTop: SPACING.xxxl + 40, alignItems: 'center' }}>
-        <Text style={styles.stepTitle}>MBTI를{'\n'}선택해주세요</Text>
+        <Text style={styles.stepTitle}>{t('onboarding.mbti.title')}</Text>
       </View>
 
       {/* Centered content - moved up */}
@@ -2166,14 +2166,14 @@ function MBTIStep({
       <View style={{ width: '100%', paddingBottom: SPACING.lg }}>
         <View style={styles.buttonRow}>
           <Pressable style={styles.secondaryButton} onPress={onBack}>
-            <Text style={styles.secondaryButtonText}>이전</Text>
+            <Text style={styles.secondaryButtonText}>{t('onboarding.previous')}</Text>
           </Pressable>
           <Pressable
             style={[styles.primaryButton, styles.buttonFlex, !mbti && styles.buttonDisabled]}
             onPress={mbti ? onNext : undefined}
             disabled={!mbti}
           >
-            <Text style={[styles.primaryButtonText, !mbti && styles.buttonTextDisabled]}>다음</Text>
+            <Text style={[styles.primaryButtonText, !mbti && styles.buttonTextDisabled]}>{t('onboarding.next')}</Text>
           </Pressable>
         </View>
       </View>
@@ -2207,9 +2207,9 @@ function ActivityTypeStep({
     <View style={styles.centeredStepContainer}>
       {/* Title at top */}
       <View style={{ width: '100%', paddingHorizontal: SPACING.xl, paddingTop: SPACING.xxxl + 40, alignItems: 'center' }}>
-        <Text style={styles.stepTitle}>선호하는 활동을{'\n'}선택해주세요</Text>
+        <Text style={styles.stepTitle}>{t('onboarding.preferences.title')}</Text>
         <Text style={styles.stepDescription}>
-          여러 개 선택할 수 있어요
+          {t('onboarding.preferences.subtitle')}
         </Text>
       </View>
 
@@ -2243,14 +2243,14 @@ function ActivityTypeStep({
       <View style={{ width: '100%', paddingBottom: SPACING.lg }}>
         <View style={styles.buttonRow}>
           <Pressable style={styles.secondaryButton} onPress={onBack}>
-            <Text style={styles.secondaryButtonText}>이전</Text>
+            <Text style={styles.secondaryButtonText}>{t('onboarding.previous')}</Text>
           </Pressable>
           <Pressable
             style={[styles.primaryButton, styles.buttonFlex, !isValid && styles.buttonDisabled]}
             onPress={isValid ? onNext : undefined}
             disabled={!isValid}
           >
-            <Text style={[styles.primaryButtonText, !isValid && styles.buttonTextDisabled]}>다음</Text>
+            <Text style={[styles.primaryButtonText, !isValid && styles.buttonTextDisabled]}>{t('onboarding.next')}</Text>
           </Pressable>
         </View>
       </View>
@@ -2287,10 +2287,10 @@ function DateWorriesStep({
       {/* Title at top */}
       <View style={{ width: '100%', paddingHorizontal: SPACING.xl, paddingTop: SPACING.xxxl + 40, alignItems: 'center' }}>
         <Text style={styles.stepTitle}>
-          데이트할 때{'\n'}어떤 게 고민이에요?
+          {t('onboarding.concerns.title')}
         </Text>
         <Text style={styles.stepDescription}>
-          여러 개 선택할 수 있어요
+          {t('onboarding.concerns.subtitle')}
         </Text>
       </View>
 
@@ -2323,14 +2323,14 @@ function DateWorriesStep({
       <View style={styles.bottomButtonArea}>
         <View style={styles.buttonRow}>
           <Pressable style={styles.secondaryButton} onPress={onBack}>
-            <Text style={styles.secondaryButtonText}>이전</Text>
+            <Text style={styles.secondaryButtonText}>{t('onboarding.previous')}</Text>
           </Pressable>
           <Pressable
             style={[styles.primaryButton, styles.buttonFlex, !isValid && styles.buttonDisabled]}
             onPress={isValid ? onNext : undefined}
             disabled={!isValid}
           >
-            <Text style={[styles.primaryButtonText, !isValid && styles.buttonTextDisabled]}>다음</Text>
+            <Text style={[styles.primaryButtonText, !isValid && styles.buttonTextDisabled]}>{t('onboarding.next')}</Text>
           </Pressable>
         </View>
       </View>
@@ -2374,9 +2374,9 @@ function ConstraintsStep({
     <View style={styles.centeredStepContainer}>
       {/* Title at top */}
       <View style={{ width: '100%', paddingHorizontal: SPACING.xl, paddingTop: SPACING.xxxl + 40, alignItems: 'center' }}>
-        <Text style={styles.stepTitle}>미션을 줄 때{'\n'}참고할 사항은?</Text>
+        <Text style={styles.stepTitle}>{t('onboarding.constraints.title')}</Text>
         <Text style={styles.stepDescription}>
-          해당하는 것을 모두 선택해주세요
+          {t('onboarding.constraints.subtitle')}
         </Text>
       </View>
 
@@ -2400,14 +2400,14 @@ function ConstraintsStep({
       <View style={styles.bottomButtonArea}>
         <View style={styles.buttonRow}>
           <Pressable style={styles.secondaryButton} onPress={onBack}>
-            <Text style={styles.secondaryButtonText}>이전</Text>
+            <Text style={styles.secondaryButtonText}>{t('onboarding.previous')}</Text>
           </Pressable>
           <Pressable
             style={[styles.primaryButton, styles.buttonFlex, !isValid && styles.buttonDisabled]}
             onPress={isValid ? onNext : undefined}
             disabled={!isValid}
           >
-            <Text style={[styles.primaryButtonText, !isValid && styles.buttonTextDisabled]}>완료</Text>
+            <Text style={[styles.primaryButtonText, !isValid && styles.buttonTextDisabled]}>{t('onboarding.complete')}</Text>
           </Pressable>
         </View>
       </View>
@@ -2431,17 +2431,16 @@ function CompleteStep({
         </View>
 
         <Text style={styles.celebrationTitle}>
-          {nickname}님, 환영해요!
+          {t('onboarding.completeStep.title', { nickname })}
         </Text>
 
         <Text style={styles.celebrationDescription}>
-          모든 설정이 완료되었어요{'\n'}
-          특별한 순간들을 함께 만들어가요!
+          {t('onboarding.completeStep.subtitle')}
         </Text>
       </View>
 
       <Pressable style={styles.primaryButton} onPress={onComplete}>
-        <Text style={styles.primaryButtonText}>시작하기</Text>
+        <Text style={styles.primaryButtonText}>{t('onboarding.start')}</Text>
       </Pressable>
     </View>
   );

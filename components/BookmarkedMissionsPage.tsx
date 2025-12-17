@@ -7,6 +7,7 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Image } from 'expo-image';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -26,6 +27,7 @@ interface BookmarkedMissionsPageProps {
 type BookmarkItem = KeptMission | SyncedBookmark;
 
 export function BookmarkedMissionsPage({ onBack }: BookmarkedMissionsPageProps) {
+  const { t } = useTranslation();
   const router = useRouter();
   const { keptMissions, removeKeptMissionByKeptId, canStartMission, isTodayCompletedMission } = useMissionStore();
   const { sharedBookmarks, removeBookmark, isInitialized: isSyncInitialized } = useCoupleSyncStore();
@@ -55,24 +57,24 @@ export function BookmarkedMissionsPage({ onBack }: BookmarkedMissionsPageProps) 
     // Show message if can't start (already completed another mission today)
     if (!canStartMission(missionId) && !isTodayCompletedMission(missionId)) {
       Alert.alert(
-        '미션 시작 불가',
-        '오늘 가능한 미션을 모두 완료했어요.\n내일 다시 도전해보세요!',
-        [{ text: '확인' }]
+        t('mission.alerts.cannotStart'),
+        t('mission.alerts.dailyLimitMessage'),
+        [{ text: t('common.confirm') }]
       );
       return;
     }
 
     router.push(`/mission/${missionId}`);
-  }, [router, canStartMission, isTodayCompletedMission]);
+  }, [router, canStartMission, isTodayCompletedMission, t]);
 
   const handleRemove = useCallback((bookmark: BookmarkItem, title: string) => {
     Alert.alert(
-      '미션 삭제',
-      `'${title}' 미션을 삭제하시겠어요?`,
+      t('bookmark.deleteMission'),
+      t('bookmark.deleteConfirm', { title }),
       [
-        { text: '취소', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: '삭제',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             if ('mission_data' in bookmark) {
@@ -86,7 +88,7 @@ export function BookmarkedMissionsPage({ onBack }: BookmarkedMissionsPageProps) 
         },
       ]
     );
-  }, [removeKeptMissionByKeptId, removeBookmark]);
+  }, [removeKeptMissionByKeptId, removeBookmark, t]);
 
   return (
     <View style={styles.container}>
@@ -106,7 +108,7 @@ export function BookmarkedMissionsPage({ onBack }: BookmarkedMissionsPageProps) 
         </Pressable>
 
         {/* Centered Title */}
-        <Text style={styles.headerTitle}>보관함</Text>
+        <Text style={styles.headerTitle}>{t('bookmark.title')}</Text>
 
         {/* Spacer for alignment */}
         <View style={styles.headerSpacer} />
@@ -119,8 +121,8 @@ export function BookmarkedMissionsPage({ onBack }: BookmarkedMissionsPageProps) 
             <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
             <Bookmark color="rgba(255, 255, 255, 0.4)" size={40} />
           </View>
-          <Text style={styles.emptyText}>보관한 미션이 없어요</Text>
-          <Text style={styles.emptySubtext}>마음에 드는 미션을 Keep 해보세요</Text>
+          <Text style={styles.emptyText}>{t('bookmark.empty')}</Text>
+          <Text style={styles.emptySubtext}>{t('bookmark.emptyHint')}</Text>
         </View>
       ) : (
         <ScrollView
@@ -180,7 +182,7 @@ export function BookmarkedMissionsPage({ onBack }: BookmarkedMissionsPageProps) 
                           styles.startButtonText,
                           !canStartMission(mission.id) && !isTodayCompletedMission(mission.id) && styles.startButtonTextDisabled,
                         ]}>
-                          {isTodayCompletedMission(mission.id) ? '완료' : '시작하기'}
+                          {isTodayCompletedMission(mission.id) ? t('mission.completed') : t('mission.start')}
                         </Text>
                       </Pressable>
 

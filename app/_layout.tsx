@@ -9,6 +9,9 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StyleSheet, AppState, AppStateStatus } from 'react-native';
 import 'react-native-reanimated';
 
+// Initialize i18n (must be imported before any component that uses translations)
+import '@/lib/i18n';
+
 import { useAuthStore } from '@/stores';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
 import { BackgroundProvider, useBackground } from '@/contexts';

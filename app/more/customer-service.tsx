@@ -17,6 +17,7 @@ import {
   MessageCircle,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 import { COLORS, SPACING, RADIUS } from '@/constants/design';
 import { db } from '@/lib/supabase';
@@ -29,6 +30,7 @@ type FAQItem = {
 
 export default function CustomerServiceScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [faqItems, setFaqItems] = useState<FAQItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -78,7 +80,7 @@ export default function CustomerServiceScreen() {
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <ChevronLeft color={COLORS.black} size={24} />
         </Pressable>
-        <Text style={styles.headerTitle}>고객센터</Text>
+        <Text style={styles.headerTitle}>{t('more.customerService.title')}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -88,7 +90,7 @@ export default function CustomerServiceScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* FAQ Section */}
-        <Text style={styles.sectionTitle}>자주 묻는 질문</Text>
+        <Text style={styles.sectionTitle}>{t('more.customerService.faqTitle')}</Text>
         {isLoading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={COLORS.primary} />
@@ -124,15 +126,15 @@ export default function CustomerServiceScreen() {
 
         {/* Kakao Inquiry Section */}
         <View style={styles.inquiryContainer}>
-          <Text style={styles.inquiryTitle}>궁금한 점이 해소되지 않으셨나요?</Text>
+          <Text style={styles.inquiryTitle}>{t('more.customerService.inquiryTitle')}</Text>
           <Text style={styles.inquiryDescription}>
-            카카오톡으로 1:1 문의를 남겨주시면{'\n'}빠르게 답변 드리겠습니다.
+            {t('more.customerService.inquiryDescription')}
           </Text>
           <Pressable style={styles.kakaoButton} onPress={handleKakaoInquiry}>
             <View style={styles.kakaoIcon}>
               <MessageCircle color="#000" size={20} />
             </View>
-            <Text style={styles.kakaoButtonText}>1:1 문의하기</Text>
+            <Text style={styles.kakaoButtonText}>{t('more.customerService.kakaoButton')}</Text>
           </Pressable>
         </View>
       </ScrollView>

@@ -27,6 +27,7 @@ import {
   Info,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 import { COLORS, SPACING, RADIUS } from '@/constants/design';
 import { useOnboardingStore, useAuthStore, useMemoryStore } from '@/stores';
@@ -37,6 +38,7 @@ const { width } = Dimensions.get('window');
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { data } = useOnboardingStore();
   const { signOut, couple } = useAuthStore();
   const { memories } = useMemoryStore();
@@ -88,7 +90,7 @@ export default function SettingsScreen() {
   };
 
   const handleDeleteAccountConfirm = async () => {
-    if (deleteConfirmText !== '계정탈퇴') return;
+    if (deleteConfirmText !== t('settings.deleteAccount.confirmText')) return;
 
     setIsDeleting(true);
     const { user } = useAuthStore.getState();
@@ -117,11 +119,11 @@ export default function SettingsScreen() {
       setIsDeleting(false);
 
       Alert.alert(
-        '계정 탈퇴 완료',
-        '모든 데이터가 삭제되었습니다.\n이용해 주셔서 감사합니다.',
+        t('settings.deleteAccount.success'),
+        t('settings.deleteAccount.successMessage'),
         [
           {
-            text: '확인',
+            text: t('common.confirm'),
             onPress: () => router.replace('/(auth)/onboarding'),
           },
         ]
@@ -129,12 +131,12 @@ export default function SettingsScreen() {
     } catch (error) {
       console.error('[Settings] Account deletion error:', error);
       setIsDeleting(false);
-      Alert.alert('오류', '계정 탈퇴 중 오류가 발생했습니다.');
+      Alert.alert(t('common.error'), t('settings.deleteAccount.error'));
     }
   };
 
   const handleUnpairConfirm = async () => {
-    if (unpairConfirmText === '페어링끊기') {
+    if (unpairConfirmText === t('settings.unpair.confirmText')) {
       setShowUnpairConfirmModal(false);
       setShowUnpairModal(false);
       setUnpairConfirmText('');
@@ -148,7 +150,7 @@ export default function SettingsScreen() {
           const { error } = await db.couples.disconnect(couple.id, user.id);
           if (error) {
             console.error('[Settings] Error disconnecting couple:', error);
-            Alert.alert('오류', '페어링 해제 중 오류가 발생했습니다.');
+            Alert.alert(t('common.error'), t('settings.unpair.error'));
             return;
           }
         }
@@ -164,11 +166,11 @@ export default function SettingsScreen() {
         setIsOnboardingComplete(false);
 
         Alert.alert(
-          '페어링 해제',
-          '페어링이 해제되었습니다.\n30일 이내에 같은 파트너와 재연결하면 기존 데이터가 복구됩니다.',
+          t('settings.unpair.success'),
+          t('settings.unpair.successMessage'),
           [
             {
-              text: '확인',
+              text: t('common.confirm'),
               onPress: () => {
                 // Navigate to pairing screen
                 router.replace('/(auth)/onboarding');
@@ -178,7 +180,7 @@ export default function SettingsScreen() {
         );
       } catch (error) {
         console.error('[Settings] Unpair error:', error);
-        Alert.alert('오류', '페어링 해제 중 오류가 발생했습니다.');
+        Alert.alert(t('common.error'), t('settings.unpair.error'));
       }
     }
   };
@@ -195,7 +197,7 @@ export default function SettingsScreen() {
           <Pressable onPress={() => setShowUnpairModal(false)} style={styles.modalCloseButton}>
             <X color={COLORS.black} size={24} />
           </Pressable>
-          <Text style={styles.modalTitle}>페어링 끊기</Text>
+          <Text style={styles.modalTitle}>{t('settings.unpair.title')}</Text>
           <View style={styles.modalHeaderSpacer} />
         </View>
 
@@ -209,56 +211,55 @@ export default function SettingsScreen() {
             <AlertTriangle color="#ff5722" size={48} />
           </View>
 
-          <Text style={styles.warningTitle}>정말 페어링을 끊으시겠어요?</Text>
+          <Text style={styles.warningTitle}>{t('settings.unpair.warningTitle')}</Text>
           <Text style={styles.warningDescription}>
-            페어링을 끊으면 파트너와의 연결이 해제되고,{'\n'}
-            일부 데이터에 접근할 수 없게 됩니다.
+            {t('settings.unpair.warningText')}
           </Text>
 
           {/* Info Cards */}
           <View style={styles.infoSection}>
-            <Text style={styles.infoSectionTitle}>연결 끊기 전 확인해주세요</Text>
+            <Text style={styles.infoSectionTitle}>{t('settings.unpair.checkTitle')}</Text>
 
             <View style={styles.infoCard}>
               <View style={styles.infoCardHeader}>
                 <Text style={styles.infoCardIcon}>📅</Text>
-                <Text style={styles.infoCardLabel}>함께한 기간</Text>
+                <Text style={styles.infoCardLabel}>{t('settings.unpair.daysTogether')}</Text>
               </View>
-              <Text style={styles.infoCardValue}>{calculateDaysTogether()}일</Text>
+              <Text style={styles.infoCardValue}>{calculateDaysTogether()}{t('settings.unpair.daysUnit')}</Text>
             </View>
 
             <View style={styles.infoCard}>
               <View style={styles.infoCardHeader}>
                 <Text style={styles.infoCardIcon}>✅</Text>
-                <Text style={styles.infoCardLabel}>함께 완료한 미션</Text>
+                <Text style={styles.infoCardLabel}>{t('settings.unpair.completedMissions')}</Text>
               </View>
-              <Text style={styles.infoCardValue}>{memories.length}개</Text>
+              <Text style={styles.infoCardValue}>{memories.length}{t('settings.unpair.missionsUnit')}</Text>
             </View>
 
             <View style={styles.infoCard}>
               <View style={styles.infoCardHeader}>
                 <Text style={styles.infoCardIcon}>🔄</Text>
-                <Text style={styles.infoCardLabel}>복구 가능한 기간</Text>
+                <Text style={styles.infoCardLabel}>{t('settings.unpair.recoveryPeriod')}</Text>
               </View>
               <Text style={styles.infoCardValue}>{getRecoveryPeriod()}</Text>
-              <Text style={styles.infoCardSubtext}>최대 30일 동안 복구할 수 있어요</Text>
+              <Text style={styles.infoCardSubtext}>{t('settings.unpair.recoveryHint')}</Text>
             </View>
           </View>
 
           {/* Warning List */}
           <View style={styles.warningList}>
-            <Text style={styles.warningListTitle}>주의사항</Text>
+            <Text style={styles.warningListTitle}>{t('settings.unpair.warningsTitle')}</Text>
             <View style={styles.warningListItem}>
               <Text style={styles.warningBullet}>•</Text>
-              <Text style={styles.warningListText}>상대방에게 페어링 해제 알림이 전송됩니다</Text>
+              <Text style={styles.warningListText}>{t('settings.unpair.warning1')}</Text>
             </View>
             <View style={styles.warningListItem}>
               <Text style={styles.warningBullet}>•</Text>
-              <Text style={styles.warningListText}>미션 히스토리는 개별 계정에 보관됩니다</Text>
+              <Text style={styles.warningListText}>{t('settings.unpair.warning2')}</Text>
             </View>
             <View style={styles.warningListItem}>
               <Text style={styles.warningBullet}>•</Text>
-              <Text style={styles.warningListText}>30일 이내 같은 파트너와 재연결 가능합니다</Text>
+              <Text style={styles.warningListText}>{t('settings.unpair.warning3')}</Text>
             </View>
           </View>
         </ScrollView>
@@ -273,7 +274,7 @@ export default function SettingsScreen() {
             }}
           >
             <Link2Off color={COLORS.white} size={20} />
-            <Text style={styles.unpairButtonText}>페어링 끊기</Text>
+            <Text style={styles.unpairButtonText}>{t('settings.unpair.button')}</Text>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -292,16 +293,16 @@ export default function SettingsScreen() {
     >
       <View style={styles.confirmModalOverlay}>
         <View style={styles.confirmModalContent}>
-          <Text style={styles.confirmModalTitle}>페어링 끊기 확인</Text>
+          <Text style={styles.confirmModalTitle}>{t('settings.unpair.confirmTitle')}</Text>
           <Text style={styles.confirmModalDescription}>
-            계속하려면 아래에 '페어링끊기'를{'\n'}정확히 입력해주세요
+            {t('settings.unpair.confirmPrompt')}
           </Text>
 
           <TextInput
             style={styles.confirmInput}
             value={unpairConfirmText}
             onChangeText={setUnpairConfirmText}
-            placeholder="페어링끊기"
+            placeholder={t('settings.unpair.confirmText')}
             placeholderTextColor="#ccc"
             autoFocus
           />
@@ -314,17 +315,17 @@ export default function SettingsScreen() {
                 setUnpairConfirmText('');
               }}
             >
-              <Text style={styles.confirmCancelButtonText}>취소</Text>
+              <Text style={styles.confirmCancelButtonText}>{t('common.cancel')}</Text>
             </Pressable>
             <Pressable
               style={[
                 styles.confirmUnpairButton,
-                unpairConfirmText !== '페어링끊기' && styles.confirmUnpairButtonDisabled,
+                unpairConfirmText !== t('settings.unpair.confirmText') && styles.confirmUnpairButtonDisabled,
               ]}
               onPress={handleUnpairConfirm}
-              disabled={unpairConfirmText !== '페어링끊기'}
+              disabled={unpairConfirmText !== t('settings.unpair.confirmText')}
             >
-              <Text style={styles.confirmUnpairButtonText}>페어링 끊기</Text>
+              <Text style={styles.confirmUnpairButtonText}>{t('settings.unpair.button')}</Text>
             </Pressable>
           </View>
         </View>
@@ -341,7 +342,7 @@ export default function SettingsScreen() {
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <ChevronLeft color={COLORS.black} size={24} />
         </Pressable>
-        <Text style={styles.headerTitle}>설정</Text>
+        <Text style={styles.headerTitle}>{t('settings.title')}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -351,7 +352,7 @@ export default function SettingsScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Push Notifications */}
-        <Text style={styles.sectionTitle}>알림</Text>
+        <Text style={styles.sectionTitle}>{t('settings.sections.notifications')}</Text>
         <View style={styles.settingCard}>
           <View style={styles.settingItem}>
             <View style={styles.settingItemLeft}>
@@ -359,8 +360,8 @@ export default function SettingsScreen() {
                 <Bell color={COLORS.black} size={20} />
               </View>
               <View style={styles.settingItemContent}>
-                <Text style={styles.settingItemLabel}>푸시 알림</Text>
-                <Text style={styles.settingItemDescription}>모든 알림 받기</Text>
+                <Text style={styles.settingItemLabel}>{t('settings.notifications.push')}</Text>
+                <Text style={styles.settingItemDescription}>{t('settings.notifications.pushDesc')}</Text>
               </View>
             </View>
             <Switch
@@ -377,8 +378,8 @@ export default function SettingsScreen() {
             <View style={styles.settingItemLeft}>
               <View style={styles.iconWrapperEmpty} />
               <View style={styles.settingItemContent}>
-                <Text style={styles.settingItemLabel}>미션 알림</Text>
-                <Text style={styles.settingItemDescription}>새로운 미션이 도착하면 알림</Text>
+                <Text style={styles.settingItemLabel}>{t('settings.notifications.mission')}</Text>
+                <Text style={styles.settingItemDescription}>{t('settings.notifications.missionDesc')}</Text>
               </View>
             </View>
             <Switch
@@ -396,8 +397,8 @@ export default function SettingsScreen() {
             <View style={styles.settingItemLeft}>
               <View style={styles.iconWrapperEmpty} />
               <View style={styles.settingItemContent}>
-                <Text style={styles.settingItemLabel}>서로에게 한마디 미작성 알림</Text>
-                <Text style={styles.settingItemDescription}>한마디를 작성하지 않으면 알림</Text>
+                <Text style={styles.settingItemLabel}>{t('settings.notifications.message')}</Text>
+                <Text style={styles.settingItemDescription}>{t('settings.notifications.messageDesc')}</Text>
               </View>
             </View>
             <Switch
@@ -411,7 +412,7 @@ export default function SettingsScreen() {
         </View>
 
         {/* Marketing Notifications */}
-        <Text style={styles.sectionTitle}>마케팅</Text>
+        <Text style={styles.sectionTitle}>{t('settings.sections.marketing')}</Text>
         <View style={styles.settingCard}>
           <View style={styles.settingItem}>
             <View style={styles.settingItemLeft}>
@@ -419,8 +420,8 @@ export default function SettingsScreen() {
                 <Megaphone color={COLORS.black} size={20} />
               </View>
               <View style={styles.settingItemContent}>
-                <Text style={styles.settingItemLabel}>소식 알림 받기</Text>
-                <Text style={styles.settingItemDescription}>이벤트 및 업데이트 소식</Text>
+                <Text style={styles.settingItemLabel}>{t('settings.marketing.news')}</Text>
+                <Text style={styles.settingItemDescription}>{t('settings.marketing.newsDesc')}</Text>
               </View>
             </View>
             <Switch
@@ -437,8 +438,8 @@ export default function SettingsScreen() {
             <View style={styles.settingItemLeft}>
               <View style={styles.iconWrapperEmpty} />
               <View style={styles.settingItemContent}>
-                <Text style={styles.settingItemLabel}>마케팅 정보 수신</Text>
-                <Text style={styles.settingItemDescription}>프로모션 및 할인 정보</Text>
+                <Text style={styles.settingItemLabel}>{t('settings.marketing.info')}</Text>
+                <Text style={styles.settingItemDescription}>{t('settings.marketing.infoDesc')}</Text>
               </View>
             </View>
             <Switch
@@ -451,14 +452,14 @@ export default function SettingsScreen() {
         </View>
 
         {/* Others */}
-        <Text style={styles.sectionTitle}>기타</Text>
+        <Text style={styles.sectionTitle}>{t('settings.sections.other')}</Text>
         <View style={styles.settingCard}>
           <Pressable style={styles.menuItem} onPress={() => {}}>
             <View style={styles.settingItemLeft}>
               <View style={styles.iconWrapper}>
                 <FileText color={COLORS.black} size={20} />
               </View>
-              <Text style={styles.settingItemLabel}>서비스 이용약관</Text>
+              <Text style={styles.settingItemLabel}>{t('settings.other.termsOfService')}</Text>
             </View>
             <ChevronRight color="#999" size={20} />
           </Pressable>
@@ -470,7 +471,7 @@ export default function SettingsScreen() {
               <View style={styles.iconWrapper}>
                 <Shield color={COLORS.black} size={20} />
               </View>
-              <Text style={styles.settingItemLabel}>개인정보 처리방침</Text>
+              <Text style={styles.settingItemLabel}>{t('settings.other.privacyPolicy')}</Text>
             </View>
             <ChevronRight color="#999" size={20} />
           </Pressable>
@@ -482,21 +483,21 @@ export default function SettingsScreen() {
               <View style={styles.iconWrapper}>
                 <Info color={COLORS.black} size={20} />
               </View>
-              <Text style={styles.settingItemLabel}>버전 1.0.0</Text>
+              <Text style={styles.settingItemLabel}>{t('settings.other.version', { version: '1.0.0' })}</Text>
             </View>
-            <Text style={styles.versionStatus}>최신버전</Text>
+            <Text style={styles.versionStatus}>{t('settings.other.latestVersion')}</Text>
           </View>
         </View>
 
         {/* Account Actions */}
-        <Text style={styles.sectionTitle}>계정</Text>
+        <Text style={styles.sectionTitle}>{t('settings.sections.account')}</Text>
         <View style={styles.settingCard}>
           <Pressable style={styles.dangerItem} onPress={handleAccountDeletion}>
             <View style={styles.settingItemLeft}>
               <View style={[styles.iconWrapper, { backgroundColor: '#ffebee' }]}>
                 <UserX color="#f44336" size={20} />
               </View>
-              <Text style={styles.dangerItemLabel}>계정 탈퇴</Text>
+              <Text style={styles.dangerItemLabel}>{t('settings.account.deleteAccount')}</Text>
             </View>
           </Pressable>
 
@@ -507,7 +508,7 @@ export default function SettingsScreen() {
               <View style={[styles.iconWrapper, { backgroundColor: '#fff3e0' }]}>
                 <Link2Off color="#ff9800" size={20} />
               </View>
-              <Text style={[styles.dangerItemLabel, { color: '#ff9800' }]}>페어링 끊기</Text>
+              <Text style={[styles.dangerItemLabel, { color: '#ff9800' }]}>{t('settings.account.unpair')}</Text>
             </View>
           </Pressable>
         </View>
@@ -534,26 +535,22 @@ export default function SettingsScreen() {
             <View style={styles.deleteWarningIcon}>
               <AlertTriangle color="#f44336" size={32} />
             </View>
-            <Text style={styles.confirmModalTitle}>계정 탈퇴</Text>
+            <Text style={styles.confirmModalTitle}>{t('settings.deleteAccount.title')}</Text>
             <Text style={styles.confirmModalDescription}>
-              계정을 탈퇴하면 모든 데이터가{'\n'}
-              <Text style={styles.deleteWarningText}>영구적으로 삭제</Text>됩니다.{'\n\n'}
-              삭제되는 데이터:{'\n'}
-              • 프로필 정보{'\n'}
-              • 커플 연결 정보{'\n'}
-              • 완료한 미션 기록{'\n'}
-              • 앨범 및 사진{'\n'}
-              • 모든 설정
+              {t('settings.deleteAccount.warningText')}
+              <Text style={styles.deleteWarningText}>{t('settings.deleteAccount.permanentDelete')}</Text>
+              {t('settings.deleteAccount.warningEnd')}{'\n\n'}
+              {t('settings.deleteAccount.dataList')}
             </Text>
             <Text style={styles.deleteConfirmHint}>
-              계속하려면 아래에 '계정탈퇴'를 입력해주세요
+              {t('settings.deleteAccount.confirmPrompt')}
             </Text>
 
             <TextInput
               style={styles.confirmInput}
               value={deleteConfirmText}
               onChangeText={setDeleteConfirmText}
-              placeholder="계정탈퇴"
+              placeholder={t('settings.deleteAccount.confirmText')}
               placeholderTextColor="#ccc"
               autoFocus
               editable={!isDeleting}
@@ -568,20 +565,20 @@ export default function SettingsScreen() {
                 }}
                 disabled={isDeleting}
               >
-                <Text style={styles.confirmCancelButtonText}>취소</Text>
+                <Text style={styles.confirmCancelButtonText}>{t('common.cancel')}</Text>
               </Pressable>
               <Pressable
                 style={[
                   styles.confirmDeleteButton,
-                  (deleteConfirmText !== '계정탈퇴' || isDeleting) && styles.confirmDeleteButtonDisabled,
+                  (deleteConfirmText !== t('settings.deleteAccount.confirmText') || isDeleting) && styles.confirmDeleteButtonDisabled,
                 ]}
                 onPress={handleDeleteAccountConfirm}
-                disabled={deleteConfirmText !== '계정탈퇴' || isDeleting}
+                disabled={deleteConfirmText !== t('settings.deleteAccount.confirmText') || isDeleting}
               >
                 {isDeleting ? (
-                  <Text style={styles.confirmDeleteButtonText}>삭제 중...</Text>
+                  <Text style={styles.confirmDeleteButtonText}>{t('settings.deleteAccount.deleting')}</Text>
                 ) : (
-                  <Text style={styles.confirmDeleteButtonText}>계정 탈퇴</Text>
+                  <Text style={styles.confirmDeleteButtonText}>{t('settings.deleteAccount.button')}</Text>
                 )}
               </Pressable>
             </View>

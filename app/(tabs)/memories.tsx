@@ -37,6 +37,7 @@ import ReanimatedModule, {
   withTiming,
   Easing,
 } from 'react-native-reanimated';
+import { useTranslation } from 'react-i18next';
 
 import { COLORS, SPACING } from '@/constants/design';
 import { useMemoryStore, SAMPLE_MEMORIES } from '@/stores/memoryStore';
@@ -85,6 +86,7 @@ interface MonthData {
 }
 
 export default function MemoriesScreen() {
+  const { t, i18n } = useTranslation();
   const { backgroundImage } = useBackground();
   const { memories, deleteMemory } = useMemoryStore();
   const { user, partner } = useAuthStore();
@@ -555,10 +557,7 @@ export default function MemoriesScreen() {
   }, [albumPhotos, selectedAlbum?.id, showAlbumDetailModal, selectedAlbumPhoto]);
 
   const getMonthName = (monthNumber: string) => {
-    const monthNames = [
-      '1월', '2월', '3월', '4월', '5월', '6월',
-      '7월', '8월', '9월', '10월', '11월', '12월'
-    ];
+    const monthNames = t('memories.monthNames', { returnObjects: true }) as string[];
     return monthNames[parseInt(monthNumber) - 1];
   };
 
@@ -617,7 +616,7 @@ export default function MemoriesScreen() {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (permissionResult.granted === false) {
-      Alert.alert('권한 필요', '사진첩 접근 권한이 필요합니다.');
+      Alert.alert(t('memories.permission.required'), t('memories.permission.photoAccess'));
       return;
     }
 
@@ -648,7 +647,7 @@ export default function MemoriesScreen() {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (permissionResult.granted === false) {
-      Alert.alert('권한 필요', '사진첩 접근 권한이 필요합니다.');
+      Alert.alert(t('memories.permission.required'), t('memories.permission.photoAccess'));
       return;
     }
 
@@ -1038,8 +1037,8 @@ export default function MemoriesScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerTitle}>추억</Text>
-          <Text style={styles.headerSubtitle}>우리가 함께한 순간들</Text>
+          <Text style={styles.headerTitle}>{t('memories.title')}</Text>
+          <Text style={styles.headerSubtitle}>{t('memories.subtitle')}</Text>
         </View>
       </View>
 
@@ -1047,9 +1046,9 @@ export default function MemoriesScreen() {
       {completedMemories.length === 0 ? (
         <View style={styles.emptyState}>
           <View style={styles.emptyMissionCard}>
-            <Text style={styles.emptyMissionText}>완료된 미션이 없습니다</Text>
+            <Text style={styles.emptyMissionText}>{t('memories.empty')}</Text>
             <Text style={styles.emptyMissionHint}>
-              미션을 완료하고 서로에게 한마디를 작성해주세요
+              {t('memories.emptyHint')}
             </Text>
           </View>
         </View>
@@ -1071,7 +1070,7 @@ export default function MemoriesScreen() {
               <View key={year} style={styles.yearSection}>
                 {/* Year Header */}
                 <View style={styles.yearHeader}>
-                  <Text style={styles.yearTitle}>{year}년</Text>
+                  <Text style={styles.yearTitle}>{i18n.language === 'ko' ? `${year}년` : year}</Text>
                   {years.length > 1 && (
                     <Pressable
                       onPress={() => setShowYearPicker(showYearPicker === year ? null : year)}
@@ -1108,7 +1107,7 @@ export default function MemoriesScreen() {
                             y === year && styles.yearPickerItemTextActive,
                           ]}
                         >
-                          {y}년
+                          {i18n.language === 'ko' ? `${y}년` : y}
                         </Text>
                       </Pressable>
                     ))}
@@ -1174,12 +1173,12 @@ export default function MemoriesScreen() {
           {/* Photo Collage Section */}
           <View style={styles.collageSection}>
             <View style={styles.collageSectionHeader}>
-              <Text style={styles.collageSectionTitle}>앨범</Text>
+              <Text style={styles.collageSectionTitle}>{t('memories.album.title')}</Text>
               <Pressable style={styles.albumIconButton} onPress={openAlbumModal}>
                 <BookHeart color={COLORS.white} size={20} strokeWidth={1.5} />
               </Pressable>
             </View>
-            <Text style={styles.collageSectionSubtitle}>기억에 남는 순간을 앨범으로 만들어보세요</Text>
+            <Text style={styles.collageSectionSubtitle}>{t('memories.album.subtitle')}</Text>
 
             {/* Created Albums List */}
             {albums.length > 0 && (
@@ -1299,10 +1298,12 @@ export default function MemoriesScreen() {
               <View style={styles.monthModalHeader}>
                 <View>
                   <Text style={styles.monthModalTitle}>
-                    {selectedMonth?.year}년 {selectedMonth?.monthName}
+                    {i18n.language === 'ko'
+                      ? `${selectedMonth?.year}년 ${selectedMonth?.monthName}`
+                      : `${selectedMonth?.monthName} ${selectedMonth?.year}`}
                   </Text>
                   <Text style={styles.monthModalCount}>
-                    {selectedMonth?.missions.length}개의 항목
+                    {t('memories.itemCount', { count: selectedMonth?.missions.length })}
                   </Text>
                 </View>
                 {/* Close Button */}
@@ -1415,7 +1416,7 @@ export default function MemoriesScreen() {
                 {/* Header */}
                 <View style={styles.albumModalHeader}>
                   <Text style={styles.albumModalTitle}>
-                    {albumStep === 'fontStyle' ? '폰트 스타일' : albumStep === 'name' ? '앨범 이름' : '대표 사진'}
+                    {albumStep === 'fontStyle' ? t('memories.album.fontStyle') : albumStep === 'name' ? t('memories.album.name') : t('memories.album.coverPhoto')}
                   </Text>
                   <Pressable
                     style={styles.albumModalCloseButton}
@@ -1431,7 +1432,7 @@ export default function MemoriesScreen() {
                     <>
                       {/* Step 0: Font Style Selection */}
                       <Text style={styles.albumModalSubtitle}>
-                        앨범 제목에 사용할 폰트 스타일을 선택하세요
+                        {t('memories.album.fontStyleDesc')}
                       </Text>
 
                       <View style={styles.fontStyleOptions}>
@@ -1443,8 +1444,8 @@ export default function MemoriesScreen() {
                           ]}
                           onPress={() => setFontStyle('basic')}
                         >
-                          <Text style={styles.fontStylePreviewBasic}>기본폰트</Text>
-                          <Text style={styles.fontStyleLabel}>깔끔한 스타일</Text>
+                          <Text style={styles.fontStylePreviewBasic}>{t('memories.album.basicFont')}</Text>
+                          <Text style={styles.fontStyleLabel}>{t('memories.album.basicFontDesc')}</Text>
                         </Pressable>
 
                         {/* Ransom Font Option */}
@@ -1471,7 +1472,7 @@ export default function MemoriesScreen() {
                               enableYOffset={true}
                             />
                           </View>
-                          <Text style={styles.fontStyleLabel}>랜섬노트 스타일</Text>
+                          <Text style={styles.fontStyleLabel}>{t('memories.album.ransomStyle')}</Text>
                         </Pressable>
                       </View>
 
@@ -1484,14 +1485,14 @@ export default function MemoriesScreen() {
                         onPress={() => transitionToNextStep('name')}
                         disabled={!fontStyle}
                       >
-                        <Text style={styles.albumModalButtonText}>다음</Text>
+                        <Text style={styles.albumModalButtonText}>{t('common.next')}</Text>
                       </Pressable>
                     </>
                   ) : albumStep === 'name' ? (
                     <>
                       {/* Step 1: Album Name Input */}
                       <Text style={styles.albumModalSubtitle}>
-                        {fontStyle === 'basic' ? '깔끔한 폰트가 적용됩니다' : '입력하는 글자마다 특별한 스타일이 적용됩니다'}
+                        {fontStyle === 'basic' ? t('memories.album.basicFontHint') : t('memories.album.ransomFontHint')}
                       </Text>
 
                       {/* Text Preview - Basic or Ransom Style */}
@@ -1512,7 +1513,7 @@ export default function MemoriesScreen() {
                             />
                           )
                         ) : (
-                          <Text style={[styles.ransomPlaceholder, fontStyle === 'basic' && { fontFamily: 'Jua_400Regular' }]}>앨범 이름</Text>
+                          <Text style={[styles.ransomPlaceholder, fontStyle === 'basic' && { fontFamily: 'Jua_400Regular' }]}>{t('memories.album.name')}</Text>
                         )}
                         {/* Refresh Button for Ransom Style */}
                         {fontStyle === 'ransom' && albumName.length > 0 && (
@@ -1530,7 +1531,7 @@ export default function MemoriesScreen() {
                         style={styles.albumNameInput}
                         value={albumName}
                         onChangeText={handleAlbumNameChange}
-                        placeholder={fontStyle === 'ransom' ? "영어만 입력 가능 (A-Z, 0-9)" : "앨범 이름 입력..."}
+                        placeholder={fontStyle === 'ransom' ? t('memories.album.ransomPlaceholder') : t('memories.album.namePlaceholder')}
                         placeholderTextColor="rgba(255,255,255,0.4)"
                         maxLength={20}
                         autoFocus
@@ -1542,7 +1543,7 @@ export default function MemoriesScreen() {
                           style={styles.albumModalButtonSecondary}
                           onPress={() => transitionToNextStep('fontStyle')}
                         >
-                          <Text style={styles.albumModalButtonSecondaryText}>이전</Text>
+                          <Text style={styles.albumModalButtonSecondaryText}>{t('common.back')}</Text>
                         </Pressable>
                         <Pressable
                           style={[
@@ -1552,7 +1553,7 @@ export default function MemoriesScreen() {
                           onPress={goToNextStep}
                           disabled={!albumName.trim()}
                         >
-                          <Text style={styles.albumModalButtonText}>다음</Text>
+                          <Text style={styles.albumModalButtonText}>{t('common.next')}</Text>
                         </Pressable>
                       </View>
                     </>
@@ -1560,7 +1561,7 @@ export default function MemoriesScreen() {
                     <>
                       {/* Step 2: Cover Photo Selection with Draggable Text */}
                       <Text style={styles.albumModalSubtitle}>
-                        사진을 선택하고 문구 위치를 드래그해서 조정하세요
+                        {t('memories.album.coverEditHint')}
                       </Text>
 
                       {/* Cover Photo Preview with Draggable Text */}
@@ -1590,7 +1591,7 @@ export default function MemoriesScreen() {
                             ) : (
                               <View style={styles.coverPhotoPlaceholder}>
                                 <Plus color="rgba(255,255,255,0.6)" size={40} />
-                                <Text style={styles.coverPhotoPlaceholderText}>사진 선택</Text>
+                                <Text style={styles.coverPhotoPlaceholderText}>{t('memories.album.selectPhoto')}</Text>
                               </View>
                             )}
                           </Pressable>
@@ -1636,7 +1637,7 @@ export default function MemoriesScreen() {
 
                       {/* Drag instruction */}
                       {albumCoverPhoto && (
-                        <Text style={styles.dragHintText}>문구를 드래그하여 위치를 조정하세요</Text>
+                        <Text style={styles.dragHintText}>{t('memories.album.dragHint')}</Text>
                       )}
 
                       {/* Text Style Selection - Different UI based on font style */}
@@ -1644,7 +1645,7 @@ export default function MemoriesScreen() {
                         <View style={styles.textStyleSelectionContainer}>
                           {/* Color Selection (Left) */}
                           <View style={styles.colorSelectionSection}>
-                            <Text style={styles.selectionLabel}>색상</Text>
+                            <Text style={styles.selectionLabel}>{t('memories.album.color')}</Text>
                             <View style={styles.colorButtonRow}>
                               <Pressable
                                 style={[
@@ -1667,7 +1668,7 @@ export default function MemoriesScreen() {
 
                           {/* Size Selection (Right) */}
                           <View style={styles.sizeSelectionSection}>
-                            <Text style={styles.selectionLabel}>크기</Text>
+                            <Text style={styles.selectionLabel}>{t('memories.album.size')}</Text>
                             <View style={styles.sizeButtonRow}>
                               {[1.5, 2.25, 3.0].map((scale, index) => (
                                 <Pressable
@@ -1693,7 +1694,7 @@ export default function MemoriesScreen() {
                       {/* Ransom Style - Size Only */}
                       {albumCoverPhoto && fontStyle === 'ransom' && (
                         <View style={styles.sizeSelectionContainer}>
-                          <Text style={styles.sizeSelectionLabel}>문구 크기</Text>
+                          <Text style={styles.sizeSelectionLabel}>{t('memories.album.textSize')}</Text>
                           <View style={styles.sizeButtonRow}>
                             {[1.0, 1.5, 2.0].map((scale, index) => (
                               <Pressable
@@ -1721,7 +1722,7 @@ export default function MemoriesScreen() {
                           style={styles.albumModalButtonSecondary}
                           onPress={() => transitionToNextStep('name')}
                         >
-                          <Text style={styles.albumModalButtonSecondaryText}>이전</Text>
+                          <Text style={styles.albumModalButtonSecondaryText}>{t('common.back')}</Text>
                         </Pressable>
                         <Pressable
                           style={[
@@ -1734,7 +1735,7 @@ export default function MemoriesScreen() {
                           <Text style={[
                             styles.albumModalButtonText,
                             !albumCoverPhoto && styles.albumModalButtonTextDisabled
-                          ]}>완료</Text>
+                          ]}>{t('common.done')}</Text>
                         </Pressable>
                       </View>
                     </>
@@ -1759,7 +1760,7 @@ export default function MemoriesScreen() {
                   ]}
                 >
                   <View style={styles.monthModalHeader}>
-                    <Text style={styles.monthModalTitle}>사진 선택</Text>
+                    <Text style={styles.monthModalTitle}>{t('memories.album.selectPhoto')}</Text>
                     <Pressable
                       style={styles.monthModalCloseButton}
                       onPress={closeCoverPhotoPicker}
@@ -1770,7 +1771,7 @@ export default function MemoriesScreen() {
                   <ScrollView contentContainerStyle={styles.monthModalGrid}>
                     {completedMemories.length === 0 ? (
                       <View style={styles.missionPickerEmpty}>
-                        <Text style={styles.missionPickerEmptyText}>완료된 미션이 없습니다</Text>
+                        <Text style={styles.missionPickerEmptyText}>{t('memories.empty')}</Text>
                       </View>
                     ) : (
                       completedMemories.map((mission) => (
@@ -1840,7 +1841,7 @@ export default function MemoriesScreen() {
                   adjustsFontSizeToFit
                   minimumFontScale={0.6}
                 >
-                  {selectedAlbum?.name || '앨범'}
+                  {selectedAlbum?.name || t('memories.album.title')}
                 </Text>
                 <Pressable
                   style={styles.albumDetailMenuButton}
@@ -1860,7 +1861,7 @@ export default function MemoriesScreen() {
                       }}
                     >
                       <Plus color="#FFFFFF" size={18} />
-                      <Text style={styles.albumMenuItemText}>사진 추가</Text>
+                      <Text style={styles.albumMenuItemText}>{t('memories.album.addPhoto')}</Text>
                     </Pressable>
                     <Pressable
                       style={styles.albumMenuItem}
@@ -1880,19 +1881,19 @@ export default function MemoriesScreen() {
                       }}
                     >
                       <Edit2 color="#FFFFFF" size={18} />
-                      <Text style={styles.albumMenuItemText}>표지 편집</Text>
+                      <Text style={styles.albumMenuItemText}>{t('memories.album.editCover')}</Text>
                     </Pressable>
                     <Pressable
                       style={[styles.albumMenuItem, styles.albumMenuItemDanger]}
                       onPress={() => {
                         setShowAlbumMenu(false);
                         Alert.alert(
-                          '앨범 삭제',
-                          '이 앨범을 삭제하시겠습니까?',
+                          t('memories.album.deleteAlbum'),
+                          t('memories.album.deleteAlbumConfirm'),
                           [
-                            { text: '취소', style: 'cancel' },
+                            { text: t('common.cancel'), style: 'cancel' },
                             {
-                              text: '삭제',
+                              text: t('common.delete'),
                               style: 'destructive',
                               onPress: async () => {
                                 if (selectedAlbum) {
@@ -1938,7 +1939,7 @@ export default function MemoriesScreen() {
                       }}
                     >
                       <Trash2 color="#FF6B6B" size={18} />
-                      <Text style={[styles.albumMenuItemText, { color: '#FF6B6B' }]}>앨범 삭제</Text>
+                      <Text style={[styles.albumMenuItemText, { color: '#FF6B6B' }]}>{t('memories.album.deleteAlbum')}</Text>
                     </Pressable>
                   </View>
                 )}
@@ -2001,7 +2002,7 @@ export default function MemoriesScreen() {
                 <View style={styles.albumPhotosSectionHeaderSticky}>
                   <View style={styles.albumPhotosSectionHeaderInner}>
                     <Text style={styles.albumPhotosSectionTitle}>
-                      {selectedAlbum ? `${(albumPhotos[selectedAlbum.id] || []).length}개의 항목` : '0개의 항목'}
+                      {selectedAlbum ? t('memories.itemCount', { count: (albumPhotos[selectedAlbum.id] || []).length }) : t('memories.itemCount', { count: 0 })}
                     </Text>
                     {/* Select/Delete/Cancel Buttons */}
                     {selectedAlbum && (albumPhotos[selectedAlbum.id] || []).length > 0 && (
@@ -2015,7 +2016,7 @@ export default function MemoriesScreen() {
                                 setSelectedAlbumPhotoIndices(new Set());
                               }}
                             >
-                              <Text style={styles.albumPhotoCancelButtonText}>취소</Text>
+                              <Text style={styles.albumPhotoCancelButtonText}>{t('common.cancel')}</Text>
                             </Pressable>
                             <Pressable
                               style={[
@@ -2026,12 +2027,12 @@ export default function MemoriesScreen() {
                               onPress={() => {
                                 if (selectedAlbumPhotoIndices.size > 0) {
                                   Alert.alert(
-                                    '사진 삭제',
-                                    `${selectedAlbumPhotoIndices.size}개의 사진을 삭제하시겠습니까?`,
+                                    t('memories.photo.deleteTitle'),
+                                    t('memories.photo.deleteConfirm', { count: selectedAlbumPhotoIndices.size }),
                                     [
-                                      { text: '취소', style: 'cancel' },
+                                      { text: t('common.cancel'), style: 'cancel' },
                                       {
-                                        text: '삭제',
+                                        text: t('common.delete'),
                                         style: 'destructive',
                                         onPress: async () => {
                                           if (selectedAlbum) {
@@ -2103,7 +2104,7 @@ export default function MemoriesScreen() {
                               <Text style={[
                                 styles.albumPhotoDeleteButtonText,
                                 selectedAlbumPhotoIndices.size === 0 && styles.albumPhotoDeleteButtonTextDisabled
-                              ]}>삭제</Text>
+                              ]}>{t('common.delete')}</Text>
                             </Pressable>
                           </>
                         ) : (
@@ -2111,7 +2112,7 @@ export default function MemoriesScreen() {
                             style={styles.albumPhotoSelectButton}
                             onPress={() => setIsSelectingAlbumPhotos(true)}
                           >
-                            <Text style={styles.albumPhotoSelectButtonText}>선택</Text>
+                            <Text style={styles.albumPhotoSelectButtonText}>{t('memories.photo.select')}</Text>
                           </Pressable>
                         )}
                       </View>
@@ -2128,7 +2129,7 @@ export default function MemoriesScreen() {
                       onPress={() => setShowMissionPhotosPicker(true)}
                     >
                       <Plus color="#FFFFFF" size={32} />
-                      <Text style={styles.emptyAddPhotoButtonText}>사진 추가</Text>
+                      <Text style={styles.emptyAddPhotoButtonText}>{t('memories.album.addPhoto')}</Text>
                     </Pressable>
                   )}
 
@@ -2275,9 +2276,9 @@ export default function MemoriesScreen() {
                     style={styles.missionPickerHeaderButton}
                     onPress={closeMissionPicker}
                   >
-                    <Text style={styles.missionPickerHeaderButtonText}>닫기</Text>
+                    <Text style={styles.missionPickerHeaderButtonText}>{t('common.close')}</Text>
                   </Pressable>
-                  <Text style={styles.missionPickerTitle}>사진 선택</Text>
+                  <Text style={styles.missionPickerTitle}>{t('memories.album.selectPhoto')}</Text>
                   <Pressable
                     style={styles.missionPickerHeaderButton}
                     onPress={async () => {
@@ -2315,14 +2316,14 @@ export default function MemoriesScreen() {
                       styles.missionPickerDoneButton,
                       selectedMissionPhotos.size === 0 && styles.missionPickerDoneButtonDisabled
                     ]}>
-                      추가
+                      {t('common.add')}
                     </Text>
                   </Pressable>
                 </View>
                 <ScrollView contentContainerStyle={styles.monthModalGrid}>
                   {completedMemories.length === 0 ? (
                     <View style={styles.missionPickerEmpty}>
-                      <Text style={styles.missionPickerEmptyText}>완료된 미션이 없습니다</Text>
+                      <Text style={styles.missionPickerEmptyText}>{t('memories.empty')}</Text>
                     </View>
                   ) : (
                     completedMemories.map((mission) => {
@@ -2396,7 +2397,7 @@ export default function MemoriesScreen() {
                     {/* Header */}
                     <View style={styles.albumModalHeader}>
                       <Text style={styles.albumModalTitle}>
-                        {editAlbumStep === 'fontStyle' ? '폰트 스타일' : editAlbumStep === 'name' ? '앨범 이름' : '대표 사진'}
+                        {editAlbumStep === 'fontStyle' ? t('memories.album.fontStyle') : editAlbumStep === 'name' ? t('memories.album.name') : t('memories.album.coverPhoto')}
                       </Text>
                       <Pressable
                         style={styles.albumModalCloseButton}
@@ -2411,7 +2412,7 @@ export default function MemoriesScreen() {
                       <>
                         {/* Step 0: Font Style Selection */}
                         <Text style={styles.albumModalSubtitle}>
-                          앨범 제목에 사용할 폰트 스타일을 선택하세요
+                          {t('memories.album.fontStyleDesc')}
                         </Text>
 
                         <View style={styles.fontStyleOptions}>
@@ -2423,8 +2424,8 @@ export default function MemoriesScreen() {
                             ]}
                             onPress={() => setEditFontStyle('basic')}
                           >
-                            <Text style={styles.fontStylePreviewBasic}>기본폰트</Text>
-                            <Text style={styles.fontStyleLabel}>깔끔한 스타일</Text>
+                            <Text style={styles.fontStylePreviewBasic}>{t('memories.album.basicFont')}</Text>
+                            <Text style={styles.fontStyleLabel}>{t('memories.album.basicFontDesc')}</Text>
                           </Pressable>
 
                           {/* Ransom Font Option */}
@@ -2455,7 +2456,7 @@ export default function MemoriesScreen() {
                                 <Text style={[styles.ransomMiniText, { fontFamily: 'RockSalt_400Regular' }]}>T</Text>
                               </View>
                             </View>
-                            <Text style={styles.fontStyleLabel}>랜섬노트 스타일</Text>
+                            <Text style={styles.fontStyleLabel}>{t('memories.album.ransomStyle')}</Text>
                           </Pressable>
                         </View>
 
@@ -2468,14 +2469,14 @@ export default function MemoriesScreen() {
                           onPress={() => setEditAlbumStep('name')}
                           disabled={!editFontStyle}
                         >
-                          <Text style={styles.albumModalButtonText}>다음</Text>
+                          <Text style={styles.albumModalButtonText}>{t('common.next')}</Text>
                         </Pressable>
                       </>
                     ) : editAlbumStep === 'name' ? (
                       <>
                         {/* Step 1: Album Name Input */}
                         <Text style={styles.albumModalSubtitle}>
-                          {editFontStyle === 'basic' ? '깔끔한 폰트가 적용됩니다' : '입력하는 글자마다 특별한 스타일이 적용됩니다'}
+                          {editFontStyle === 'basic' ? t('memories.album.basicFontHint') : t('memories.album.ransomFontHint')}
                         </Text>
 
                         {/* Text Preview - Basic or Ransom Style */}
@@ -2494,7 +2495,7 @@ export default function MemoriesScreen() {
                               />
                             )
                           ) : (
-                            <Text style={[styles.ransomPlaceholder, editFontStyle === 'basic' && { fontFamily: 'Jua_400Regular' }]}>앨범 이름</Text>
+                            <Text style={[styles.ransomPlaceholder, editFontStyle === 'basic' && { fontFamily: 'Jua_400Regular' }]}>{t('memories.album.name')}</Text>
                           )}
                           {/* Refresh Button for Ransom Style */}
                           {editFontStyle === 'ransom' && editAlbumName.length > 0 && (
@@ -2512,7 +2513,7 @@ export default function MemoriesScreen() {
                           style={styles.albumNameInput}
                           value={editAlbumName}
                           onChangeText={handleEditAlbumNameChange}
-                          placeholder={editFontStyle === 'ransom' ? "영어만 입력 가능 (A-Z, 0-9)" : "앨범 이름 입력..."}
+                          placeholder={editFontStyle === 'ransom' ? t('memories.album.ransomPlaceholder') : t('memories.album.namePlaceholder')}
                           placeholderTextColor="rgba(255,255,255,0.4)"
                           maxLength={20}
                           autoFocus
@@ -2524,7 +2525,7 @@ export default function MemoriesScreen() {
                             style={styles.albumModalButtonSecondary}
                             onPress={() => setEditAlbumStep('fontStyle')}
                           >
-                            <Text style={styles.albumModalButtonSecondaryText}>이전</Text>
+                            <Text style={styles.albumModalButtonSecondaryText}>{t('common.back')}</Text>
                           </Pressable>
                           <Pressable
                             style={[
@@ -2534,7 +2535,7 @@ export default function MemoriesScreen() {
                             onPress={() => setEditAlbumStep('cover')}
                             disabled={!editAlbumName.trim()}
                           >
-                            <Text style={styles.albumModalButtonText}>다음</Text>
+                            <Text style={styles.albumModalButtonText}>{t('common.next')}</Text>
                           </Pressable>
                         </View>
                       </>
@@ -2542,7 +2543,7 @@ export default function MemoriesScreen() {
                       <>
                         {/* Step 2: Cover Photo Selection with Draggable Text */}
                         <Text style={styles.albumModalSubtitle}>
-                          사진을 선택하고 문구 위치를 드래그해서 조정하세요
+                          {t('memories.album.coverEditHint')}
                         </Text>
 
                         {/* Cover Photo Preview with Draggable Text */}
@@ -2572,7 +2573,7 @@ export default function MemoriesScreen() {
                               ) : (
                                 <View style={styles.coverPhotoPlaceholder}>
                                   <Plus color="rgba(255,255,255,0.6)" size={40} />
-                                  <Text style={styles.coverPhotoPlaceholderText}>사진 선택</Text>
+                                  <Text style={styles.coverPhotoPlaceholderText}>{t('memories.album.selectPhoto')}</Text>
                                 </View>
                               )}
                             </Pressable>
@@ -2616,7 +2617,7 @@ export default function MemoriesScreen() {
 
                         {/* Drag instruction */}
                         {editCoverPhoto && (
-                          <Text style={styles.dragHintText}>문구를 드래그하여 위치를 조정하세요</Text>
+                          <Text style={styles.dragHintText}>{t('memories.album.dragHint')}</Text>
                         )}
 
                         {/* Text Style Selection - Different UI based on font style */}
@@ -2624,7 +2625,7 @@ export default function MemoriesScreen() {
                           <View style={styles.textStyleSelectionContainer}>
                             {/* Color Selection (Left) */}
                             <View style={styles.colorSelectionSection}>
-                              <Text style={styles.selectionLabel}>색상</Text>
+                              <Text style={styles.selectionLabel}>{t('memories.album.color')}</Text>
                               <View style={styles.colorButtonRow}>
                                 <Pressable
                                   style={[
@@ -2647,7 +2648,7 @@ export default function MemoriesScreen() {
 
                             {/* Size Selection (Right) */}
                             <View style={styles.sizeSelectionSection}>
-                              <Text style={styles.selectionLabel}>크기</Text>
+                              <Text style={styles.selectionLabel}>{t('memories.album.size')}</Text>
                               <View style={styles.sizeButtonRow}>
                                 {[1.5, 2.25, 3.0].map((scale, index) => (
                                   <Pressable
@@ -2673,7 +2674,7 @@ export default function MemoriesScreen() {
                         {/* Ransom Style - Size Only */}
                         {editCoverPhoto && editFontStyle === 'ransom' && (
                           <View style={styles.sizeSelectionContainer}>
-                            <Text style={styles.sizeSelectionLabel}>문구 크기</Text>
+                            <Text style={styles.sizeSelectionLabel}>{t('memories.album.textSize')}</Text>
                             <View style={styles.sizeButtonRow}>
                               {[1.0, 1.5, 2.0].map((scale, index) => (
                                 <Pressable
@@ -2701,7 +2702,7 @@ export default function MemoriesScreen() {
                             style={styles.albumModalButtonSecondary}
                             onPress={() => setEditAlbumStep('name')}
                           >
-                            <Text style={styles.albumModalButtonSecondaryText}>이전</Text>
+                            <Text style={styles.albumModalButtonSecondaryText}>{t('common.back')}</Text>
                           </Pressable>
                           <Pressable
                             style={[
@@ -2714,7 +2715,7 @@ export default function MemoriesScreen() {
                             <Text style={[
                               styles.albumModalButtonText,
                               !editCoverPhoto && styles.albumModalButtonTextDisabled
-                            ]}>완료</Text>
+                            ]}>{t('common.done')}</Text>
                           </Pressable>
                         </View>
                       </>
@@ -2767,11 +2768,11 @@ function FlipCardItem({
   // This ensures consistent display order regardless of who's viewing
   const isCurrentUserCoupleUser1 = user?.id === couple?.user1Id;
   const user1Nickname = isCurrentUserCoupleUser1
-    ? (user?.nickname || onboardingData.nickname || '나')
-    : (partner?.nickname || '상대방');
+    ? (user?.nickname || onboardingData.nickname || t('common.me'))
+    : (partner?.nickname || t('common.partner'));
   const user2Nickname = isCurrentUserCoupleUser1
-    ? (partner?.nickname || '상대방')
-    : (user?.nickname || onboardingData.nickname || '나');
+    ? (partner?.nickname || t('common.partner'))
+    : (user?.nickname || onboardingData.nickname || t('common.me'));
 
   // Handle flip
   const handleFlip = () => {
@@ -2827,7 +2828,7 @@ function FlipCardItem({
             <View style={styles.flipCardBackContent}>
               <View style={styles.flipCardBackTop}>
                 <Text style={styles.flipCardTitle} allowFontScaling={false}>
-                  {mission.mission?.title || '함께한 순간'}
+                  {mission.mission?.title || t('memories.togetherMoment')}
                 </Text>
                 <View style={styles.flipCardInfoSection}>
                   <View style={styles.flipCardInfoRow}>
@@ -3078,7 +3079,7 @@ function PhotoDetailView({
       // Request permission
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('권한 필요', '사진을 저장하려면 갤러리 접근 권한이 필요합니다.');
+        Alert.alert(t('memories.permission.required'), t('memories.permission.saveAccess'));
         return;
       }
 
@@ -3091,13 +3092,13 @@ function PhotoDetailView({
 
       // Save to media library
       await MediaLibrary.saveToLibraryAsync(downloadedFile.uri);
-      Alert.alert('저장 완료', '사진이 갤러리에 저장되었습니다.');
+      Alert.alert(t('memories.permission.saveSuccess'), t('memories.permission.saveSuccessMessage'));
 
       // Clean up temp file
       await downloadedFile.delete();
     } catch (error) {
       console.log('Download error:', error);
-      Alert.alert('저장 실패', '사진을 저장하는 중 오류가 발생했습니다.');
+      Alert.alert(t('memories.permission.saveFailed'), t('memories.permission.saveFailedMessage'));
     }
   }, [currentIndex, localMissions]);
 
@@ -3190,7 +3191,7 @@ function PhotoDetailView({
               }}
             >
               <Download color={COLORS.white} size={18} />
-              <Text style={styles.photoDetailMenuItemText}>사진 저장</Text>
+              <Text style={styles.photoDetailMenuItemText}>{t('memories.photo.save')}</Text>
             </Pressable>
             <Pressable
               style={[styles.photoDetailMenuItem, styles.photoDetailMenuItemDanger]}
@@ -3198,12 +3199,12 @@ function PhotoDetailView({
                 setShowPhotoDetailMenu(false);
                 const currentMission = localMissions[currentIndex];
                 Alert.alert(
-                  '사진 삭제',
-                  '이 사진을 삭제하시겠습니까?',
+                  t('memories.photo.deleteTitle'),
+                  t('memories.photo.deleteSingleConfirm'),
                   [
-                    { text: '취소', style: 'cancel' },
+                    { text: t('common.cancel'), style: 'cancel' },
                     {
-                      text: '삭제',
+                      text: t('common.delete'),
                       style: 'destructive',
                       onPress: async () => {
                         // Calculate remaining photos after deletion
@@ -3245,7 +3246,7 @@ function PhotoDetailView({
               }}
             >
               <Trash2 color="#FF6B6B" size={18} />
-              <Text style={[styles.photoDetailMenuItemText, { color: '#FF6B6B' }]}>사진 삭제</Text>
+              <Text style={[styles.photoDetailMenuItemText, { color: '#FF6B6B' }]}>{t('memories.photo.delete')}</Text>
             </Pressable>
           </BlurView>
         </Pressable>
@@ -3257,7 +3258,7 @@ function PhotoDetailView({
         <View style={styles.flipInstructionContainer}>
           <View style={styles.flipInstructionBadge}>
             <Text style={styles.flipInstructionText}>
-              {isFlipped ? '탭하여 사진 보기' : '탭하여 뒷면 확인'}
+              {isFlipped ? t('memories.photo.tapToView') : t('memories.photo.tapToFlip')}
             </Text>
           </View>
         </View>

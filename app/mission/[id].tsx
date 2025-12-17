@@ -29,6 +29,7 @@ import {
   X,
 } from 'lucide-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '@/constants/design';
 import { useMissionStore } from '@/stores/missionStore';
@@ -43,6 +44,7 @@ const { width, height } = Dimensions.get('window');
 export default function MissionDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { t } = useTranslation();
 
   const [photoTaken, setPhotoTaken] = useState(false);
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
@@ -106,8 +108,8 @@ export default function MissionDetailScreen() {
     keptMissions.find((m) => m.id === id) ||
     {
       id: id || 'unknown',
-      title: '미션을 찾을 수 없습니다',
-      description: '이 미션은 더 이상 사용할 수 없습니다.',
+      title: t('missionDetail.notFound.title'),
+      description: t('missionDetail.notFound.description'),
       category: 'home' as const,
       tags: [],
       imageUrl: '',
@@ -216,8 +218,8 @@ export default function MissionDetailScreen() {
       } else {
         // Mission is completed but no memory found - show as completed anyway
         setPhotoTaken(true);
-        setUser1Message('완료됨');
-        setUser2Message('완료됨');
+        setUser1Message(t('missionDetail.completed'));
+        setUser2Message(t('missionDetail.completed'));
       }
       return;
     }
@@ -272,9 +274,9 @@ export default function MissionDetailScreen() {
       const result = await requestPermission();
       if (!result.granted) {
         Alert.alert(
-          '카메라 권한 필요',
-          '사진을 촬영하려면 카메라 권한이 필요합니다.',
-          [{ text: '확인' }]
+          t('missionDetail.camera.permissionRequired'),
+          t('missionDetail.camera.permissionMessage'),
+          [{ text: t('common.confirm') }]
         );
         return;
       }
@@ -398,7 +400,7 @@ export default function MissionDetailScreen() {
         }
       } catch (error) {
         console.error('Failed to take picture:', error);
-        Alert.alert('오류', '사진 촬영에 실패했습니다. 다시 시도해주세요.');
+        Alert.alert(t('common.error'), t('missionDetail.camera.photoError'));
       } finally {
         setIsCapturing(false);
       }
@@ -414,7 +416,7 @@ export default function MissionDetailScreen() {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         console.log('Location permission denied');
-        return '위치 정보 없음';
+        return t('missionDetail.location.noInfo');
       }
 
       // Get current position
@@ -461,10 +463,10 @@ export default function MissionDetailScreen() {
         }
       }
 
-      return '위치 정보 없음';
+      return t('missionDetail.location.noInfo');
     } catch (error) {
       console.error('Error getting location:', error);
-      return '위치 정보 없음';
+      return t('missionDetail.location.noInfo');
     } finally {
       setIsLoadingLocation(false);
     }
@@ -502,14 +504,14 @@ export default function MissionDetailScreen() {
                 // Upload photo to the progress
                 await uploadMissionPhoto(uploadedPhotoUrl, progress.id);
                 // Update location
-                if (locationName && locationName !== '위치 정보 없음') {
+                if (locationName && locationName !== t('missionDetail.location.noInfo')) {
                   await updateMissionLocation(locationName, progress.id);
                 }
               }
             } else {
               // Same mission already started (maybe by partner), just upload photo
               await uploadMissionPhoto(uploadedPhotoUrl, thisMissionProgress.id);
-              if (locationName && locationName !== '위치 정보 없음') {
+              if (locationName && locationName !== t('missionDetail.location.noInfo')) {
                 await updateMissionLocation(locationName, thisMissionProgress.id);
               }
             }
@@ -571,7 +573,7 @@ export default function MissionDetailScreen() {
         // Demo mode fallback: simulate partner message after delay
         // This allows solo testing without a real partner
         setTimeout(() => {
-          const partnerMessage = '너와 함께여서 행복해 💕';
+          const partnerMessage = t('missionDetail.defaultPartnerMessage');
           setUser2Message(partnerMessage);
           saveInProgressMission({
             missionId: mission.id,
@@ -597,7 +599,7 @@ export default function MissionDetailScreen() {
       memorySavedRef.current = true;
 
       // Use actual location if available
-      const finalLocation = currentLocation || '위치 정보 없음';
+      const finalLocation = currentLocation || t('missionDetail.location.noInfo');
 
       // Determine message order based on couple relationship
       // Always save in couple order: user1_message = couple.user1's message, user2_message = couple.user2's message
@@ -690,7 +692,7 @@ export default function MissionDetailScreen() {
         memorySavedRef.current = true;
 
         const autoSave = async () => {
-          const finalLocation = currentLocation || '위치 정보 없음';
+          const finalLocation = currentLocation || t('missionDetail.location.noInfo');
           const isCurrentUserCoupleUser1 = user?.id === couple?.user1Id;
           const messageForCoupleUser1 = isCurrentUserCoupleUser1 ? user1Message : user2Message;
           const messageForCoupleUser2 = isCurrentUserCoupleUser1 ? user2Message : user1Message;
@@ -813,7 +815,7 @@ export default function MissionDetailScreen() {
             >
               <ChevronLeft color={COLORS.white} size={24} />
             </Pressable>
-            <Text style={styles.cameraTitle}>사진 확인</Text>
+            <Text style={styles.cameraTitle}>{t('missionDetail.camera.confirmTitle')}</Text>
             <View style={styles.headerSpacer} />
           </View>
 
@@ -836,7 +838,7 @@ export default function MissionDetailScreen() {
 
           {/* Confirm Button */}
           <Pressable onPress={handleConfirmPhoto} style={styles.floatingConfirmButton}>
-            <Text style={styles.confirmButtonText}>사용하기</Text>
+            <Text style={styles.confirmButtonText}>{t('missionDetail.camera.usePhoto')}</Text>
           </Pressable>
         </View>
       );
@@ -896,7 +898,7 @@ export default function MissionDetailScreen() {
           >
             <X color={COLORS.white} size={24} />
           </Pressable>
-          <Text style={styles.cameraTitle}>사진 촬영</Text>
+          <Text style={styles.cameraTitle}>{t('missionDetail.camera.title')}</Text>
           <Pressable
             onPress={toggleCameraFacing}
             style={styles.cameraBackButton}
@@ -952,7 +954,7 @@ export default function MissionDetailScreen() {
           <Pressable onPress={() => router.back()} style={styles.backButton}>
             <ChevronLeft color={COLORS.white} size={20} />
           </Pressable>
-          <Text style={styles.headerTitle}>미션 상세</Text>
+          <Text style={styles.headerTitle}>{t('missionDetail.headerTitle')}</Text>
           <View style={styles.headerSpacer} />
         </View>
         <View style={styles.headerLine} />
@@ -1011,14 +1013,14 @@ export default function MissionDetailScreen() {
                 <View style={styles.stepContent}>
                   <View style={styles.stepTitleRow}>
                     <Camera color={COLORS.white} size={20} />
-                    <Text style={styles.stepTitle}>사진 촬영하기</Text>
-                    {photoTaken && <Text style={styles.stepComplete}>완료</Text>}
+                    <Text style={styles.stepTitle}>{t('missionDetail.steps.photo.title')}</Text>
+                    {photoTaken && <Text style={styles.stepComplete}>{t('missionDetail.steps.complete')}</Text>}
                   </View>
                   <Text style={styles.stepDescription}>
-                    두 분의 특별한 순간을 사진으로 담아주세요.
+                    {t('missionDetail.steps.photo.description')}
                   </Text>
                   <Text style={styles.stepDescription}>
-                    지금 이 순간의 설렘과 행복을 사진에 담아{'\n'}추억으로 만들어보세요.
+                    {t('missionDetail.steps.photo.hint')}
                   </Text>
                   {capturedPhoto && (
                     <View style={styles.photoPreviewContainer}>
@@ -1036,7 +1038,7 @@ export default function MissionDetailScreen() {
                           style={styles.detailRetakeButton}
                         >
                           <Camera color={COLORS.white} size={16} />
-                          <Text style={styles.detailRetakeButtonText}>다시 찍기</Text>
+                          <Text style={styles.detailRetakeButtonText}>{t('missionDetail.camera.retake')}</Text>
                         </Pressable>
                       )}
                     </View>
@@ -1063,13 +1065,13 @@ export default function MissionDetailScreen() {
                 <View style={styles.stepContent}>
                   <View style={styles.stepTitleRow}>
                     <Edit3 color={COLORS.white} size={20} />
-                    <Text style={styles.stepTitle}>서로에게 한마디 작성하기</Text>
+                    <Text style={styles.stepTitle}>{t('missionDetail.steps.message.title')}</Text>
                     {user1Message && user2Message && (
-                      <Text style={styles.stepComplete}>완료</Text>
+                      <Text style={styles.stepComplete}>{t('missionDetail.steps.complete')}</Text>
                     )}
                   </View>
                   <Text style={styles.stepDescription}>
-                    이 순간 상대방에게 전하고 싶은 마음을 글로 남겨보세요. 진심이 담긴 메시지가 더 특별한 추억을{'\n'}만듭니다.
+                    {t('missionDetail.steps.message.description')}
                   </Text>
 
                   {/* User Status Cards */}
@@ -1087,14 +1089,14 @@ export default function MissionDetailScreen() {
                         />
                       </View>
                       <View style={styles.userInfo}>
-                        <Text style={styles.userLabel}>나</Text>
+                        <Text style={styles.userLabel}>{t('common.me')}</Text>
                         <Text
                           style={[
                             styles.userStatusText,
                             user1Message && styles.userStatusComplete,
                           ]}
                         >
-                          {user1Message ? '작성 완료' : '미작성'}
+                          {user1Message ? t('missionDetail.steps.message.written') : t('missionDetail.steps.message.notWritten')}
                         </Text>
                       </View>
                     </View>
@@ -1111,14 +1113,14 @@ export default function MissionDetailScreen() {
                         />
                       </View>
                       <View style={styles.userInfo}>
-                        <Text style={styles.userLabel}>상대방</Text>
+                        <Text style={styles.userLabel}>{t('common.partner')}</Text>
                         <Text
                           style={[
                             styles.userStatusText,
                             user2Message && styles.userStatusComplete,
                           ]}
                         >
-                          {user2Message ? '작성 완료' : '미작성'}
+                          {user2Message ? t('missionDetail.steps.message.written') : t('missionDetail.steps.message.notWritten')}
                         </Text>
                       </View>
                     </View>
@@ -1154,7 +1156,7 @@ export default function MissionDetailScreen() {
             {isComplete ? (
               <View style={styles.ctaButtonCompleteContent}>
                 <Check color="#86efac" size={18} />
-                <Text style={styles.ctaButtonCompleteText}>미션 완료! 🎉</Text>
+                <Text style={styles.ctaButtonCompleteText}>{t('missionDetail.completeButton')}</Text>
               </View>
             ) : (
               <Text style={[
@@ -1162,14 +1164,14 @@ export default function MissionDetailScreen() {
                 (isWaitingForPartner || isWaitingForPhoto || isMissionLockedByAnother) && styles.ctaButtonTextDisabled,
               ]}>
                 {isMissionLockedByAnother
-                  ? '다른 미션 진행 중'
+                  ? t('missionDetail.status.anotherInProgress')
                   : isWaitingForPartner
-                    ? '상대방 대기 중...'
+                    ? t('missionDetail.status.waitingPartner')
                     : isWaitingForPhoto
-                      ? '사진 대기 중...'
+                      ? t('missionDetail.status.waitingPhoto')
                       : photoTaken
-                        ? '서로에게 한마디 작성'
-                        : '사진 촬영'}
+                        ? t('missionDetail.status.writeMessage')
+                        : t('missionDetail.status.takePhoto')}
               </Text>
             )}
           </Pressable>
@@ -1196,7 +1198,7 @@ export default function MissionDetailScreen() {
               <View style={styles.modalContent}>
                 {/* Modal Header */}
                 <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>서로에게 한마디</Text>
+                  <Text style={styles.modalTitle}>{t('missionDetail.modal.title')}</Text>
                   <Pressable
                     onPress={() => {
                       setShowMessageModal(false);
@@ -1211,7 +1213,7 @@ export default function MissionDetailScreen() {
                 <View style={styles.textInputContainer}>
                   <TextInput
                     style={styles.textInput}
-                    placeholder="상대방에게 전하고 싶은 말을 적어주세요"
+                    placeholder={t('missionDetail.modal.placeholder')}
                     placeholderTextColor="rgba(255,255,255,0.5)"
                     value={messageText}
                     onChangeText={setMessageText}
@@ -1227,7 +1229,7 @@ export default function MissionDetailScreen() {
                   onPress={handleAddMessage}
                   disabled={!messageText.trim()}
                 >
-                  <Text style={styles.submitButtonText}>완료</Text>
+                  <Text style={styles.submitButtonText}>{t('common.done')}</Text>
                 </Pressable>
               </View>
             </BlurView>

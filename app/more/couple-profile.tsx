@@ -22,6 +22,7 @@ import {
   Clock,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 import { COLORS, SPACING, RADIUS } from '@/constants/design';
 import { useOnboardingStore, useAuthStore } from '@/stores';
@@ -35,6 +36,7 @@ type ViewMode = 'main' | 'anniversary' | 'my-account' | 'partner-account';
 
 export default function CoupleProfileScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { data, updateData } = useOnboardingStore();
   const { user, partner, couple, updateAnniversary } = useAuthStore();
 
@@ -96,8 +98,8 @@ export default function CoupleProfileScreen() {
   };
 
   // Get the user's and partner's nicknames
-  const myNickname = data.nickname || user?.nickname || '나';
-  const partnerNickname = partner?.nickname || '파트너';
+  const myNickname = data.nickname || user?.nickname || t('profile.me');
+  const partnerNickname = partner?.nickname || t('profile.partner');
 
   const handleSaveAnniversary = async () => {
     updateData({
@@ -106,7 +108,7 @@ export default function CoupleProfileScreen() {
     });
 
     if (tempAnniversaryDate && couple) {
-      const typeLabel = tempRelationshipType === 'dating' ? '연애 시작일' : '결혼 기념일';
+      const typeLabel = tempRelationshipType === 'dating' ? t('profile.couple.editAnniversary.datingStart') : t('profile.couple.editAnniversary.marriedAnniversary');
       updateAnniversary(tempAnniversaryDate, typeLabel);
 
       // Update couple in authStore with new dates
@@ -135,27 +137,27 @@ export default function CoupleProfileScreen() {
   };
 
   const formatDate = (date: Date | string | null) => {
-    if (!date) return '설정되지 않음';
+    if (!date) return t('profile.notSet');
     const d = date instanceof Date ? date : new Date(date);
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
-    return `${year}년 ${month}월 ${day}일`;
+    return t('profile.dateFormat', { year, month, day });
   };
 
   const getRelationshipLabel = (type: RelationshipType) => {
     switch (type) {
-      case 'dating': return '연인';
-      case 'married': return '부부';
-      default: return '연인';
+      case 'dating': return t('profile.couple.datingType');
+      case 'married': return t('profile.couple.marriedType');
+      default: return t('profile.couple.datingType');
     }
   };
 
   const getDateLabel = (type: RelationshipType) => {
     switch (type) {
-      case 'dating': return '사귄 날';
-      case 'married': return '결혼기념일';
-      default: return '사귄 날';
+      case 'dating': return t('profile.couple.datingLabel');
+      case 'married': return t('profile.couple.marriedLabel');
+      default: return t('profile.couple.datingLabel');
     }
   };
 
@@ -166,7 +168,7 @@ export default function CoupleProfileScreen() {
       showsVerticalScrollIndicator={false}
     >
       {/* Anniversary Section */}
-      <Text style={styles.sectionTitle}>기념일</Text>
+      <Text style={styles.sectionTitle}>{t('profile.couple.anniversary')}</Text>
       <Pressable
         style={styles.menuItem}
         onPress={() => {
@@ -188,7 +190,7 @@ export default function CoupleProfileScreen() {
       </Pressable>
 
       {/* Account Info Section */}
-      <Text style={styles.sectionTitle}>계정 정보</Text>
+      <Text style={styles.sectionTitle}>{t('profile.couple.accountInfo')}</Text>
       <Pressable
         style={styles.menuItem}
         onPress={() => setViewMode('my-account')}
@@ -198,8 +200,8 @@ export default function CoupleProfileScreen() {
             <User color="#4caf50" size={20} />
           </View>
           <View style={styles.menuItemContent}>
-            <Text style={styles.menuItemLabel}>{myNickname} 계정 정보</Text>
-            <Text style={styles.menuItemValue}>내 계정</Text>
+            <Text style={styles.menuItemLabel}>{t('profile.couple.myAccountInfo', { nickname: myNickname })}</Text>
+            <Text style={styles.menuItemValue}>{t('profile.couple.myAccount')}</Text>
           </View>
         </View>
         <ChevronRight color="#999" size={20} />
@@ -214,8 +216,8 @@ export default function CoupleProfileScreen() {
             <User color="#e91e63" size={20} />
           </View>
           <View style={styles.menuItemContent}>
-            <Text style={styles.menuItemLabel}>{partnerNickname} 계정 정보</Text>
-            <Text style={styles.menuItemValue}>파트너 계정</Text>
+            <Text style={styles.menuItemLabel}>{t('profile.couple.myAccountInfo', { nickname: partnerNickname })}</Text>
+            <Text style={styles.menuItemValue}>{t('profile.couple.partnerAccount')}</Text>
           </View>
         </View>
         <ChevronRight color="#999" size={20} />
@@ -225,11 +227,11 @@ export default function CoupleProfileScreen() {
 
   const renderAnniversaryEdit = () => (
     <View style={styles.editContainer}>
-      <Text style={styles.editTitle}>기념일 변경</Text>
-      <Text style={styles.editDescription}>특별한 날을 수정해주세요</Text>
+      <Text style={styles.editTitle}>{t('profile.couple.editAnniversary.title')}</Text>
+      <Text style={styles.editDescription}>{t('profile.couple.editAnniversary.description')}</Text>
 
       {/* Relationship Type */}
-      <Text style={styles.fieldLabel}>관계 유형</Text>
+      <Text style={styles.fieldLabel}>{t('profile.couple.editAnniversary.relationshipLabel')}</Text>
       <View style={styles.relationshipRow}>
         {(['dating', 'married'] as RelationshipType[]).map((type) => (
           <Pressable
@@ -252,7 +254,7 @@ export default function CoupleProfileScreen() {
       >
         <Calendar color="#666" size={20} />
         <Text style={[styles.datePickerText, tempAnniversaryDate && styles.datePickerTextSelected]}>
-          {tempAnniversaryDate ? formatDate(tempAnniversaryDate) : '날짜를 선택해주세요'}
+          {tempAnniversaryDate ? formatDate(tempAnniversaryDate) : t('profile.couple.editAnniversary.selectDate')}
         </Text>
       </Pressable>
 
@@ -275,10 +277,10 @@ export default function CoupleProfileScreen() {
             >
               <View style={styles.datePickerHeader}>
                 <Pressable onPress={closeDatePicker}>
-                  <Text style={styles.datePickerCancel}>취소</Text>
+                  <Text style={styles.datePickerCancel}>{t('common.cancel')}</Text>
                 </Pressable>
                 <Pressable onPress={closeDatePicker}>
-                  <Text style={styles.datePickerConfirm}>확인</Text>
+                  <Text style={styles.datePickerConfirm}>{t('common.confirm')}</Text>
                 </Pressable>
               </View>
               <DateTimePicker
@@ -312,10 +314,10 @@ export default function CoupleProfileScreen() {
 
       <View style={[styles.buttonRow, { marginTop: 'auto' }]}>
         <Pressable style={styles.cancelButton} onPress={() => setViewMode('main')}>
-          <Text style={styles.cancelButtonText}>취소</Text>
+          <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
         </Pressable>
         <Pressable style={styles.saveButton} onPress={handleSaveAnniversary}>
-          <Text style={styles.saveButtonText}>저장</Text>
+          <Text style={styles.saveButtonText}>{t('common.save')}</Text>
         </Pressable>
       </View>
     </View>
@@ -323,7 +325,7 @@ export default function CoupleProfileScreen() {
 
   const renderAccountInfo = (isMe: boolean) => {
     const nickname = isMe ? myNickname : partnerNickname;
-    const email = isMe ? (user?.email || 'email@example.com') : (partner?.email || '연결된 파트너');
+    const email = isMe ? (user?.email || 'email@example.com') : (partner?.email || t('profile.couple.accountDetail.defaultPartnerEmail'));
     const createdAt = isMe ? user?.createdAt : partner?.createdAt;
 
     return (
@@ -342,7 +344,7 @@ export default function CoupleProfileScreen() {
           <Text style={styles.profileName}>{nickname}</Text>
           <View style={styles.relationshipBadge}>
             <Text style={styles.relationshipBadgeText}>
-              {isMe ? '나' : '파트너'}
+              {isMe ? t('profile.couple.accountDetail.me') : t('profile.couple.accountDetail.partner')}
             </Text>
           </View>
         </View>
@@ -352,7 +354,7 @@ export default function CoupleProfileScreen() {
           <View style={styles.infoItem}>
             <View style={styles.infoItemLeft}>
               <User color="#666" size={18} />
-              <Text style={styles.infoLabel}>닉네임</Text>
+              <Text style={styles.infoLabel}>{t('profile.couple.accountDetail.nickname')}</Text>
             </View>
             <Text style={styles.infoValue}>{nickname}</Text>
           </View>
@@ -362,7 +364,7 @@ export default function CoupleProfileScreen() {
           <View style={styles.infoItem}>
             <View style={styles.infoItemLeft}>
               <Mail color="#666" size={18} />
-              <Text style={styles.infoLabel}>이메일</Text>
+              <Text style={styles.infoLabel}>{t('profile.couple.accountDetail.email')}</Text>
             </View>
             <Text style={styles.infoValue}>{email}</Text>
           </View>
@@ -372,10 +374,10 @@ export default function CoupleProfileScreen() {
           <View style={styles.infoItem}>
             <View style={styles.infoItemLeft}>
               <Clock color="#666" size={18} />
-              <Text style={styles.infoLabel}>가입일</Text>
+              <Text style={styles.infoLabel}>{t('profile.couple.accountDetail.joinDate')}</Text>
             </View>
             <Text style={styles.infoValue}>
-              {createdAt ? formatDate(new Date(createdAt)) : '정보 없음'}
+              {createdAt ? formatDate(new Date(createdAt)) : t('profile.couple.accountDetail.noInfo')}
             </Text>
           </View>
         </View>
@@ -385,10 +387,10 @@ export default function CoupleProfileScreen() {
 
   const getHeaderTitle = () => {
     switch (viewMode) {
-      case 'anniversary': return '기념일 변경';
-      case 'my-account': return `${myNickname} 계정 정보`;
-      case 'partner-account': return `${partnerNickname} 계정 정보`;
-      default: return '커플 프로필';
+      case 'anniversary': return t('profile.couple.editAnniversary.title');
+      case 'my-account': return t('profile.couple.myAccountInfo', { nickname: myNickname });
+      case 'partner-account': return t('profile.couple.myAccountInfo', { nickname: partnerNickname });
+      default: return t('profile.couple.title');
     }
   };
 

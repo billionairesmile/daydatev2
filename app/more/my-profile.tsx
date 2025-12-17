@@ -22,6 +22,7 @@ import {
   Sliders,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 import { COLORS, SPACING, RADIUS } from '@/constants/design';
 import { useOnboardingStore, useAuthStore } from '@/stores';
@@ -44,6 +45,7 @@ type EditMode = 'nickname' | 'birthday' | 'preferences-view' | 'preferences-edit
 
 export default function MyProfileScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { data, updateData } = useOnboardingStore();
   const { user, updateNickname } = useAuthStore();
 
@@ -225,11 +227,11 @@ export default function MyProfileScreen() {
   };
 
   const formatDate = (date: Date | null) => {
-    if (!date) return '설정되지 않음';
+    if (!date) return t('profile.notSet');
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
-    return `${year}년 ${month}월 ${day}일`;
+    return t('profile.dateFormat', { year, month, day });
   };
 
   const renderMainContent = () => (
@@ -251,8 +253,8 @@ export default function MyProfileScreen() {
             <User color={COLORS.black} size={20} />
           </View>
           <View style={styles.menuItemContent}>
-            <Text style={styles.menuItemLabel}>닉네임</Text>
-            <Text style={styles.menuItemValue}>{data.nickname || '설정되지 않음'}</Text>
+            <Text style={styles.menuItemLabel}>{t('profile.nickname')}</Text>
+            <Text style={styles.menuItemValue}>{data.nickname || t('profile.notSet')}</Text>
           </View>
         </View>
         <ChevronRight color="#999" size={20} />
@@ -272,10 +274,10 @@ export default function MyProfileScreen() {
             <Calendar color={COLORS.black} size={20} />
           </View>
           <View style={styles.menuItemContent}>
-            <Text style={styles.menuItemLabel}>생년월일</Text>
+            <Text style={styles.menuItemLabel}>{t('profile.birthDate')}</Text>
             <Text style={styles.menuItemValue}>
               {formatDate(data.birthDate ? new Date(data.birthDate) : null)}
-              {data.birthDate && ` (${data.birthDateCalendarType === 'lunar' ? '음력' : '양력'})`}
+              {data.birthDate && ` (${data.birthDateCalendarType === 'lunar' ? t('profile.lunar') : t('profile.solar')})`}
             </Text>
           </View>
         </View>
@@ -292,11 +294,11 @@ export default function MyProfileScreen() {
             <Sliders color={COLORS.black} size={20} />
           </View>
           <View style={styles.menuItemContent}>
-            <Text style={styles.menuItemLabel}>취향 설정</Text>
+            <Text style={styles.menuItemLabel}>{t('profile.preferences')}</Text>
             <Text style={styles.menuItemValue}>
               {data.mbti ? `${data.mbti}` : ''}
-              {data.activityTypes.length > 0 ? ` · ${data.activityTypes.length}개 활동` : ''}
-              {!data.mbti && data.activityTypes.length === 0 ? '설정되지 않음' : ''}
+              {data.activityTypes.length > 0 ? ` · ${t('profile.activitiesCount', { count: data.activityTypes.length })}` : ''}
+              {!data.mbti && data.activityTypes.length === 0 ? t('profile.notSet') : ''}
             </Text>
           </View>
         </View>
@@ -307,14 +309,14 @@ export default function MyProfileScreen() {
 
   const renderNicknameEdit = () => (
     <View style={styles.editContainer}>
-      <Text style={styles.editTitle}>닉네임 변경</Text>
-      <Text style={styles.editDescription}>파트너에게 보여질 이름이에요</Text>
+      <Text style={styles.editTitle}>{t('profile.editNickname.title')}</Text>
+      <Text style={styles.editDescription}>{t('profile.editNickname.description')}</Text>
 
       <TextInput
         style={styles.textInput}
         value={tempNickname}
         onChangeText={setTempNickname}
-        placeholder="닉네임 입력"
+        placeholder={t('profile.editNickname.placeholder')}
         placeholderTextColor="#999"
         maxLength={10}
         autoFocus
@@ -325,14 +327,14 @@ export default function MyProfileScreen() {
           style={styles.cancelButton}
           onPress={() => setEditMode(null)}
         >
-          <Text style={styles.cancelButtonText}>취소</Text>
+          <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
         </Pressable>
         <Pressable
           style={[styles.saveButton, !tempNickname.trim() && styles.saveButtonDisabled]}
           onPress={handleSaveNickname}
           disabled={!tempNickname.trim()}
         >
-          <Text style={styles.saveButtonText}>저장</Text>
+          <Text style={styles.saveButtonText}>{t('common.save')}</Text>
         </Pressable>
       </View>
     </View>
@@ -340,8 +342,8 @@ export default function MyProfileScreen() {
 
   const renderBirthdayEdit = () => (
     <View style={styles.editContainer}>
-      <Text style={styles.editTitle}>생년월일 수정</Text>
-      <Text style={styles.editDescription}>정확한 생년월일을 입력해주세요</Text>
+      <Text style={styles.editTitle}>{t('profile.editBirthday.title')}</Text>
+      <Text style={styles.editDescription}>{t('profile.editBirthday.description')}</Text>
 
       {/* Calendar Type Toggle */}
       <View style={styles.calendarTypeToggle}>
@@ -350,7 +352,7 @@ export default function MyProfileScreen() {
           onPress={() => setTempCalendarType('solar')}
         >
           <Text style={[styles.calendarTypeButtonText, tempCalendarType === 'solar' && styles.calendarTypeButtonTextActive]}>
-            양력
+            {t('profile.solar')}
           </Text>
         </Pressable>
         <Pressable
@@ -358,7 +360,7 @@ export default function MyProfileScreen() {
           onPress={() => setTempCalendarType('lunar')}
         >
           <Text style={[styles.calendarTypeButtonText, tempCalendarType === 'lunar' && styles.calendarTypeButtonTextActive]}>
-            음력
+            {t('profile.lunar')}
           </Text>
         </Pressable>
       </View>
@@ -369,7 +371,7 @@ export default function MyProfileScreen() {
       >
         <Calendar color="#666" size={20} />
         <Text style={[styles.datePickerText, tempBirthday && styles.datePickerTextSelected]}>
-          {tempBirthday ? formatDate(tempBirthday) : '날짜를 선택해주세요'}
+          {tempBirthday ? formatDate(tempBirthday) : t('profile.editBirthday.selectDate')}
         </Text>
       </Pressable>
 
@@ -392,10 +394,10 @@ export default function MyProfileScreen() {
             >
               <View style={styles.datePickerHeader}>
                 <Pressable onPress={closeDatePicker}>
-                  <Text style={styles.datePickerCancel}>취소</Text>
+                  <Text style={styles.datePickerCancel}>{t('common.cancel')}</Text>
                 </Pressable>
                 <Pressable onPress={closeDatePicker}>
-                  <Text style={styles.datePickerConfirm}>확인</Text>
+                  <Text style={styles.datePickerConfirm}>{t('common.confirm')}</Text>
                 </Pressable>
               </View>
               <DateTimePicker
@@ -429,10 +431,10 @@ export default function MyProfileScreen() {
 
       <View style={styles.buttonRow}>
         <Pressable style={styles.cancelButton} onPress={() => setEditMode(null)}>
-          <Text style={styles.cancelButtonText}>취소</Text>
+          <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
         </Pressable>
         <Pressable style={styles.saveButton} onPress={handleSaveBirthday}>
-          <Text style={styles.saveButtonText}>저장</Text>
+          <Text style={styles.saveButtonText}>{t('common.save')}</Text>
         </Pressable>
       </View>
     </View>
@@ -450,7 +452,7 @@ export default function MyProfileScreen() {
       >
         {!hasAnyPreference ? (
           <View style={styles.emptyPreferences}>
-            <Text style={styles.emptyPreferencesText}>설정된 취향이 없습니다</Text>
+            <Text style={styles.emptyPreferencesText}>{t('profile.noPreferences')}</Text>
           </View>
         ) : (
           <>
@@ -469,7 +471,7 @@ export default function MyProfileScreen() {
             {/* Activity Types */}
             {data.activityTypes.length > 0 && (
               <View style={styles.preferenceViewSection}>
-                <Text style={styles.preferenceViewLabel}>선호하는 활동</Text>
+                <Text style={styles.preferenceViewLabel}>{t('profile.preferredActivities')}</Text>
                 <View style={styles.hashtagContainer}>
                   {data.activityTypes.map((type) => {
                     const option = ACTIVITY_TYPE_OPTIONS.find((o) => o.id === type);
@@ -486,7 +488,7 @@ export default function MyProfileScreen() {
             {/* Date Worries */}
             {data.dateWorries.length > 0 && (
               <View style={styles.preferenceViewSection}>
-                <Text style={styles.preferenceViewLabel}>데이트 고민</Text>
+                <Text style={styles.preferenceViewLabel}>{t('profile.dateConcerns')}</Text>
                 <View style={styles.hashtagContainer}>
                   {data.dateWorries.map((worry) => {
                     const option = DATE_WORRY_OPTIONS.find((o) => o.id === worry);
@@ -503,7 +505,7 @@ export default function MyProfileScreen() {
             {/* Constraints */}
             {data.constraints.length > 0 && data.constraints[0] !== 'none' && (
               <View style={styles.preferenceViewSection}>
-                <Text style={styles.preferenceViewLabel}>제약 조건</Text>
+                <Text style={styles.preferenceViewLabel}>{t('profile.constraints')}</Text>
                 <View style={styles.hashtagContainer}>
                   {data.constraints.map((con) => {
                     const option = CONSTRAINT_OPTIONS.find((o) => o.id === con);
@@ -530,7 +532,7 @@ export default function MyProfileScreen() {
             setEditMode('preferences-edit');
           }}
         >
-          <Text style={styles.editPreferencesButtonText}>수정하기</Text>
+          <Text style={styles.editPreferencesButtonText}>{t('profile.editPreferences.button')}</Text>
         </Pressable>
       </ScrollView>
     );
@@ -562,7 +564,7 @@ export default function MyProfileScreen() {
 
       {/* Activity Types */}
       <View style={styles.preferenceSection}>
-        <Text style={styles.preferenceSectionTitle}>선호하는 활동</Text>
+        <Text style={styles.preferenceSectionTitle}>{t('profile.preferredActivities')}</Text>
         <View style={styles.activityGrid}>
           {ACTIVITY_TYPE_OPTIONS.map((option) => (
             <Pressable
@@ -581,7 +583,7 @@ export default function MyProfileScreen() {
 
       {/* Date Worries */}
       <View style={styles.preferenceSection}>
-        <Text style={styles.preferenceSectionTitle}>데이트 고민</Text>
+        <Text style={styles.preferenceSectionTitle}>{t('profile.dateConcerns')}</Text>
         <View style={styles.dateWorryList}>
           {DATE_WORRY_OPTIONS.map((option) => (
             <Pressable
@@ -600,7 +602,7 @@ export default function MyProfileScreen() {
 
       {/* Constraints */}
       <View style={styles.preferenceSection}>
-        <Text style={styles.preferenceSectionTitle}>제약 조건</Text>
+        <Text style={styles.preferenceSectionTitle}>{t('profile.constraints')}</Text>
         <View style={styles.constraintGrid}>
           {CONSTRAINT_OPTIONS.map((option) => (
             <Pressable
@@ -619,10 +621,10 @@ export default function MyProfileScreen() {
 
       <View style={[styles.buttonRow, { marginTop: SPACING.xl, marginBottom: SPACING.xxxl }]}>
         <Pressable style={styles.cancelButton} onPress={() => setEditMode(null)}>
-          <Text style={styles.cancelButtonText}>취소</Text>
+          <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
         </Pressable>
         <Pressable style={styles.saveButton} onPress={handleSavePreferences}>
-          <Text style={styles.saveButtonText}>저장</Text>
+          <Text style={styles.saveButtonText}>{t('common.save')}</Text>
         </Pressable>
       </View>
     </ScrollView>
@@ -641,10 +643,10 @@ export default function MyProfileScreen() {
           <ChevronLeft color={COLORS.black} size={24} />
         </Pressable>
         <Text style={styles.headerTitle}>
-          {editMode === 'nickname' ? '닉네임 변경' :
-           editMode === 'birthday' ? '생년월일 수정' :
-           editMode === 'preferences-view' ? '취향 설정' :
-           editMode === 'preferences-edit' ? '취향 설정 수정' : '내 프로필'}
+          {editMode === 'nickname' ? t('profile.editNickname.title') :
+           editMode === 'birthday' ? t('profile.editBirthday.title') :
+           editMode === 'preferences-view' ? t('profile.editPreferences.title') :
+           editMode === 'preferences-edit' ? t('profile.editPreferences.editTitle') : t('profile.myProfile')}
         </Text>
         <View style={styles.headerSpacer} />
       </View>
