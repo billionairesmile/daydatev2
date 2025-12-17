@@ -3,11 +3,9 @@ import {
   View,
   Text,
   StyleSheet,
-  ImageBackground,
   Dimensions,
   Pressable,
   ScrollView,
-  Image,
   Modal,
   Animated,
   PanResponder,
@@ -20,6 +18,7 @@ import {
   NativeScrollEvent,
   LayoutChangeEvent,
 } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import * as ImagePicker from 'expo-image-picker';
@@ -167,12 +166,23 @@ export default function MemoriesScreen() {
   useEffect(() => {
     albums.forEach(album => {
       if (album.coverPhoto) {
-        Image.prefetch(album.coverPhoto).catch(() => {
+        ExpoImage.prefetch(album.coverPhoto).catch(() => {
           // Ignore prefetch errors silently
         });
       }
     });
   }, [albums]);
+
+  // Prefetch album photos for instant display when opening albums
+  useEffect(() => {
+    Object.values(albumPhotos).forEach(photos => {
+      photos.forEach(photo => {
+        if (photo.photoUrl) {
+          ExpoImage.prefetch(photo.photoUrl).catch(() => {});
+        }
+      });
+    });
+  }, [albumPhotos]);
 
   // Album creation states
   const [showAlbumModal, setShowAlbumModal] = useState(false);
@@ -327,28 +337,46 @@ export default function MemoriesScreen() {
 
   // Animation for month modal
   const slideAnim = useRef(new Animated.Value(height)).current;
+  const backdropOpacityAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (selectedMonth) {
-      // Slide up animation
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 65,
-        friction: 11,
-      }).start();
+      // Slide up + backdrop fade in animation
+      Animated.parallel([
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 65,
+          friction: 11,
+        }),
+        Animated.timing(backdropOpacityAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
     }
   }, [selectedMonth]);
 
-  // Close month modal with slide down animation
+  // Close month modal with slide down + backdrop fade out animation
   const closeMonthModal = () => {
-    Animated.timing(slideAnim, {
-      toValue: height,
-      duration: 300,
-      useNativeDriver: true,
-    }).start(() => {
+    Animated.parallel([
+      Animated.timing(slideAnim, {
+        toValue: height,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+      Animated.timing(backdropOpacityAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
       setSelectedMonth(null);
       setSelectedPhoto(null);
+      // Reset animations for next open
+      slideAnim.setValue(height);
+      backdropOpacityAnim.setValue(0);
     });
   };
 
@@ -408,30 +436,39 @@ export default function MemoriesScreen() {
     closeCoverPhotoPicker();
   };
 
-  // Animation for album detail modal (scale + fade)
-  const albumDetailScaleAnim = useRef(new Animated.Value(0.9)).current;
+  // Animation for album detail modal (scale + fade + slide)
+  const albumDetailScaleAnim = useRef(new Animated.Value(0.92)).current;
   const albumDetailOpacityAnim = useRef(new Animated.Value(0)).current;
+  const albumDetailTranslateYAnim = useRef(new Animated.Value(30)).current;
 
   useEffect(() => {
     if (showAlbumDetailModal) {
-      // Scale up + fade in animation
+      // Scale up + fade in + slide up animation (iOS-like natural feel)
       Animated.parallel([
         Animated.spring(albumDetailScaleAnim, {
           toValue: 1,
           useNativeDriver: true,
-          tension: 100,
-          friction: 12,
+          tension: 65,
+          friction: 11,
         }),
-        Animated.timing(albumDetailOpacityAnim, {
+        Animated.spring(albumDetailOpacityAnim, {
           toValue: 1,
-          duration: 200,
           useNativeDriver: true,
+          tension: 65,
+          friction: 11,
+        }),
+        Animated.spring(albumDetailTranslateYAnim, {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 65,
+          friction: 11,
         }),
       ]).start();
     } else {
       // Reset animations
-      albumDetailScaleAnim.setValue(0.9);
+      albumDetailScaleAnim.setValue(0.92);
       albumDetailOpacityAnim.setValue(0);
+      albumDetailTranslateYAnim.setValue(30);
     }
   }, [showAlbumDetailModal]);
 
@@ -462,6 +499,60 @@ export default function MemoriesScreen() {
 
   const groupedMissions = groupByYearMonth(completedMemories);
   const years = Object.keys(groupedMissions).sort((a, b) => parseInt(b) - parseInt(a));
+
+  // Sync selectedMonth with current groupedMissions when memories change (real-time sync from partner)
+  useEffect(() => {
+    if (!selectedMonth) return;
+
+    const currentMissions = groupedMissions[selectedMonth.year]?.[selectedMonth.month];
+
+    if (!currentMissions || currentMissions.length === 0) {
+      // Month no longer has any photos - close the modal
+      console.log('[RealTimeSync] Month has no photos, closing modal');
+      setSelectedMonth(null);
+      setSelectedPhoto(null);
+      return;
+    }
+
+    // Check if missions have changed (compare IDs)
+    const currentIds = currentMissions.map(m => m.id).join(',');
+    const selectedIds = selectedMonth.missions.map(m => m.id).join(',');
+
+    if (currentIds !== selectedIds) {
+      console.log('[RealTimeSync] Missions changed, updating selectedMonth');
+      console.log('[RealTimeSync] Previous count:', selectedMonth.missions.length, '-> New count:', currentMissions.length);
+
+      setSelectedMonth(prev => prev ? {
+        ...prev,
+        missions: currentMissions
+      } : null);
+
+      // Also update selectedPhoto if it was deleted
+      if (selectedPhoto && !currentMissions.some(m => m.id === selectedPhoto.id)) {
+        console.log('[RealTimeSync] Selected photo was deleted, clearing selection');
+        // The PhotoDetailView useEffect will handle navigation
+      }
+    }
+  }, [completedMemories]); // Only depend on completedMemories to avoid infinite loops
+
+  // Sync custom album PhotoDetailView when albumPhotos change (real-time sync from partner)
+  useEffect(() => {
+    if (!selectedAlbum || !showAlbumDetailModal) return;
+
+    const currentAlbumPhotos = albumPhotos[selectedAlbum.id] || [];
+
+    // If viewing a photo that was deleted by partner
+    if (selectedAlbumPhoto && !currentAlbumPhotos.some(p => p.id === selectedAlbumPhoto.id)) {
+      console.log('[RealTimeSync Album] Currently viewed photo was deleted by partner');
+
+      if (currentAlbumPhotos.length === 0) {
+        // No photos left in album - only close the photo detail view, keep album modal open
+        console.log('[RealTimeSync Album] No photos remaining, closing photo detail view only');
+        setSelectedAlbumPhoto(null);
+      }
+      // If there are other photos, PhotoDetailView will handle navigation automatically
+    }
+  }, [albumPhotos, selectedAlbum?.id, showAlbumDetailModal, selectedAlbumPhoto]);
 
   const getMonthName = (monthNumber: string) => {
     const monthNames = [
@@ -740,18 +831,25 @@ export default function MemoriesScreen() {
     });
   };
 
-  // Close album detail modal with fade-out animation
+  // Close album detail modal with fade-out + scale-down + slide-down animation
   const closeAlbumDetailModal = () => {
     Animated.parallel([
-      Animated.timing(albumDetailScaleAnim, {
-        toValue: 0.9,
-        duration: 200,
+      Animated.spring(albumDetailScaleAnim, {
+        toValue: 0.92,
         useNativeDriver: true,
+        tension: 65,
+        friction: 9,
       }),
       Animated.timing(albumDetailOpacityAnim, {
         toValue: 0,
-        duration: 200,
+        duration: 180,
         useNativeDriver: true,
+      }),
+      Animated.spring(albumDetailTranslateYAnim, {
+        toValue: 30,
+        useNativeDriver: true,
+        tension: 65,
+        friction: 9,
       }),
     ]).start(() => {
       setShowAlbumDetailModal(false);
@@ -923,14 +1021,18 @@ export default function MemoriesScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Background Image */}
-      <ImageBackground
-        source={backgroundImage}
-        defaultSource={require('@/assets/images/backgroundimage.png')}
-        style={styles.backgroundImage}
-        imageStyle={styles.backgroundImageStyle}
-        blurRadius={40}
-      />
+      {/* Background Image - Optimized with expo-image + blur */}
+      <View style={styles.backgroundImage}>
+        <ExpoImage
+          source={backgroundImage?.uri ? { uri: backgroundImage.uri } : backgroundImage}
+          placeholder="L6PZfSi_.AyE_3t7t7R**0LTIpIp"
+          contentFit="cover"
+          transition={150}
+          cachePolicy="memory-disk"
+          style={styles.backgroundImageStyle}
+        />
+        <BlurView intensity={90} tint="light" style={StyleSheet.absoluteFill} />
+      </View>
       <View style={styles.overlay} />
 
       {/* Header */}
@@ -1036,10 +1138,12 @@ export default function MemoriesScreen() {
                         })}
                       >
                         <View style={styles.monthCardInner}>
-                          <Image
+                          <ExpoImage
                             source={{ uri: representativeMission.photoUrl }}
                             style={styles.monthCardImage}
-                            resizeMode="cover"
+                            contentFit="cover"
+                            cachePolicy="memory-disk"
+                            transition={100}
                           />
 
                           {/* Month Badge */}
@@ -1097,7 +1201,7 @@ export default function MemoriesScreen() {
                       <View style={styles.hardcoverBook}>
                         {/* Full Photo Background */}
                         {album.coverPhoto ? (
-                          <Image source={{ uri: album.coverPhoto }} style={styles.bookFullPhoto} resizeMode="cover" fadeDuration={0} />
+                          <ExpoImage source={{ uri: album.coverPhoto }} style={styles.bookFullPhoto} contentFit="cover" cachePolicy="memory-disk" transition={100} />
                         ) : (
                           <View style={styles.bookPlaceholder}>
                             <ImageIcon color="rgba(255,255,255,0.3)" size={24} />
@@ -1169,18 +1273,20 @@ export default function MemoriesScreen() {
         }}
       >
         <View style={styles.monthModalContainer}>
-          <Pressable
-            style={styles.monthModalBackdrop}
-            onPress={() => {
-              if (selectedPhoto) {
-                setSelectedPhoto(null);
-              } else {
-                closeMonthModal();
-              }
-            }}
-          >
-            <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
-          </Pressable>
+          <Animated.View style={[StyleSheet.absoluteFill, { opacity: backdropOpacityAnim }]}>
+            <Pressable
+              style={styles.monthModalBackdrop}
+              onPress={() => {
+                if (selectedPhoto) {
+                  setSelectedPhoto(null);
+                } else {
+                  closeMonthModal();
+                }
+              }}
+            >
+              <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
+            </Pressable>
+          </Animated.View>
 
           {/* Album Grid View */}
           {!selectedPhoto && (
@@ -1216,10 +1322,12 @@ export default function MemoriesScreen() {
                     onPress={() => setSelectedPhoto(mission)}
                   >
                     <View style={styles.monthModalItemInner}>
-                      <Image
+                      <ExpoImage
                         source={{ uri: mission.photoUrl }}
                         style={styles.monthModalItemImage}
-                        resizeMode="cover"
+                        contentFit="cover"
+                        cachePolicy="memory-disk"
+                        transition={100}
                       />
                     </View>
                   </Pressable>
@@ -1260,6 +1368,19 @@ export default function MemoriesScreen() {
                 // Delete from local state
                 console.log('[Delete] Deleting from local state...');
                 deleteMemory(memoryId);
+
+                // Update selectedMonth to remove the deleted photo from the modal
+                // Use callback form to avoid stale closure issue
+                setSelectedMonth(prevMonth => {
+                  if (!prevMonth) return null;
+                  const updatedMissions = prevMonth.missions.filter(m => m.id !== memoryId);
+                  console.log('[Delete] Updated selectedMonth - remaining missions:', updatedMissions.length);
+                  return {
+                    ...prevMonth,
+                    missions: updatedMissions
+                  };
+                });
+
                 console.log('[Delete] Deletion complete');
               }}
             />
@@ -1459,10 +1580,12 @@ export default function MemoriesScreen() {
                             onPress={handlePickCoverPhoto}
                           >
                             {albumCoverPhoto ? (
-                              <Image
+                              <ExpoImage
                                 source={{ uri: albumCoverPhoto }}
                                 style={styles.coverPhotoPreview}
-                                resizeMode="cover"
+                                contentFit="cover"
+                                cachePolicy="memory-disk"
+                                transition={100}
                               />
                             ) : (
                               <View style={styles.coverPhotoPlaceholder}>
@@ -1657,7 +1780,7 @@ export default function MemoriesScreen() {
                           onPress={() => handleSelectCoverPhoto(mission.photoUrl)}
                         >
                           <View style={styles.monthModalItemInner}>
-                            <Image source={{ uri: mission.photoUrl }} style={styles.monthModalItemImage} />
+                            <ExpoImage source={{ uri: mission.photoUrl }} style={styles.monthModalItemImage} contentFit="cover" cachePolicy="memory-disk" transition={100} />
                           </View>
                         </Pressable>
                       ))
@@ -1682,7 +1805,10 @@ export default function MemoriesScreen() {
             styles.albumDetailFullScreen,
             {
               opacity: albumDetailOpacityAnim,
-              transform: [{ scale: albumDetailScaleAnim }],
+              transform: [
+                { scale: albumDetailScaleAnim },
+                { translateY: albumDetailTranslateYAnim },
+              ],
             },
           ]}
         >
@@ -1838,7 +1964,7 @@ export default function MemoriesScreen() {
                         style={styles.albumDetailSpine}
                       />
                       {selectedAlbum.coverPhoto ? (
-                        <Image source={{ uri: selectedAlbum.coverPhoto }} style={styles.albumDetailCoverImage} fadeDuration={0} />
+                        <ExpoImage source={{ uri: selectedAlbum.coverPhoto }} style={styles.albumDetailCoverImage} contentFit="cover" cachePolicy="memory-disk" transition={100} />
                       ) : (
                         <View style={styles.albumDetailCoverPlaceholder}>
                           <ImageIcon color="rgba(255,255,255,0.3)" size={40} />
@@ -1913,6 +2039,14 @@ export default function MemoriesScreen() {
                                             const photosToRemove = currentPhotos.filter((_, idx) => selectedAlbumPhotoIndices.has(idx));
                                             const newPhotos = currentPhotos.filter((_, idx) => !selectedAlbumPhotoIndices.has(idx));
 
+                                            console.log('[AlbumRemove] ========== ALBUM REMOVE START ==========');
+                                            console.log('[AlbumRemove] Selected album ID:', selectedAlbum.id);
+                                            console.log('[AlbumRemove] Selected indices:', Array.from(selectedAlbumPhotoIndices));
+                                            console.log('[AlbumRemove] Current photos count:', currentPhotos.length);
+                                            console.log('[AlbumRemove] Current photos (id list):', currentPhotos.map(p => p.id));
+                                            console.log('[AlbumRemove] Photos to remove:', photosToRemove.map(p => ({ id: p.id, photoUrl: p.photoUrl })));
+                                            console.log('[AlbumRemove] syncedAlbumPhotosMap for this album:', syncedAlbumPhotosMap[selectedAlbum.id]?.map(p => ({ id: p.id, memory_id: p.memory_id })));
+
                                             // UUID validation helper
                                             const isValidUUID = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
@@ -1920,20 +2054,29 @@ export default function MemoriesScreen() {
                                             const realPhotos = photosToRemove.filter(p => isValidUUID(p.id));
                                             const samplePhotos = photosToRemove.filter(p => !isValidUUID(p.id));
 
+                                            console.log('[AlbumRemove] Real photos:', realPhotos.length, 'Sample photos:', samplePhotos.length);
+                                            console.log('[AlbumRemove] isSyncInitialized:', isSyncInitialized, 'isDemoMode:', isDemoMode);
+
                                             // Remove real photos via sync
                                             if (isSyncInitialized && !isDemoMode && realPhotos.length > 0) {
+                                              console.log('[AlbumRemove] Calling syncRemovePhotoFromAlbum for each real photo...');
                                               try {
                                                 // Remove each real photo from the album in sync store
                                                 for (const photo of realPhotos) {
+                                                  console.log('[AlbumRemove] Removing photo:', photo.id);
                                                   await syncRemovePhotoFromAlbum(selectedAlbum.id, photo.id);
                                                 }
+                                                console.log('[AlbumRemove] All removals completed');
                                               } catch (error) {
-                                                console.error('Error syncing photo removal:', error);
+                                                console.error('[AlbumRemove] Error syncing photo removal:', error);
                                               }
+                                            } else {
+                                              console.log('[AlbumRemove] Skipping sync removal - conditions not met');
                                             }
 
                                             // Always update local state for all photos (including samples)
                                             if (samplePhotos.length > 0 || !isSyncInitialized || isDemoMode) {
+                                              console.log('[AlbumRemove] Updating local album photos state');
                                               setLocalAlbumPhotos(prev => ({
                                                 ...prev,
                                                 [selectedAlbum.id]: newPhotos
@@ -1947,6 +2090,8 @@ export default function MemoriesScreen() {
 
                                             setSelectedAlbumPhotoIndices(new Set());
                                             setIsSelectingAlbumPhotos(false);
+                                            console.log('[AlbumRemove] ========== ALBUM REMOVE COMPLETE ==========');
+                                            console.log('[AlbumRemove] (Note: UI will update on next render cycle)');
                                           }
                                         }
                                       }
@@ -2039,7 +2184,7 @@ export default function MemoriesScreen() {
                                   }
                                 }}
                               >
-                                <Image source={{ uri: photo.photoUrl }} style={styles.missionPhotoImage} />
+                                <ExpoImage source={{ uri: photo.photoUrl }} style={styles.missionPhotoImage} contentFit="cover" cachePolicy="memory-disk" transition={100} />
                                 {/* Selection Overlay */}
                                 {isSelectingAlbumPhotos && (
                                   <View style={[
@@ -2207,7 +2352,7 @@ export default function MemoriesScreen() {
                           }}
                         >
                           <View style={styles.monthModalItemInner}>
-                            <Image source={{ uri: mission.photoUrl }} style={styles.monthModalItemImage} />
+                            <ExpoImage source={{ uri: mission.photoUrl }} style={styles.monthModalItemImage} contentFit="cover" cachePolicy="memory-disk" transition={100} />
                             {isSelected && (
                               <>
                                 <View style={styles.missionPickerSelectedOverlay} />
@@ -2417,10 +2562,12 @@ export default function MemoriesScreen() {
                               onPress={handlePickEditCoverPhoto}
                             >
                               {editCoverPhoto ? (
-                                <Image
+                                <ExpoImage
                                   source={{ uri: editCoverPhoto }}
                                   style={styles.coverPhotoPreview}
-                                  resizeMode="cover"
+                                  contentFit="cover"
+                                  cachePolicy="memory-disk"
+                                  transition={100}
                                 />
                               ) : (
                                 <View style={styles.coverPhotoPlaceholder}>
@@ -2660,10 +2807,12 @@ function FlipCardItem({
               { transform: [{ perspective: 1000 }, { rotateY: frontInterpolate }] },
             ]}
           >
-            <Image
+            <ExpoImage
               source={{ uri: mission.photoUrl }}
               style={styles.flipCardImage}
-              resizeMode="cover"
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              transition={100}
             />
           </Animated.View>
 
@@ -2758,11 +2907,17 @@ function CarouselBackgroundImage({
   });
 
   return (
-    <ReanimatedModule.Image
-      source={{ uri: image }}
-      style={[StyleSheet.absoluteFill, animatedStyle]}
-      blurRadius={18}
-    />
+    <ReanimatedModule.View style={[StyleSheet.absoluteFill, animatedStyle]}>
+      <ExpoImage
+        source={{ uri: image }}
+        style={StyleSheet.absoluteFill}
+        blurRadius={18}
+        contentFit="cover"
+        cachePolicy="memory-disk"
+        transition={100}
+        placeholder="L6PZfSi_.AyE_3t7t7R**0LTIpIp"
+      />
+    </ReanimatedModule.View>
   );
 }
 
@@ -2826,12 +2981,65 @@ function PhotoDetailView({
   const [localMissions, setLocalMissions] = useState<MemoryType[]>(missions);
   const scrollViewRef = useRef<any>(null);
 
-  // Update local missions when parent missions change
+  // Prefetch all photos for instant display when swiping
   useEffect(() => {
+    missions.forEach(mission => {
+      if (mission.photoUrl) {
+        ExpoImage.prefetch(mission.photoUrl).catch(() => {});
+      }
+    });
+  }, [missions]);
+
+  // Update local missions when parent missions change (including external deletions by partner)
+  useEffect(() => {
+    // Check if the currently viewed photo was deleted externally (by partner)
+    const currentPhoto = localMissions[currentIndex];
+    const currentPhotoStillExists = currentPhoto ? missions.some(m => m.id === currentPhoto.id) : false;
+
+    // Update local missions to sync with parent
     setLocalMissions(missions);
+
+    // Handle external deletion of the current photo
+    if (currentPhoto && !currentPhotoStillExists) {
+      console.log('[PhotoDetailView] Current photo was deleted externally');
+
+      if (missions.length === 0) {
+        // No photos left - close the view
+        console.log('[PhotoDetailView] No photos remaining, closing view');
+        onClose();
+        return;
+      }
+
+      // Navigate to adjacent photo (prefer previous, fallback to next)
+      const newIndex = Math.min(currentIndex, missions.length - 1);
+      console.log('[PhotoDetailView] Navigating to index:', newIndex);
+      setCurrentIndex(newIndex);
+
+      // Scroll to the adjusted position
+      setTimeout(() => {
+        if (scrollViewRef.current) {
+          scrollViewRef.current?.scrollTo({
+            x: newIndex * width,
+            animated: false,
+          });
+        }
+      }, 50);
+      return;
+    }
+
     // Adjust currentIndex if it's now out of bounds
     if (currentIndex >= missions.length && missions.length > 0) {
-      setCurrentIndex(missions.length - 1);
+      const newIndex = missions.length - 1;
+      setCurrentIndex(newIndex);
+      // Scroll to the adjusted position
+      setTimeout(() => {
+        if (scrollViewRef.current) {
+          scrollViewRef.current?.scrollTo({
+            x: newIndex * width,
+            animated: false,
+          });
+        }
+      }, 50);
     }
   }, [missions]);
 
@@ -3006,26 +3214,26 @@ function PhotoDetailView({
                           await onDelete(currentMission.id);
                           onClose();
                         } else {
-                          // Remove photo from local state immediately for smooth UX
+                          // Calculate the target index BEFORE removing the photo
+                          // User requested: show previous photo, or next if no previous
+                          const deletedIndex = currentIndex;
+                          const targetIndex = deletedIndex > 0 ? deletedIndex - 1 : 0;
+
+                          // Remove photo from local state
                           const newMissions = localMissions.filter(m => m.id !== currentMission.id);
                           setLocalMissions(newMissions);
+                          setCurrentIndex(targetIndex);
 
-                          // Navigate to previous photo if available, otherwise stay at current (shows next)
-                          // User requested: "그 이전 사진으로 돌아가줘. 이전 사진이 없다면 바로 다음 사진을 띄워주고"
-                          if (currentIndex > 0) {
-                            // Go to previous photo
-                            const newIndex = currentIndex - 1;
-                            setCurrentIndex(newIndex);
+                          // Scroll to the target position after state update
+                          // Use setTimeout to ensure the scroll happens after React re-renders
+                          setTimeout(() => {
                             if (scrollViewRef.current) {
                               scrollViewRef.current?.scrollTo({
-                                x: newIndex * width,
-                                animated: true,
+                                x: targetIndex * width,
+                                animated: false, // No animation to prevent visual jumping
                               });
                             }
-                          } else {
-                            // Already at index 0 - stay here (which now shows what was the next photo)
-                            // No scroll needed, the array just shifted left
-                          }
+                          }, 50);
 
                           // Delete from DB in background
                           await onDelete(currentMission.id);
@@ -3107,6 +3315,7 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   backgroundImageStyle: {
+    ...StyleSheet.absoluteFillObject,
     transform: [{ scale: 1.0 }],
   },
   overlay: {
@@ -3115,7 +3324,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
   },
   topFadeOverlay: {
     position: 'absolute',

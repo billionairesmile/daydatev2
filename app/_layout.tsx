@@ -15,6 +15,25 @@ import { BackgroundProvider, useBackground } from '@/contexts';
 import { preloadCharacterAssets } from '@/utils';
 import { db, isDemoMode, supabase } from '@/lib/supabase';
 import { updateUserLocationInDB, checkLocationPermission } from '@/lib/locationUtils';
+import { initializeNetworkMonitoring, subscribeToNetwork } from '@/lib/useNetwork';
+import { offlineQueue } from '@/lib/offlineQueue';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
+
+// Parse date string as local date (not UTC) to avoid timezone issues
+// "1990-01-03" should be January 3rd in local timezone, not UTC
+// Handles both simple date strings and ISO timestamps
+const parseDateAsLocal = (dateString: string): Date => {
+  // If it's an ISO timestamp (contains T), parse as Date first to get correct local time
+  // e.g., "1990-01-02T15:00:00.000Z" represents Jan 3 00:00 in KST (UTC+9)
+  if (dateString.includes('T')) {
+    const d = new Date(dateString);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+
+  // If it's a simple date string like "1990-01-03", parse as local
+  const [year, month, day] = dateString.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -110,11 +129,32 @@ function BackgroundLoadedHandler({ setBackgroundLoaded }: { setBackgroundLoaded:
 function RootLayoutNav() {
   const router = useRouter();
   const segments = useSegments();
-  const { isAuthenticated, isOnboardingComplete, couple, user, setCouple, setPartner, partner } = useAuthStore();
-  const { initializeSync, cleanup: cleanupSync } = useCoupleSyncStore();
+  const { isAuthenticated, isOnboardingComplete, setIsOnboardingComplete, couple, user, setCouple, setPartner, partner } = useAuthStore();
+  const { initializeSync, cleanup: cleanupSync, processPendingOperations } = useCoupleSyncStore();
   const [isNavigationReady, setIsNavigationReady] = useState(false);
   const appState = useRef(AppState.currentState);
   const lastFetchTime = useRef<number>(0);
+
+  // Initialize push notifications
+  usePushNotifications();
+
+  // Initialize network monitoring and handle reconnection sync
+  useEffect(() => {
+    // Initialize network monitoring on app start
+    initializeNetworkMonitoring();
+
+    // Subscribe to network status changes for sync-on-reconnect
+    const unsubscribe = subscribeToNetwork(async (isOnline) => {
+      if (isOnline && offlineQueue.hasPendingOperations()) {
+        console.log('[Layout] Network reconnected - processing pending operations');
+        await processPendingOperations();
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [processPendingOperations]);
 
   // Reusable function to fetch couple and partner data
   const fetchCoupleAndPartnerData = useCallback(async (forceRefresh = false) => {
@@ -143,9 +183,9 @@ function RootLayoutNav() {
           ...couple,
           user1Id: coupleData.user1_id,
           user2Id: coupleData.user2_id,
-          anniversaryDate: coupleData.dating_start_date ? new Date(coupleData.dating_start_date) : couple.anniversaryDate,
-          datingStartDate: coupleData.dating_start_date ? new Date(coupleData.dating_start_date) : undefined,
-          weddingDate: coupleData.wedding_date ? new Date(coupleData.wedding_date) : undefined,
+          anniversaryDate: coupleData.dating_start_date ? parseDateAsLocal(coupleData.dating_start_date) : couple.anniversaryDate,
+          datingStartDate: coupleData.dating_start_date ? parseDateAsLocal(coupleData.dating_start_date) : undefined,
+          weddingDate: coupleData.wedding_date ? parseDateAsLocal(coupleData.wedding_date) : undefined,
           relationshipType,
           status: coupleData.status || 'active',
         });
@@ -170,7 +210,7 @@ function RootLayoutNav() {
               nickname: partnerData.nickname || '',
               inviteCode: partnerData.invite_code || '',
               preferences: partnerPreferences,
-              birthDate: partnerData.birth_date ? new Date(partnerData.birth_date) : undefined,
+              birthDate: partnerData.birth_date ? parseDateAsLocal(partnerData.birth_date) : undefined,
               birthDateCalendarType: birthDateCalendarType || 'solar',
               createdAt: partnerData.created_at ? new Date(partnerData.created_at) : new Date(),
             });
@@ -290,7 +330,7 @@ function RootLayoutNav() {
               nickname: partnerData.nickname || '',
               inviteCode: partnerData.invite_code || '',
               preferences: prefs as unknown as import('@/types').UserPreferences,
-              birthDate: partnerData.birth_date ? new Date(partnerData.birth_date) : undefined,
+              birthDate: partnerData.birth_date ? parseDateAsLocal(partnerData.birth_date) : undefined,
               birthDateCalendarType: birthDateCalendarType || 'solar',
               createdAt: partnerData.created_at ? new Date(partnerData.created_at) : new Date(),
             });
@@ -304,7 +344,7 @@ function RootLayoutNav() {
     };
   }, [isOnboardingComplete, couple?.id, couple?.user1Id, couple?.user2Id, user?.id, setPartner]);
 
-  // Subscribe to couple data changes for real-time sync (anniversary updates)
+  // Subscribe to couple data changes for real-time sync (anniversary updates + disconnect detection)
   useEffect(() => {
     if (!isOnboardingComplete || !couple?.id || isDemoMode || !supabase) return;
 
@@ -327,18 +367,39 @@ function RootLayoutNav() {
             dating_start_date?: string;
             wedding_date?: string;
             status?: string;
+            disconnected_at?: string;
+            disconnected_by?: string;
           };
 
           if (coupleData) {
+            // Check if couple was disconnected by partner
+            if (coupleData.status === 'disconnected') {
+              console.log('[Layout] Couple disconnected, redirecting to pairing screen');
+
+              // Cleanup realtime subscriptions
+              cleanupSync();
+
+              // Clear couple and partner from local state
+              setCouple(null);
+              setPartner(null);
+
+              // Set onboarding incomplete to show pairing screen
+              setIsOnboardingComplete(false);
+
+              // Navigate to onboarding
+              router.replace('/(auth)/onboarding');
+              return;
+            }
+
             const relationshipType = coupleData.wedding_date ? 'married' : 'dating';
 
             setCouple({
               ...couple,
               user1Id: coupleData.user1_id,
               user2Id: coupleData.user2_id,
-              anniversaryDate: coupleData.dating_start_date ? new Date(coupleData.dating_start_date) : couple.anniversaryDate,
-              datingStartDate: coupleData.dating_start_date ? new Date(coupleData.dating_start_date) : undefined,
-              weddingDate: coupleData.wedding_date ? new Date(coupleData.wedding_date) : undefined,
+              anniversaryDate: coupleData.dating_start_date ? parseDateAsLocal(coupleData.dating_start_date) : couple.anniversaryDate,
+              datingStartDate: coupleData.dating_start_date ? parseDateAsLocal(coupleData.dating_start_date) : undefined,
+              weddingDate: coupleData.wedding_date ? parseDateAsLocal(coupleData.wedding_date) : undefined,
               relationshipType,
               status: (coupleData.status as 'pending' | 'active') || 'active',
             });
@@ -350,7 +411,7 @@ function RootLayoutNav() {
     return () => {
       supabase?.removeChannel(channel);
     };
-  }, [isOnboardingComplete, couple?.id, setCouple]);
+  }, [isOnboardingComplete, couple?.id, setCouple, setPartner, setIsOnboardingComplete, cleanupSync, router]);
 
   // Wait for navigation to be ready before redirecting
   useEffect(() => {

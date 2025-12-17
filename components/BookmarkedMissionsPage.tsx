@@ -5,9 +5,9 @@ import {
   StyleSheet,
   Pressable,
   ScrollView,
-  Image,
   Alert,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ChevronLeft, Bookmark, Trash2 } from 'lucide-react-native';
@@ -144,7 +144,9 @@ export function BookmarkedMissionsPage({ onBack }: BookmarkedMissionsPageProps) 
                     <Image
                       source={{ uri: `${mission.imageUrl}?w=300&h=400&fit=crop` }}
                       style={styles.thumbnail}
-                      resizeMode="cover"
+                      contentFit="cover"
+                      cachePolicy="memory-disk"
+                      transition={200}
                     />
                     <LinearGradient
                       colors={['transparent', 'rgba(0,0,0,0.5)']}

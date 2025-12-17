@@ -3,12 +3,12 @@ import {
   View,
   Text,
   StyleSheet,
-  ImageBackground,
   Dimensions,
   Pressable,
   ScrollView,
   Alert,
 } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import {
   User,
   Heart,
@@ -214,14 +214,18 @@ export default function MoreScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Background */}
-      <ImageBackground
-        source={backgroundImage}
-        defaultSource={require('@/assets/images/backgroundimage.png')}
-        style={styles.backgroundImage}
-        imageStyle={styles.backgroundImageStyle}
-        blurRadius={40}
-      />
+      {/* Background - ExpoImage + BlurView (optimized) */}
+      <View style={styles.backgroundImage}>
+        <ExpoImage
+          source={backgroundImage?.uri ? { uri: backgroundImage.uri } : backgroundImage}
+          placeholder="L6PZfSi_.AyE_3t7t7R**0LTIpIp"
+          contentFit="cover"
+          transition={150}
+          cachePolicy="memory-disk"
+          style={styles.backgroundImageStyle}
+        />
+        <BlurView intensity={90} tint="light" style={StyleSheet.absoluteFill} />
+      </View>
       <View style={styles.overlay} />
 
       <ScrollView
@@ -273,6 +277,8 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   backgroundImageStyle: {
+    width: '100%',
+    height: '100%',
     transform: [{ scale: 1.0 }],
   },
   overlay: {
@@ -281,7 +287,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
   },
   scrollView: {
     flex: 1,

@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  ImageBackground,
   Dimensions,
   Pressable,
   Animated,
@@ -14,6 +13,7 @@ import {
   ActivityIndicator,
   Linking,
 } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import MaskedView from '@react-native-masked-view/masked-view';
@@ -33,9 +33,9 @@ import { db, isDemoMode } from '@/lib/supabase';
 
 const { width, height } = Dimensions.get('window');
 
-const CARD_WIDTH = width * 0.82;
+const CARD_WIDTH = width * 0.75;
 const CARD_HEIGHT = 468;
-const CARD_MARGIN = 8;
+const CARD_MARGIN = 10;
 const SNAP_INTERVAL = CARD_WIDTH + CARD_MARGIN * 2;
 
 // Easing gradient for smooth blur transition
@@ -60,6 +60,7 @@ export default function MissionScreen() {
   const [featuredMissions, setFeaturedMissions] = useState<Mission[]>([]);
   const [isLoadingFeatured, setIsLoadingFeatured] = useState(false);
   const [partnerGeneratingMessage, setPartnerGeneratingMessage] = useState<string | null>(null);
+  const [isScrollInitialized, setIsScrollInitialized] = useState(false);
   const scrollX = useRef(new Animated.Value(0)).current;
   const scrollViewRef = useRef<Animated.FlatList<Mission>>(null);
 
@@ -73,6 +74,7 @@ export default function MissionScreen() {
     getTodayMissions,
     generateTodayMissions,
     checkAndResetMissions,
+    generatedMissionData, // Subscribe to this state to trigger re-renders
   } = useMissionStore();
 
   // Couple sync state
@@ -83,6 +85,8 @@ export default function MissionScreen() {
     isInitialized: isSyncInitialized,
     addBookmark,
     isBookmarked,
+    lockedMissionId,
+    allMissionProgress,
   } = useCoupleSyncStore();
 
   // Use synced bookmark check if initialized, otherwise local
@@ -92,6 +96,16 @@ export default function MissionScreen() {
     }
     return isKeptMission(missionId);
   }, [isSyncInitialized, isBookmarked, isKeptMission]);
+
+  // Check if another mission is in progress (locked but not completed)
+  const isAnotherMissionInProgress = useCallback((missionId: string) => {
+    if (!lockedMissionId || lockedMissionId === missionId) {
+      return false;
+    }
+    // Check if the locked mission is still in progress (not completed)
+    const lockedProgress = allMissionProgress.find(p => p.mission_id === lockedMissionId);
+    return lockedProgress?.status !== 'completed';
+  }, [lockedMissionId, allMissionProgress]);
 
   // Handle keeping/bookmarking a mission
   const handleKeepMission = useCallback(async (mission: Mission): Promise<boolean> => {
@@ -107,11 +121,43 @@ export default function MissionScreen() {
   const bookmarkCount = isSyncInitialized ? sharedBookmarks.length : keptMissions.length;
 
   // Get today's missions or empty array
-  const todayMissions = getTodayMissions();
-  const hasGeneratedMissions = hasTodayMissions();
+  // Use useMemo to ensure re-calculation when dependencies change
+  const todayMissions = React.useMemo(() => {
+    return getTodayMissions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [generatedMissionData, sharedMissions, getTodayMissions]);
+
+  const hasGeneratedMissions = React.useMemo(() => {
+    return hasTodayMissions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [generatedMissionData, sharedMissions, isSyncInitialized, hasTodayMissions]);
 
   // Combine AI-generated missions with featured missions
-  const allMissions = [...todayMissions, ...featuredMissions];
+  const allMissions = React.useMemo(() => {
+    return [...todayMissions, ...featuredMissions];
+  }, [todayMissions, featuredMissions]);
+
+  // Force FlatList to render properly when missions change from empty to populated
+  // This handles cases where the list mounts before React has finished updating
+  useEffect(() => {
+    if (allMissions.length > 0 && !isGenerating) {
+      // Reset scroll initialization state when missions change
+      setIsScrollInitialized(false);
+
+      // Trigger a scroll to ensure the FlatList renders the items
+      // Then set scroll as initialized after a brief delay
+      const timer = setTimeout(() => {
+        if (scrollViewRef.current) {
+          scrollViewRef.current.scrollToOffset({ offset: 0, animated: false });
+          // Mark scroll as initialized after the scroll position is set
+          setTimeout(() => {
+            setIsScrollInitialized(true);
+          }, 50);
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [allMissions.length, isGenerating]);
 
   // Load featured missions on mount and focus
   const loadFeaturedMissions = useCallback(async () => {
@@ -295,14 +341,24 @@ export default function MissionScreen() {
     // Reset carousel state before showing
     setCurrentIndex(0);
     scrollX.setValue(0);
+    setIsScrollInitialized(false);
 
     // Hide loading animation after images are loaded
     setIsGenerating(false);
 
-    // Scroll to beginning after a short delay to ensure FlatList is mounted
+    // Force FlatList to properly initialize by triggering scroll events
+    // Use multiple timeouts to ensure the native driver syncs the scroll position
     setTimeout(() => {
-      scrollViewRef.current?.scrollToOffset({ offset: 0, animated: false });
-    }, 100);
+      if (scrollViewRef.current) {
+        // First scroll to a tiny offset to trigger the scroll event
+        scrollViewRef.current.scrollToOffset({ offset: 1, animated: false });
+        // Then immediately scroll back to 0 and mark as initialized
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToOffset({ offset: 0, animated: false });
+          setIsScrollInitialized(true);
+        }, 50);
+      }
+    }, 150);
 
     // Reset form
     setCanMeetToday(null);
@@ -340,6 +396,13 @@ export default function MissionScreen() {
     []
   );
 
+  // Mark scroll as initialized when user starts dragging
+  const onScrollBeginDrag = useCallback(() => {
+    if (!isScrollInitialized) {
+      setIsScrollInitialized(true);
+    }
+  }, [isScrollInitialized]);
+
   const viewabilityConfig = useRef({
     viewAreaCoveragePercentThreshold: 50,
   }).current;
@@ -352,17 +415,18 @@ export default function MissionScreen() {
         (index + 1) * SNAP_INTERVAL,
       ];
 
-      const scale = scrollX.interpolate({
-        inputRange,
-        outputRange: [0.9, 1, 0.9],
-        extrapolate: 'clamp',
-      });
+      // For the first card, use full scale (1.0) until scroll is initialized
+      // This prevents the intermittent bug where first card appears smaller
+      const scale = index === 0 && !isScrollInitialized
+        ? 1
+        : scrollX.interpolate({
+            inputRange,
+            outputRange: [0.9, 1, 0.9],
+            extrapolate: 'clamp',
+          });
 
-      const opacity = scrollX.interpolate({
-        inputRange,
-        outputRange: [0, 1, 0],
-        extrapolate: 'clamp',
-      });
+      // Don't use opacity animation - it causes cards to be invisible until scroll event
+      // The scale animation provides enough visual feedback for carousel effect
 
       return (
         <Animated.View
@@ -370,7 +434,6 @@ export default function MissionScreen() {
             styles.card,
             {
               transform: [{ scale }],
-              opacity,
             },
           ]}
         >
@@ -382,24 +445,29 @@ export default function MissionScreen() {
               isKept={checkIsKept(item.id)}
               canStart={canStartMission(item.id)}
               isCompletedToday={isTodayCompletedMission(item.id)}
+              isAnotherMissionInProgress={isAnotherMissionInProgress(item.id)}
             />
           </View>
         </Animated.View>
       );
     },
-    [scrollX, handleMissionPress, isTodayCompletedMission]
+    [scrollX, handleMissionPress, handleKeepMission, checkIsKept, canStartMission, isTodayCompletedMission, lockedMissionId, isScrollInitialized, isAnotherMissionInProgress]
   );
 
   return (
     <View style={styles.container}>
-      {/* Background Image */}
-      <ImageBackground
-        source={backgroundImage}
-        defaultSource={require('@/assets/images/backgroundimage.png')}
-        style={styles.backgroundImage}
-        imageStyle={styles.backgroundImageStyle}
-        blurRadius={40}
-      />
+      {/* Background Image - Optimized with expo-image + blur */}
+      <View style={styles.backgroundImage}>
+        <ExpoImage
+          source={backgroundImage?.uri ? { uri: backgroundImage.uri } : backgroundImage}
+          placeholder="L6PZfSi_.AyE_3t7t7R**0LTIpIp"
+          contentFit="cover"
+          transition={150}
+          cachePolicy="memory-disk"
+          style={styles.backgroundImageStyle}
+        />
+        <BlurView intensity={90} tint="light" style={StyleSheet.absoluteFill} />
+      </View>
       <View style={styles.overlay} />
 
       {/* BookmarkedMissionsPage Overlay */}
@@ -453,6 +521,7 @@ export default function MissionScreen() {
                 { useNativeDriver: true }
               )}
               scrollEventThrottle={16}
+              onScrollBeginDrag={onScrollBeginDrag}
               onViewableItemsChanged={onViewableItemsChanged}
               viewabilityConfig={viewabilityConfig}
               getItemLayout={(_, index) => ({
@@ -460,7 +529,7 @@ export default function MissionScreen() {
                 offset: SNAP_INTERVAL * index,
                 index,
               })}
-              extraData={[hasGeneratedMissions, allMissions.map(m => m.id).join(',')]}
+              extraData={[hasGeneratedMissions, allMissions.map(m => m.id).join(','), lockedMissionId]}
               initialNumToRender={3}
               maxToRenderPerBatch={3}
               windowSize={5}
@@ -662,10 +731,11 @@ interface MissionCardContentProps {
   isKept?: boolean;
   canStart?: boolean;
   isCompletedToday?: boolean;
+  isAnotherMissionInProgress?: boolean;
 }
 
-function MissionCardContent({ mission, onStartPress, onKeepPress, isKept, canStart = true, isCompletedToday = false }: MissionCardContentProps) {
-  const blurHeight = CARD_HEIGHT * 0.65; // Blur covers bottom 55% of card
+function MissionCardContent({ mission, onStartPress, onKeepPress, isKept, canStart = true, isCompletedToday = false, isAnotherMissionInProgress = false }: MissionCardContentProps) {
+  const blurHeight = CARD_HEIGHT * 0.8; // Blur covers bottom 55% of card
 
   const handleKeepPress = (e: { stopPropagation: () => void }) => {
     e.stopPropagation();
@@ -710,13 +780,23 @@ function MissionCardContent({ mission, onStartPress, onKeepPress, isKept, canSta
   const handleStartPress = (e: { stopPropagation: () => void }) => {
     e.stopPropagation();
 
-    // Show message if can't start (already completed another mission today)
+    // Show message if can't start
     if (!canStart && !isCompletedToday) {
-      Alert.alert(
-        '미션 시작 불가',
-        '오늘 가능한 미션을 모두 완료했어요.\n내일 다시 도전해보세요!',
-        [{ text: '확인' }]
-      );
+      if (isAnotherMissionInProgress) {
+        // Another mission is in progress (locked but not completed)
+        Alert.alert(
+          '미션 시작 불가',
+          '이미 다른 미션이 진행 중이에요.\n진행 중인 미션을 완료해주세요!',
+          [{ text: '확인' }]
+        );
+      } else {
+        // Today's mission quota is used (another mission was completed)
+        Alert.alert(
+          '미션 시작 불가',
+          '오늘 가능한 미션을 모두 완료했어요.\n내일 다시 도전해보세요!',
+          [{ text: '확인' }]
+        );
+      }
       return;
     }
 
@@ -816,7 +896,7 @@ function MissionCardContent({ mission, onStartPress, onKeepPress, isKept, canSta
                 styles.startActionButtonText,
                 !canStart && !isCompletedToday && styles.startActionButtonTextDisabled,
               ]}>
-                {isCompletedToday ? '완료' : '시작하기'}
+                {isCompletedToday ? '완료' : (isAnotherMissionInProgress ? '다른 미션 진행 중' : '시작하기')}
               </Text>
             </Pressable>
           )}
@@ -848,6 +928,8 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   backgroundImageStyle: {
+    width: '100%',
+    height: '100%',
     transform: [{ scale: 1.0 }],
   },
   overlay: {
@@ -856,7 +938,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
   },
   header: {
     flexDirection: 'row',

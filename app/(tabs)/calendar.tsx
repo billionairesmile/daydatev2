@@ -3,11 +3,9 @@ import {
   View,
   Text,
   StyleSheet,
-  ImageBackground,
   Dimensions,
   Pressable,
   ScrollView,
-  Image,
   Animated,
   PanResponder,
   Modal,
@@ -16,6 +14,7 @@ import {
   TouchableWithoutFeedback,
   Platform,
 } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import {
@@ -41,6 +40,21 @@ import { useCoupleSyncStore, type SyncedTodo } from '@/stores/coupleSyncStore';
 import { isDemoMode } from '@/lib/supabase';
 
 const { width, height } = Dimensions.get('window');
+
+// Parse date string as local date (not UTC) to avoid timezone issues
+// Handles both simple date strings and ISO timestamps
+const parseDateAsLocal = (dateString: string): Date => {
+  // If it's an ISO timestamp (contains T), parse as Date first to get correct local time
+  // e.g., "1990-01-02T15:00:00.000Z" represents Jan 3 00:00 in KST (UTC+9)
+  if (dateString.includes('T')) {
+    const d = new Date(dateString);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+
+  // If it's a simple date string like "1990-01-03", parse as local
+  const [year, month, day] = dateString.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
 
 const MONTH_NAMES_EN = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -315,7 +329,7 @@ export default function CalendarScreen() {
 
   // Derived menstrual state from sync
   const menstrualTrackingEnabled = menstrualSettings?.enabled ?? false;
-  const lastPeriodDate = menstrualSettings?.last_period_date ? new Date(menstrualSettings.last_period_date) : null;
+  const lastPeriodDate = menstrualSettings?.last_period_date ? parseDateAsLocal(menstrualSettings.last_period_date) : null;
   const cycleLength = menstrualSettings?.cycle_length ?? 28;
   const hasPeriodData = !!menstrualSettings?.last_period_date;
 
@@ -374,7 +388,20 @@ export default function CalendarScreen() {
     });
   };
 
-  const openPeriodModal = () => {
+  const openPeriodModal = (skipReset = false) => {
+    // Load existing values from menstrualSettings, unless skipReset is true
+    // (e.g., when coming back from date picker where user selected a date)
+    if (!skipReset) {
+      if (menstrualSettings?.last_period_date) {
+        setTempLastPeriodDate(parseDateAsLocal(menstrualSettings.last_period_date));
+        setPickerMonth(parseDateAsLocal(menstrualSettings.last_period_date));
+      } else {
+        setTempLastPeriodDate(new Date());
+        setPickerMonth(new Date());
+      }
+      setTempCycleLength(String(menstrualSettings?.cycle_length ?? 28));
+    }
+
     periodOpacity.setValue(0);
     setIsPeriodSettingsOpen(true);
     Animated.timing(periodOpacity, {
@@ -533,12 +560,31 @@ export default function CalendarScreen() {
     }
   };
 
+  // Calculate cycle offset range: from past cycles to 3 months ahead from current month
+  const getCycleOffsetRange = (): { start: number; end: number } => {
+    if (!lastPeriodDate || !cycleLength) return { start: 0, end: 0 };
+
+    const today = new Date();
+    // 3 months from current month (end of that month)
+    const threeMonthsAhead = new Date(today.getFullYear(), today.getMonth() + 4, 0);
+
+    // Calculate how many days from lastPeriodDate to 3 months ahead
+    const daysDiff = Math.ceil((threeMonthsAhead.getTime() - lastPeriodDate.getTime()) / (1000 * 60 * 60 * 24));
+    const endOffset = Math.ceil(daysDiff / cycleLength) + 1;
+
+    // Start from a few cycles before the last period date to handle past viewing
+    const startOffset = -3;
+
+    return { start: startOffset, end: endOffset };
+  };
+
   // Period tracking helpers
   const isPeriodDay = (day: number): boolean => {
     if (!lastPeriodDate || !menstrualTrackingEnabled) return false;
     const currentDayDate = new Date(year, month, day);
+    const { start, end } = getCycleOffsetRange();
 
-    for (let cycleOffset = -5; cycleOffset <= 3; cycleOffset++) {
+    for (let cycleOffset = start; cycleOffset <= end; cycleOffset++) {
       const cycleStartDate = new Date(lastPeriodDate);
       cycleStartDate.setDate(cycleStartDate.getDate() + cycleOffset * cycleLength);
       const cycleEndDate = new Date(cycleStartDate);
@@ -554,8 +600,9 @@ export default function CalendarScreen() {
   const isOvulationDay = (day: number): boolean => {
     if (!lastPeriodDate || !cycleLength || !menstrualTrackingEnabled) return false;
     const currentDayDate = new Date(year, month, day);
+    const { start, end } = getCycleOffsetRange();
 
-    for (let cycleOffset = -5; cycleOffset <= 3; cycleOffset++) {
+    for (let cycleOffset = start; cycleOffset <= end; cycleOffset++) {
       const cycleStartDate = new Date(lastPeriodDate);
       cycleStartDate.setDate(cycleStartDate.getDate() + cycleOffset * cycleLength);
       const ovulationDate = new Date(cycleStartDate);
@@ -571,8 +618,9 @@ export default function CalendarScreen() {
   const isFertileWindow = (day: number): boolean => {
     if (!lastPeriodDate || !cycleLength || !menstrualTrackingEnabled) return false;
     const currentDayDate = new Date(year, month, day);
+    const { start, end } = getCycleOffsetRange();
 
-    for (let cycleOffset = -5; cycleOffset <= 3; cycleOffset++) {
+    for (let cycleOffset = start; cycleOffset <= end; cycleOffset++) {
       const cycleStartDate = new Date(lastPeriodDate);
       cycleStartDate.setDate(cycleStartDate.getDate() + cycleOffset * cycleLength);
       const ovulationDate = new Date(cycleStartDate);
@@ -699,14 +747,18 @@ export default function CalendarScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Background Image */}
-      <ImageBackground
-        source={backgroundImage}
-        defaultSource={require('@/assets/images/backgroundimage.png')}
-        style={styles.backgroundImage}
-        imageStyle={styles.backgroundImageStyle}
-        blurRadius={40}
-      />
+      {/* Background Image - Optimized with expo-image + blur */}
+      <View style={styles.backgroundImage}>
+        <ExpoImage
+          source={backgroundImage?.uri ? { uri: backgroundImage.uri } : backgroundImage}
+          placeholder="L6PZfSi_.AyE_3t7t7R**0LTIpIp"
+          contentFit="cover"
+          transition={150}
+          cachePolicy="memory-disk"
+          style={styles.backgroundImageStyle}
+        />
+        <BlurView intensity={90} tint="light" style={StyleSheet.absoluteFill} />
+      </View>
       <View style={styles.overlay} />
 
       {/* Header - Fixed at top */}
@@ -798,9 +850,12 @@ export default function CalendarScreen() {
                       isSelectedDay && !isTodayDay && styles.selectedBorder,
                     ]}
                   >
-                    <Image
+                    <ExpoImage
                       source={{ uri: mission.imageUrl }}
                       style={styles.missionImage}
+                      contentFit="cover"
+                      cachePolicy="memory-disk"
+                      transition={100}
                     />
                     <View style={styles.missionOverlay}>
                       <Text
@@ -911,7 +966,7 @@ export default function CalendarScreen() {
               <Text style={styles.periodSectionTitle}>월경 정보</Text>
               <Pressable
                 style={styles.iconButtonRound}
-                onPress={openPeriodModal}
+                onPress={() => openPeriodModal()}
               >
                 <Pen color={COLORS.white} size={18} strokeWidth={2} />
               </Pressable>
@@ -919,7 +974,7 @@ export default function CalendarScreen() {
             <View style={styles.divider} />
 
             {!hasPeriodData ? (
-              <Pressable style={styles.emptyPeriodCard} onPress={openPeriodModal}>
+              <Pressable style={styles.emptyPeriodCard} onPress={() => openPeriodModal()}>
                 <LinearGradient
                   colors={['#ef4444', '#ec4899']}
                   start={{ x: 0, y: 0 }}
@@ -1224,7 +1279,7 @@ export default function CalendarScreen() {
         animationType="none"
         onRequestClose={() => {
           setIsDatePickerOpen(false);
-          openPeriodModal();
+          openPeriodModal(true); // Skip reset to preserve temp values
         }}
       >
         <View style={styles.modalOverlay}>
@@ -1235,7 +1290,7 @@ export default function CalendarScreen() {
                 <Pressable
                   onPress={() => {
                     setIsDatePickerOpen(false);
-                    openPeriodModal();
+                    openPeriodModal(true); // Skip reset to preserve temp values
                   }}
                   style={styles.modalCloseButton}
                 >
@@ -1297,7 +1352,7 @@ export default function CalendarScreen() {
                         onPress={() => {
                           setTempLastPeriodDate(new Date(pickerMonth.getFullYear(), pickerMonth.getMonth(), day));
                           setIsDatePickerOpen(false);
-                          openPeriodModal();
+                          openPeriodModal(true); // Skip reset to preserve selected date
                         }}
                       >
                         {isSelected ? (
@@ -1352,6 +1407,8 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   backgroundImageStyle: {
+    width: '100%',
+    height: '100%',
     transform: [{ scale: 1.0 }],
   },
   overlay: {
@@ -1360,7 +1417,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: COLORS.glass.black40,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
   },
   scrollView: {
     flex: 1,

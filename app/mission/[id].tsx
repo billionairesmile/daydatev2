@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  ImageBackground,
   Dimensions,
   Pressable,
   ScrollView,
@@ -12,9 +11,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
-  Image,
+  Image as RNImage,
   GestureResponderEvent,
 } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { BlurView } from 'expo-blur';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImageManipulator from 'expo-image-manipulator';
@@ -86,6 +86,8 @@ export default function MissionDetailScreen() {
   const {
     isInitialized: isSyncInitialized,
     activeMissionProgress,
+    allMissionProgress,
+    lockedMissionId,
     startMissionProgress,
     uploadMissionPhoto,
     submitMissionMessage,
@@ -94,6 +96,8 @@ export default function MissionDetailScreen() {
     isUserMessage1Submitter,
     hasUserSubmittedMessage,
     hasPartnerSubmittedMessage,
+    getMissionProgressByMissionId,
+    isMissionLocked,
   } = useCoupleSyncStore();
 
   // Find mission in today's missions, kept missions, or provide a fallback
@@ -109,25 +113,40 @@ export default function MissionDetailScreen() {
       imageUrl: '',
       isPremium: false,
     };
+
+  // Get the progress for THIS specific mission (not just the active one)
+  const thisMissionProgress = getMissionProgressByMissionId(mission.id);
+
+  // Check if another mission is locked (meaning we can't start this one)
+  const isOtherMissionLocked = isMissionLocked(mission.id);
   const { addMemory, memories } = useMemoryStore();
   const hasCompletedRef = useRef(false);
   const memorySavedRef = useRef(false);
   const hasRestoredRef = useRef(false);
 
-  // Sync state from activeMissionProgress (real-time updates from partner)
+  // Prefetch mission images for instant display
   useEffect(() => {
-    if (!isSyncInitialized || !activeMissionProgress) return;
+    // Prefetch mission background image
+    if (mission?.imageUrl) {
+      ExpoImage.prefetch(mission.imageUrl).catch(() => {});
+    }
+    // Prefetch mission progress photo (for this specific mission)
+    if (thisMissionProgress?.photo_url) {
+      ExpoImage.prefetch(thisMissionProgress.photo_url).catch(() => {});
+    }
+  }, [mission?.imageUrl, thisMissionProgress?.photo_url]);
 
-    // Only sync if this is the same mission
-    if (activeMissionProgress.mission_id !== mission.id) return;
+  // Sync state from thisMissionProgress (real-time updates from partner for THIS mission)
+  useEffect(() => {
+    if (!isSyncInitialized || !thisMissionProgress) return;
 
     // Determine if current user is the photo taker (user1 = the one who started/took photo)
-    const isUser1 = user?.id === activeMissionProgress.user1_id;
+    const isUser1 = user?.id === thisMissionProgress.user1_id;
     setIsPhotoTaker(isUser1);
 
     // Sync photo - this shows the photo to both users
-    if (activeMissionProgress.photo_url && !capturedPhoto) {
-      setCapturedPhoto(activeMissionProgress.photo_url);
+    if (thisMissionProgress.photo_url && !capturedPhoto) {
+      setCapturedPhoto(thisMissionProgress.photo_url);
       setPhotoTaken(true);
     }
 
@@ -136,32 +155,31 @@ export default function MissionDetailScreen() {
     // Always update partner's message when it arrives (remove the !user2Message check to force update)
     if (isUser1) {
       // User is user1 (photo taker) - their message is user1_message
-      if (activeMissionProgress.user1_message && !user1Message) {
-        setUser1Message(activeMissionProgress.user1_message);
+      if (thisMissionProgress.user1_message && !user1Message) {
+        setUser1Message(thisMissionProgress.user1_message);
       }
       // Partner's message is user2_message - always sync when available
-      if (activeMissionProgress.user2_message) {
-        setUser2Message(activeMissionProgress.user2_message);
+      if (thisMissionProgress.user2_message) {
+        setUser2Message(thisMissionProgress.user2_message);
       }
     } else {
       // User is user2 (partner) - their message is user2_message
-      if (activeMissionProgress.user2_message && !user1Message) {
-        setUser1Message(activeMissionProgress.user2_message);
+      if (thisMissionProgress.user2_message && !user1Message) {
+        setUser1Message(thisMissionProgress.user2_message);
       }
       // Partner's message (user1) goes to user2Message display - always sync when available
-      if (activeMissionProgress.user1_message) {
-        setUser2Message(activeMissionProgress.user1_message);
+      if (thisMissionProgress.user1_message) {
+        setUser2Message(thisMissionProgress.user1_message);
       }
     }
 
     // Sync location
-    if (activeMissionProgress.location && !currentLocation) {
-      setCurrentLocation(activeMissionProgress.location);
+    if (thisMissionProgress.location && !currentLocation) {
+      setCurrentLocation(thisMissionProgress.location);
     }
   }, [
     isSyncInitialized,
-    activeMissionProgress,
-    mission.id,
+    thisMissionProgress,
     user?.id,
     capturedPhoto,
     user1Message,
@@ -275,7 +293,7 @@ export default function MissionDetailScreen() {
 
         if (photo) {
           // Get original image dimensions
-          Image.getSize(photo.uri, async (originalWidth, originalHeight) => {
+          RNImage.getSize(photo.uri, async (originalWidth: number, originalHeight: number) => {
             try {
               const isLandscapeImage = originalWidth > originalHeight;
               const manipulations: ImageManipulator.Action[] = [];
@@ -370,7 +388,7 @@ export default function MissionDetailScreen() {
               setPreviewPhoto(photo.uri);
               setShowPreview(true);
             }
-          }, (error) => {
+          }, (error: Error) => {
             console.error('Failed to get original image size:', error);
             setPhotoAspectRatio(3 / 4);
             setIsLandscapePhoto(false);
@@ -477,31 +495,22 @@ export default function MissionDetailScreen() {
           const uploadedPhotoUrl = await db.storage.uploadPhoto(couple.id, previewPhoto);
 
           if (uploadedPhotoUrl) {
-            // Check if there's already an active mission progress for THIS mission
-            const isThisMissionProgress = activeMissionProgress?.mission_id === mission.id;
-
-            if (!activeMissionProgress || !isThisMissionProgress) {
-              // No progress or different mission - start new mission progress for this mission
-              // If there was a different mission progress, cancel it first
-              if (activeMissionProgress && !isThisMissionProgress) {
-                console.log('[MissionSync] Different mission progress exists, starting new one for:', mission.id);
-                await cancelMissionProgress();
-              }
-
+            if (!thisMissionProgress) {
+              // No progress for this mission - start new mission progress
               const progress = await startMissionProgress(mission.id, mission);
               if (progress) {
                 // Upload photo to the progress
-                await uploadMissionPhoto(uploadedPhotoUrl);
+                await uploadMissionPhoto(uploadedPhotoUrl, progress.id);
                 // Update location
                 if (locationName && locationName !== '위치 정보 없음') {
-                  await updateMissionLocation(locationName);
+                  await updateMissionLocation(locationName, progress.id);
                 }
               }
             } else {
               // Same mission already started (maybe by partner), just upload photo
-              await uploadMissionPhoto(uploadedPhotoUrl);
+              await uploadMissionPhoto(uploadedPhotoUrl, thisMissionProgress.id);
               if (locationName && locationName !== '위치 정보 없음') {
-                await updateMissionLocation(locationName);
+                await updateMissionLocation(locationName, thisMissionProgress.id);
               }
             }
           }
@@ -551,9 +560,9 @@ export default function MissionDetailScreen() {
 
       // Sync message to partner via coupleSyncStore
       // Partner's message will arrive via real-time subscription (useEffect above)
-      if (isSyncInitialized && activeMissionProgress) {
+      if (isSyncInitialized && thisMissionProgress) {
         try {
-          await submitMissionMessage(message);
+          await submitMissionMessage(message, thisMissionProgress.id);
         } catch (error) {
           console.error('Error syncing message:', error);
           // Local save already done, continue even if sync fails
@@ -665,7 +674,9 @@ export default function MissionDetailScreen() {
   const isComplete = photoTaken && user1Message && user2Message;
   const isWaitingForPartner = photoTaken && user1Message && !user2Message;
   // Partner waiting for photo (partner joined but photo not taken yet)
-  const isWaitingForPhoto = !photoTaken && !isPhotoTaker && isSyncInitialized && activeMissionProgress;
+  const isWaitingForPhoto = !photoTaken && !isPhotoTaker && isSyncInitialized && thisMissionProgress;
+  // Mission locked by another mission (can't start this one)
+  const isMissionLockedByAnother = isOtherMissionLocked && !thisMissionProgress;
 
   // Mark mission as completed and auto-save when all steps are done
   useEffect(() => {
@@ -814,10 +825,12 @@ export default function MissionDetailScreen() {
             width: previewWidth,
             height: previewHeight
           }]}>
-            <Image
+            <ExpoImage
               source={{ uri: previewPhoto }}
               style={styles.previewFrameImage}
-              resizeMode="contain"
+              contentFit="contain"
+              cachePolicy="memory-disk"
+              transition={100}
             />
           </View>
 
@@ -919,14 +932,18 @@ export default function MissionDetailScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Background */}
-      <ImageBackground
-        source={{ uri: mission.imageUrl }}
-        style={styles.backgroundImage}
-        blurRadius={8}
-      >
+      {/* Background - Optimized with expo-image */}
+      <View style={styles.backgroundImage}>
+        <ExpoImage
+          source={{ uri: mission.imageUrl }}
+          style={StyleSheet.absoluteFill}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          transition={100}
+        />
+        <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
         <View style={styles.overlay} />
-      </ImageBackground>
+      </View>
 
 
       {/* Header */}
@@ -1005,10 +1022,12 @@ export default function MissionDetailScreen() {
                   </Text>
                   {capturedPhoto && (
                     <View style={styles.photoPreviewContainer}>
-                      <Image
+                      <ExpoImage
                         source={{ uri: capturedPhoto }}
                         style={[styles.photoPreview, { aspectRatio: photoAspectRatio }]}
-                        resizeMode="contain"
+                        contentFit="contain"
+                        cachePolicy="memory-disk"
+                        transition={100}
                       />
                       {/* Only show retake button to the photo taker, not the partner */}
                       {!isComplete && isPhotoTaker && (
@@ -1118,19 +1137,19 @@ export default function MissionDetailScreen() {
           <Pressable
             style={[
               styles.ctaButton,
-              (isWaitingForPartner || isWaitingForPhoto) && styles.ctaButtonDisabled,
+              (isWaitingForPartner || isWaitingForPhoto || isMissionLockedByAnother) && styles.ctaButtonDisabled,
               isComplete && styles.ctaButtonComplete,
             ]}
             onPress={
               isComplete
                 ? handleCompleteAndClose
-                : isWaitingForPartner || isWaitingForPhoto
+                : isWaitingForPartner || isWaitingForPhoto || isMissionLockedByAnother
                   ? undefined
                   : photoTaken
                     ? handleOpenMessageModal
                     : handleTakePhoto
             }
-            disabled={!!(isWaitingForPartner || isWaitingForPhoto)}
+            disabled={!!(isWaitingForPartner || isWaitingForPhoto || isMissionLockedByAnother)}
           >
             {isComplete ? (
               <View style={styles.ctaButtonCompleteContent}>
@@ -1140,15 +1159,17 @@ export default function MissionDetailScreen() {
             ) : (
               <Text style={[
                 styles.ctaButtonText,
-                (isWaitingForPartner || isWaitingForPhoto) && styles.ctaButtonTextDisabled,
+                (isWaitingForPartner || isWaitingForPhoto || isMissionLockedByAnother) && styles.ctaButtonTextDisabled,
               ]}>
-                {isWaitingForPartner
-                  ? '상대방 대기 중...'
-                  : isWaitingForPhoto
-                    ? '사진 대기 중...'
-                    : photoTaken
-                      ? '서로에게 한마디 작성'
-                      : '사진 촬영'}
+                {isMissionLockedByAnother
+                  ? '다른 미션 진행 중'
+                  : isWaitingForPartner
+                    ? '상대방 대기 중...'
+                    : isWaitingForPhoto
+                      ? '사진 대기 중...'
+                      : photoTaken
+                        ? '서로에게 한마디 작성'
+                        : '사진 촬영'}
               </Text>
             )}
           </Pressable>

@@ -407,12 +407,18 @@ const SYSTEM_PROMPT = `당신은 한국 2030 커플의 데이트 플래너입니
 - 소확행: 편의점 데이트, 다이소 쇼핑, 네컷사진, 스티커사진
 - 계절: 벚꽃/단풍 명소, 한강 피크닉, 눈 오는 날 데이트
 - 야경: 드라이브, 루프탑, 야경 맛집, 한강 야경
-- 활동: 방탈출, 보드게임카페, 스크린골프, 코인노래방, VR게임
+- 활동: 방탈출, 보드게임카페, PC방, 코인노래방, VR게임
 - 먹거리: 전통시장 투어, 길거리 음식, 맛집 웨이팅
 
 ## 미션 작성 규칙
-1. title: 15자 이내, 호기심 유발 (X: 카페 가기 → O: 눈 감고 고른 메뉴 도전)
-2. description: 80자 이내, 구체적인 데이트 아이디어만
+1. title: 감성적이고 시적인 문구로 작성 (15~25자)
+   - 좋은 예: "반짝이는 트리 아래, 우리의 겨울", "함께 외치는 응원의 순간", "우리, 그리고 반려견과의 하루"
+   - 나쁜 예: "카페 가기", "방탈출 하기", "맛집 탐방" (너무 직접적이고 평범함)
+   - 미션명만으로도 어떤 활동인지 유추 가능해야 함 (구체적인 내용은 description에서 보충)
+   - 단어가 중간에 끊기지 않도록 작성 (한 단어가 줄에 다 안 들어가면 그 단어 전체를 다음 줄에 작성)
+2. description: 80자 이내, 미션이 무엇인지 구체적으로 설명
+   - 미션명이 감성적인 만큼 description은 명확하게 "무엇을 하는 미션인지" 설명
+   - 예: title "반짝이는 트리 아래, 우리의 겨울" → description "크리스마스 트리 명소에서 함께 사진 찍기"
 3. 금액 언급 절대 금지 (X: "3000원으로", "무료로")
 4. "후기 나누기", "이야기 나누기" 같은 부가 설명 금지
 5. 사진 인증이 자연스러운 활동으로 구성
@@ -434,12 +440,20 @@ const SYSTEM_PROMPT = `당신은 한국 2030 커플의 데이트 플래너입니
 
 ※ 세 미션의 카테고리는 서로 겹치지 않게!
 
-## 카테고리 목록
+## 카테고리 목록 (반드시 이 중 하나만 사용!)
 Food: cafe, restaurant, streetfood, dessert, cooking, drink, brunch
 Place: outdoor, home, travel, daytrip, drive, night, nature
 Activity: culture, movie, sports, fitness, wellness, creative, game, shopping, photo, learning
 Special: romantic, anniversary, surprise, memory
 Online: online, challenge
+
+### 카테고리 상세 설명 (중요!)
+- creative: DIY, 공예, 원데이클래스, 캔들/향수/비누 만들기, 도자기, 그림, 꽃꽂이, 가죽공예, 뜨개질, 레진아트, 네일아트 등 모든 만들기/체험 활동
+- culture: 전시회, 미술관, 박물관, 공연, 콘서트, 연극 등 문화생활
+- learning: 언어교환, 스터디, 강연, 세미나 등 학습 활동
+- wellness: 스파, 마사지, 온천, 명상, 요가 등 힐링 활동
+
+⚠️ 위 목록에 없는 카테고리(diy, craft, workshop, class 등)는 절대 사용 금지!
 
 ## JSON 출력 형식
 {"missions":[{"title":"","description":"","category":"","tags":["","",""]}]}`;
@@ -449,58 +463,60 @@ Online: online, challenge
 // ============================================
 
 const FEW_SHOT_EXAMPLES = `
-## 좋은 미션 예시 (만났을 때)
+## 좋은 미션 예시 (만났을 때) - 감성적인 title + 구체적인 description
 
 [감성/로맨틱]
-{"title":"크리스마스 트리 핫플 투어","description":"올해 뜨는 크리스마스 트리 스팟 찾아가서 인증샷 남기기","category":"romantic","tags":["크리스마스","트리","핫플"]}
-{"title":"한옥카페 겨울 감성","description":"한옥카페에서 따뜻한 차 마시며 겨울 풍경 즐기기","category":"cafe","tags":["한옥","카페","감성"]}
-{"title":"루프탑바 야경 데이트","description":"야경 보이는 루프탑바에서 시그니처 칵테일 마시기","category":"drink","tags":["루프탑","야경","칵테일"]}
-{"title":"네컷사진 컬렉션","description":"요즘 뜨는 포토부스 돌면서 네컷사진 모으기","category":"photo","tags":["포토부스","네컷","투어"]}
+{"title":"반짝이는 트리 아래, 우리의 겨울","description":"올해 뜨는 크리스마스 트리 명소에서 함께 인증샷 남기기","category":"romantic","tags":["크리스마스","트리","핫플"]}
+{"title":"고즈넉한 처마 아래, 차 한 잔","description":"한옥카페에서 따뜻한 전통차 마시며 겨울 풍경 감상하기","category":"cafe","tags":["한옥","카페","감성"]}
+{"title":"도시의 밤, 너와 건배","description":"야경이 보이는 루프탑바에서 시그니처 칵테일 즐기기","category":"drink","tags":["루프탑","야경","칵테일"]}
+{"title":"찰칵, 우리의 순간들","description":"요즘 뜨는 포토부스 돌면서 네컷사진 컬렉션 만들기","category":"photo","tags":["포토부스","네컷","투어"]}
 
 [액티비티]
-{"title":"방탈출 도전","description":"둘이서 머리 맞대고 방탈출 게임 클리어하기","category":"game","tags":["방탈출","협동","게임"]}
-{"title":"VR 가상현실 데이트","description":"VR 게임존에서 가상현실 속 데이트 즐기기","category":"game","tags":["VR","게임","체험"]}
-{"title":"원데이 쿠킹클래스","description":"함께 요리 배우면서 새로운 레시피 도전하기","category":"cooking","tags":["쿠킹클래스","요리","체험"]}
-{"title":"오락실 올킬 대결","description":"다트, 볼링, 사격 다 섭렵하기. 진 사람이 다음 데이트 계획!","category":"game","tags":["오락실","대결","볼링"]}
+{"title":"함께 풀어가는 비밀의 방","description":"둘이서 머리 맞대고 방탈출 게임 클리어하기","category":"game","tags":["방탈출","협동","게임"]}
+{"title":"현실을 넘어, 가상의 모험","description":"VR 게임존에서 가상현실 속 데이트 즐기기","category":"game","tags":["VR","게임","체험"]}
+{"title":"우리가 만든 한 끼의 행복","description":"원데이 쿠킹클래스에서 함께 요리 배우기","category":"cooking","tags":["쿠킹클래스","요리","체험"]}
+{"title":"진지한 승부, 웃긴 결말","description":"오락실에서 다트, 볼링, 사격 대결하기. 진 사람이 다음 데이트 계획!","category":"game","tags":["오락실","대결","볼링"]}
+{"title":"함께 외치는 응원의 순간","description":"야구장이나 경기장에서 같이 응원하며 열정 폭발하기","category":"sports","tags":["경기관람","응원","스포츠"]}
 
 [먹거리]
-{"title":"전통시장 먹방 투어","description":"전통시장 돌아다니며 이것저것 사먹기","category":"streetfood","tags":["전통시장","먹방","투어"]}
-{"title":"편의점 조합 대결","description":"편의점에서 각자 조합 메뉴 만들어서 맛 평가하기","category":"streetfood","tags":["편의점","조합","대결"]}
-{"title":"숨은 맛집 탐방","description":"리뷰 10개 미만 로컬 맛집 찾아가보기","category":"restaurant","tags":["맛집","로컬","탐방"]}
+{"title":"골목 사이로 번지는 추억의 맛","description":"전통시장 돌아다니며 길거리 음식 먹방 투어하기","category":"streetfood","tags":["전통시장","먹방","투어"]}
+{"title":"우리만의 레시피, 편의점 에디션","description":"편의점에서 각자 조합 메뉴 만들어서 맛 평가 대결하기","category":"streetfood","tags":["편의점","조합","대결"]}
+{"title":"아무도 모르는 우리만의 맛집","description":"리뷰 10개 미만의 숨은 로컬 맛집 탐방하기","category":"restaurant","tags":["맛집","로컬","탐방"]}
 
 [이색/신선]
-{"title":"쓸데없는 선물 교환","description":"다이소에서 서로에게 쓸데없지만 웃긴 선물 사주기","category":"shopping","tags":["다이소","선물","웃음"]}
-{"title":"눈 감고 메뉴 주문","description":"카페에서 눈 감고 메뉴판 짚어서 나온 거 마시기","category":"cafe","tags":["랜덤","도전","카페"]}
-{"title":"인생네컷 7종 콤보","description":"한 번에 포즈 7개 다 다르게 찍기 챌린지","category":"photo","tags":["인생네컷","챌린지","사진"]}
-{"title":"즉흥 버스 여행","description":"먼저 오는 버스 타고 종점까지 가보기","category":"adventure","tags":["즉흥","버스","모험"]}
+{"title":"쓸데없지만 웃긴, 그게 우리야","description":"다이소에서 서로에게 쓸데없지만 웃긴 선물 골라주기","category":"shopping","tags":["다이소","선물","웃음"]}
+{"title":"운명에 맡긴 오늘의 음료","description":"카페에서 눈 감고 메뉴판 짚어서 나온 거 마시기","category":"cafe","tags":["랜덤","도전","카페"]}
+{"title":"7가지 표정, 하나의 네컷","description":"인생네컷에서 7가지 다른 포즈 챌린지 도전하기","category":"photo","tags":["인생네컷","챌린지","사진"]}
+{"title":"종점까지, 우리의 즉흥 여행","description":"먼저 오는 버스 타고 종점까지 떠나보기","category":"daytrip","tags":["즉흥","버스","모험"]}
+{"title":"우리, 그리고 반려견과의 하루","description":"반려동물과 함께 펫프렌들리 카페나 공원 나들이하기","category":"outdoor","tags":["반려동물","산책","힐링"]}
 
 [힐링]
-{"title":"스파 힐링 데이트","description":"온천이나 스파에서 따뜻하게 릴랙스하기","category":"wellness","tags":["스파","온천","힐링"]}
-{"title":"북카페 독서 데이트","description":"같이 책 읽다가 좋은 구절 공유하기","category":"cafe","tags":["북카페","독서","감성"]}
-{"title":"향수 공방 체험","description":"서로에게 어울리는 향수 직접 만들어주기","category":"creative","tags":["향수","공방","선물"]}
+{"title":"따뜻한 물 속, 흘러가는 시간","description":"온천이나 스파에서 따뜻하게 릴랙스하기","category":"wellness","tags":["스파","온천","힐링"]}
+{"title":"같은 페이지를 넘기는 우리","description":"북카페에서 같이 책 읽다가 좋은 구절 공유하기","category":"cafe","tags":["북카페","독서","감성"]}
+{"title":"너를 담은 향기 한 병","description":"향수 공방에서 서로에게 어울리는 향수 직접 만들어주기","category":"creative","tags":["향수","공방","선물"]}
 
 [기념일 당일 특별 미션]
-{"title":"우리만의 포토북 제작","description":"오늘 찍은 사진들로 포토북 주문해두기","category":"anniversary","tags":["기념일","포토북","추억"]}
-{"title":"기념일 레터링 케이크","description":"레터링 케이크 예약해서 함께 촛불 끄고 소원 빌기","category":"anniversary","tags":["케이크","기념일","로맨틱"]}
-{"title":"커플링/팔찌 맞추기","description":"기념일 기념 커플 아이템 함께 고르러 가기","category":"anniversary","tags":["커플링","선물","기념일"]}
-{"title":"첫 만남 장소 재방문","description":"처음 만났던 그 장소 다시 가서 추억 회상하기","category":"memory","tags":["첫만남","추억","회상"]}
-{"title":"사랑의 타임캡슐","description":"서로에게 편지 써서 1년 뒤 열어보기로 약속하기","category":"romantic","tags":["타임캡슐","편지","약속"]}
-{"title":"별 보며 소원 빌기","description":"야경 좋은 곳에서 별 보며 서로 소원 말해주기","category":"romantic","tags":["별","야경","로맨틱"]}
-{"title":"기념일 풀코스 디너","description":"분위기 좋은 레스토랑에서 코스요리 즐기기","category":"anniversary","tags":["디너","레스토랑","기념일"]}
-{"title":"추억 앨범 감상회","description":"지금까지 찍은 사진들 보며 그때 이야기 나누기","category":"memory","tags":["추억","사진","대화"]}
-{"title":"손편지 교환","description":"미리 준비한 손편지 서로 읽어주기","category":"romantic","tags":["손편지","감동","사랑"]}
+{"title":"오늘을 영원히 담아두는 법","description":"오늘 찍은 사진들로 포토북 주문해두기","category":"anniversary","tags":["기념일","포토북","추억"]}
+{"title":"달콤한 축하, 촛불 앞의 소원","description":"레터링 케이크 앞에서 함께 촛불 끄고 소원 빌기","category":"anniversary","tags":["케이크","기념일","로맨틱"]}
+{"title":"손끝에 새기는 우리의 약속","description":"기념일 기념 커플링이나 팔찌 함께 고르러 가기","category":"anniversary","tags":["커플링","선물","기념일"]}
+{"title":"그날의 우리로 돌아가는 시간","description":"처음 만났던 그 장소 다시 가서 추억 회상하기","category":"memory","tags":["첫만남","추억","회상"]}
+{"title":"미래의 우리에게 보내는 편지","description":"서로에게 편지 써서 1년 뒤 열어보기로 약속하기","category":"romantic","tags":["타임캡슐","편지","약속"]}
+{"title":"밤하늘 아래, 속삭이는 소원","description":"야경 좋은 곳에서 별 보며 서로 소원 말해주기","category":"romantic","tags":["별","야경","로맨틱"]}
+{"title":"오늘 밤은 우리만의 만찬","description":"분위기 좋은 레스토랑에서 코스요리 즐기기","category":"anniversary","tags":["디너","레스토랑","기념일"]}
+{"title":"흘러간 시간 속 우리의 발자취","description":"지금까지 찍은 사진들 보며 그때 이야기 나누기","category":"memory","tags":["추억","사진","대화"]}
+{"title":"손끝으로 전하는 마음 한 줄","description":"미리 준비한 손편지 서로 읽어주기","category":"romantic","tags":["손편지","감동","사랑"]}
 
 ---
 ## 만나지 못할 때 미션 예시 (한 명이 현장에서 직접 촬영하여 인증)
 
-{"title":"오늘의 버킷리스트","description":"내년에 함께 하고 싶은 버킷리스트 적어서 사진 찍기","category":"online","tags":["버킷리스트","계획","사진"]}
-{"title":"같은 책 함께 읽기","description":"같은 책 정해서 각자 읽고 읽는 중인 페이지 인증","category":"online","tags":["독서","책","인증"]}
-{"title":"손편지 쓰기","description":"손으로 직접 편지 써서 사진 찍어 보내기","category":"online","tags":["손편지","감동","아날로그"]}
-{"title":"같은 영화 동시 감상","description":"같은 영화 틀어놓고 동시에 보기. 보는 중 화면 인증","category":"online","tags":["영화","동시시청","인증"]}
-{"title":"같은 메뉴 각자 만들기","description":"같은 레시피로 각자 요리해서 결과물 인증","category":"online","tags":["요리","챌린지","인증"]}
-{"title":"플레이리스트 선물","description":"상대방을 위한 플레이리스트 만들어서 캡처 공유하기","category":"online","tags":["음악","플리","선물"]}
-{"title":"100일 후 읽을 편지","description":"100일 뒤의 우리에게 편지 써서 사진 인증","category":"online","tags":["편지","미래","약속"]}
-{"title":"오늘 입은 옷 인증","description":"오늘 입은 전신 코디 사진 서로 공유하기","category":"online","tags":["패션","일상","공유"]}
+{"title":"내년의 우리를 그리며","description":"내년에 함께 하고 싶은 버킷리스트 적어서 사진 찍기","category":"online","tags":["버킷리스트","계획","사진"]}
+{"title":"같은 페이지, 다른 공간","description":"같은 책 정해서 각자 읽고 읽는 중인 페이지 인증하기","category":"online","tags":["독서","책","인증"]}
+{"title":"펜 끝에서 전해지는 마음","description":"손으로 직접 편지 써서 사진 찍어 보내기","category":"online","tags":["손편지","감동","아날로그"]}
+{"title":"같은 장면, 다른 소파","description":"같은 영화 동시에 틀어놓고 보는 중 화면 인증하기","category":"online","tags":["영화","동시시청","인증"]}
+{"title":"떨어져 있어도 같은 맛","description":"같은 레시피로 각자 요리해서 결과물 인증하기","category":"online","tags":["요리","챌린지","인증"]}
+{"title":"너를 위해 고른 멜로디","description":"상대방을 위한 플레이리스트 만들어서 캡처 공유하기","category":"online","tags":["음악","플리","선물"]}
+{"title":"100일 뒤의 우리에게","description":"100일 뒤에 열어볼 편지 써서 사진으로 인증하기","category":"online","tags":["편지","미래","약속"]}
+{"title":"오늘의 나, 너에게 보여줄게","description":"오늘 입은 전신 코디 사진 서로 공유하기","category":"online","tags":["패션","일상","공유"]}
 `;
 
 // ============================================
@@ -537,6 +553,13 @@ export async function generateMissionsWithAI(input: MissionGenerationInput): Pro
   const userPrompt = `다음 상황의 커플을 위한 데이트 미션 3개를 생성해주세요.
 
 ${contextString}
+
+---
+💡 [미션 다양성 유지]
+매번 새롭고 다양한 미션을 생성해주세요:
+- 비슷한 패턴의 미션 반복 금지
+- 창의적이고 신선한 아이디어 우선
+- 다양한 카테고리와 활동 유형을 골고루 활용
 
 ---
 참고할 좋은 예시들:

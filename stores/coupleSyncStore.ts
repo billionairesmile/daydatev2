@@ -1,9 +1,19 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { db, isDemoMode, supabase } from '@/lib/supabase';
 import type { Mission } from '@/types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { useMemoryStore, dbToCompletedMission } from './memoryStore';
 import { formatDateToLocal } from '@/lib/dateUtils';
+import { offlineQueue, OfflineOperationType } from '@/lib/offlineQueue';
+import { getIsOnline } from '@/lib/useNetwork';
+import {
+  notifyPartnerMissionGenerated,
+  notifyMissionReminder,
+  scheduleMissionReminderNotification,
+  cancelMissionReminderNotification,
+} from '@/lib/pushNotifications';
 
 // Types
 export interface SyncedTodo {
@@ -68,6 +78,7 @@ export interface MissionProgress {
   status: MissionProgressStatus;
   location: string | null;
   date: string;
+  is_message_locked?: boolean; // True if this mission is locked for message submission
 }
 
 export interface CoupleAlbum {
@@ -130,8 +141,10 @@ interface CoupleSyncState {
   coupleSettings: CoupleSettings | null;
   backgroundImageUrl: string | null;
 
-  // Extended sync - Mission Progress
-  activeMissionProgress: MissionProgress | null;
+  // Extended sync - Mission Progress (supports multiple missions per day)
+  activeMissionProgress: MissionProgress | null; // The locked mission or first mission (legacy compatibility)
+  allMissionProgress: MissionProgress[]; // All missions for today
+  lockedMissionId: string | null; // The mission_id that is locked for message submission
 
   // Extended sync - Albums
   coupleAlbums: CoupleAlbum[];
@@ -155,9 +168,12 @@ interface CoupleSyncActions {
   // Mission sync
   acquireMissionLock: () => Promise<boolean>;
   releaseMissionLock: (status?: 'completed' | 'idle') => Promise<void>;
-  saveSharedMissions: (missions: Mission[], answers: unknown) => Promise<void>;
+  saveSharedMissions: (missions: Mission[], answers: unknown, partnerId?: string, userNickname?: string) => Promise<void>;
   loadSharedMissions: () => Promise<Mission[] | null>;
   resetAllMissions: () => Promise<void>;
+
+  // Mission reminder notification
+  sendMissionReminderNotifications: (userNickname: string, partnerNickname: string) => Promise<void>;
 
   // Bookmark sync
   addBookmark: (mission: Mission) => Promise<boolean>;
@@ -181,16 +197,21 @@ interface CoupleSyncActions {
   loadCoupleSettings: () => Promise<void>;
   setBackgroundImageUrl: (url: string | null) => void;
 
-  // Extended sync - Mission Progress
+  // Extended sync - Mission Progress (supports multiple missions per day)
   startMissionProgress: (missionId: string, missionData: Mission) => Promise<MissionProgress | null>;
-  uploadMissionPhoto: (photoUrl: string) => Promise<void>;
-  submitMissionMessage: (message: string) => Promise<void>;
-  updateMissionLocation: (location: string) => Promise<void>;
+  uploadMissionPhoto: (photoUrl: string, progressId?: string) => Promise<void>;
+  submitMissionMessage: (message: string, progressId?: string) => Promise<void>;
+  updateMissionLocation: (location: string, progressId?: string) => Promise<void>;
   loadMissionProgress: () => Promise<void>;
-  cancelMissionProgress: () => Promise<void>;
-  isUserMessage1Submitter: () => boolean;
-  hasUserSubmittedMessage: () => boolean;
-  hasPartnerSubmittedMessage: () => boolean;
+  cancelMissionProgress: (progressId?: string) => Promise<void>;
+  isUserMessage1Submitter: (progress?: MissionProgress | null) => boolean;
+  hasUserSubmittedMessage: (progress?: MissionProgress | null) => boolean;
+  hasPartnerSubmittedMessage: (progress?: MissionProgress | null) => boolean;
+  // Multi-mission support
+  getMissionProgressByMissionId: (missionId: string) => MissionProgress | undefined;
+  getLockedMissionProgress: () => MissionProgress | null;
+  isMissionLocked: (missionId: string) => boolean;
+  canStartNewMission: () => boolean;
 
   // Extended sync - Albums
   createAlbum: (
@@ -211,6 +232,9 @@ interface CoupleSyncActions {
   // State setters (for internal use)
   setSharedMissions: (missions: Mission[]) => void;
   setMissionGenerationStatus: (status: MissionGenerationStatus, userId?: string | null) => void;
+
+  // Offline sync
+  processPendingOperations: () => Promise<void>;
 }
 
 // Store channels for cleanup
@@ -241,6 +265,8 @@ const initialState: CoupleSyncState = {
   coupleSettings: null,
   backgroundImageUrl: null,
   activeMissionProgress: null,
+  allMissionProgress: [],
+  lockedMissionId: null,
   coupleAlbums: [],
   albumPhotosMap: {},
   // Loading states
@@ -253,7 +279,9 @@ const initialState: CoupleSyncState = {
   isLoadingAlbums: false,
 };
 
-export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()((set, get) => ({
+export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
+  persist(
+    (set, get) => ({
   ...initialState,
 
   // ============================================
@@ -320,11 +348,17 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       const todo = payload.todo as SyncedTodo;
 
       if (payload.eventType === 'INSERT') {
-        set((state) => ({
-          sharedTodos: [...state.sharedTodos, todo].sort(
-            (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-          ),
-        }));
+        set((state) => {
+          // Check if todo already exists (prevent duplicate from realtime + direct add)
+          if (state.sharedTodos.some(t => t.id === todo.id)) {
+            return state;
+          }
+          return {
+            sharedTodos: [...state.sharedTodos, todo].sort(
+              (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+            ),
+          };
+        });
       } else if (payload.eventType === 'UPDATE') {
         set((state) => ({
           sharedTodos: state.sharedTodos.map((t) => (t.id === todo.id ? todo : t)),
@@ -360,14 +394,78 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       });
     });
 
-    // 7. Mission progress subscription
+    // 7. Mission progress subscription (handles multiple missions per day)
     progressChannel = db.missionProgress.subscribeToProgress(coupleId, (payload) => {
       const progress = payload.progress as MissionProgress;
+      const today = formatDateToLocal(new Date());
 
-      if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-        set({ activeMissionProgress: progress });
+      // Only process progress for today
+      if (progress.date !== today) return;
+
+      if (payload.eventType === 'INSERT') {
+        set((state) => {
+          const existing = state.allMissionProgress.find(p => p.id === progress.id);
+          if (existing) return state;
+
+          const updatedAll = [...state.allMissionProgress, progress];
+          const lockedProgress = updatedAll.find(p => p.is_message_locked);
+          const lockedId = lockedProgress?.mission_id || null;
+          const active = lockedProgress || updatedAll[0] || null;
+
+          return {
+            allMissionProgress: updatedAll,
+            activeMissionProgress: active,
+            lockedMissionId: lockedId,
+          };
+        });
+      } else if (payload.eventType === 'UPDATE') {
+        set((state) => {
+          const updatedAll = state.allMissionProgress.map(p =>
+            p.id === progress.id ? progress : p
+          );
+
+          // If progress wasn't in the array, add it
+          if (!state.allMissionProgress.some(p => p.id === progress.id)) {
+            updatedAll.push(progress);
+          }
+
+          const lockedProgress = updatedAll.find(p => p.is_message_locked);
+          const lockedId = lockedProgress?.mission_id || null;
+          const active = lockedProgress || updatedAll[0] || null;
+
+          // Cancel scheduled reminder if locked mission is completed
+          if (progress.status === 'completed' && progress.is_message_locked) {
+            cancelMissionReminderNotification().catch((err) => {
+              console.error('[CoupleSyncStore] Failed to cancel reminder notification:', err);
+            });
+
+            // Clean up non-locked missions when locked mission completes
+            if (state.coupleId && !isDemoMode) {
+              db.missionProgress.deleteNonLockedMissions(state.coupleId).catch((err) => {
+                console.error('[CoupleSyncStore] Failed to delete non-locked missions:', err);
+              });
+            }
+          }
+
+          return {
+            allMissionProgress: updatedAll,
+            activeMissionProgress: active,
+            lockedMissionId: lockedId,
+          };
+        });
       } else if (payload.eventType === 'DELETE') {
-        set({ activeMissionProgress: null });
+        set((state) => {
+          const updatedAll = state.allMissionProgress.filter(p => p.id !== progress.id);
+          const lockedProgress = updatedAll.find(p => p.is_message_locked);
+          const lockedId = lockedProgress?.mission_id || null;
+          const active = lockedProgress || updatedAll[0] || null;
+
+          return {
+            allMissionProgress: updatedAll,
+            activeMissionProgress: active,
+            lockedMissionId: lockedId,
+          };
+        });
       }
     });
 
@@ -602,7 +700,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     set({ missionGenerationStatus: status, generatingUserId: null });
   },
 
-  saveSharedMissions: async (missions: Mission[], answers: unknown) => {
+  saveSharedMissions: async (missions: Mission[], answers: unknown, partnerId?: string, userNickname?: string) => {
     const { coupleId, userId } = get();
     if (!coupleId || !userId || isDemoMode) {
       set({ sharedMissions: missions, lastMissionUpdate: new Date() });
@@ -619,6 +717,19 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
         sharedMissions: missions,
         lastMissionUpdate: new Date(),
         missionGenerationStatus: 'completed',
+      });
+
+      // Send push notification to partner
+      if (partnerId && userNickname) {
+        console.log('[CoupleSyncStore] Sending mission generated notification to partner:', partnerId);
+        notifyPartnerMissionGenerated(partnerId, userNickname).catch((err) => {
+          console.error('[CoupleSyncStore] Failed to send notification:', err);
+        });
+      }
+
+      // Schedule a reminder notification for 8 PM if missions aren't completed
+      scheduleMissionReminderNotification(20).catch((err) => {
+        console.error('[CoupleSyncStore] Failed to schedule reminder notification:', err);
       });
     }
 
@@ -665,6 +776,73 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     set({ missionGenerationStatus: status, generatingUserId: userId });
   },
 
+  /**
+   * Send mission reminder notifications to users who haven't written their message.
+   * Logic:
+   * 1. If the mission date is not today (past midnight), don't send any notifications
+   * 2. If today's mission is already completed (any mission with status='completed'), don't send any notifications
+   * 3. Only check missions that have photo uploaded (status='message_pending' or 'waiting_partner')
+   * 4. If neither user has written their message -> notify both users
+   * 5. If only one user hasn't written -> notify only that user
+   */
+  sendMissionReminderNotifications: async (userNickname: string, partnerNickname: string) => {
+    const { activeMissionProgress, userId } = get();
+
+    // No active mission progress - nothing to remind about
+    if (!activeMissionProgress || isDemoMode) {
+      console.log('[CoupleSyncStore] No active mission progress - skipping reminder');
+      return;
+    }
+
+    // Check if mission date is still today (don't send reminders for past missions after midnight)
+    const today = formatDateToLocal(new Date());
+    if (activeMissionProgress.date !== today) {
+      console.log('[CoupleSyncStore] Mission date is not today - skipping reminder (mission date:', activeMissionProgress.date, ', today:', today, ')');
+      return;
+    }
+
+    // If mission is already completed, don't send any notifications
+    if (activeMissionProgress.status === 'completed') {
+      console.log('[CoupleSyncStore] Mission already completed - skipping reminder');
+      return;
+    }
+
+    // Only proceed if photo has been uploaded (status is message_pending or waiting_partner)
+    if (activeMissionProgress.status === 'photo_pending') {
+      console.log('[CoupleSyncStore] Photo not yet uploaded - skipping reminder');
+      return;
+    }
+
+    const user1HasMessage = !!activeMissionProgress.user1_message;
+    const user2HasMessage = !!activeMissionProgress.user2_message;
+
+    // Both have written - should have been marked completed, but just in case
+    if (user1HasMessage && user2HasMessage) {
+      console.log('[CoupleSyncStore] Both users have written messages - skipping reminder');
+      return;
+    }
+
+    // Determine who needs to be notified
+    const isCurrentUserUser1 = activeMissionProgress.user1_id === userId;
+    const currentUserHasMessage = isCurrentUserUser1 ? user1HasMessage : user2HasMessage;
+    const partnerHasMessage = isCurrentUserUser1 ? user2HasMessage : user1HasMessage;
+    const partnerId = isCurrentUserUser1
+      ? activeMissionProgress.user2_id
+      : activeMissionProgress.user1_id;
+
+    // Notify current user if they haven't written
+    if (!currentUserHasMessage && userId) {
+      console.log('[CoupleSyncStore] Sending reminder to current user:', userId);
+      await notifyMissionReminder(userId, partnerNickname, partnerHasMessage);
+    }
+
+    // Notify partner if they haven't written
+    if (!partnerHasMessage && partnerId) {
+      console.log('[CoupleSyncStore] Sending reminder to partner:', partnerId);
+      await notifyMissionReminder(partnerId, userNickname, currentUserHasMessage);
+    }
+  },
+
   // Reset all missions (for manual reset from settings)
   resetAllMissions: async () => {
     const { coupleId } = get();
@@ -674,6 +852,8 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       sharedMissions: [],
       missionGenerationStatus: 'idle',
       activeMissionProgress: null,
+      allMissionProgress: [],
+      lockedMissionId: null,
       generatingUserId: null,
     });
 
@@ -768,60 +948,106 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
   addTodo: async (date: string, text: string) => {
     const { coupleId, userId, sharedTodos } = get();
 
+    // Create local todo first (optimistic update)
+    const newTodo: SyncedTodo = {
+      id: `local-${Date.now()}`,
+      couple_id: coupleId || 'demo',
+      date,
+      text,
+      completed: false,
+      created_by: userId || 'demo',
+      completed_by: null,
+      completed_at: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    // Always add to local state first
+    set({
+      sharedTodos: [...sharedTodos, newTodo].sort(
+        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+      ),
+    });
+
     if (!coupleId || !userId || isDemoMode) {
-      // Demo mode: add locally
-      const newTodo: SyncedTodo = {
-        id: `local-${Date.now()}`,
-        couple_id: coupleId || 'demo',
-        date,
-        text,
-        completed: false,
-        created_by: userId || 'demo',
-        completed_by: null,
-        completed_at: null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      set({
-        sharedTodos: [...sharedTodos, newTodo].sort(
-          (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-        ),
-      });
+      // Demo mode: local only
       return newTodo;
     }
 
-    const { data, error } = await db.coupleTodos.create(coupleId, date, text, userId);
-    if (!error && data) {
-      return data as SyncedTodo;
+    // Check if online
+    const isOnline = getIsOnline();
+    if (!isOnline) {
+      // Offline: Queue for later sync
+      console.log('[CoupleSyncStore] Offline - queueing todo for later sync');
+      await offlineQueue.add('ADD_TODO', { date, text, localId: newTodo.id, coupleId, userId });
+      return newTodo;
     }
-    return null;
+
+    // Online: Try to sync to server
+    try {
+      const { data, error } = await db.coupleTodos.create(coupleId, date, text, userId);
+      if (!error && data) {
+        // Replace local todo with server todo
+        const serverTodo = data as SyncedTodo;
+        set({
+          sharedTodos: get().sharedTodos.map(t =>
+            t.id === newTodo.id ? serverTodo : t
+          ),
+        });
+        return serverTodo;
+      } else {
+        // Server error - queue for later
+        console.log('[CoupleSyncStore] Server error - queueing todo for later sync');
+        await offlineQueue.add('ADD_TODO', { date, text, localId: newTodo.id, coupleId, userId });
+        return newTodo;
+      }
+    } catch (error) {
+      // Network error - queue for later
+      console.log('[CoupleSyncStore] Network error - queueing todo for later sync');
+      await offlineQueue.add('ADD_TODO', { date, text, localId: newTodo.id, coupleId, userId });
+      return newTodo;
+    }
   },
 
   toggleTodo: async (todoId: string, completed: boolean) => {
-    const { userId, sharedTodos } = get();
+    const { userId, sharedTodos, coupleId } = get();
+
+    // Optimistic update: update locally first
+    set({
+      sharedTodos: sharedTodos.map((t) =>
+        t.id === todoId
+          ? {
+              ...t,
+              completed,
+              completed_by: completed ? (userId || 'demo') : null,
+              completed_at: completed ? new Date().toISOString() : null,
+            }
+          : t
+      ),
+    });
 
     if (isDemoMode) {
-      // Demo mode: update locally
-      set({
-        sharedTodos: sharedTodos.map((t) =>
-          t.id === todoId
-            ? {
-                ...t,
-                completed,
-                completed_by: completed ? (userId || 'demo') : null,
-                completed_at: completed ? new Date().toISOString() : null,
-              }
-            : t
-        ),
-      });
       return;
     }
 
-    await db.coupleTodos.toggleComplete(todoId, completed, userId || '');
+    // Check if online
+    const isOnline = getIsOnline();
+    if (!isOnline) {
+      console.log('[CoupleSyncStore] Offline - queueing toggle for later sync');
+      await offlineQueue.add('TOGGLE_TODO', { todoId, completed, userId, coupleId });
+      return;
+    }
+
+    try {
+      await db.coupleTodos.toggleComplete(todoId, completed, userId || '');
+    } catch (error) {
+      console.log('[CoupleSyncStore] Network error - queueing toggle for later sync');
+      await offlineQueue.add('TOGGLE_TODO', { todoId, completed, userId, coupleId });
+    }
   },
 
   deleteTodo: async (todoId: string) => {
-    const { sharedTodos } = get();
+    const { sharedTodos, coupleId, userId } = get();
 
     // Optimistic delete - update local state immediately
     set({
@@ -829,12 +1055,23 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     });
 
     if (isDemoMode) {
-      // Demo mode: already deleted locally
       return;
     }
 
-    // Delete from DB (real-time subscription will also fire, but we've already updated locally)
-    await db.coupleTodos.delete(todoId);
+    // Check if online
+    const isOnline = getIsOnline();
+    if (!isOnline) {
+      console.log('[CoupleSyncStore] Offline - queueing delete for later sync');
+      await offlineQueue.add('DELETE_TODO', { todoId, coupleId, userId });
+      return;
+    }
+
+    try {
+      await db.coupleTodos.delete(todoId);
+    } catch (error) {
+      console.log('[CoupleSyncStore] Network error - queueing delete for later sync');
+      await offlineQueue.add('DELETE_TODO', { todoId, coupleId, userId });
+    }
   },
 
   loadTodos: async () => {
@@ -946,7 +1183,20 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
   // ============================================
 
   startMissionProgress: async (missionId: string, missionData: Mission) => {
-    const { coupleId, userId } = get();
+    const { coupleId, userId, allMissionProgress, lockedMissionId } = get();
+
+    // Check if this mission already has progress
+    const existingProgress = allMissionProgress.find(p => p.mission_id === missionId);
+    if (existingProgress) {
+      console.log('[CoupleSyncStore] Mission already has progress:', missionId);
+      return existingProgress;
+    }
+
+    // Check if a mission is locked and it's not this one
+    if (lockedMissionId && lockedMissionId !== missionId) {
+      console.log('[CoupleSyncStore] Cannot start new mission - another mission is locked');
+      return null;
+    }
 
     if (!coupleId || !userId || isDemoMode) {
       // Demo mode: create locally
@@ -968,88 +1218,148 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
         status: 'photo_pending',
         location: null,
         date: formatDateToLocal(new Date()),
+        is_message_locked: false,
       };
-      set({ activeMissionProgress: progress });
+
+      set((state) => ({
+        allMissionProgress: [...state.allMissionProgress, progress],
+        activeMissionProgress: state.lockedMissionId ? state.activeMissionProgress : progress,
+      }));
       return progress;
     }
 
     const { data, error } = await db.missionProgress.start(coupleId, missionId, missionData, userId);
     if (!error && data) {
       const progress = data as MissionProgress;
-      set({ activeMissionProgress: progress });
+      set((state) => ({
+        allMissionProgress: [...state.allMissionProgress, progress],
+        activeMissionProgress: state.lockedMissionId ? state.activeMissionProgress : progress,
+      }));
       return progress;
     }
     return null;
   },
 
-  uploadMissionPhoto: async (photoUrl: string) => {
-    const { activeMissionProgress } = get();
+  uploadMissionPhoto: async (photoUrl: string, progressId?: string) => {
+    const { activeMissionProgress, allMissionProgress } = get();
+    const targetId = progressId || activeMissionProgress?.id;
+    const targetProgress = progressId
+      ? allMissionProgress.find(p => p.id === progressId)
+      : activeMissionProgress;
 
-    if (!activeMissionProgress || isDemoMode) {
-      // Demo mode: update locally
-      if (activeMissionProgress) {
-        set({
-          activeMissionProgress: {
-            ...activeMissionProgress,
-            photo_url: photoUrl,
-            status: 'message_pending',
-          },
-        });
-      }
-      return;
-    }
-
-    await db.missionProgress.uploadPhoto(activeMissionProgress.id, photoUrl);
-  },
-
-  submitMissionMessage: async (message: string) => {
-    const { activeMissionProgress, userId } = get();
-
-    if (!activeMissionProgress || !userId) return;
+    if (!targetProgress) return;
 
     if (isDemoMode) {
       // Demo mode: update locally
-      const isUser1 = activeMissionProgress.user1_id === userId;
+      set((state) => {
+        const updatedProgress = {
+          ...targetProgress,
+          photo_url: photoUrl,
+          status: 'message_pending' as MissionProgressStatus,
+        };
+        const updatedAll = state.allMissionProgress.map(p =>
+          p.id === targetProgress.id ? updatedProgress : p
+        );
+        const lockedProgress = updatedAll.find(p => p.is_message_locked);
+        return {
+          allMissionProgress: updatedAll,
+          activeMissionProgress: lockedProgress || updatedAll[0] || null,
+        };
+      });
+      return;
+    }
+
+    await db.missionProgress.uploadPhoto(targetProgress.id, photoUrl);
+  },
+
+  submitMissionMessage: async (message: string, progressId?: string) => {
+    const { activeMissionProgress, allMissionProgress, userId, lockedMissionId } = get();
+    const targetProgress = progressId
+      ? allMissionProgress.find(p => p.id === progressId)
+      : activeMissionProgress;
+
+    if (!targetProgress || !userId) return;
+
+    // Check if another mission is already locked
+    if (lockedMissionId && lockedMissionId !== targetProgress.mission_id) {
+      console.log('[CoupleSyncStore] Cannot submit message - another mission is locked');
+      return;
+    }
+
+    if (isDemoMode) {
+      // Demo mode: update locally
+      const isUser1 = targetProgress.user1_id === userId;
       const now = new Date().toISOString();
 
       const updates: Partial<MissionProgress> = isUser1
         ? { user1_message: message, user1_message_at: now }
         : { user2_id: userId, user2_message: message, user2_message_at: now };
 
-      const hasUser1Message = isUser1 ? true : !!activeMissionProgress.user1_message;
-      const hasUser2Message = isUser1 ? !!activeMissionProgress.user2_message : true;
+      const hasUser1Message = isUser1 ? true : !!targetProgress.user1_message;
+      const hasUser2Message = isUser1 ? !!targetProgress.user2_message : true;
+
+      // Set is_message_locked if this is the first message and no mission is locked yet
+      if (!lockedMissionId) {
+        updates.is_message_locked = true;
+      }
 
       if (hasUser1Message && hasUser2Message) {
         updates.status = 'completed';
         updates.completed_at = now;
+
+        // Cancel scheduled reminder since mission is completed
+        cancelMissionReminderNotification().catch((err) => {
+          console.error('[CoupleSyncStore] Failed to cancel reminder notification:', err);
+        });
       } else {
         updates.status = 'waiting_partner';
       }
 
-      set({
-        activeMissionProgress: { ...activeMissionProgress, ...updates } as MissionProgress,
+      set((state) => {
+        const updatedProgress = { ...targetProgress, ...updates } as MissionProgress;
+        const updatedAll = state.allMissionProgress.map(p =>
+          p.id === targetProgress.id ? updatedProgress : p
+        );
+        const newLockedId = updatedProgress.is_message_locked ? updatedProgress.mission_id : state.lockedMissionId;
+
+        return {
+          allMissionProgress: updatedAll,
+          activeMissionProgress: updatedProgress,
+          lockedMissionId: newLockedId,
+        };
       });
       return;
     }
 
-    const isUser1 = activeMissionProgress.user1_id === userId;
-    await db.missionProgress.submitMessage(activeMissionProgress.id, userId, message, isUser1);
+    const isUser1 = targetProgress.user1_id === userId;
+    await db.missionProgress.submitMessage(targetProgress.id, userId, message, isUser1);
   },
 
-  updateMissionLocation: async (location: string) => {
-    const { activeMissionProgress } = get();
+  updateMissionLocation: async (location: string, progressId?: string) => {
+    const { activeMissionProgress, allMissionProgress } = get();
+    const targetProgress = progressId
+      ? allMissionProgress.find(p => p.id === progressId)
+      : activeMissionProgress;
 
-    if (!activeMissionProgress || isDemoMode) {
+    if (!targetProgress) return;
+
+    if (isDemoMode) {
       // Demo mode: update locally
-      if (activeMissionProgress) {
-        set({
-          activeMissionProgress: { ...activeMissionProgress, location },
-        });
-      }
+      set((state) => {
+        const updatedProgress = { ...targetProgress, location };
+        const updatedAll = state.allMissionProgress.map(p =>
+          p.id === targetProgress.id ? updatedProgress : p
+        );
+        const lockedProgress = updatedAll.find(p => p.is_message_locked);
+        return {
+          allMissionProgress: updatedAll,
+          activeMissionProgress: lockedProgress || updatedAll[0] || null,
+        };
+      });
       return;
     }
 
-    await db.missionProgress.updateLocation(activeMissionProgress.id, location);
+    await db.missionProgress.updateLocation(targetProgress.id, location);
   },
 
   loadMissionProgress: async () => {
@@ -1057,52 +1367,129 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     if (!coupleId || isDemoMode) return;
 
     set({ isLoadingProgress: true });
-    const { data, error } = await db.missionProgress.getToday(coupleId);
+
+    // Load all mission progress for today
+    const { data: allData, error } = await db.missionProgress.getTodayAll(coupleId);
     set({ isLoadingProgress: false });
 
-    if (!error && data) {
-      set({ activeMissionProgress: data as MissionProgress });
+    if (!error && allData) {
+      const allProgress = allData as MissionProgress[];
+      const lockedProgress = allProgress.find(p => p.is_message_locked);
+      const lockedId = lockedProgress?.mission_id || null;
+      const active = lockedProgress || allProgress[0] || null;
+
+      set({
+        allMissionProgress: allProgress,
+        activeMissionProgress: active,
+        lockedMissionId: lockedId,
+      });
     }
   },
 
-  cancelMissionProgress: async () => {
-    const { activeMissionProgress } = get();
+  cancelMissionProgress: async (progressId?: string) => {
+    const { activeMissionProgress, allMissionProgress } = get();
+    const targetId = progressId || activeMissionProgress?.id;
 
-    if (!activeMissionProgress || isDemoMode) {
-      set({ activeMissionProgress: null });
+    if (!targetId) {
       return;
     }
 
-    await db.missionProgress.delete(activeMissionProgress.id);
-    set({ activeMissionProgress: null });
+    // Find the progress to cancel
+    const progressToCancel = allMissionProgress.find(p => p.id === targetId);
+
+    if (isDemoMode) {
+      set((state) => {
+        const updatedAll = state.allMissionProgress.filter(p => p.id !== targetId);
+        const lockedProgress = updatedAll.find(p => p.is_message_locked);
+        const active = lockedProgress || updatedAll[0] || null;
+        return {
+          allMissionProgress: updatedAll,
+          activeMissionProgress: active,
+          lockedMissionId: lockedProgress?.mission_id || null,
+        };
+      });
+      return;
+    }
+
+    // Don't allow canceling a locked mission
+    if (progressToCancel?.is_message_locked) {
+      console.log('[CoupleSyncStore] Cannot cancel a locked mission');
+      return;
+    }
+
+    await db.missionProgress.delete(targetId);
+
+    set((state) => {
+      const updatedAll = state.allMissionProgress.filter(p => p.id !== targetId);
+      const lockedProgress = updatedAll.find(p => p.is_message_locked);
+      const active = lockedProgress || updatedAll[0] || null;
+      return {
+        allMissionProgress: updatedAll,
+        activeMissionProgress: active,
+        lockedMissionId: lockedProgress?.mission_id || null,
+      };
+    });
   },
 
-  isUserMessage1Submitter: () => {
+  isUserMessage1Submitter: (progress?: MissionProgress | null) => {
     const { activeMissionProgress, userId } = get();
-    if (!activeMissionProgress || !userId) return false;
-    return activeMissionProgress.user1_id === userId;
+    const targetProgress = progress ?? activeMissionProgress;
+    if (!targetProgress || !userId) return false;
+    return targetProgress.user1_id === userId;
   },
 
-  hasUserSubmittedMessage: () => {
+  hasUserSubmittedMessage: (progress?: MissionProgress | null) => {
     const { activeMissionProgress, userId } = get();
-    if (!activeMissionProgress || !userId) return false;
+    const targetProgress = progress ?? activeMissionProgress;
+    if (!targetProgress || !userId) return false;
 
-    if (activeMissionProgress.user1_id === userId) {
-      return !!activeMissionProgress.user1_message;
+    if (targetProgress.user1_id === userId) {
+      return !!targetProgress.user1_message;
     } else {
-      return !!activeMissionProgress.user2_message;
+      return !!targetProgress.user2_message;
     }
   },
 
-  hasPartnerSubmittedMessage: () => {
+  hasPartnerSubmittedMessage: (progress?: MissionProgress | null) => {
     const { activeMissionProgress, userId } = get();
-    if (!activeMissionProgress || !userId) return false;
+    const targetProgress = progress ?? activeMissionProgress;
+    if (!targetProgress || !userId) return false;
 
-    if (activeMissionProgress.user1_id === userId) {
-      return !!activeMissionProgress.user2_message;
+    if (targetProgress.user1_id === userId) {
+      return !!targetProgress.user2_message;
     } else {
-      return !!activeMissionProgress.user1_message;
+      return !!targetProgress.user1_message;
     }
+  },
+
+  // Multi-mission support functions
+  getMissionProgressByMissionId: (missionId: string) => {
+    const { allMissionProgress } = get();
+    return allMissionProgress.find(p => p.mission_id === missionId);
+  },
+
+  getLockedMissionProgress: () => {
+    const { allMissionProgress } = get();
+    return allMissionProgress.find(p => p.is_message_locked) || null;
+  },
+
+  isMissionLocked: (missionId: string) => {
+    const { lockedMissionId } = get();
+    if (!lockedMissionId) return false;
+    return lockedMissionId !== missionId;
+  },
+
+  canStartNewMission: () => {
+    const { lockedMissionId, allMissionProgress } = get();
+    // Can start if no mission is locked yet, or if there's a locked mission and we can add photos to other missions
+    // Note: Once a mission is locked (first message written), user can't start new missions
+    // But they can still take photos for existing started missions
+    if (lockedMissionId) {
+      // If there's a locked mission, check if it's completed
+      const lockedProgress = allMissionProgress.find(p => p.mission_id === lockedMissionId);
+      return lockedProgress?.status === 'completed';
+    }
+    return true;
   },
 
   // ============================================
@@ -1299,24 +1686,51 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
   },
 
   removePhotoFromAlbum: async (albumId: string, memoryId: string) => {
-    const { albumPhotosMap } = get();
+    const { albumPhotosMap, isInitialized, coupleId } = get();
+
+    console.log('[removePhotoFromAlbum] ========== REMOVAL START ==========');
+    console.log('[removePhotoFromAlbum] Parameters:', { albumId, memoryId });
+    console.log('[removePhotoFromAlbum] Store state:', { isInitialized, coupleId, isDemoMode });
+    console.log('[removePhotoFromAlbum] All album IDs in map:', Object.keys(albumPhotosMap));
+
+    const existingPhotos = albumPhotosMap[albumId] || [];
+    console.log('[removePhotoFromAlbum] Existing photos for this album:', existingPhotos.length);
+    console.log('[removePhotoFromAlbum] Existing photo memory_ids:', existingPhotos.map(p => p.memory_id));
+
+    // Check if the memoryId exists in the photos
+    const photoToRemove = existingPhotos.find(p => p.memory_id === memoryId);
+    console.log('[removePhotoFromAlbum] Photo to remove found?:', !!photoToRemove);
+    if (photoToRemove) {
+      console.log('[removePhotoFromAlbum] Photo details:', { id: photoToRemove.id, memory_id: photoToRemove.memory_id, album_id: photoToRemove.album_id });
+    }
 
     // Optimistic update: remove from local state immediately
-    const existingPhotos = albumPhotosMap[albumId] || [];
+    const filteredPhotos = existingPhotos.filter((p) => p.memory_id !== memoryId);
+    console.log('[removePhotoFromAlbum] After filter - photos remaining:', filteredPhotos.length);
+
     set({
       albumPhotosMap: {
         ...albumPhotosMap,
-        [albumId]: existingPhotos.filter((p) => p.memory_id !== memoryId),
+        [albumId]: filteredPhotos,
       },
     });
 
+    // Verify state was updated
+    const updatedState = get();
+    console.log('[removePhotoFromAlbum] State updated - new count for album:', (updatedState.albumPhotosMap[albumId] || []).length);
+    console.log('[removePhotoFromAlbum] ========== OPTIMISTIC UPDATE DONE ==========');
+
     if (isDemoMode) {
+      console.log('[removePhotoFromAlbum] Demo mode - skipping DB delete');
       return;
     }
 
     // Perform database delete
+    console.log('[removePhotoFromAlbum] Calling DB delete with:', { albumId, memoryId });
     const { error } = await db.albumPhotos.remove(albumId, memoryId);
     if (error) {
+      console.error('[removePhotoFromAlbum] DB delete error:', error);
+      console.error('[removePhotoFromAlbum] Error details:', JSON.stringify(error, null, 2));
       // Rollback optimistic update on error
       set({
         albumPhotosMap: {
@@ -1324,6 +1738,10 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
           [albumId]: existingPhotos,
         },
       });
+      console.log('[removePhotoFromAlbum] Rolled back to previous state');
+    } else {
+      console.log('[removePhotoFromAlbum] DB delete successful');
+      console.log('[removePhotoFromAlbum] ========== REMOVAL COMPLETE ==========');
     }
   },
 
@@ -1340,6 +1758,118 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       }));
     }
   },
-}));
+
+  // ============================================
+  // OFFLINE SYNC PROCESSING
+  // ============================================
+
+  processPendingOperations: async () => {
+    const queue = offlineQueue.getQueue();
+    if (queue.length === 0) {
+      console.log('[CoupleSyncStore] No pending operations to process');
+      return;
+    }
+
+    console.log('[CoupleSyncStore] Processing', queue.length, 'pending operations');
+    offlineQueue.setProcessing(true);
+
+    for (const operation of queue) {
+      try {
+        const { type, payload } = operation;
+        let success = false;
+
+        switch (type) {
+          case 'ADD_TODO': {
+            const { date, text, localId, coupleId, userId } = payload as {
+              date: string;
+              text: string;
+              localId: string;
+              coupleId: string;
+              userId: string;
+            };
+            const { data, error } = await db.coupleTodos.create(coupleId, date, text, userId);
+            if (!error && data) {
+              // Replace local todo with server todo
+              const serverTodo = data as SyncedTodo;
+              set({
+                sharedTodos: get().sharedTodos.map(t =>
+                  t.id === localId ? serverTodo : t
+                ),
+              });
+              success = true;
+            }
+            break;
+          }
+          case 'TOGGLE_TODO': {
+            const { todoId, completed, userId } = payload as {
+              todoId: string;
+              completed: boolean;
+              userId: string;
+            };
+            // Skip local-only todos
+            if (todoId.startsWith('local-')) {
+              success = true;
+              break;
+            }
+            await db.coupleTodos.toggleComplete(todoId, completed, userId);
+            success = true;
+            break;
+          }
+          case 'DELETE_TODO': {
+            const { todoId } = payload as { todoId: string };
+            // Skip local-only todos
+            if (todoId.startsWith('local-')) {
+              success = true;
+              break;
+            }
+            await db.coupleTodos.delete(todoId);
+            success = true;
+            break;
+          }
+          default:
+            console.log('[CoupleSyncStore] Unknown operation type:', type);
+            success = true; // Remove unknown operations
+        }
+
+        if (success) {
+          await offlineQueue.remove(operation.id);
+          console.log('[CoupleSyncStore] Processed operation:', type);
+        } else {
+          await offlineQueue.incrementRetry(operation.id);
+          if (operation.retryCount >= 3) {
+            console.log('[CoupleSyncStore] Max retries reached, removing operation:', type);
+            await offlineQueue.remove(operation.id);
+          }
+        }
+      } catch (error) {
+        console.error('[CoupleSyncStore] Error processing operation:', error);
+        await offlineQueue.incrementRetry(operation.id);
+        if (operation.retryCount >= 3) {
+          await offlineQueue.remove(operation.id);
+        }
+      }
+    }
+
+    offlineQueue.setProcessing(false);
+    console.log('[CoupleSyncStore] Finished processing pending operations');
+  },
+}),
+  {
+    name: 'daydate-couple-sync-storage',
+    storage: createJSONStorage(() => AsyncStorage),
+    partialize: (state) => ({
+      // Only persist essential local data
+      sharedTodos: state.sharedTodos,
+      sharedBookmarks: state.sharedBookmarks,
+      coupleAlbums: state.coupleAlbums,
+      albumPhotosMap: state.albumPhotosMap,
+      backgroundImageUrl: state.backgroundImageUrl,
+      menstrualSettings: state.menstrualSettings,
+      // Mission progress state
+      allMissionProgress: state.allMissionProgress,
+      lockedMissionId: state.lockedMissionId,
+    }),
+  }
+));
 
 export default useCoupleSyncStore;

@@ -600,6 +600,22 @@ export const db = {
         .single();
       return { data, error };
     },
+
+    // Check if user has completed preference survey (has onboarding answers)
+    async hasAnswers(userId: string): Promise<boolean> {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('onboarding_answers')
+        .select('id')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (error) {
+        console.error('[onboardingAnswers.hasAnswers] Error:', error);
+        return false;
+      }
+      return data !== null;
+    },
   },
 
   // Anniversaries
@@ -1537,7 +1553,8 @@ export const db = {
 
   // Mission Progress (real-time mission sync with both user messages)
   missionProgress: {
-    async getToday(coupleId: string) {
+    // Get all mission progress records for today (supports multiple missions per day)
+    async getTodayAll(coupleId: string) {
       const client = getSupabase();
       const today = formatDateToLocal(new Date());
       const { data, error } = await client
@@ -1545,8 +1562,63 @@ export const db = {
         .select('*')
         .eq('couple_id', coupleId)
         .eq('date', today)
+        .order('created_at', { ascending: true });
+      return { data: data || [], error };
+    },
+
+    // Get the locked mission for today (the one where first message was written)
+    async getLockedMission(coupleId: string) {
+      const client = getSupabase();
+      const today = formatDateToLocal(new Date());
+      const { data, error } = await client
+        .from('mission_progress')
+        .select('*')
+        .eq('couple_id', coupleId)
+        .eq('date', today)
+        .eq('is_message_locked', true)
         .maybeSingle();
       return { data, error };
+    },
+
+    // Get progress for a specific mission today
+    async getByMissionIdToday(coupleId: string, missionId: string) {
+      const client = getSupabase();
+      const today = formatDateToLocal(new Date());
+      const { data, error } = await client
+        .from('mission_progress')
+        .select('*')
+        .eq('couple_id', coupleId)
+        .eq('date', today)
+        .eq('mission_id', missionId)
+        .maybeSingle();
+      return { data, error };
+    },
+
+    // Legacy: Get single mission (first one or locked one) - for backwards compatibility
+    async getToday(coupleId: string) {
+      const client = getSupabase();
+      const today = formatDateToLocal(new Date());
+      // First try to get locked mission
+      const { data: locked, error: lockedError } = await client
+        .from('mission_progress')
+        .select('*')
+        .eq('couple_id', coupleId)
+        .eq('date', today)
+        .eq('is_message_locked', true)
+        .maybeSingle();
+
+      if (locked) return { data: locked, error: null };
+
+      // If no locked mission, get any mission progress
+      const { data, error } = await client
+        .from('mission_progress')
+        .select('*')
+        .eq('couple_id', coupleId)
+        .eq('date', today)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      return { data, error: lockedError || error };
     },
 
     async getById(progressId: string) {
@@ -1613,11 +1685,11 @@ export const db = {
       // First get current state to check if both messages are now complete
       const { data: current } = await client
         .from('mission_progress')
-        .select('user1_message, user2_message, status')
+        .select('user1_message, user2_message, status, couple_id, date, is_message_locked')
         .eq('id', progressId)
         .single();
 
-      // Determine new status
+      // Determine new status and lock state
       if (current) {
         const hasUser1Message = isUser1 ? true : !!current.user1_message;
         const hasUser2Message = isUser1 ? !!current.user2_message : true;
@@ -1627,6 +1699,24 @@ export const db = {
           updateData.completed_at = now;
         } else {
           updateData.status = 'waiting_partner';
+        }
+
+        // If this is the first message for this mission and no other mission is locked,
+        // lock this mission for the day
+        if (!current.is_message_locked) {
+          // Check if any other mission is already locked for today
+          const { data: existingLocked } = await client
+            .from('mission_progress')
+            .select('id')
+            .eq('couple_id', current.couple_id)
+            .eq('date', current.date)
+            .eq('is_message_locked', true)
+            .maybeSingle();
+
+          if (!existingLocked) {
+            // No other mission is locked, so lock this one
+            updateData.is_message_locked = true;
+          }
         }
       }
 
@@ -1668,6 +1758,19 @@ export const db = {
         .delete()
         .eq('couple_id', coupleId)
         .eq('date', today);
+      return { error };
+    },
+
+    // Delete all non-locked missions for today (cleanup after locked mission completes)
+    async deleteNonLockedMissions(coupleId: string) {
+      const client = getSupabase();
+      const today = formatDateToLocal(new Date());
+      const { error } = await client
+        .from('mission_progress')
+        .delete()
+        .eq('couple_id', coupleId)
+        .eq('date', today)
+        .eq('is_message_locked', false);
       return { error };
     },
 

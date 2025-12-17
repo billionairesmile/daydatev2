@@ -1,14 +1,16 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Asset } from 'expo-asset';
-import { Image } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
+import { useMemoryStore, SAMPLE_MEMORIES } from '@/stores/memoryStore';
 
 interface BackgroundContextType {
   backgroundImage: any;
   setBackgroundImage: (image: any, skipPrefetch?: boolean) => Promise<void>;
   resetToDefault: () => void;
   isLoaded: boolean;
+  prefetchImages: (urls: string[]) => Promise<void>;
 }
 
 // Default background image
@@ -26,7 +28,11 @@ export function BackgroundProvider({ children }: { children: ReactNode }) {
     isInitialized: isSyncInitialized,
     backgroundImageUrl: syncedBackgroundUrl,
     updateBackgroundImage: syncBackgroundImage,
+    coupleAlbums,
   } = useCoupleSyncStore();
+
+  // Get memories for prefetching
+  const { memories } = useMemoryStore();
 
   // Helper to check if URL is a valid remote URL (not local file://)
   const isValidRemoteUrl = (url: string | null | undefined): boolean => {
@@ -44,25 +50,25 @@ export function BackgroundProvider({ children }: { children: ReactNode }) {
 
         // First priority: Check for synced background from partner (only remote URLs)
         if (isSyncInitialized && isValidRemoteUrl(syncedBackgroundUrl)) {
-          try {
-            await Image.prefetch(syncedBackgroundUrl!);
-            setBackgroundImageState({ uri: syncedBackgroundUrl });
-            // Also save to local storage as fallback
-            await AsyncStorage.setItem(BACKGROUND_STORAGE_KEY, syncedBackgroundUrl!);
-          } catch {
-            console.warn('Failed to load synced background, falling back to local');
-          }
+          // Set state immediately for instant display (expo-image handles caching)
+          setBackgroundImageState({ uri: syncedBackgroundUrl });
+          // Prefetch in background (non-blocking)
+          ExpoImage.prefetch(syncedBackgroundUrl!).catch(() => {
+            console.warn('Failed to prefetch synced background');
+          });
+          // Also save to local storage as fallback (non-blocking)
+          AsyncStorage.setItem(BACKGROUND_STORAGE_KEY, syncedBackgroundUrl!).catch(console.error);
         } else {
           // Fallback: Check for locally saved custom background
           const savedBackground = await AsyncStorage.getItem(BACKGROUND_STORAGE_KEY);
 
           if (savedBackground && isValidRemoteUrl(savedBackground)) {
-            try {
-              await Image.prefetch(savedBackground);
-              setBackgroundImageState({ uri: savedBackground });
-            } catch {
-              console.warn('Failed to load saved background');
-            }
+            // Set state immediately (expo-image handles caching)
+            setBackgroundImageState({ uri: savedBackground });
+            // Prefetch in background (non-blocking)
+            ExpoImage.prefetch(savedBackground).catch(() => {
+              console.warn('Failed to prefetch saved background');
+            });
           }
         }
 
@@ -76,6 +82,51 @@ export function BackgroundProvider({ children }: { children: ReactNode }) {
     preloadImages();
   }, [isSyncInitialized, syncedBackgroundUrl]);
 
+  // Prefetch all important images after initial load (album covers + mission photos)
+  useEffect(() => {
+    if (!isLoaded) return;
+
+    const prefetchAppImages = async () => {
+      const imagesToPrefetch: string[] = [];
+
+      // Collect album cover photos
+      if (coupleAlbums && coupleAlbums.length > 0) {
+        coupleAlbums.forEach(album => {
+          if (album.cover_photo_url && isValidRemoteUrl(album.cover_photo_url)) {
+            imagesToPrefetch.push(album.cover_photo_url);
+          }
+        });
+      }
+
+      // Collect mission photos (both from store and samples)
+      const allMemories = [...memories, ...SAMPLE_MEMORIES];
+      allMemories.forEach(memory => {
+        if (memory.photoUrl && isValidRemoteUrl(memory.photoUrl)) {
+          imagesToPrefetch.push(memory.photoUrl);
+        }
+      });
+
+      // Prefetch all images in background (limit to first 20 for performance)
+      if (imagesToPrefetch.length > 0) {
+        const limitedUrls = imagesToPrefetch.slice(0, 20);
+        console.log('[Background] Prefetching', limitedUrls.length, 'app images');
+
+        // Non-blocking prefetch
+        Promise.allSettled(
+          limitedUrls.map(url => ExpoImage.prefetch(url))
+        ).then(() => {
+          console.log('[Background] App images prefetch complete');
+        }).catch(() => {
+          // Ignore prefetch errors
+        });
+      }
+    };
+
+    // Delay prefetching slightly to not block main thread during splash
+    const timer = setTimeout(prefetchAppImages, 500);
+    return () => clearTimeout(timer);
+  }, [isLoaded, coupleAlbums, memories]);
+
   // Listen for synced background updates from partner
   useEffect(() => {
     if (!isSyncInitialized) return;
@@ -84,18 +135,14 @@ export function BackgroundProvider({ children }: { children: ReactNode }) {
     if (isValidRemoteUrl(syncedBackgroundUrl)) {
       const currentUri = backgroundImage?.uri;
       if (currentUri !== syncedBackgroundUrl) {
-        // Partner changed the background - update ours
-        const updateFromSync = async () => {
-          try {
-            await Image.prefetch(syncedBackgroundUrl!);
-            setBackgroundImageState({ uri: syncedBackgroundUrl });
-            await AsyncStorage.setItem(BACKGROUND_STORAGE_KEY, syncedBackgroundUrl!);
-          } catch (error) {
-            console.error('Error loading synced background:', error);
-            // Don't crash - just keep current background
-          }
-        };
-        updateFromSync();
+        // Partner changed the background - update ours IMMEDIATELY (optimistic)
+        setBackgroundImageState({ uri: syncedBackgroundUrl });
+        // Prefetch in background (non-blocking)
+        ExpoImage.prefetch(syncedBackgroundUrl!).catch((error) => {
+          console.error('Error prefetching synced background:', error);
+        });
+        // Save to local storage (non-blocking)
+        AsyncStorage.setItem(BACKGROUND_STORAGE_KEY, syncedBackgroundUrl!).catch(console.error);
       }
     } else if (syncedBackgroundUrl === null && backgroundImage?.uri) {
       // Partner reset to default - reset ours too
@@ -108,17 +155,16 @@ export function BackgroundProvider({ children }: { children: ReactNode }) {
     try {
       console.log('[Background] setBackgroundImage called:', { uri: image?.uri, isSyncInitialized, skipPrefetch });
 
-      // Prefetch image BEFORE setting state for instant display
-      if (image?.uri && !skipPrefetch) {
-        try {
-          await Image.prefetch(image.uri);
-        } catch (prefetchError) {
-          console.warn('[Background] Prefetch failed, continuing anyway:', prefetchError);
-        }
-      }
-
-      // Now set state - image is already cached, so it will display instantly
+      // OPTIMISTIC UPDATE: Set state immediately for instant UI response
+      // expo-image handles caching automatically, so prefetching is not blocking
       setBackgroundImageState(image);
+
+      // Pre-cache with expo-image in the background (non-blocking)
+      if (image?.uri && !skipPrefetch) {
+        ExpoImage.prefetch(image.uri).catch((prefetchError) => {
+          console.warn('[Background] Prefetch failed:', prefetchError);
+        });
+      }
 
       // Save custom background URI to AsyncStorage (non-blocking)
       if (image?.uri) {
@@ -151,12 +197,28 @@ export function BackgroundProvider({ children }: { children: ReactNode }) {
     }
   }, [isSyncInitialized, syncBackgroundImage]);
 
+  // Utility function to prefetch multiple images at once (for splash screen)
+  const prefetchImages = useCallback(async (urls: string[]) => {
+    if (!urls || urls.length === 0) return;
+
+    const validUrls = urls.filter(url => url && typeof url === 'string');
+    console.log('[Background] Prefetching', validUrls.length, 'images');
+
+    // Use expo-image's prefetch for all URLs in parallel
+    await Promise.allSettled(
+      validUrls.map(url => ExpoImage.prefetch(url))
+    );
+
+    console.log('[Background] Prefetch complete');
+  }, []);
+
   return (
     <BackgroundContext.Provider value={{
       backgroundImage,
       setBackgroundImage,
       resetToDefault,
-      isLoaded
+      isLoaded,
+      prefetchImages,
     }}>
       {children}
     </BackgroundContext.Provider>

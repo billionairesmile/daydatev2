@@ -899,8 +899,9 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
 // 카테고리별 랜덤 이미지 1개 가져오기
 export const getRandomImage = (category: MissionCategory): string => {
   const images = MISSION_IMAGES[category];
-  if (images.length === 0) {
-    // 이미지가 없는 카테고리는 모든 이미지에서 랜덤 선택
+  // 카테고리가 없거나 이미지가 없는 경우 모든 이미지에서 랜덤 선택
+  if (!images || images.length === 0) {
+    console.warn(`[MissionImages] Unknown or empty category: ${category}, using random image`);
     return getRandomImageFromAll();
   }
   return images[Math.floor(Math.random() * images.length)];
@@ -908,11 +909,13 @@ export const getRandomImage = (category: MissionCategory): string => {
 
 // 카테고리별 랜덤 이미지 N개 가져오기 (중복 없이)
 export const getRandomImages = (category: MissionCategory, count: number): string[] => {
-  const images = [...MISSION_IMAGES[category]];
-  if (images.length === 0) {
-    // 이미지가 없는 카테고리는 모든 이미지에서 랜덤 선택
+  const categoryImages = MISSION_IMAGES[category];
+  // 카테고리가 없거나 이미지가 없는 경우 모든 이미지에서 랜덤 선택
+  if (!categoryImages || categoryImages.length === 0) {
+    console.warn(`[MissionImages] Unknown or empty category: ${category}, using random images`);
     return Array.from({ length: count }, () => getRandomImageFromAll());
   }
+  const images = [...categoryImages];
 
   const result: string[] = [];
   const maxCount = Math.min(count, images.length);

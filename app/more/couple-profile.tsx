@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Platform,
   SafeAreaView,
   StatusBar,
+  Animated,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import {
@@ -51,6 +52,48 @@ export default function CoupleProfileScreen() {
 
   const [tempAnniversaryDate, setTempAnniversaryDate] = useState<Date | null>(syncedAnniversaryDate);
   const [showDatePicker, setShowDatePicker] = useState(false);
+
+  // DatePicker animation
+  const { height } = Dimensions.get('window');
+  const datePickerSlideAnim = useRef(new Animated.Value(height)).current;
+  const datePickerBackdropAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (showDatePicker) {
+      Animated.parallel([
+        Animated.spring(datePickerSlideAnim, {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 65,
+          friction: 11,
+        }),
+        Animated.timing(datePickerBackdropAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [showDatePicker]);
+
+  const closeDatePicker = () => {
+    Animated.parallel([
+      Animated.timing(datePickerSlideAnim, {
+        toValue: height,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+      Animated.timing(datePickerBackdropAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setShowDatePicker(false);
+      datePickerSlideAnim.setValue(height);
+      datePickerBackdropAnim.setValue(0);
+    });
+  };
 
   // Get the user's and partner's nicknames
   const myNickname = data.nickname || user?.nickname || '나';
@@ -214,14 +257,27 @@ export default function CoupleProfileScreen() {
       </Pressable>
 
       {Platform.OS === 'ios' && (
-        <Modal visible={showDatePicker} transparent animationType="slide">
+        <Modal visible={showDatePicker} transparent animationType="none" onRequestClose={closeDatePicker}>
           <View style={styles.datePickerModal}>
-            <View style={styles.datePickerModalContent}>
+            <Animated.View
+              style={[
+                StyleSheet.absoluteFill,
+                { backgroundColor: 'rgba(0, 0, 0, 0.5)', opacity: datePickerBackdropAnim }
+              ]}
+            >
+              <Pressable style={StyleSheet.absoluteFill} onPress={closeDatePicker} />
+            </Animated.View>
+            <Animated.View
+              style={[
+                styles.datePickerModalContent,
+                { transform: [{ translateY: datePickerSlideAnim }] }
+              ]}
+            >
               <View style={styles.datePickerHeader}>
-                <Pressable onPress={() => setShowDatePicker(false)}>
+                <Pressable onPress={closeDatePicker}>
                   <Text style={styles.datePickerCancel}>취소</Text>
                 </Pressable>
-                <Pressable onPress={() => setShowDatePicker(false)}>
+                <Pressable onPress={closeDatePicker}>
                   <Text style={styles.datePickerConfirm}>확인</Text>
                 </Pressable>
               </View>
@@ -236,7 +292,7 @@ export default function CoupleProfileScreen() {
                 themeVariant="light"
                 style={styles.datePicker}
               />
-            </View>
+            </Animated.View>
           </View>
         </Modal>
       )}
@@ -509,7 +565,6 @@ const styles = StyleSheet.create({
   datePickerModal: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   datePickerModalContent: {
     backgroundColor: COLORS.white,

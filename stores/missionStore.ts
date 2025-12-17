@@ -239,6 +239,24 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
       // Check if a specific mission can be started
       canStartMission: (missionId) => {
         const { todayCompletedMission } = get();
+        const syncStore = useCoupleSyncStore.getState();
+
+        // Check if another mission is already locked (message written)
+        if (syncStore.isInitialized && syncStore.lockedMissionId) {
+          // If the locked mission is completed, don't block other missions
+          const lockedProgress = syncStore.allMissionProgress.find(
+            p => p.mission_id === syncStore.lockedMissionId
+          );
+
+          // Only block if locked mission is still in progress (not completed)
+          if (lockedProgress?.status !== 'completed') {
+            // Can only start if it's the locked mission (for viewing/continuing)
+            if (syncStore.lockedMissionId !== missionId) {
+              return false;
+            }
+          }
+        }
+
         if (!todayCompletedMission) return true;
         if (todayCompletedMission.date !== getTodayDateString()) return true;
         // Can only start if it's the same mission that was completed today (for viewing)
@@ -353,7 +371,12 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
 
           // Save to couple sync (will broadcast to partner)
           if (syncStore.isInitialized && syncStore.coupleId) {
-            await syncStore.saveSharedMissions(aiMissions, answers);
+            await syncStore.saveSharedMissions(
+              aiMissions,
+              answers,
+              partner?.id, // Partner ID for push notification
+              user?.nickname // Current user's nickname for notification message
+            );
           }
 
           return { status: 'success' as const };
@@ -378,7 +401,12 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
 
           // Save fallback missions to couple sync
           if (syncStore.isInitialized && syncStore.coupleId) {
-            await syncStore.saveSharedMissions(fallbackMissions, answers);
+            await syncStore.saveSharedMissions(
+              fallbackMissions,
+              answers,
+              partner?.id, // Partner ID for push notification
+              user?.nickname // Current user's nickname for notification message
+            );
           }
 
           return { status: 'success' as const };

@@ -3,11 +3,9 @@ import {
   View,
   Text,
   StyleSheet,
-  ImageBackground,
   Dimensions,
   Pressable,
   Modal,
-  Image,
   ScrollView,
   TouchableWithoutFeedback,
   TextInput,
@@ -16,6 +14,7 @@ import {
   Alert,
   Animated,
 } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { BlurView } from 'expo-blur';
 import Svg, { Rect, Circle, Defs, Mask } from 'react-native-svg';
 import { Image as ImageIcon, X, Edit2, Trash2 } from 'lucide-react-native';
@@ -47,6 +46,26 @@ const lunarToSolar = (lunarYear: number, lunarMonth: number, lunarDay: number): 
   calendar.setLunarDate(lunarYear, lunarMonth, lunarDay, false);
   const solarDate = calendar.getSolarCalendar();
   return new Date(solarDate.year, solarDate.month - 1, solarDate.day);
+};
+
+// Parse date as local date (not UTC) to avoid timezone issues
+// Handles both Date objects and ISO date strings
+const parseDateAsLocal = (date: Date | string): Date => {
+  if (date instanceof Date) {
+    // If it's already a Date, extract components and create new local date
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  }
+
+  // If it's an ISO timestamp (contains T), parse as Date first to get correct local time
+  // e.g., "1990-01-02T15:00:00.000Z" represents Jan 3 00:00 in KST (UTC+9)
+  if (date.includes('T')) {
+    const d = new Date(date);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+
+  // If it's a simple date string like "1990-01-03", parse as local
+  const [year, month, day] = date.split('-').map(Number);
+  return new Date(year, month - 1, day);
 };
 
 // Get next birthday date (handling lunar if needed)
@@ -324,6 +343,7 @@ export default function HomeScreen() {
   const [buttonPosition, setButtonPosition] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const imageButtonRef = useRef<View>(null);
 
+
   // Measure the image change button position for tutorial overlay
   const measureButton = useCallback(() => {
     if (imageButtonRef.current) {
@@ -521,7 +541,7 @@ export default function HomeScreen() {
 
     // Add birthday if birthDate exists (current user)
     if (onboardingData.birthDate) {
-      const birthDate = new Date(onboardingData.birthDate);
+      const birthDate = parseDateAsLocal(onboardingData.birthDate);
       const isLunar = onboardingData.birthDateCalendarType === 'lunar';
       const nextBirthday = getNextBirthdayDate(birthDate, isLunar, today);
 
@@ -538,7 +558,7 @@ export default function HomeScreen() {
 
     // Add partner's birthday if exists
     if (partner?.birthDate) {
-      const partnerBirthDate = new Date(partner.birthDate);
+      const partnerBirthDate = parseDateAsLocal(partner.birthDate);
       // Use partner's birthDateCalendarType (default to solar if not set)
       const isPartnerLunar = partner.birthDateCalendarType === 'lunar';
       const nextPartnerBirthday = getNextBirthdayDate(partnerBirthDate, isPartnerLunar, today);
@@ -749,13 +769,14 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Background Image - No blur like Figma */}
-      <ImageBackground
-        source={backgroundImage}
-        defaultSource={DEFAULT_BACKGROUND_IMAGE}
-        style={styles.backgroundImage}
-        imageStyle={styles.backgroundImageStyle}
-        fadeDuration={0}
+      {/* Background Image - Optimized with expo-image */}
+      <ExpoImage
+        source={backgroundImage?.uri ? { uri: backgroundImage.uri } : backgroundImage}
+        placeholder="L6PZfSi_.AyE_3t7t7R**0LTIpIp"
+        contentFit="cover"
+        transition={150}
+        cachePolicy="memory-disk"
+        style={[styles.backgroundImage, styles.backgroundImageStyle]}
       />
 
       {/* Content */}
@@ -788,11 +809,12 @@ export default function HomeScreen() {
           <View style={styles.polaroid}>
             {/* Photo area */}
             <View style={styles.polaroidImageContainer}>
-              <Image
-                source={backgroundImage}
+              <ExpoImage
+                source={backgroundImage?.uri ? { uri: backgroundImage.uri } : backgroundImage}
                 style={styles.polaroidImage}
-                resizeMode="cover"
-                fadeDuration={0}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                transition={100}
               />
               {/* Subtle vignette overlay */}
               <View style={styles.vignetteOverlay} />
@@ -801,11 +823,12 @@ export default function HomeScreen() {
             {/* Bottom area with logo */}
             <View style={styles.polaroidBottom}>
               <View style={styles.brandRow}>
-                <Image
+                <ExpoImage
                   source={LOGO_IMAGE}
                   style={styles.polaroidLogo}
-                  resizeMode="contain"
-                  fadeDuration={0}
+                  contentFit="contain"
+                  cachePolicy="memory-disk"
+                  priority="high"
                 />
                 {/* Image Change Button */}
                 <Pressable
@@ -818,9 +841,6 @@ export default function HomeScreen() {
                 </Pressable>
               </View>
             </View>
-
-            {/* Paper texture overlay for realistic matte finish */}
-            <View style={styles.paperTexture} pointerEvents="none" />
 
             {/* Edge highlight for 3D effect */}
             <View style={styles.edgeHighlight} pointerEvents="none" />
@@ -1495,17 +1515,6 @@ const styles = StyleSheet.create({
   imageChangeButton: {
     padding: 6,
     marginRight: -4,
-  },
-  paperTexture: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 2,
-    // Subtle noise/grain effect simulation
-    backgroundColor: 'rgba(245, 242, 235, 0.3)',
-    opacity: 0.4,
   },
   edgeHighlight: {
     position: 'absolute',
