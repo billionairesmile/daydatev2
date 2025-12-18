@@ -22,7 +22,20 @@ export const supabase: SupabaseClient | null =
     : null;
 
 // 개발 모드에서 Supabase 없이도 앱 테스트 가능
+// Static check: true if Supabase is not configured
 export const isDemoMode = !supabase;
+
+// Dynamic test mode check function - checks user-selected test mode from authStore
+// Import authStore dynamically to avoid circular dependencies
+export const isInTestMode = (): boolean => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { useAuthStore } = require('@/stores/authStore');
+    return isDemoMode || useAuthStore.getState().isTestMode;
+  } catch {
+    return isDemoMode;
+  }
+};
 
 // Helper to get supabase client with null check
 function getSupabase(): SupabaseClient {
@@ -30,6 +43,36 @@ function getSupabase(): SupabaseClient {
     throw new Error('Supabase client is not initialized. Check your environment variables.');
   }
   return supabase;
+}
+
+// Helper to extract storage path from public URL
+// URL format: https://{project}.supabase.co/storage/v1/object/public/memories/{path}
+function extractStoragePathFromUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const marker = '/storage/v1/object/public/memories/';
+    const index = url.indexOf(marker);
+    if (index === -1) return null;
+    return url.substring(index + marker.length);
+  } catch {
+    return null;
+  }
+}
+
+// Helper to delete a file from storage
+async function deleteFromStorage(path: string | null): Promise<void> {
+  if (!path) return;
+  try {
+    const client = getSupabase();
+    const { error } = await client.storage.from('memories').remove([path]);
+    if (error) {
+      console.warn('[Storage] Failed to delete file:', path, error.message);
+    } else {
+      console.log('[Storage] Deleted file:', path);
+    }
+  } catch (e) {
+    console.warn('[Storage] Delete error:', e);
+  }
 }
 
 // Database helper functions
@@ -207,7 +250,7 @@ export const db = {
         .update(updates)
         .eq('id', userId)
         .select()
-        .single();
+        .maybeSingle();
       return { data, error };
     },
 
@@ -1506,6 +1549,25 @@ export const db = {
       userId: string
     ) {
       const client = getSupabase();
+
+      // Auto-cleanup: Delete old background image from storage if changing
+      if (settings.background_image_url !== undefined) {
+        const { data: currentSettings } = await client
+          .from('couple_settings')
+          .select('background_image_url')
+          .eq('couple_id', coupleId)
+          .maybeSingle();
+
+        const oldUrl = currentSettings?.background_image_url;
+        const newUrl = settings.background_image_url;
+
+        // Delete old file if URL is changing (new upload or removal)
+        if (oldUrl && oldUrl !== newUrl) {
+          const oldPath = extractStoragePathFromUrl(oldUrl);
+          await deleteFromStorage(oldPath);
+        }
+      }
+
       const { data, error } = await client
         .from('couple_settings')
         .upsert(
@@ -1865,6 +1927,25 @@ export const db = {
       }
     ) {
       const client = getSupabase();
+
+      // Auto-cleanup: Delete old cover image from storage if changing
+      if (updates.cover_photo_url !== undefined) {
+        const { data: currentAlbum } = await client
+          .from('couple_albums')
+          .select('cover_photo_url')
+          .eq('id', albumId)
+          .single();
+
+        const oldUrl = currentAlbum?.cover_photo_url;
+        const newUrl = updates.cover_photo_url;
+
+        // Delete old file if URL is changing (new upload or removal)
+        if (oldUrl && oldUrl !== newUrl) {
+          const oldPath = extractStoragePathFromUrl(oldUrl);
+          await deleteFromStorage(oldPath);
+        }
+      }
+
       const { data, error } = await client
         .from('couple_albums')
         .update(updates)
@@ -1876,10 +1957,26 @@ export const db = {
 
     async delete(albumId: string) {
       const client = getSupabase();
+
+      // Auto-cleanup: Get album data first to delete cover from storage
+      const { data: album } = await client
+        .from('couple_albums')
+        .select('cover_photo_url')
+        .eq('id', albumId)
+        .single();
+
+      // Delete album record from database
       const { error } = await client
         .from('couple_albums')
         .delete()
         .eq('id', albumId);
+
+      // Delete cover image from storage if exists (after successful DB delete)
+      if (!error && album?.cover_photo_url) {
+        const coverPath = extractStoragePathFromUrl(album.cover_photo_url);
+        await deleteFromStorage(coverPath);
+      }
+
       return { error };
     },
 

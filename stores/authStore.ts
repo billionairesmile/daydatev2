@@ -12,6 +12,7 @@ interface AuthActions {
   setIsOnboardingComplete: (isComplete: boolean) => void;
   setIsLoading: (isLoading: boolean) => void;
   setError: (error: string | null) => void;
+  setIsTestMode: (isTestMode: boolean) => void;
 
   // User actions
   updateUserPreferences: (preferences: Partial<UserPreferences>) => void;
@@ -26,7 +27,7 @@ interface AuthActions {
   reset: () => void;
 }
 
-const initialState: AuthState = {
+const initialState: AuthState & { isTestMode: boolean } = {
   user: null,
   couple: null,
   partner: null,
@@ -34,9 +35,10 @@ const initialState: AuthState = {
   isOnboardingComplete: false,
   isLoading: false,
   error: null,
+  isTestMode: false,
 };
 
-export const useAuthStore = create<AuthState & AuthActions>()(
+export const useAuthStore = create<AuthState & { isTestMode: boolean } & AuthActions>()(
   persist(
     (set, get) => ({
       ...initialState,
@@ -49,6 +51,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       setIsOnboardingComplete: (isComplete) => set({ isOnboardingComplete: isComplete }),
       setIsLoading: (isLoading) => set({ isLoading }),
       setError: (error) => set({ error }),
+      setIsTestMode: (isTestMode) => set({ isTestMode }),
 
       // User actions
       updateUserPreferences: (preferences) => {
@@ -123,6 +126,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         partner: state.partner,
         isAuthenticated: state.isAuthenticated,
         isOnboardingComplete: state.isOnboardingComplete,
+        isTestMode: state.isTestMode,
       }),
     }
   )

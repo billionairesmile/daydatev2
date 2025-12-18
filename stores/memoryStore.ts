@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { CompletedMission, MemoryState, Mission, MissionCategory } from '@/types';
-import { db, isDemoMode } from '@/lib/supabase';
+import { db, isInTestMode } from '@/lib/supabase';
 
 interface MemoryActions {
   setMemories: (memories: CompletedMission[]) => void;
@@ -99,8 +99,8 @@ export const useMemoryStore = create<MemoryState & MemoryActions>()(
 
       // Load memories from database
       loadFromDB: async (coupleId: string) => {
-        if (isDemoMode) {
-          return; // Use local data in demo mode
+        if (isInTestMode()) {
+          return; // Use local data in demo/test mode
         }
 
         set({ isLoading: true, error: null });

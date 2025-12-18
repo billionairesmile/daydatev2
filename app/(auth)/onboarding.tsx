@@ -36,7 +36,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { signInWithGoogle, signInWithKakao, onAuthStateChange } from '@/lib/socialAuth';
 
-import { COLORS, SPACING, RADIUS } from '@/constants/design';
+import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '@/constants/design';
 import { useAuthStore } from '@/stores';
 import {
   useOnboardingStore,
@@ -52,7 +52,13 @@ import {
   type CalendarType,
 } from '@/stores/onboardingStore';
 import { useBackground } from '@/contexts';
-import { db, isDemoMode, supabase } from '@/lib/supabase';
+import { db, isDemoMode, isInTestMode, supabase } from '@/lib/supabase';
+import {
+  createTestPairingCode,
+  joinTestPairingCode,
+  checkTestPairingStatus,
+  generateDeterministicId,
+} from '@/lib/testPairing';
 import { formatDateToLocal } from '@/lib/dateUtils';
 
 const { width, height } = Dimensions.get('window');
@@ -90,7 +96,7 @@ export default function OnboardingScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const { backgroundImage } = useBackground();
-  const { setIsOnboardingComplete, updateNickname, setCouple, setUser, setPartner, user: currentUser, couple } = useAuthStore();
+  const { setIsOnboardingComplete, updateNickname, setCouple, setUser, setPartner, setIsTestMode, user: currentUser, couple } = useAuthStore();
   const {
     currentStep,
     data,
@@ -116,7 +122,7 @@ export default function OnboardingScreen() {
   // Check if user has existing onboarding answers (for conditional preference skipping)
   useEffect(() => {
     const checkExistingPreferences = async () => {
-      if (!isDemoMode && currentUser?.id) {
+      if (!isInTestMode() && currentUser?.id) {
         try {
           const hasAnswers = await db.onboardingAnswers.hasAnswers(currentUser.id);
           setHasExistingPreferences(hasAnswers);
@@ -297,8 +303,8 @@ export default function OnboardingScreen() {
       });
     }
 
-    // Save onboarding data to Supabase if not in demo mode
-    if (!isDemoMode) {
+    // Save onboarding data to Supabase if not in test mode
+    if (!isInTestMode()) {
       try {
         if (currentUser?.id) {
           // Prepare preferences object for DB storage
@@ -406,14 +412,21 @@ export default function OnboardingScreen() {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       enabled={currentStep !== 'basic_info' && currentStep !== 'pairing'}
     >
-      {/* Background */}
-      <ImageBackground
-        source={backgroundImage}
-        style={styles.backgroundImage}
-        resizeMode="cover"
-        blurRadius={40}
-      />
-      <View style={styles.overlay} />
+      {/* Background - White for welcome step, image for others */}
+      {currentStep !== 'welcome' && (
+        <>
+          <ImageBackground
+            source={backgroundImage}
+            style={styles.backgroundImage}
+            resizeMode="cover"
+            blurRadius={40}
+          />
+          <View style={styles.overlay} />
+        </>
+      )}
+      {currentStep === 'welcome' && (
+        <View style={styles.whiteBackground} />
+      )}
 
       {/* Progress Bar */}
       {showProgress && (
@@ -436,7 +449,6 @@ export default function OnboardingScreen() {
         <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
           {currentStep === 'welcome' && (
             <WelcomeStep
-              onNext={() => animateTransition(() => setStep('terms'))}
               onSocialLogin={handleSocialLogin}
             />
           )}
@@ -570,7 +582,7 @@ export default function OnboardingScreen() {
 // ========== STEP COMPONENTS ==========
 
 // Welcome Step
-function WelcomeStep({ onNext, onSocialLogin }: { onNext: () => void; onSocialLogin: (provider: 'google' | 'kakao') => void }) {
+function WelcomeStep({ onSocialLogin }: { onSocialLogin: (provider: 'google' | 'kakao') => void }) {
   const { t } = useTranslation();
   const [isLoading, setIsLoading] = useState<'google' | 'kakao' | null>(null);
 
@@ -603,20 +615,12 @@ function WelcomeStep({ onNext, onSocialLogin }: { onNext: () => void; onSocialLo
 
   return (
     <View style={styles.centeredStepContainer}>
-      <View style={styles.welcomeCenteredContent}>
-        <View style={styles.welcomeIconWrapper}>
-          <View style={styles.iconContainer}>
-            <Heart color={COLORS.white} size={48} fill={COLORS.white} />
-          </View>
-        </View>
-
-        <Text style={styles.welcomeTitle}>
-          {t('onboarding.welcomeTitle')}
-        </Text>
-
-        <Text style={styles.welcomeDescription}>
-          {t('onboarding.welcomeSubtitle')}
-        </Text>
+      <View style={styles.welcomeLogoContainer}>
+        <Image
+          source={require('@/assets/images/daydate-logo.png')}
+          style={styles.welcomeLogo}
+          resizeMode="contain"
+        />
       </View>
 
       <View style={styles.socialLoginContainer}>
@@ -657,17 +661,7 @@ function WelcomeStep({ onNext, onSocialLogin }: { onNext: () => void; onSocialLo
             </>
           )}
         </Pressable>
-
-        <View style={styles.dividerContainer}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>{t('onboarding.login.or')}</Text>
-          <View style={styles.dividerLine} />
-        </View>
       </View>
-
-      <Pressable style={styles.primaryButton} onPress={onNext}>
-        <Text style={styles.primaryButtonText}>{t('onboarding.start')}</Text>
-      </Pressable>
     </View>
   );
 }
@@ -1251,12 +1245,29 @@ function PairingStep({
 
   // For code creator: Save code to DB, create couple, and subscribe to changes
   React.useEffect(() => {
-    if (isCreatingCode && !isDemoMode && !isCodeSaved) {
+    if (isCreatingCode && !isInTestMode() && !isCodeSaved) {
       const setupPairing = async (codeToUse: string, retryCount = 0) => {
         try {
-          // Use existing user ID if logged in, otherwise generate new ID
-          const creatorUserId = currentUser?.id || generateUUID();
-          const isExistingUser = !!currentUser?.id;
+          // Get actual auth.uid() from Supabase for RLS compliance
+          let creatorUserId = currentUser?.id;
+          let isExistingUser = !!currentUser?.id;
+
+          if (!creatorUserId && supabase) {
+            const { data: authData } = await supabase.auth.getUser();
+            if (authData?.user?.id) {
+              creatorUserId = authData.user.id;
+              isExistingUser = false; // User exists in auth but not in our store yet
+              console.log('[PairingStep] Using auth.uid():', creatorUserId);
+            }
+          }
+
+          // If still no userId, user needs to authenticate first
+          if (!creatorUserId) {
+            console.log('[PairingStep] No authenticated user, skipping profile creation');
+            // Still create pairing code with a temporary ID for the code itself
+            creatorUserId = generateUUID();
+          }
+
           console.log('[PairingStep] Creator setup:', { creatorUserId, isExistingUser });
 
           // Save code to DB
@@ -1275,24 +1286,31 @@ function PairingStep({
           }
 
           // Create or update profile for creator in DB
-          if (isExistingUser) {
-            // Update existing profile with new invite code
-            const { error: profileError } = await db.profiles.update(creatorUserId, {
-              invite_code: codeToUse,
-            });
-            if (profileError) {
-              console.error('Error updating profile:', profileError);
+          // Only if we have a valid auth.uid() (not a generated UUID)
+          const hasAuthUserId = currentUser?.id || (supabase && (await supabase.auth.getUser()).data?.user?.id);
+
+          if (hasAuthUserId) {
+            if (isExistingUser) {
+              // Update existing profile with new invite code
+              const { error: profileError } = await db.profiles.update(creatorUserId, {
+                invite_code: codeToUse,
+              });
+              if (profileError) {
+                console.error('Error updating profile:', profileError);
+              }
+            } else {
+              // Create new profile
+              const { error: profileError } = await db.profiles.create({
+                id: creatorUserId,
+                nickname: '', // Will be updated in handleComplete
+                invite_code: codeToUse,
+              });
+              if (profileError) {
+                console.error('Error creating profile:', profileError);
+              }
             }
           } else {
-            // Create new profile
-            const { error: profileError } = await db.profiles.create({
-              id: creatorUserId,
-              nickname: '', // Will be updated in handleComplete
-              invite_code: codeToUse,
-            });
-            if (profileError) {
-              console.error('Error creating profile:', profileError);
-            }
+            console.log('[PairingStep] Skipping profile creation - user not authenticated yet');
           }
 
           // Create couple for this user (creator is user1)
@@ -1408,42 +1426,66 @@ function PairingStep({
       };
 
       setupPairing(generatedCode);
-    } else if (isCreatingCode && isDemoMode && !codeExpiresAt) {
-      // Demo mode: set fake expiration and create demo couple
-      const expiresAt = new Date();
-      expiresAt.setHours(expiresAt.getHours() + 24);
-      setCodeExpiresAt(expiresAt);
+    } else if (isCreatingCode && isInTestMode() && !codeExpiresAt) {
+      // Test mode: create pairing code with deterministic IDs
+      // This allows cross-device testing - both devices get same coupleId from same code
+      const setupTestPairing = async () => {
+        const expiresAt = new Date();
+        expiresAt.setHours(expiresAt.getHours() + 24);
+        setCodeExpiresAt(expiresAt);
 
-      // Set demo couple in authStore
-      const demoUserId = generateUUID();
-      const demoCoupleId = generateUUID();
-      setUser({
-        id: demoUserId,
-        email: '',
-        nickname: '',
-        inviteCode: generatedCode,
-        preferences: {
-          weekendActivity: '',
-          dateEnergy: '',
-          dateTypes: [],
-          adventureLevel: '',
-          photoPreference: '',
-          dateStyle: '',
-          planningStyle: '',
-          foodStyles: [],
-          preferredTimes: [],
-          budgetStyle: '',
-        },
-        createdAt: new Date(),
-      });
-      setCouple({
-        id: demoCoupleId,
-        user1Id: demoUserId,
-        anniversaryDate: new Date(),
-        anniversaryType: t('onboarding.anniversary.datingStart'),
-        status: 'pending',
-        createdAt: new Date(),
-      });
+        // Use deterministic IDs based on the pairing code
+        // This ensures both devices get matching IDs
+        const testCoupleId = generateDeterministicId(generatedCode, 'couple');
+        const testUserId = currentUser?.id || generateDeterministicId(generatedCode, 'test-creator');
+
+        // Set user in authStore
+        if (!currentUser?.id) {
+          setUser({
+            id: testUserId,
+            email: 'test@daydate.app',
+            nickname: currentUser?.nickname || 'Test User',
+            inviteCode: generatedCode,
+            preferences: {
+              weekendActivity: '',
+              dateEnergy: '',
+              dateTypes: [],
+              adventureLevel: '',
+              photoPreference: '',
+              dateStyle: '',
+              planningStyle: '',
+              foodStyles: [],
+              preferredTimes: [],
+              budgetStyle: '',
+            },
+            createdAt: new Date(),
+          });
+        }
+
+        // Create couple with pending status (waiting for partner)
+        // coupleId is deterministic so partner will have the same one
+        setCouple({
+          id: testCoupleId,
+          user1Id: testUserId,
+          anniversaryDate: new Date(),
+          anniversaryType: '연애 시작일',
+          status: 'pending',
+          createdAt: new Date(),
+        });
+
+        // Save pairing code to local storage
+        await createTestPairingCode(
+          generatedCode,
+          testUserId,
+          currentUser?.nickname || 'Test User'
+        );
+
+        setIsCodeSaved(true);
+        console.log('[TestMode] Pairing code created:', generatedCode);
+        console.log('[TestMode] Deterministic coupleId:', testCoupleId);
+      };
+
+      setupTestPairing();
     }
 
     // Cleanup subscription on unmount
@@ -1456,11 +1498,41 @@ function PairingStep({
 
   // Separate useEffect for polling - runs when code is saved but not yet connected
   React.useEffect(() => {
-    if (isCreatingCode && !isDemoMode && isCodeSaved && !isPairingConnected && generatedCode) {
+    if (isCreatingCode && isCodeSaved && !isPairingConnected && generatedCode) {
       // Start polling as fallback (every 1.5 seconds)
       pollingRef.current = setInterval(async () => {
         try {
-          if (supabase) {
+          if (isInTestMode()) {
+            // Test mode: poll local storage
+            const pairingData = await checkTestPairingStatus(generatedCode);
+            if (pairingData?.status === 'connected' && pairingData.joinerId) {
+              console.log('[TestMode] Partner connected!', pairingData.joinerNickname);
+
+              // Update couple with partner info
+              setCouple({
+                id: pairingData.coupleId,
+                user1Id: pairingData.creatorId,
+                user2Id: pairingData.joinerId,
+                anniversaryDate: new Date(),
+                anniversaryType: '연애 시작일',
+                status: 'active',
+                createdAt: new Date(),
+              });
+
+              // Set partner info
+              setPartner({
+                id: pairingData.joinerId,
+                email: 'partner@daydate.app',
+                nickname: pairingData.joinerNickname || 'Partner',
+                inviteCode: '',
+                preferences: {} as any,
+                createdAt: new Date(),
+              });
+
+              setIsPairingConnected(true);
+            }
+          } else if (supabase) {
+            // Production mode: poll Supabase
             const { data: checkData } = await supabase
               .from('pairing_codes')
               .select('status')
@@ -1483,7 +1555,7 @@ function PairingStep({
         pollingRef.current = null;
       }
     };
-  }, [isCreatingCode, isCodeSaved, isPairingConnected, generatedCode, setIsPairingConnected]);
+  }, [isCreatingCode, isCodeSaved, isPairingConnected, generatedCode, setIsPairingConnected, setCouple, setPartner]);
 
   // Copy code to clipboard
   const handleCopyCode = async () => {
@@ -1498,41 +1570,88 @@ function PairingStep({
 
   // Handle join (for code enterer)
   const handleJoin = async () => {
-    if (isDemoMode) {
-      // Demo mode: create demo joiner and couple
-      const demoJoinerId = generateUUID();
-      const demoCoupleId = generateUUID();
-      setUser({
-        id: demoJoinerId,
-        email: '',
-        nickname: '',
-        inviteCode: '',
-        preferences: {
-          weekendActivity: '',
-          dateEnergy: '',
-          dateTypes: [],
-          adventureLevel: '',
-          photoPreference: '',
-          dateStyle: '',
-          planningStyle: '',
-          foodStyles: [],
-          preferredTimes: [],
-          budgetStyle: '',
-        },
-        createdAt: new Date(),
-      });
-      setCouple({
-        id: demoCoupleId,
-        user1Id: generateUUID(),
-        user2Id: demoJoinerId,
-        anniversaryDate: new Date(),
-        anniversaryType: t('onboarding.anniversary.datingStart'),
-        status: 'active',
-        createdAt: new Date(),
-      });
-      setIsPairingConnected(true);
-      // Navigation will be handled by useEffect that detects paired couple
-      return;
+    if (isInTestMode()) {
+      // Test mode: Join with deterministic IDs based on the code
+      // No lookup needed - both devices get matching IDs from the same code
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        // Validate code format (at least 4 characters)
+        if (pairingCode.length < 4) {
+          setError(t('onboarding.pairing.invalidCode'));
+          setIsLoading(false);
+          return;
+        }
+
+        // Use deterministic joiner ID based on the pairing code
+        const joinerId = currentUser?.id || generateDeterministicId(pairingCode, 'test-joiner');
+
+        // Join with deterministic IDs - this always succeeds
+        const pairingData = await joinTestPairingCode(
+          pairingCode,
+          joinerId,
+          currentUser?.nickname || 'Partner'
+        );
+
+        // Set joiner user with deterministic ID
+        if (!currentUser?.id) {
+          setUser({
+            id: joinerId,
+            email: 'partner@daydate.app',
+            nickname: currentUser?.nickname || 'Partner',
+            inviteCode: '',
+            preferences: {
+              weekendActivity: '',
+              dateEnergy: '',
+              dateTypes: [],
+              adventureLevel: '',
+              photoPreference: '',
+              dateStyle: '',
+              planningStyle: '',
+              foodStyles: [],
+              preferredTimes: [],
+              budgetStyle: '',
+            },
+            createdAt: new Date(),
+          });
+        }
+
+        // Set couple with deterministic coupleId (same as creator's device)
+        setCouple({
+          id: pairingData.coupleId,
+          user1Id: pairingData.creatorId,
+          user2Id: joinerId,
+          anniversaryDate: new Date(),
+          anniversaryType: '연애 시작일',
+          status: 'active',
+          createdAt: new Date(),
+        });
+
+        // Set partner (the code creator - deterministic ID)
+        setPartner({
+          id: pairingData.creatorId,
+          email: 'test@daydate.app',
+          nickname: pairingData.creatorNickname || 'Partner',
+          inviteCode: pairingCode,
+          preferences: {} as any,
+          createdAt: new Date(),
+        });
+
+        console.log('[TestMode] Successfully joined with code:', pairingCode);
+        console.log('[TestMode] Deterministic coupleId:', pairingData.coupleId);
+        console.log('[TestMode] Creator:', pairingData.creatorId, '+ Joiner:', joinerId);
+
+        setIsPairingConnected(true);
+        setIsLoading(false);
+        // Navigation will be handled by handleConnect or validation check
+        return;
+      } catch (err) {
+        console.error('[TestMode] Join error:', err);
+        setError(t('onboarding.pairing.invalidCode'));
+        setIsLoading(false);
+        return;
+      }
     }
 
     setIsLoading(true);
@@ -1758,7 +1877,9 @@ function PairingStep({
   // Handle connect button press
   const handleConnect = () => {
     if (isCreatingCode) {
-      if (isPairingConnected || isDemoMode) {
+      // In test mode, creator can proceed after code is saved (no cross-device detection)
+      // In production mode, wait for partner to connect via realtime
+      if (isPairingConnected || (isInTestMode() && isCodeSaved)) {
         onNext();
       }
     } else {
@@ -1767,8 +1888,11 @@ function PairingStep({
   };
 
   // Validation
+  // - Test mode creator: can proceed after code is saved (partner enters same code on their device)
+  // - Production creator: must wait for partner connection
+  // - Joiner: must have valid code length
   const isValid = isCreatingCode
-    ? (isPairingConnected || isDemoMode)
+    ? isPairingConnected || (isInTestMode() && isCodeSaved)
     : pairingCode.length >= 4;
 
   return (
@@ -1877,7 +2001,7 @@ function PairingStep({
           disabled={!isValid || isLoading}
         >
           <Text style={styles.primaryButtonText}>
-            {isLoading ? t('onboarding.pairing.connecting') : (isCreatingCode && !isPairingConnected && !isDemoMode) ? t('onboarding.pairing.waitingConnection') : t('onboarding.pairing.connect')}
+            {isLoading ? t('onboarding.pairing.connecting') : (isCreatingCode && !isPairingConnected && !isInTestMode()) ? t('onboarding.pairing.waitingConnection') : t('onboarding.pairing.connect')}
           </Text>
         </Pressable>
       </View>
@@ -2455,6 +2579,14 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
   },
+  whiteBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#FFFFFF',
+  },
   progressContainer: {
     position: 'absolute',
     top: 60,
@@ -2522,6 +2654,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: '100%',
     paddingBottom: 140,
+  },
+  welcomeLogo: {
+    width: 200,
+    height: 100,
+  },
+  welcomeLogoContainer: {
+    alignItems: 'center',
+    paddingTop: 220,
+  },
+  welcomeSubtitle: {
+    fontFamily: TYPOGRAPHY.fontFamily.display,
+    fontSize: 18,
+    color: 'rgba(255, 255, 255, 0.9)',
+    textAlign: 'center',
+    marginTop: SPACING.xxl,
+    lineHeight: 28,
+    letterSpacing: 0.5,
   },
   welcomeIconWrapper: {
     marginTop: 0,
@@ -2714,8 +2863,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: '100%',
     paddingVertical: 14,
-    borderRadius: RADIUS.lg,
-    marginBottom: SPACING.sm,
+    borderRadius: 12,
+    marginBottom: SPACING.lg,
   },
   googleButton: {
     backgroundColor: '#ffffff',
@@ -2726,14 +2875,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEE500',
   },
   socialIcon: {
-    width: 20,
-    height: 20,
-    marginRight: 10,
+    width: 22,
+    height: 22,
+    marginRight: 12,
   },
   kakaoIcon: {
-    width: 20,
-    height: 20,
-    marginRight: 10,
+    width: 22,
+    height: 22,
+    marginRight: 12,
     borderRadius: 4,
   },
   googleButtonText: {

@@ -37,7 +37,7 @@ export interface Couple {
   user1Id: string;
   user2Id?: string;
   anniversaryDate: Date; // Legacy field (keep for backward compatibility)
-  anniversaryType: AnniversaryType; // Legacy field
+  anniversaryType: string; // Legacy field (now accepts i18n translated strings)
   datingStartDate?: Date; // For 100-day anniversary calculation
   weddingDate?: Date; // For wedding anniversary (if married)
   relationshipType?: 'dating' | 'married'; // Relationship type for anniversary display

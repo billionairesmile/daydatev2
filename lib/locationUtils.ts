@@ -116,7 +116,7 @@ export const updateUserLocationInDB = async (userId: string): Promise<boolean> =
       return false;
     }
 
-    const { error } = await db.profiles.update(userId, {
+    const { data, error } = await db.profiles.update(userId, {
       location_latitude: location.latitude,
       location_longitude: location.longitude,
       location_city: location.city,
@@ -125,6 +125,12 @@ export const updateUserLocationInDB = async (userId: string): Promise<boolean> =
 
     if (error) {
       console.error('[Location] Error updating user location in DB:', error);
+      return false;
+    }
+
+    if (!data) {
+      // Profile doesn't exist yet (user still in onboarding) - this is not an error
+      console.log('[Location] Profile not found for location update, skipping');
       return false;
     }
 

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { db, isDemoMode, supabase } from '@/lib/supabase';
+import { db, isInTestMode, supabase } from '@/lib/supabase';
 import type { Mission } from '@/types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { useMemoryStore, dbToCompletedMission } from './memoryStore';
@@ -289,7 +289,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
   // ============================================
 
   initializeSync: async (coupleId: string, userId: string) => {
-    if (isDemoMode || !supabase) {
+    if (isInTestMode() || !supabase) {
       set({ isInitialized: true, coupleId, userId });
       return;
     }
@@ -440,7 +440,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
             });
 
             // Clean up non-locked missions when locked mission completes
-            if (state.coupleId && !isDemoMode) {
+            if (state.coupleId && !isInTestMode()) {
               db.missionProgress.deleteNonLockedMissions(state.coupleId).catch((err) => {
                 console.error('[CoupleSyncStore] Failed to delete non-locked missions:', err);
               });
@@ -683,7 +683,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
 
   acquireMissionLock: async () => {
     const { coupleId, userId } = get();
-    if (!coupleId || !userId || isDemoMode) return true;
+    if (!coupleId || !userId || isInTestMode()) return true;
 
     const acquired = await db.missionLock.acquire(coupleId, userId);
     if (acquired) {
@@ -694,7 +694,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
 
   releaseMissionLock: async (status: 'completed' | 'idle' = 'completed') => {
     const { coupleId } = get();
-    if (!coupleId || isDemoMode) return;
+    if (!coupleId || isInTestMode()) return;
 
     await db.missionLock.release(coupleId, status);
     set({ missionGenerationStatus: status, generatingUserId: null });
@@ -702,7 +702,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
 
   saveSharedMissions: async (missions: Mission[], answers: unknown, partnerId?: string, userNickname?: string) => {
     const { coupleId, userId } = get();
-    if (!coupleId || !userId || isDemoMode) {
+    if (!coupleId || !userId || isInTestMode()) {
       set({ sharedMissions: missions, lastMissionUpdate: new Date() });
       return;
     }
@@ -739,7 +739,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
 
   loadSharedMissions: async () => {
     const { coupleId } = get();
-    if (!coupleId || isDemoMode) return null;
+    if (!coupleId || isInTestMode()) return null;
 
     set({ isLoadingMissions: true });
     const { data, error } = await db.coupleMissions.getToday(coupleId);
@@ -789,7 +789,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     const { activeMissionProgress, userId } = get();
 
     // No active mission progress - nothing to remind about
-    if (!activeMissionProgress || isDemoMode) {
+    if (!activeMissionProgress || isInTestMode()) {
       console.log('[CoupleSyncStore] No active mission progress - skipping reminder');
       return;
     }
@@ -858,7 +858,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     });
 
     // If synced, also delete from database
-    if (coupleId && !isDemoMode) {
+    if (coupleId && !isInTestMode()) {
       try {
         // Delete active missions from couple_missions table
         await db.coupleMissions.deleteActive(coupleId);
@@ -881,18 +881,14 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
   addBookmark: async (mission: Mission) => {
     const { coupleId, userId, sharedBookmarks } = get();
 
-    // Check if already bookmarked (max 5)
-    if (sharedBookmarks.length >= 5) {
-      return false;
-    }
-
-    // Check if already exists
-    if (sharedBookmarks.some((b) => b.mission_id === mission.id)) {
-      return false;
-    }
-
-    if (!coupleId || !userId || isDemoMode) {
-      // Demo mode: add locally
+    if (!coupleId || !userId || isInTestMode()) {
+      // Demo mode: add locally with local state check
+      if (sharedBookmarks.length >= 5) {
+        return false;
+      }
+      if (sharedBookmarks.some((b) => b.mission_id === mission.id)) {
+        return false;
+      }
       const newBookmark: SyncedBookmark = {
         id: `local-${Date.now()}`,
         couple_id: coupleId || 'demo',
@@ -905,14 +901,66 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       return true;
     }
 
-    const { error } = await db.coupleBookmarks.add(coupleId, mission.id, mission, userId);
-    return !error;
+    // Get actual auth.uid() for RLS compliance
+    let authUserId = userId;
+    if (supabase) {
+      const { data: authData } = await supabase.auth.getUser();
+      authUserId = authData?.user?.id || userId;
+      console.log('[Bookmark] Debug - Store userId:', userId);
+      console.log('[Bookmark] Debug - Auth uid:', authUserId);
+      console.log('[Bookmark] Debug - coupleId:', coupleId);
+    }
+
+    // Try to fetch current bookmarks from DB
+    const { data: currentBookmarks, error: fetchError } = await db.coupleBookmarks.getAll(coupleId);
+
+    // Use DB data if available, otherwise fall back to local state
+    const bookmarkList = fetchError ? sharedBookmarks : (currentBookmarks || []);
+
+    if (fetchError) {
+      console.warn('[Bookmark] DB fetch failed, using local state:', fetchError);
+    }
+
+    // Check if already bookmarked (max 5)
+    if (bookmarkList.length >= 5) {
+      console.log('[Bookmark] Limit reached:', bookmarkList.length);
+      return false;
+    }
+
+    // Check if already exists
+    if (bookmarkList.some((b) => b.mission_id === mission.id)) {
+      console.log('[Bookmark] Already bookmarked:', mission.id);
+      return false;
+    }
+
+    // Try to add to DB - use authUserId for RLS compliance
+    const { error } = await db.coupleBookmarks.add(coupleId, mission.id, mission, authUserId);
+
+    if (error) {
+      // Offline or DB error - add locally
+      console.warn('[Bookmark] DB add failed, adding locally:', error);
+      console.warn('[Bookmark] Error code:', error.code, 'Message:', error.message);
+      const newBookmark: SyncedBookmark = {
+        id: `local-${Date.now()}`,
+        couple_id: coupleId,
+        mission_id: mission.id,
+        mission_data: mission,
+        bookmarked_by: authUserId,
+        created_at: new Date().toISOString(),
+      };
+      set({ sharedBookmarks: [newBookmark, ...sharedBookmarks] });
+      return true;
+    }
+
+    // Success - refresh local state
+    await get().loadBookmarks();
+    return true;
   },
 
   removeBookmark: async (missionId: string) => {
     const { coupleId, sharedBookmarks } = get();
 
-    if (!coupleId || isDemoMode) {
+    if (!coupleId || isInTestMode()) {
       // Demo mode: remove locally
       set({
         sharedBookmarks: sharedBookmarks.filter((b) => b.mission_id !== missionId),
@@ -920,13 +968,31 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       return true;
     }
 
+    console.log('[Bookmark] Removing bookmark for mission:', missionId, 'coupleId:', coupleId);
+
     const { error } = await db.coupleBookmarks.remove(coupleId, missionId);
-    return !error;
+
+    if (error) {
+      console.warn('[Bookmark] DB remove failed:', error);
+      console.warn('[Bookmark] Error code:', error.code, 'Message:', error.message);
+      // Still remove locally for better UX
+      set({
+        sharedBookmarks: sharedBookmarks.filter((b) => b.mission_id !== missionId),
+      });
+      return false;
+    }
+
+    // Success - update local state
+    set({
+      sharedBookmarks: sharedBookmarks.filter((b) => b.mission_id !== missionId),
+    });
+    console.log('[Bookmark] Successfully removed bookmark');
+    return true;
   },
 
   loadBookmarks: async () => {
     const { coupleId } = get();
-    if (!coupleId || isDemoMode) return;
+    if (!coupleId || isInTestMode()) return;
 
     set({ isLoadingBookmarks: true });
     const { data, error } = await db.coupleBookmarks.getAll(coupleId);
@@ -934,6 +1000,9 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
 
     if (!error && data) {
       set({ sharedBookmarks: data as SyncedBookmark[] });
+    } else {
+      // On error, sync with empty array to clear stale persist data
+      set({ sharedBookmarks: [] });
     }
   },
 
@@ -969,7 +1038,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       ),
     });
 
-    if (!coupleId || !userId || isDemoMode) {
+    if (!coupleId || !userId || isInTestMode()) {
       // Demo mode: local only
       return newTodo;
     }
@@ -1026,7 +1095,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       ),
     });
 
-    if (isDemoMode) {
+    if (isInTestMode()) {
       return;
     }
 
@@ -1054,7 +1123,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       sharedTodos: sharedTodos.filter((t) => t.id !== todoId),
     });
 
-    if (isDemoMode) {
+    if (isInTestMode()) {
       return;
     }
 
@@ -1076,7 +1145,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
 
   loadTodos: async () => {
     const { coupleId } = get();
-    if (!coupleId || isDemoMode) return;
+    if (!coupleId || isInTestMode()) return;
 
     set({ isLoadingTodos: true });
     const { data, error } = await db.coupleTodos.getAll(coupleId);
@@ -1098,7 +1167,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
   updateMenstrualSettings: async (settings: Partial<MenstrualSettings>) => {
     const { coupleId, userId, menstrualSettings } = get();
 
-    if (!coupleId || !userId || isDemoMode) {
+    if (!coupleId || !userId || isInTestMode()) {
       // Demo mode: update locally
       const updated = {
         id: menstrualSettings?.id || `local-${Date.now()}`,
@@ -1128,7 +1197,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
 
   loadMenstrualSettings: async () => {
     const { coupleId } = get();
-    if (!coupleId || isDemoMode) return;
+    if (!coupleId || isInTestMode()) return;
 
     set({ isLoadingMenstrual: true });
     const { data, error } = await db.menstrualSettings.get(coupleId);
@@ -1146,7 +1215,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
   updateBackgroundImage: async (imageUrl: string | null) => {
     const { coupleId, userId } = get();
 
-    if (!coupleId || !userId || isDemoMode) {
+    if (!coupleId || !userId || isInTestMode()) {
       // Demo mode: update locally only
       set({ backgroundImageUrl: imageUrl });
       return;
@@ -1160,7 +1229,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
 
   loadCoupleSettings: async () => {
     const { coupleId } = get();
-    if (!coupleId || isDemoMode) return;
+    if (!coupleId || isInTestMode()) return;
 
     set({ isLoadingSettings: true });
     const { data, error } = await db.coupleSettings.get(coupleId);
@@ -1198,7 +1267,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       return null;
     }
 
-    if (!coupleId || !userId || isDemoMode) {
+    if (!coupleId || !userId || isInTestMode()) {
       // Demo mode: create locally
       const progress: MissionProgress = {
         id: `local-${Date.now()}`,
@@ -1249,7 +1318,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
 
     if (!targetProgress) return;
 
-    if (isDemoMode) {
+    if (isInTestMode()) {
       // Demo mode: update locally
       set((state) => {
         const updatedProgress = {
@@ -1286,7 +1355,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       return;
     }
 
-    if (isDemoMode) {
+    if (isInTestMode()) {
       // Demo mode: update locally
       const isUser1 = targetProgress.user1_id === userId;
       const now = new Date().toISOString();
@@ -1343,7 +1412,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
 
     if (!targetProgress) return;
 
-    if (isDemoMode) {
+    if (isInTestMode()) {
       // Demo mode: update locally
       set((state) => {
         const updatedProgress = { ...targetProgress, location };
@@ -1364,7 +1433,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
 
   loadMissionProgress: async () => {
     const { coupleId } = get();
-    if (!coupleId || isDemoMode) return;
+    if (!coupleId || isInTestMode()) return;
 
     set({ isLoadingProgress: true });
 
@@ -1397,7 +1466,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     // Find the progress to cancel
     const progressToCancel = allMissionProgress.find(p => p.id === targetId);
 
-    if (isDemoMode) {
+    if (isInTestMode()) {
       set((state) => {
         const updatedAll = state.allMissionProgress.filter(p => p.id !== targetId);
         const lockedProgress = updatedAll.find(p => p.is_message_locked);
@@ -1508,7 +1577,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
 
     const finalRansomSeed = ransomSeed ?? Math.floor(Math.random() * 1000000);
 
-    if (!coupleId || !userId || isDemoMode) {
+    if (!coupleId || !userId || isInTestMode()) {
       // Demo mode: create locally
       const album: CoupleAlbum = {
         id: `local-${Date.now()}`,
@@ -1549,7 +1618,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
   updateAlbum: async (albumId: string, updates: Partial<CoupleAlbum>) => {
     const { coupleAlbums } = get();
 
-    if (isDemoMode) {
+    if (isInTestMode()) {
       // Demo mode: update locally
       set({
         coupleAlbums: coupleAlbums.map((a) =>
@@ -1572,7 +1641,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
   deleteAlbum: async (albumId: string) => {
     const { coupleAlbums, albumPhotosMap } = get();
 
-    if (isDemoMode) {
+    if (isInTestMode()) {
       // Demo mode: delete locally
       const newPhotosMap = { ...albumPhotosMap };
       delete newPhotosMap[albumId];
@@ -1588,7 +1657,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
 
   loadAlbums: async () => {
     const { coupleId } = get();
-    if (!coupleId || isDemoMode) return;
+    if (!coupleId || isInTestMode()) return;
 
     set({ isLoadingAlbums: true });
     const { data, error } = await db.coupleAlbums.getAll(coupleId);
@@ -1623,7 +1692,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     // Check if memoryId is a valid UUID (sample memories have non-UUID IDs like '1', '2', etc.)
     const isSampleMemory = !isValidUUID(memoryId);
 
-    if (!userId || isDemoMode || isSampleMemory) {
+    if (!userId || isInTestMode() || isSampleMemory) {
       // Demo mode or sample memory: add locally only
       const newPhoto: AlbumPhoto = {
         id: `local-${Date.now()}`,
@@ -1690,7 +1759,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
 
     console.log('[removePhotoFromAlbum] ========== REMOVAL START ==========');
     console.log('[removePhotoFromAlbum] Parameters:', { albumId, memoryId });
-    console.log('[removePhotoFromAlbum] Store state:', { isInitialized, coupleId, isDemoMode });
+    console.log('[removePhotoFromAlbum] Store state:', { isInitialized, coupleId, isTestMode: isInTestMode() });
     console.log('[removePhotoFromAlbum] All album IDs in map:', Object.keys(albumPhotosMap));
 
     const existingPhotos = albumPhotosMap[albumId] || [];
@@ -1720,7 +1789,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     console.log('[removePhotoFromAlbum] State updated - new count for album:', (updatedState.albumPhotosMap[albumId] || []).length);
     console.log('[removePhotoFromAlbum] ========== OPTIMISTIC UPDATE DONE ==========');
 
-    if (isDemoMode) {
+    if (isInTestMode()) {
       console.log('[removePhotoFromAlbum] Demo mode - skipping DB delete');
       return;
     }
@@ -1746,7 +1815,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
   },
 
   loadAlbumPhotos: async (albumId: string) => {
-    if (isDemoMode) return;
+    if (isInTestMode()) return;
 
     const { data, error } = await db.albumPhotos.getByAlbum(albumId);
     if (!error && data) {

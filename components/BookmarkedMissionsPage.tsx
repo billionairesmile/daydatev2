@@ -32,8 +32,8 @@ export function BookmarkedMissionsPage({ onBack }: BookmarkedMissionsPageProps) 
   const { keptMissions, removeKeptMissionByKeptId, canStartMission, isTodayCompletedMission } = useMissionStore();
   const { sharedBookmarks, removeBookmark, isInitialized: isSyncInitialized } = useCoupleSyncStore();
 
-  // Use synced bookmarks if available, otherwise fall back to local
-  const bookmarks: BookmarkItem[] = isSyncInitialized && sharedBookmarks.length > 0
+  // Use synced bookmarks if initialized, otherwise fall back to local
+  const bookmarks: BookmarkItem[] = isSyncInitialized
     ? sharedBookmarks
     : keptMissions;
 

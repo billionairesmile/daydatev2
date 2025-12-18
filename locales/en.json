@@ -550,6 +550,14 @@
       "welcomeBack": "Welcome back!",
       "alreadyConnected": "You are already connected with your partner. Continuing from basic info."
     },
+    "testMode": {
+      "title": "Test Mode",
+      "message": "In test mode, data is stored locally only and will not sync with the server.\n\nUse this only for development testing.",
+      "confirm": "Start in Test Mode",
+      "button": "Start in Test Mode",
+      "divider": "Developer",
+      "hint": "Data is stored locally only"
+    },
     "basicInfo": {
       "title": "Enter your\nbasic information",
       "nickname": "Nickname",
