@@ -18,7 +18,6 @@ import {
   RotateCcw,
   Megaphone,
   Headphones,
-  LogOut,
   Trash2,
 } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
@@ -138,26 +137,6 @@ export default function MoreScreen() {
     );
   };
 
-  const handleLogout = () => {
-    Alert.alert(
-      t('more.alerts.logout'),
-      t('more.alerts.logoutMessage'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('more.menu.logout'),
-          style: 'destructive',
-          onPress: async () => {
-            resetOnboarding();
-            setIsOnboardingComplete(false);
-            await AsyncStorage.removeItem('hasSeenHomeTutorial');
-            router.replace('/(auth)/onboarding');
-          },
-        },
-      ]
-    );
-  };
-
   const menuSections: MenuSectionType[] = [
     {
       title: t('more.sections.profile'),
@@ -253,12 +232,6 @@ export default function MoreScreen() {
           </View>
         ))}
 
-        {/* Logout Button - Red Glass Style */}
-        <Pressable style={styles.logoutButton} onPress={handleLogout}>
-          <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-          <LogOut color="#ff4444" size={20} />
-          <Text style={styles.logoutButtonText}>{t('more.menu.logout')}</Text>
-        </Pressable>
       </ScrollView>
     </View>
   );
@@ -346,24 +319,5 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     marginLeft: SPACING.md,
     fontWeight: '400',
-  },
-  logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.sm,
-    marginTop: SPACING.xl,
-    marginHorizontal: SPACING.xs,
-    paddingVertical: 16,
-    borderRadius: 20,
-    overflow: 'hidden',
-    backgroundColor: 'rgba(255, 68, 68, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 68, 68, 0.3)',
-  },
-  logoutButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ff4444',
   },
 });

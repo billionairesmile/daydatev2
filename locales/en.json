@@ -62,9 +62,9 @@
     }
   },
   "mission": {
-    "title": "Today's Mission",
+    "title": "Mission",
     "subtitle": "What moments will you share today?",
-    "generate": "Generate Mission",
+    "generate": "Get Missions",
     "generating": "Generating...",
     "generatingMessage": "Creating your mission",
     "pleaseWait": "Please wait a moment",
@@ -74,9 +74,9 @@
     "keep": "Keep",
     "anotherInProgress": "Another mission in progress",
     "questions": {
-      "canMeetToday": "Can you meet today?",
-      "yesMeet": "Yes, we can",
-      "noMeet": "No",
+      "canMeetToday": "Can you meet each other today?",
+      "yesMeet": "Yeah, we can",
+      "noMeet": "Nope",
       "availableTime": "How much time do you have together today?",
       "todayMood": "What mood are you in today? (Select all)"
     },
@@ -89,9 +89,9 @@
     "moodOptions": {
       "fun": "Want to laugh",
       "deep_talk": "Need to talk",
-      "active": "Active & Energy",
-      "healing": "Rest & Relaxation",
-      "culture": "Culture & Art",
+      "active": "Active",
+      "healing": "Relax",
+      "culture": "Culture",
       "adventure": "New Challenge",
       "romantic": "Romantic"
     },
@@ -177,7 +177,15 @@
   "calendar": {
     "title": "Calendar",
     "subtitle": "Record our time together",
-    "dayNames": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+    "dayNames": [
+      "Sun",
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ],
     "settings": {
       "title": "Calendar Settings",
       "description": "Choose features to display"
@@ -236,7 +244,20 @@
     "viewAll": "View All",
     "togetherMoment": "Moment together",
     "itemCount": "{{count}} items",
-    "monthNames": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+    "monthNames": [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec"
+    ],
     "yearFormat": "{{year}}",
     "yearMonthFormat": "{{month}} {{year}}",
     "filter": {
@@ -441,12 +462,18 @@
       "infoDesc": "Promotions and discounts"
     },
     "other": {
+      "language": "Language",
+      "selectLanguage": "Select Language",
       "termsOfService": "Terms of Service",
+      "locationTerms": "Location Terms",
       "privacyPolicy": "Privacy Policy",
       "version": "Version {{version}}",
       "latestVersion": "Latest"
     },
     "account": {
+      "logout": "Log Out",
+      "logoutTitle": "Log Out",
+      "logoutMessage": "Are you sure you want to log out?",
       "deleteAccount": "Delete Account",
       "unpair": "Unpair"
     },
@@ -471,14 +498,16 @@
       "button": "Unpair",
       "success": "Unpaired",
       "successMessage": "You have been unpaired.\nReconnect with the same partner within 30 days to recover your data.",
-      "error": "An error occurred while unpairing."
+      "error": "An error occurred while unpairing.",
+      "notificationTitle": "You've been unpaired",
+      "notificationBody": "{{nickname}} has unpaired from you. Reconnect within 30 days to recover your data."
     },
     "deleteAccount": {
       "title": "Delete Account",
       "warningText": "Deleting your account will\n",
       "permanentDelete": "permanently delete",
       "warningEnd": " all data.",
-      "dataList": "Data to be deleted:\n• Profile information\n• Couple connection info\n• Completed mission records\n• Albums and photos\n• All settings",
+      "dataList": "Data to be deleted: Profile information, Couple connection info, Completed mission records, Albums and photos, All settings",
       "confirmPrompt": "To continue, please type 'delete' below",
       "confirmText": "delete",
       "button": "Delete Account",

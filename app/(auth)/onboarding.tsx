@@ -50,7 +50,6 @@ import {
   type DateWorry,
   type Constraint,
   type CalendarType,
-  type Gender,
 } from '@/stores/onboardingStore';
 import { useBackground } from '@/contexts';
 import { db, isDemoMode, supabase } from '@/lib/supabase';
@@ -472,8 +471,6 @@ export default function OnboardingScreen() {
             <BasicInfoStep
               nickname={data.nickname}
               setNickname={(name) => updateData({ nickname: name })}
-              gender={data.gender}
-              setGender={(gender) => updateData({ gender })}
               birthDate={data.birthDate}
               setBirthDate={(date) => updateData({ birthDate: date })}
               calendarType={data.birthDateCalendarType}
@@ -574,6 +571,7 @@ export default function OnboardingScreen() {
 
 // Welcome Step
 function WelcomeStep({ onNext, onSocialLogin }: { onNext: () => void; onSocialLogin: (provider: 'google' | 'kakao') => void }) {
+  const { t } = useTranslation();
   const [isLoading, setIsLoading] = useState<'google' | 'kakao' | null>(null);
 
   const handleSocialLogin = async (provider: 'google' | 'kakao') => {
@@ -674,12 +672,10 @@ function WelcomeStep({ onNext, onSocialLogin }: { onNext: () => void; onSocialLo
   );
 }
 
-// Basic Info Step - Nickname, gender, and birthdate only
+// Basic Info Step - Nickname and birthdate only
 function BasicInfoStep({
   nickname,
   setNickname,
-  gender,
-  setGender,
   birthDate,
   setBirthDate,
   calendarType,
@@ -689,8 +685,6 @@ function BasicInfoStep({
 }: {
   nickname: string;
   setNickname: (name: string) => void;
-  gender: Gender | null;
-  setGender: (gender: Gender) => void;
   birthDate: Date | null;
   setBirthDate: (date: Date | null) => void;
   calendarType: CalendarType;
@@ -698,6 +692,7 @@ function BasicInfoStep({
   onNext: () => void;
   onBack: () => void;
 }) {
+  const { t } = useTranslation();
   const [showBirthDatePicker, setShowBirthDatePicker] = useState(false);
 
   const ensureBirthDate = (date: Date | string | null): Date => {
@@ -734,7 +729,7 @@ function BasicInfoStep({
     setShowBirthDatePicker(false);
   };
 
-  const isValid = nickname.trim().length >= 1 && gender !== null && birthDate !== null;
+  const isValid = nickname.trim().length >= 1 && birthDate !== null;
 
   return (
     <View style={styles.centeredStepContainer}>
@@ -761,25 +756,6 @@ function BasicInfoStep({
             autoCapitalize="none"
             maxLength={10}
           />
-        </View>
-
-        {/* Gender */}
-        <View style={styles.basicInfoSection}>
-          <Text style={styles.basicInfoLabel}>{t('onboarding.basicInfo.gender')}</Text>
-          <View style={styles.genderButtons}>
-            <Pressable
-              style={[styles.genderButton, gender === 'male' && styles.genderButtonActive]}
-              onPress={() => setGender('male')}
-            >
-              <Text style={[styles.genderButtonText, gender === 'male' && styles.genderButtonTextActive]}>{t('onboarding.basicInfo.male')}</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.genderButton, gender === 'female' && styles.genderButtonActive]}
-              onPress={() => setGender('female')}
-            >
-              <Text style={[styles.genderButtonText, gender === 'female' && styles.genderButtonTextActive]}>{t('onboarding.basicInfo.female')}</Text>
-            </Pressable>
-          </View>
         </View>
 
         {/* Birth Date */}
@@ -891,6 +867,7 @@ function TermsStep({
   onBack: () => void;
   updateData: (data: Partial<import('@/stores/onboardingStore').OnboardingData>) => void;
 }) {
+  const { t } = useTranslation();
   const [ageVerified, setAgeVerified] = useState(false);
   const [termsAgreed, setTermsAgreed] = useState(false);
   const [locationTermsAgreed, setLocationTermsAgreed] = useState(false);
@@ -1217,6 +1194,7 @@ function PairingStep({
   onNext: () => void;
   onBack: () => void;
 }) {
+  const { t } = useTranslation();
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [isCodeSaved, setIsCodeSaved] = React.useState(false);
@@ -1932,6 +1910,7 @@ function CoupleInfoStep({
   onNext: () => void;
   onBack: () => void;
 }) {
+  const { t } = useTranslation();
   const [showAnniversaryPicker, setShowAnniversaryPicker] = useState(false);
 
   const ensureAnniversaryDate = (date: Date | string | null): Date => {
@@ -2095,6 +2074,7 @@ function PreferencesIntroStep({
   onNext: () => void;
   onBack: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <View style={styles.centeredStepContainer}>
       {/* Title fixed at top */}
@@ -2138,6 +2118,7 @@ function MBTIStep({
   onNext: () => void;
   onBack: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <View style={styles.centeredStepContainer}>
       {/* Title at top */}
@@ -2193,6 +2174,7 @@ function ActivityTypeStep({
   onNext: () => void;
   onBack: () => void;
 }) {
+  const { t } = useTranslation();
   const toggleActivity = (type: ActivityType) => {
     if (activityTypes.includes(type)) {
       setActivityTypes(activityTypes.filter((t) => t !== type));
@@ -2270,6 +2252,7 @@ function DateWorriesStep({
   onNext: () => void;
   onBack: () => void;
 }) {
+  const { t } = useTranslation();
   const worries = dateWorries || [];
 
   const toggleWorry = (worry: DateWorry) => {
@@ -2350,6 +2333,7 @@ function ConstraintsStep({
   onNext: () => void;
   onBack: () => void;
 }) {
+  const { t } = useTranslation();
   const toggleConstraint = (con: Constraint) => {
     if (con === 'none') {
       // If "없음" is selected, clear all others and select only "없음"
@@ -2423,6 +2407,7 @@ function CompleteStep({
   nickname: string;
   onComplete: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <View style={styles.centeredStepContainer}>
       <View style={styles.centeredContent}>
@@ -3538,14 +3523,6 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
     marginLeft: SPACING.xs,
   },
-  nicknameGenderRow: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    alignItems: 'center',
-  },
-  nicknameInputWrapper: {
-    flex: 1,
-  },
   basicInfoInput: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: RADIUS.lg,
@@ -3557,32 +3534,6 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.2)',
     height: 50,
     letterSpacing: 0,
-  },
-  genderButtons: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-  },
-  genderButton: {
-    flex: 1,
-    height: 50,
-    borderRadius: RADIUS.lg,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  genderButtonActive: {
-    backgroundColor: COLORS.white,
-    borderColor: COLORS.white,
-  },
-  genderButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.white,
-  },
-  genderButtonTextActive: {
-    color: COLORS.black,
   },
   basicInfoDateButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',

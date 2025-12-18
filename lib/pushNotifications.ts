@@ -164,7 +164,8 @@ export async function getPartnerPushToken(partnerId: string): Promise<string | n
 export type NotificationType =
   | 'mission_generated'
   | 'mission_reminder'
-  | 'partner_message_waiting';
+  | 'partner_message_waiting'
+  | 'couple_unpaired';
 
 export interface SendNotificationParams {
   targetUserId: string;
@@ -241,6 +242,24 @@ export async function notifyMissionReminder(
     title: '미션 완료까지 한 걸음!',
     body,
     data: { screen: 'mission' },
+  });
+}
+
+/**
+ * Send unpair notification to partner
+ */
+export async function notifyPartnerUnpaired(
+  partnerId: string,
+  partnerNickname: string,
+  title: string,
+  body: string
+): Promise<boolean> {
+  return sendPushNotification({
+    targetUserId: partnerId,
+    type: 'couple_unpaired',
+    title,
+    body,
+    data: { screen: 'onboarding' },
   });
 }
 

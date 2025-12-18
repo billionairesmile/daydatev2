@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,12 @@ import {
   Alert,
   SafeAreaView,
   StatusBar,
+  ActivityIndicator,
+  Animated,
+  Keyboard,
+  Platform,
 } from 'react-native';
+import { WebView } from 'react-native-webview';
 import {
   ChevronLeft,
   ChevronRight,
@@ -25,12 +30,20 @@ import {
   FileText,
   Shield,
   Info,
+  Globe,
+  Check,
+  MapPin,
+  LogOut,
+  Gift,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import { COLORS, SPACING, RADIUS } from '@/constants/design';
-import { useOnboardingStore, useAuthStore, useMemoryStore } from '@/stores';
+import { useOnboardingStore, useAuthStore, useMemoryStore, useLanguageStore, getLanguageDisplayName } from '@/stores';
+import type { SupportedLanguage } from '@/stores';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
 import { db, isDemoMode } from '@/lib/supabase';
 
@@ -39,9 +52,10 @@ const { width } = Dimensions.get('window');
 export default function SettingsScreen() {
   const router = useRouter();
   const { t } = useTranslation();
-  const { data } = useOnboardingStore();
-  const { signOut, couple } = useAuthStore();
+  const { data, reset: resetOnboarding } = useOnboardingStore();
+  const { signOut, couple, setIsOnboardingComplete } = useAuthStore();
   const { memories } = useMemoryStore();
+  const { language, setLanguage } = useLanguageStore();
 
   // Notification settings
   const [pushEnabled, setPushEnabled] = useState(true);
@@ -50,39 +64,87 @@ export default function SettingsScreen() {
   const [newsEnabled, setNewsEnabled] = useState(false);
   const [marketingEnabled, setMarketingEnabled] = useState(false);
 
-  // Unpair modal
-  const [showUnpairModal, setShowUnpairModal] = useState(false);
-  const [showUnpairConfirmModal, setShowUnpairConfirmModal] = useState(false);
-  const [unpairConfirmText, setUnpairConfirmText] = useState('');
-
   // Account deletion modal
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const calculateDaysTogether = () => {
-    // 온보딩 완료 후 커플 생성 시점(couple.createdAt)부터 현재까지 계산
-    if (!couple?.createdAt) return 0;
-    const start = new Date(couple.createdAt);
-    const now = new Date();
-    const diffTime = Math.abs(now.getTime() - start.getTime());
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  // Language selection modal
+  const [showLanguageModal, setShowLanguageModal] = useState(false);
+
+  // Policy modal
+  const [policyModalVisible, setPolicyModalVisible] = useState(false);
+  const [policyUrl, setPolicyUrl] = useState('');
+  const [policyTitle, setPolicyTitle] = useState('');
+  const [webViewLoading, setWebViewLoading] = useState(true);
+
+  // Keyboard animation for modals
+  const modalAnimatedValue = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const keyboardWillShow = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        Animated.timing(modalAnimatedValue, {
+          toValue: -e.endCoordinates.height / 3,
+          duration: Platform.OS === 'ios' ? 250 : 100,
+          useNativeDriver: true,
+        }).start();
+      }
+    );
+
+    const keyboardWillHide = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        Animated.timing(modalAnimatedValue, {
+          toValue: 0,
+          duration: Platform.OS === 'ios' ? 250 : 100,
+          useNativeDriver: true,
+        }).start();
+      }
+    );
+
+    return () => {
+      keyboardWillShow.remove();
+      keyboardWillHide.remove();
+    };
+  }, [modalAnimatedValue]);
+
+  const AVAILABLE_LANGUAGES: { code: SupportedLanguage; name: string; nativeName: string }[] = [
+    { code: 'ko', name: 'Korean', nativeName: '한국어' },
+    { code: 'en', name: 'English', nativeName: 'English' },
+  ];
+
+  const handleLanguageSelect = (langCode: SupportedLanguage) => {
+    setLanguage(langCode);
+    setShowLanguageModal(false);
   };
 
-  const getRecoveryPeriod = () => {
-    const now = new Date();
-    const startDate = new Date(now);
-    const endDate = new Date(now);
-    endDate.setDate(endDate.getDate() + 30);
+  const openPolicyModal = (url: string, title: string) => {
+    setPolicyUrl(url);
+    setPolicyTitle(title);
+    setWebViewLoading(true);
+    setPolicyModalVisible(true);
+  };
 
-    const formatDate = (date: Date) => {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      return `${year}.${month}.${day}`;
-    };
-
-    return `${formatDate(startDate)} ~ ${formatDate(endDate)}`;
+  const handleLogout = () => {
+    Alert.alert(
+      t('settings.account.logoutTitle'),
+      t('settings.account.logoutMessage'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('settings.account.logout'),
+          style: 'destructive',
+          onPress: async () => {
+            resetOnboarding();
+            setIsOnboardingComplete(false);
+            await AsyncStorage.removeItem('hasSeenHomeTutorial');
+            router.replace('/(auth)/onboarding');
+          },
+        },
+      ]
+    );
   };
 
   const handleAccountDeletion = () => {
@@ -134,204 +196,6 @@ export default function SettingsScreen() {
       Alert.alert(t('common.error'), t('settings.deleteAccount.error'));
     }
   };
-
-  const handleUnpairConfirm = async () => {
-    if (unpairConfirmText === t('settings.unpair.confirmText')) {
-      setShowUnpairConfirmModal(false);
-      setShowUnpairModal(false);
-      setUnpairConfirmText('');
-
-      const { user, setCouple, setPartner, setIsOnboardingComplete } = useAuthStore.getState();
-      const { cleanup: cleanupSync } = useCoupleSyncStore.getState();
-
-      try {
-        // Soft delete - disconnect couple in database (30-day recovery period)
-        if (!isDemoMode && couple?.id && user?.id) {
-          const { error } = await db.couples.disconnect(couple.id, user.id);
-          if (error) {
-            console.error('[Settings] Error disconnecting couple:', error);
-            Alert.alert(t('common.error'), t('settings.unpair.error'));
-            return;
-          }
-        }
-
-        // Cleanup realtime subscriptions
-        cleanupSync();
-
-        // Clear couple and partner from local state (but keep user logged in)
-        setCouple(null);
-        setPartner(null);
-
-        // Set onboarding incomplete to show pairing screen
-        setIsOnboardingComplete(false);
-
-        Alert.alert(
-          t('settings.unpair.success'),
-          t('settings.unpair.successMessage'),
-          [
-            {
-              text: t('common.confirm'),
-              onPress: () => {
-                // Navigate to pairing screen
-                router.replace('/(auth)/onboarding');
-              },
-            },
-          ]
-        );
-      } catch (error) {
-        console.error('[Settings] Unpair error:', error);
-        Alert.alert(t('common.error'), t('settings.unpair.error'));
-      }
-    }
-  };
-
-  const renderUnpairInfoModal = () => (
-    <Modal
-      visible={showUnpairModal}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={() => setShowUnpairModal(false)}
-    >
-      <SafeAreaView style={styles.modalContainer}>
-        <View style={styles.modalHeader}>
-          <Pressable onPress={() => setShowUnpairModal(false)} style={styles.modalCloseButton}>
-            <X color={COLORS.black} size={24} />
-          </Pressable>
-          <Text style={styles.modalTitle}>{t('settings.unpair.title')}</Text>
-          <View style={styles.modalHeaderSpacer} />
-        </View>
-
-        <ScrollView
-          style={styles.modalScrollView}
-          contentContainerStyle={styles.modalContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Warning Icon */}
-          <View style={styles.warningIconWrapper}>
-            <AlertTriangle color="#ff5722" size={48} />
-          </View>
-
-          <Text style={styles.warningTitle}>{t('settings.unpair.warningTitle')}</Text>
-          <Text style={styles.warningDescription}>
-            {t('settings.unpair.warningText')}
-          </Text>
-
-          {/* Info Cards */}
-          <View style={styles.infoSection}>
-            <Text style={styles.infoSectionTitle}>{t('settings.unpair.checkTitle')}</Text>
-
-            <View style={styles.infoCard}>
-              <View style={styles.infoCardHeader}>
-                <Text style={styles.infoCardIcon}>📅</Text>
-                <Text style={styles.infoCardLabel}>{t('settings.unpair.daysTogether')}</Text>
-              </View>
-              <Text style={styles.infoCardValue}>{calculateDaysTogether()}{t('settings.unpair.daysUnit')}</Text>
-            </View>
-
-            <View style={styles.infoCard}>
-              <View style={styles.infoCardHeader}>
-                <Text style={styles.infoCardIcon}>✅</Text>
-                <Text style={styles.infoCardLabel}>{t('settings.unpair.completedMissions')}</Text>
-              </View>
-              <Text style={styles.infoCardValue}>{memories.length}{t('settings.unpair.missionsUnit')}</Text>
-            </View>
-
-            <View style={styles.infoCard}>
-              <View style={styles.infoCardHeader}>
-                <Text style={styles.infoCardIcon}>🔄</Text>
-                <Text style={styles.infoCardLabel}>{t('settings.unpair.recoveryPeriod')}</Text>
-              </View>
-              <Text style={styles.infoCardValue}>{getRecoveryPeriod()}</Text>
-              <Text style={styles.infoCardSubtext}>{t('settings.unpair.recoveryHint')}</Text>
-            </View>
-          </View>
-
-          {/* Warning List */}
-          <View style={styles.warningList}>
-            <Text style={styles.warningListTitle}>{t('settings.unpair.warningsTitle')}</Text>
-            <View style={styles.warningListItem}>
-              <Text style={styles.warningBullet}>•</Text>
-              <Text style={styles.warningListText}>{t('settings.unpair.warning1')}</Text>
-            </View>
-            <View style={styles.warningListItem}>
-              <Text style={styles.warningBullet}>•</Text>
-              <Text style={styles.warningListText}>{t('settings.unpair.warning2')}</Text>
-            </View>
-            <View style={styles.warningListItem}>
-              <Text style={styles.warningBullet}>•</Text>
-              <Text style={styles.warningListText}>{t('settings.unpair.warning3')}</Text>
-            </View>
-          </View>
-        </ScrollView>
-
-        {/* Bottom Button */}
-        <View style={styles.modalBottomButton}>
-          <Pressable
-            style={styles.unpairButton}
-            onPress={() => {
-              setShowUnpairModal(false);
-              setShowUnpairConfirmModal(true);
-            }}
-          >
-            <Link2Off color={COLORS.white} size={20} />
-            <Text style={styles.unpairButtonText}>{t('settings.unpair.button')}</Text>
-          </Pressable>
-        </View>
-      </SafeAreaView>
-    </Modal>
-  );
-
-  const renderUnpairConfirmModal = () => (
-    <Modal
-      visible={showUnpairConfirmModal}
-      transparent
-      animationType="fade"
-      onRequestClose={() => {
-        setShowUnpairConfirmModal(false);
-        setUnpairConfirmText('');
-      }}
-    >
-      <View style={styles.confirmModalOverlay}>
-        <View style={styles.confirmModalContent}>
-          <Text style={styles.confirmModalTitle}>{t('settings.unpair.confirmTitle')}</Text>
-          <Text style={styles.confirmModalDescription}>
-            {t('settings.unpair.confirmPrompt')}
-          </Text>
-
-          <TextInput
-            style={styles.confirmInput}
-            value={unpairConfirmText}
-            onChangeText={setUnpairConfirmText}
-            placeholder={t('settings.unpair.confirmText')}
-            placeholderTextColor="#ccc"
-            autoFocus
-          />
-
-          <View style={styles.confirmButtonRow}>
-            <Pressable
-              style={styles.confirmCancelButton}
-              onPress={() => {
-                setShowUnpairConfirmModal(false);
-                setUnpairConfirmText('');
-              }}
-            >
-              <Text style={styles.confirmCancelButtonText}>{t('common.cancel')}</Text>
-            </Pressable>
-            <Pressable
-              style={[
-                styles.confirmUnpairButton,
-                unpairConfirmText !== t('settings.unpair.confirmText') && styles.confirmUnpairButtonDisabled,
-              ]}
-              onPress={handleUnpairConfirm}
-              disabled={unpairConfirmText !== t('settings.unpair.confirmText')}
-            >
-              <Text style={styles.confirmUnpairButtonText}>{t('settings.unpair.button')}</Text>
-            </Pressable>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -436,7 +300,9 @@ export default function SettingsScreen() {
 
           <View style={styles.settingItem}>
             <View style={styles.settingItemLeft}>
-              <View style={styles.iconWrapperEmpty} />
+              <View style={styles.iconWrapper}>
+                <Gift color={COLORS.black} size={20} />
+              </View>
               <View style={styles.settingItemContent}>
                 <Text style={styles.settingItemLabel}>{t('settings.marketing.info')}</Text>
                 <Text style={styles.settingItemDescription}>{t('settings.marketing.infoDesc')}</Text>
@@ -454,26 +320,17 @@ export default function SettingsScreen() {
         {/* Others */}
         <Text style={styles.sectionTitle}>{t('settings.sections.other')}</Text>
         <View style={styles.settingCard}>
-          <Pressable style={styles.menuItem} onPress={() => {}}>
+          <Pressable style={styles.menuItem} onPress={() => setShowLanguageModal(true)}>
             <View style={styles.settingItemLeft}>
               <View style={styles.iconWrapper}>
-                <FileText color={COLORS.black} size={20} />
+                <Globe color={COLORS.black} size={20} />
               </View>
-              <Text style={styles.settingItemLabel}>{t('settings.other.termsOfService')}</Text>
+              <Text style={styles.settingItemLabel}>{t('settings.other.language')}</Text>
             </View>
-            <ChevronRight color="#999" size={20} />
-          </Pressable>
-
-          <View style={styles.settingDivider} />
-
-          <Pressable style={styles.menuItem} onPress={() => {}}>
-            <View style={styles.settingItemLeft}>
-              <View style={styles.iconWrapper}>
-                <Shield color={COLORS.black} size={20} />
-              </View>
-              <Text style={styles.settingItemLabel}>{t('settings.other.privacyPolicy')}</Text>
+            <View style={styles.languageValue}>
+              <Text style={styles.languageValueText}>{getLanguageDisplayName(language)}</Text>
+              <ChevronRight color="#999" size={20} />
             </View>
-            <ChevronRight color="#999" size={20} />
           </Pressable>
 
           <View style={styles.settingDivider} />
@@ -487,11 +344,69 @@ export default function SettingsScreen() {
             </View>
             <Text style={styles.versionStatus}>{t('settings.other.latestVersion')}</Text>
           </View>
+
+          <View style={styles.settingDivider} />
+
+          <Pressable style={styles.menuItem} onPress={() => openPolicyModal('https://daydate.my/policy/terms', t('settings.other.termsOfService'))}>
+            <View style={styles.settingItemLeft}>
+              <View style={styles.iconWrapper}>
+                <FileText color={COLORS.black} size={20} />
+              </View>
+              <Text style={styles.settingItemLabel}>{t('settings.other.termsOfService')}</Text>
+            </View>
+            <ChevronRight color="#999" size={20} />
+          </Pressable>
+
+          <View style={styles.settingDivider} />
+
+          <Pressable style={styles.menuItem} onPress={() => openPolicyModal('https://daydate.my/policy/location', t('settings.other.locationTerms'))}>
+            <View style={styles.settingItemLeft}>
+              <View style={styles.iconWrapper}>
+                <MapPin color={COLORS.black} size={20} />
+              </View>
+              <Text style={styles.settingItemLabel}>{t('settings.other.locationTerms')}</Text>
+            </View>
+            <ChevronRight color="#999" size={20} />
+          </Pressable>
+
+          <View style={styles.settingDivider} />
+
+          <Pressable style={styles.menuItem} onPress={() => openPolicyModal('https://daydate.my/policy/privacy', t('settings.other.privacyPolicy'))}>
+            <View style={styles.settingItemLeft}>
+              <View style={styles.iconWrapper}>
+                <Shield color={COLORS.black} size={20} />
+              </View>
+              <Text style={styles.settingItemLabel}>{t('settings.other.privacyPolicy')}</Text>
+            </View>
+            <ChevronRight color="#999" size={20} />
+          </Pressable>
         </View>
 
         {/* Account Actions */}
         <Text style={styles.sectionTitle}>{t('settings.sections.account')}</Text>
         <View style={styles.settingCard}>
+          <Pressable style={styles.menuItem} onPress={handleLogout}>
+            <View style={styles.settingItemLeft}>
+              <View style={[styles.iconWrapper, { backgroundColor: '#e3f2fd' }]}>
+                <LogOut color="#2196f3" size={20} />
+              </View>
+              <Text style={[styles.settingItemLabel, { color: '#2196f3' }]}>{t('settings.account.logout')}</Text>
+            </View>
+          </Pressable>
+
+          <View style={styles.settingDivider} />
+
+          <Pressable style={styles.dangerItem} onPress={() => router.push('/more/unpair')}>
+            <View style={styles.settingItemLeft}>
+              <View style={[styles.iconWrapper, { backgroundColor: '#fff3e0' }]}>
+                <Link2Off color="#ff9800" size={20} />
+              </View>
+              <Text style={[styles.dangerItemLabel, { color: '#ff9800' }]}>{t('settings.account.unpair')}</Text>
+            </View>
+          </Pressable>
+
+          <View style={styles.settingDivider} />
+
           <Pressable style={styles.dangerItem} onPress={handleAccountDeletion}>
             <View style={styles.settingItemLeft}>
               <View style={[styles.iconWrapper, { backgroundColor: '#ffebee' }]}>
@@ -500,23 +415,72 @@ export default function SettingsScreen() {
               <Text style={styles.dangerItemLabel}>{t('settings.account.deleteAccount')}</Text>
             </View>
           </Pressable>
-
-          <View style={styles.settingDivider} />
-
-          <Pressable style={styles.dangerItem} onPress={() => setShowUnpairModal(true)}>
-            <View style={styles.settingItemLeft}>
-              <View style={[styles.iconWrapper, { backgroundColor: '#fff3e0' }]}>
-                <Link2Off color="#ff9800" size={20} />
-              </View>
-              <Text style={[styles.dangerItemLabel, { color: '#ff9800' }]}>{t('settings.account.unpair')}</Text>
-            </View>
-          </Pressable>
         </View>
       </ScrollView>
 
-      {/* Modals */}
-      {renderUnpairInfoModal()}
-      {renderUnpairConfirmModal()}
+      {/* Language Selection Modal */}
+      <Modal
+        visible={showLanguageModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowLanguageModal(false)}
+      >
+        <Pressable
+          style={styles.languageModalOverlay}
+          onPress={() => setShowLanguageModal(false)}
+        >
+          <View style={styles.languageModalContent}>
+            <Text style={styles.languageModalTitle}>{t('settings.other.selectLanguage')}</Text>
+            {AVAILABLE_LANGUAGES.map((lang) => (
+              <Pressable
+                key={lang.code}
+                style={styles.languageOption}
+                onPress={() => handleLanguageSelect(lang.code)}
+              >
+                <View style={styles.languageOptionLeft}>
+                  <Text style={styles.languageOptionName}>{lang.nativeName}</Text>
+                  <Text style={styles.languageOptionSubname}>{lang.name}</Text>
+                </View>
+                {language === lang.code && (
+                  <Check color="#4caf50" size={20} />
+                )}
+              </Pressable>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Policy Modal with WebView */}
+      <Modal
+        visible={policyModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setPolicyModalVisible(false)}
+      >
+        <SafeAreaView style={styles.policyModalContainer}>
+          <View style={styles.policyModalHeader}>
+            <Text style={styles.policyModalTitle}>{policyTitle}</Text>
+            <Pressable
+              style={styles.policyModalCloseButton}
+              onPress={() => setPolicyModalVisible(false)}
+            >
+              <X color={COLORS.black} size={24} />
+            </Pressable>
+          </View>
+          {webViewLoading && (
+            <View style={styles.webViewLoading}>
+              <ActivityIndicator size="large" color={COLORS.black} />
+            </View>
+          )}
+          <WebView
+            source={{ uri: policyUrl }}
+            style={styles.webView}
+            onLoadStart={() => setWebViewLoading(true)}
+            onLoadEnd={() => setWebViewLoading(false)}
+            startInLoadingState={true}
+          />
+        </SafeAreaView>
+      </Modal>
 
       {/* Account Deletion Confirmation Modal */}
       <Modal
@@ -531,7 +495,12 @@ export default function SettingsScreen() {
         }}
       >
         <View style={styles.confirmModalOverlay}>
-          <View style={styles.confirmModalContent}>
+          <Animated.View
+            style={[
+              styles.confirmModalContent,
+              { transform: [{ translateY: modalAnimatedValue }] }
+            ]}
+          >
             <View style={styles.deleteWarningIcon}>
               <AlertTriangle color="#f44336" size={32} />
             </View>
@@ -582,7 +551,7 @@ export default function SettingsScreen() {
                 )}
               </Pressable>
             </View>
-          </View>
+          </Animated.View>
         </View>
       </Modal>
     </SafeAreaView>
@@ -714,151 +683,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#f44336',
   },
-  // Modal Styles
-  modalContainer: {
-    flex: 1,
-    backgroundColor: COLORS.white,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  modalCloseButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: COLORS.black,
-  },
-  modalHeaderSpacer: {
-    width: 40,
-  },
-  modalScrollView: {
-    flex: 1,
-  },
-  modalContent: {
-    padding: SPACING.lg,
-    alignItems: 'center',
-  },
-  warningIconWrapper: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#fff3e0',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: SPACING.lg,
-    marginBottom: SPACING.lg,
-  },
-  warningTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: COLORS.black,
-    textAlign: 'center',
-    marginBottom: SPACING.sm,
-  },
-  warningDescription: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: SPACING.xl,
-  },
-  infoSection: {
-    width: '100%',
-    marginBottom: SPACING.lg,
-  },
-  infoSectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
-    marginBottom: SPACING.md,
-  },
-  infoCard: {
-    backgroundColor: '#f8f8f8',
-    borderRadius: RADIUS.sm,
-    padding: SPACING.lg,
-    marginBottom: SPACING.sm,
-  },
-  infoCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SPACING.xs,
-  },
-  infoCardIcon: {
-    fontSize: 18,
-    marginRight: SPACING.sm,
-  },
-  infoCardLabel: {
-    fontSize: 14,
-    color: '#666',
-  },
-  infoCardValue: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: COLORS.black,
-    marginLeft: 28,
-  },
-  infoCardSubtext: {
-    fontSize: 12,
-    color: '#999',
-    marginTop: 4,
-    marginLeft: 28,
-  },
-  warningList: {
-    width: '100%',
-    backgroundColor: '#fff8e1',
-    borderRadius: RADIUS.sm,
-    padding: SPACING.lg,
-  },
-  warningListTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#f57c00',
-    marginBottom: SPACING.sm,
-  },
-  warningListItem: {
-    flexDirection: 'row',
-    marginBottom: SPACING.xs,
-  },
-  warningBullet: {
-    fontSize: 14,
-    color: '#ff9800',
-    marginRight: SPACING.sm,
-  },
-  warningListText: {
-    fontSize: 13,
-    color: '#666',
-    flex: 1,
-    lineHeight: 18,
-  },
-  modalBottomButton: {
-    padding: SPACING.lg,
-    paddingBottom: SPACING.xl,
-  },
-  unpairButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 52,
-    backgroundColor: '#ff5722',
-    borderRadius: RADIUS.full,
-    gap: SPACING.sm,
-  },
-  unpairButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.white,
-  },
   // Confirm Modal
   confirmModalOverlay: {
     flex: 1,
@@ -916,22 +740,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#666',
   },
-  confirmUnpairButton: {
-    flex: 1,
-    height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f44336',
-    borderRadius: RADIUS.full,
-  },
-  confirmUnpairButtonDisabled: {
-    backgroundColor: '#ffcdd2',
-  },
-  confirmUnpairButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: COLORS.white,
-  },
   // Account Deletion Modal Styles
   deleteWarningIcon: {
     width: 64,
@@ -967,5 +775,96 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: COLORS.white,
+  },
+  // Language Selection Styles
+  languageValue: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  languageValueText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  languageModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.lg,
+  },
+  languageModalContent: {
+    width: '100%',
+    maxWidth: 320,
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.md,
+    padding: SPACING.lg,
+  },
+  languageModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.black,
+    textAlign: 'center',
+    marginBottom: SPACING.lg,
+  },
+  languageOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  languageOptionLeft: {
+    flex: 1,
+  },
+  languageOptionName: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: COLORS.black,
+  },
+  languageOptionSubname: {
+    fontSize: 13,
+    color: '#999',
+    marginTop: 2,
+  },
+  // Policy Modal Styles
+  policyModalContainer: {
+    flex: 1,
+    backgroundColor: COLORS.white,
+  },
+  policyModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    position: 'relative',
+  },
+  policyModalTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: COLORS.black,
+  },
+  policyModalCloseButton: {
+    position: 'absolute',
+    right: SPACING.lg,
+    padding: SPACING.xs,
+  },
+  webView: {
+    flex: 1,
+  },
+  webViewLoading: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.white,
+    zIndex: 1,
   },
 });

@@ -2741,6 +2741,7 @@ function FlipCardItem({
   mission: MemoryType;
   isActive: boolean;
 }) {
+  const { t } = useTranslation();
   const { user, partner, couple } = useAuthStore();
   const { data: onboardingData } = useOnboardingStore();
   const [isFlipped, setIsFlipped] = useState(false);
@@ -2975,6 +2976,7 @@ function PhotoDetailView({
   onClose: () => void;
   onDelete: (memoryId: string) => void | Promise<void>;
 }) {
+  const { t } = useTranslation();
   const initialIndex = missions.findIndex((m) => m.id === initialPhoto.id);
   const [currentIndex, setCurrentIndex] = useState(
     initialIndex >= 0 ? initialIndex : 0

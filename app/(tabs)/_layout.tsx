@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { Tabs } from 'expo-router';
-import { StyleSheet, View, Pressable, Text } from 'react-native';
+import { StyleSheet, View, Pressable, Text, Animated, LayoutChangeEvent } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Target, BookHeart, Home, Calendar, Menu } from 'lucide-react-native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import { useTranslation } from 'react-i18next';
 
 import { COLORS } from '@/constants/design';
 
@@ -21,12 +22,13 @@ function TabBarIcon({
   );
 }
 
-const TAB_LABELS: Record<string, string> = {
-  mission: '미션',
-  memories: '추억',
-  index: '홈',
-  calendar: '캘린더',
-  more: '더보기',
+// Tab label translation keys mapping
+const TAB_LABEL_KEYS: Record<string, string> = {
+  mission: 'tabs.mission',
+  memories: 'tabs.memories',
+  index: 'tabs.home',
+  calendar: 'tabs.calendar',
+  more: 'tabs.more',
 };
 
 const TAB_ICONS: Record<string, React.ComponentType<{ color: string; size: number; strokeWidth: number }>> = {
@@ -38,57 +40,105 @@ const TAB_ICONS: Record<string, React.ComponentType<{ color: string; size: numbe
 };
 
 function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+  const { t } = useTranslation();
+  const [tabWidth, setTabWidth] = useState(0);
+  const indicatorPosition = useRef(new Animated.Value(0)).current;
+  const indicatorOpacity = useRef(new Animated.Value(0)).current;
+
+  // Animate indicator when tab changes
+  useEffect(() => {
+    if (tabWidth > 0) {
+      Animated.parallel([
+        Animated.spring(indicatorPosition, {
+          toValue: state.index * tabWidth,
+          useNativeDriver: true,
+          tension: 68,
+          friction: 15,
+          overshootClamping: true,
+        }),
+        Animated.timing(indicatorOpacity, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [state.index, tabWidth, indicatorPosition, indicatorOpacity]);
+
+  const handleTabsContainerLayout = (event: LayoutChangeEvent) => {
+    const { width } = event.nativeEvent.layout;
+    const singleTabWidth = width / state.routes.length;
+    setTabWidth(singleTabWidth);
+    // Set initial position without animation
+    indicatorPosition.setValue(state.index * singleTabWidth);
+  };
+
   return (
     <View style={styles.tabBarContainer}>
       <View style={styles.tabBarOuter}>
         <BlurView intensity={50} tint="dark" style={styles.tabBarBlur}>
           <View style={styles.tabBarInner}>
-            {state.routes.map((route, index) => {
-              const { options } = descriptors[route.key];
-              const isFocused = state.index === index;
-
-              const onPress = () => {
-                const event = navigation.emit({
-                  type: 'tabPress',
-                  target: route.key,
-                  canPreventDefault: true,
-                });
-
-                if (!isFocused && !event.defaultPrevented) {
-                  navigation.navigate(route.name);
-                }
-              };
-
-              const IconComponent = TAB_ICONS[route.name] || Home;
-              const label = TAB_LABELS[route.name] || route.name;
-
-              return (
-                <Pressable
-                  key={route.key}
-                  accessibilityRole="button"
-                  accessibilityState={isFocused ? { selected: true } : {}}
-                  accessibilityLabel={options.tabBarAccessibilityLabel}
-                  onPress={onPress}
+            {/* Tabs Container - indicator and tabs share the same reference */}
+            <View style={styles.tabsContainer} onLayout={handleTabsContainerLayout}>
+              {/* Animated Indicator */}
+              {tabWidth > 0 && (
+                <Animated.View
                   style={[
-                    styles.tabItem,
-                    isFocused && styles.tabItemActive,
+                    styles.indicator,
+                    {
+                      width: tabWidth,
+                      opacity: indicatorOpacity,
+                      transform: [{ translateX: indicatorPosition }],
+                    },
                   ]}
-                >
-                  <TabBarIcon Icon={IconComponent} />
-                  <Text
-                    style={[
-                      styles.tabLabel,
-                      {
-                        color: COLORS.white,
-                        fontWeight: '400',
-                      },
-                    ]}
+                />
+              )}
+
+              {state.routes.map((route, index) => {
+                const { options } = descriptors[route.key];
+                const isFocused = state.index === index;
+
+                const onPress = () => {
+                  const event = navigation.emit({
+                    type: 'tabPress',
+                    target: route.key,
+                    canPreventDefault: true,
+                  });
+
+                  if (!isFocused && !event.defaultPrevented) {
+                    navigation.navigate(route.name);
+                  }
+                };
+
+                const IconComponent = TAB_ICONS[route.name] || Home;
+                const labelKey = TAB_LABEL_KEYS[route.name];
+                const label = labelKey ? t(labelKey) : route.name;
+
+                return (
+                  <Pressable
+                    key={route.key}
+                    accessibilityRole="button"
+                    accessibilityState={isFocused ? { selected: true } : {}}
+                    accessibilityLabel={options.tabBarAccessibilityLabel}
+                    onPress={onPress}
+                    style={styles.tabItem}
                   >
-                    {label}
-                  </Text>
-                </Pressable>
-              );
-            })}
+                    <TabBarIcon Icon={IconComponent} />
+                    <Text
+                      style={[
+                        styles.tabLabel,
+                        {
+                          color: COLORS.white,
+                          fontWeight: '400',
+                        },
+                      ]}
+                    >
+                      {label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
         </BlurView>
       </View>
@@ -169,28 +219,31 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   tabBarInner: {
+    padding: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  tabsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingVertical: 6,
-    paddingHorizontal: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  indicator: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 100,
   },
   tabItem: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 6,
+    paddingHorizontal: 2,
     borderRadius: 100,
-    width: 68,
-    minWidth: 68,
-    maxWidth: 72,
-  },
-  tabItemActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
   },
   tabLabel: {
-    fontSize: 12,
+    fontSize: 11,
     marginTop: 2,
     textAlign: 'center',
   },

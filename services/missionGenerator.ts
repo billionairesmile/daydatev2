@@ -3,6 +3,8 @@ import type { Mission, MissionCategory } from '@/types';
 import type { OnboardingData, DateWorry } from '@/stores/onboardingStore';
 import type { MissionGenerationAnswers } from '@/stores/missionStore';
 import { getRandomImage } from '@/constants/missionImages';
+import { useLanguageStore } from '@/stores';
+import type { SupportedLanguage, CountryCode } from '@/stores';
 
 // ============================================
 // Types
@@ -13,6 +15,7 @@ export interface WeatherContext {
   condition: string;
   season: 'spring' | 'summer' | 'fall' | 'winter';
   isOutdoorFriendly: boolean;
+  countryCode: CountryCode;
 }
 
 interface MissionGenerationInput {
@@ -45,8 +48,37 @@ const getOpenAIClient = () => {
 };
 
 // ============================================
-// Weather API (OpenWeatherMap)
+// Weather API (OpenWeatherMap) + Country Detection
 // ============================================
+
+// Detect country from coordinates using OpenWeatherMap reverse geocoding
+async function detectCountryFromCoordinates(latitude: number, longitude: number): Promise<CountryCode> {
+  const apiKey = process.env.EXPO_PUBLIC_WEATHER_API_KEY;
+  if (!apiKey) return 'DEFAULT';
+
+  try {
+    const response = await fetch(
+      `https://api.openweathermap.org/geo/1.0/reverse?lat=${latitude}&lon=${longitude}&limit=1&appid=${apiKey}`
+    );
+
+    if (!response.ok) return 'DEFAULT';
+
+    const data = await response.json();
+    if (data && data.length > 0) {
+      const country = data[0].country;
+      // Map to supported country codes
+      if (country === 'KR') return 'KR';
+      if (country === 'US') return 'US';
+      if (country === 'GB') return 'GB';
+      if (country === 'AU') return 'AU';
+      if (country === 'CA') return 'CA';
+    }
+    return 'DEFAULT';
+  } catch (error) {
+    console.error('[Country Detection] Failed:', error);
+    return 'DEFAULT';
+  }
+}
 
 async function fetchWeather(latitude: number, longitude: number): Promise<WeatherContext> {
   const apiKey = process.env.EXPO_PUBLIC_WEATHER_API_KEY;
@@ -58,22 +90,24 @@ async function fetchWeather(latitude: number, longitude: number): Promise<Weathe
   }
 
   try {
-    const response = await fetch(
-      `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${apiKey}&units=metric&lang=kr`
-    );
+    // Fetch weather and country in parallel
+    const [weatherResponse, countryCode] = await Promise.all([
+      fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${apiKey}&units=metric`),
+      detectCountryFromCoordinates(latitude, longitude),
+    ]);
 
-    if (!response.ok) {
-      throw new Error(`Weather API error: ${response.status}`);
+    if (!weatherResponse.ok) {
+      throw new Error(`Weather API error: ${weatherResponse.status}`);
     }
 
-    const data = await response.json();
+    const data = await weatherResponse.json();
 
     const temp = Math.round(data.main.temp);
     const weatherId = data.weather[0]?.id || 800;
     const weatherMain = data.weather[0]?.main || 'Clear';
 
-    // Determine condition in Korean
-    const condition = getKoreanCondition(weatherId, weatherMain);
+    // Determine condition based on country
+    const condition = getWeatherCondition(weatherId, weatherMain, countryCode);
 
     // Determine season
     const season = getCurrentSeason();
@@ -81,22 +115,27 @@ async function fetchWeather(latitude: number, longitude: number): Promise<Weathe
     // Determine if outdoor-friendly
     const isOutdoorFriendly = checkOutdoorFriendly(weatherId, temp);
 
-    return { temperature: temp, condition, season, isOutdoorFriendly };
+    // Update detected country in store
+    useLanguageStore.getState().setDetectedCountry(countryCode);
+
+    return { temperature: temp, condition, season, isOutdoorFriendly, countryCode };
   } catch (error) {
     console.error('[Weather] API fetch failed:', error);
     return getSeasonFallback();
   }
 }
 
-function getKoreanCondition(weatherId: number, weatherMain: string): string {
+function getWeatherCondition(weatherId: number, weatherMain: string, countryCode: CountryCode): string {
   // Weather condition codes: https://openweathermap.org/weather-conditions
-  if (weatherId >= 200 && weatherId < 300) return '천둥번개';
-  if (weatherId >= 300 && weatherId < 400) return '이슬비';
-  if (weatherId >= 500 && weatherId < 600) return '비';
-  if (weatherId >= 600 && weatherId < 700) return '눈';
-  if (weatherId >= 700 && weatherId < 800) return '안개';
-  if (weatherId === 800) return '맑음';
-  if (weatherId > 800) return '흐림';
+  const isKorean = countryCode === 'KR';
+
+  if (weatherId >= 200 && weatherId < 300) return isKorean ? '천둥번개' : 'Thunderstorm';
+  if (weatherId >= 300 && weatherId < 400) return isKorean ? '이슬비' : 'Drizzle';
+  if (weatherId >= 500 && weatherId < 600) return isKorean ? '비' : 'Rain';
+  if (weatherId >= 600 && weatherId < 700) return isKorean ? '눈' : 'Snow';
+  if (weatherId >= 700 && weatherId < 800) return isKorean ? '안개' : 'Fog';
+  if (weatherId === 800) return isKorean ? '맑음' : 'Clear';
+  if (weatherId > 800) return isKorean ? '흐림' : 'Cloudy';
   return weatherMain;
 }
 
@@ -117,20 +156,24 @@ function checkOutdoorFriendly(weatherId: number, temp: number): boolean {
   return true;
 }
 
-function getSeasonFallback(): WeatherContext {
+function getSeasonFallback(countryCode: CountryCode = 'DEFAULT'): WeatherContext {
   const season = getCurrentSeason();
-  const seasonDefaults: Record<string, { temp: number; condition: string; outdoor: boolean }> = {
-    spring: { temp: 15, condition: '맑음', outdoor: true },
-    summer: { temp: 28, condition: '맑음', outdoor: true },
-    fall: { temp: 18, condition: '맑음', outdoor: true },
-    winter: { temp: 2, condition: '맑음', outdoor: false },
+  const language = useLanguageStore.getState().language;
+  const isKorean = language === 'ko';
+
+  const seasonDefaults: Record<string, { temp: number; conditionKo: string; conditionEn: string; outdoor: boolean }> = {
+    spring: { temp: 15, conditionKo: '맑음', conditionEn: 'Clear', outdoor: true },
+    summer: { temp: 28, conditionKo: '맑음', conditionEn: 'Clear', outdoor: true },
+    fall: { temp: 18, conditionKo: '맑음', conditionEn: 'Clear', outdoor: true },
+    winter: { temp: 2, conditionKo: '맑음', conditionEn: 'Clear', outdoor: false },
   };
   const defaults = seasonDefaults[season];
   return {
     temperature: defaults.temp,
-    condition: defaults.condition,
+    condition: isKorean ? defaults.conditionKo : defaults.conditionEn,
     season,
     isOutdoorFriendly: defaults.outdoor,
+    countryCode,
   };
 }
 
@@ -389,10 +432,48 @@ function analyzeMBTICombination(mbtiA?: string, mbtiB?: string): string {
 }
 
 // ============================================
-// System Prompt
+// Culture-Specific Prompts
 // ============================================
 
-const SYSTEM_PROMPT = `당신은 한국 2030 커플의 데이트 플래너입니다.
+const CULTURE_PROMPTS: Record<string, { culture: string; trends: string; activities: string; food: string; smallJoys: string; seasonal: string; nightViews: string }> = {
+  KR: {
+    culture: '한국',
+    trends: '팝업스토어, 전시회, 원데이클래스, 플리마켓, 북카페, 빈티지샵, 레코드샵, 독립서점, 루프탑바, 야외 영화관, 한강 피크닉, 감성카페 투어',
+    activities: '방탈출, 보드게임카페, PC방, 코인노래방, VR게임, 스크린골프, 볼링, 다트바, 오락실, 롤러스케이트장, 클라이밍, 드로잉카페, 도자기공방, 향수공방, 캔들공방, 가죽공예, 꽃꽂이, 쿠킹클래스, 와인클래스',
+    food: '전통시장 투어, 길거리 음식, 맛집 웨이팅, 횟집, 고기집, 이자카야, 포장마차, 야시장, 디저트카페, 베이커리 투어, 브런치 맛집, 오마카세, 파인다이닝',
+    smallJoys: '편의점 데이트, 다이소 쇼핑, 네컷사진, 스티커사진',
+    seasonal: '벚꽃/단풍 명소, 한강 피크닉, 눈 오는 날 데이트',
+    nightViews: '드라이브, 루프탑, 야경 맛집, 한강 야경',
+  },
+  US: {
+    culture: 'American',
+    trends: 'Pop-up events, art exhibitions, wine tastings, farmers markets, flea markets, vintage shops, record stores, indie bookstores, rooftop bars, outdoor movies, picnics, coffee shop hopping, thrift shopping',
+    activities: 'Escape rooms, bowling, mini golf, arcade bars, karaoke nights, trivia nights, axe throwing, go-karting, roller skating, rock climbing, pottery classes, painting classes, cooking classes, wine tasting classes, dance classes, yoga sessions',
+    food: 'Brunch spots, food halls, local diners, taco trucks, pizza joints, BBQ joints, ice cream shops, dessert bars, bakery tours, food truck festivals, farm-to-table restaurants, speakeasy bars, rooftop dining',
+    smallJoys: 'Dollar store dates, Target runs, photo booth stops, convenience store snack runs',
+    seasonal: 'Fall foliage drives, beach days, holiday light displays, spring picnics',
+    nightViews: 'Night drives, rooftop bars, city skyline views, stargazing spots',
+  },
+  DEFAULT: {
+    culture: 'local',
+    trends: 'pop-up events, exhibitions, workshops, local festivals, vintage shops, bookstores',
+    activities: 'escape rooms, game cafes, outdoor activities, cultural experiences, cooking classes, art workshops',
+    food: 'local restaurants, street food, cafes, food markets, brunch spots, dessert shops',
+    smallJoys: 'convenience store dates, photo booths, window shopping',
+    seasonal: 'seasonal festivals, outdoor picnics, weather-appropriate activities',
+    nightViews: 'night drives, rooftop spots, scenic viewpoints',
+  },
+};
+
+// ============================================
+// System Prompt Generator
+// ============================================
+
+function getSystemPrompt(countryCode: CountryCode, language: SupportedLanguage): string {
+  const cultureData = CULTURE_PROMPTS[countryCode] || CULTURE_PROMPTS.DEFAULT;
+
+  if (language === 'ko') {
+    return `당신은 ${cultureData.culture} 2030 커플의 데이트 플래너입니다.
 인스타그램, 유튜브, 틱톡 트렌드에 밝고, 소소하지만 특별한 순간을 만드는 데 탁월합니다.
 
 ## 미션 설계 철학
@@ -401,14 +482,13 @@ const SYSTEM_PROMPT = `당신은 한국 2030 커플의 데이트 플래너입니
 3. 완료 후 "우리만의 추억"이 남는 경험
 4. 대화가 자연스럽게 이어지는 상황
 
-## 한국 데이트 문화 반영
-- 핫플레이스: 성수, 연남, 을지로, 익선동, 망원, 한남, 삼청동, 가로수길
-- 트렌드: 팝업스토어, 전시회, 원데이클래스, 플리마켓, 북카페
-- 소확행: 편의점 데이트, 다이소 쇼핑, 네컷사진, 스티커사진
-- 계절: 벚꽃/단풍 명소, 한강 피크닉, 눈 오는 날 데이트
-- 야경: 드라이브, 루프탑, 야경 맛집, 한강 야경
-- 활동: 방탈출, 보드게임카페, PC방, 코인노래방, VR게임
-- 먹거리: 전통시장 투어, 길거리 음식, 맛집 웨이팅
+## ${cultureData.culture} 데이트 문화 반영
+- 트렌드: ${cultureData.trends}
+- 소확행: ${cultureData.smallJoys}
+- 계절: ${cultureData.seasonal}
+- 야경: ${cultureData.nightViews}
+- 활동: ${cultureData.activities}
+- 먹거리: ${cultureData.food}
 
 ## 미션 작성 규칙
 1. title: 감성적이고 시적인 문구로 작성 (15~25자)
@@ -457,12 +537,81 @@ Online: online, challenge
 
 ## JSON 출력 형식
 {"missions":[{"title":"","description":"","category":"","tags":["","",""]}]}`;
+  }
+
+  // English prompt
+  return `You are a date planner for couples in their 20s-30s familiar with ${cultureData.culture} culture.
+You excel at creating small but special moments, keeping up with Instagram, YouTube, and TikTok trends.
+
+## Mission Design Philosophy
+1. Ideas that spark excitement: "I want to try this!"
+2. Design moments that naturally make couples want to take photos
+3. Experiences that create "our special memories" after completion
+4. Situations where conversation flows naturally
+
+## ${cultureData.culture} Date Culture
+- Trends: ${cultureData.trends}
+- Small joys: ${cultureData.smallJoys}
+- Seasonal: ${cultureData.seasonal}
+- Night views: ${cultureData.nightViews}
+- Activities: ${cultureData.activities}
+- Food: ${cultureData.food}
+
+## Mission Writing Rules
+1. title: Write in an emotional, poetic phrase (8-15 words)
+   - Good: "Under the Sparkling Lights, Our Winter Story", "Cheering Together, Hearts United", "A Day with You and Our Furry Friend"
+   - Bad: "Go to a cafe", "Do escape room", "Food tour" (too direct and plain)
+   - The title alone should hint at the activity (details go in description)
+2. description: Under 80 characters, clearly explain what the mission is
+   - Since the title is emotional, description should clearly state "what the mission is about"
+   - Example: title "Under the Sparkling Lights, Our Winter Story" → description "Take photos together at a popular Christmas tree spot"
+3. Never mention prices (X: "for $5", "for free")
+4. No filler phrases like "share thoughts", "talk about it"
+5. Activities should naturally lend themselves to photo verification
+
+## Rules for When You Can't Meet (Important!)
+- Only one partner takes a photo on-site for verification
+- Cannot upload existing photos from album
+- Structure: "Both do the same thing separately, one verifies"
+- Examples:
+  - Read the same book → Verify page being read
+  - Cook the same recipe → Verify the result
+  - Write a handwritten letter → Verify with photo
+  - Watch the same movie → Verify with screen showing
+
+## Mission Role Distribution (When generating 3)
+- Mission 1 (Main): Best match for user's concerns and mood
+- Mission 2 (Alternative): Similar but slightly different option
+- Mission 3 (Surprise): Unexpected fresh suggestion, slight challenge
+
+※ Three missions should have different categories!
+
+## Category List (Must use one from this list!)
+Food: cafe, restaurant, streetfood, dessert, cooking, drink, brunch
+Place: outdoor, home, travel, daytrip, drive, night, nature
+Activity: culture, movie, sports, fitness, wellness, creative, game, shopping, photo, learning
+Special: romantic, anniversary, surprise, memory
+Online: online, challenge
+
+### Category Details (Important!)
+- creative: DIY, crafts, one-day classes, candle/perfume/soap making, pottery, painting, flower arrangement, leather crafts, knitting, resin art, nail art, etc.
+- culture: Exhibitions, art museums, museums, performances, concerts, theater
+- learning: Language exchange, study sessions, lectures, seminars
+- wellness: Spa, massage, hot springs, meditation, yoga
+
+⚠️ Categories not in the list above (diy, craft, workshop, class, etc.) are strictly prohibited!
+
+## JSON Output Format
+{"missions":[{"title":"","description":"","category":"","tags":["","",""]}]}`;
+}
 
 // ============================================
-// Few-shot Examples
+// Few-shot Examples (Language-specific)
 // ============================================
 
-const FEW_SHOT_EXAMPLES = `
+function getFewShotExamples(language: SupportedLanguage): string {
+  if (language === 'ko') {
+    return `
 ## 좋은 미션 예시 (만났을 때) - 감성적인 title + 구체적인 description
 
 [감성/로맨틱]
@@ -499,12 +648,8 @@ const FEW_SHOT_EXAMPLES = `
 {"title":"오늘을 영원히 담아두는 법","description":"오늘 찍은 사진들로 포토북 주문해두기","category":"anniversary","tags":["기념일","포토북","추억"]}
 {"title":"달콤한 축하, 촛불 앞의 소원","description":"레터링 케이크 앞에서 함께 촛불 끄고 소원 빌기","category":"anniversary","tags":["케이크","기념일","로맨틱"]}
 {"title":"손끝에 새기는 우리의 약속","description":"기념일 기념 커플링이나 팔찌 함께 고르러 가기","category":"anniversary","tags":["커플링","선물","기념일"]}
-{"title":"그날의 우리로 돌아가는 시간","description":"처음 만났던 그 장소 다시 가서 추억 회상하기","category":"memory","tags":["첫만남","추억","회상"]}
 {"title":"미래의 우리에게 보내는 편지","description":"서로에게 편지 써서 1년 뒤 열어보기로 약속하기","category":"romantic","tags":["타임캡슐","편지","약속"]}
 {"title":"밤하늘 아래, 속삭이는 소원","description":"야경 좋은 곳에서 별 보며 서로 소원 말해주기","category":"romantic","tags":["별","야경","로맨틱"]}
-{"title":"오늘 밤은 우리만의 만찬","description":"분위기 좋은 레스토랑에서 코스요리 즐기기","category":"anniversary","tags":["디너","레스토랑","기념일"]}
-{"title":"흘러간 시간 속 우리의 발자취","description":"지금까지 찍은 사진들 보며 그때 이야기 나누기","category":"memory","tags":["추억","사진","대화"]}
-{"title":"손끝으로 전하는 마음 한 줄","description":"미리 준비한 손편지 서로 읽어주기","category":"romantic","tags":["손편지","감동","사랑"]}
 
 ---
 ## 만나지 못할 때 미션 예시 (한 명이 현장에서 직접 촬영하여 인증)
@@ -514,10 +659,107 @@ const FEW_SHOT_EXAMPLES = `
 {"title":"펜 끝에서 전해지는 마음","description":"손으로 직접 편지 써서 사진 찍어 보내기","category":"online","tags":["손편지","감동","아날로그"]}
 {"title":"같은 장면, 다른 소파","description":"같은 영화 동시에 틀어놓고 보는 중 화면 인증하기","category":"online","tags":["영화","동시시청","인증"]}
 {"title":"떨어져 있어도 같은 맛","description":"같은 레시피로 각자 요리해서 결과물 인증하기","category":"online","tags":["요리","챌린지","인증"]}
-{"title":"너를 위해 고른 멜로디","description":"상대방을 위한 플레이리스트 만들어서 캡처 공유하기","category":"online","tags":["음악","플리","선물"]}
-{"title":"100일 뒤의 우리에게","description":"100일 뒤에 열어볼 편지 써서 사진으로 인증하기","category":"online","tags":["편지","미래","약속"]}
-{"title":"오늘의 나, 너에게 보여줄게","description":"오늘 입은 전신 코디 사진 서로 공유하기","category":"online","tags":["패션","일상","공유"]}
 `;
+  }
+
+  // English examples
+  return `
+## Good Mission Examples (When Meeting) - Emotional title + Specific description
+
+[Romantic/Emotional]
+{"title":"Under the Sparkling Lights, Our Winter Story","description":"Take photos together at a popular Christmas tree spot","category":"romantic","tags":["Christmas","lights","hotspot"]}
+{"title":"Cozy Corner, Warm Sips","description":"Enjoy specialty drinks at a cozy cafe while watching the winter scenery","category":"cafe","tags":["cozy","cafe","winter"]}
+{"title":"City Nights, Cheers to Us","description":"Sip signature cocktails at a rooftop bar with a view","category":"drink","tags":["rooftop","nightview","cocktails"]}
+{"title":"Click, Our Moments Captured","description":"Tour trendy photo booths and create a photo strip collection","category":"photo","tags":["photobooth","photos","fun"]}
+
+[Activities]
+{"title":"Solving Mysteries, Side by Side","description":"Team up to conquer an escape room challenge together","category":"game","tags":["escaperoom","teamwork","game"]}
+{"title":"Beyond Reality, Into Adventure","description":"Experience a virtual reality date at a VR gaming zone","category":"game","tags":["VR","gaming","experience"]}
+{"title":"Our Recipe for Happiness","description":"Learn to cook together at a one-day cooking class","category":"cooking","tags":["cooking","class","experience"]}
+{"title":"Serious Competition, Hilarious Ending","description":"Challenge each other at an arcade - loser plans the next date!","category":"game","tags":["arcade","competition","fun"]}
+{"title":"Cheering Together, Hearts United","description":"Watch a live game and cheer passionately together","category":"sports","tags":["sports","cheering","excitement"]}
+
+[Food Adventures]
+{"title":"Flavors Down Every Alley","description":"Explore a local market sampling street food together","category":"streetfood","tags":["market","streetfood","tour"]}
+{"title":"Our Secret Recipe, Store Edition","description":"Create custom combo meals at a convenience store and rate them","category":"streetfood","tags":["convenience","combo","challenge"]}
+{"title":"Our Hidden Gem Discovery","description":"Find and try a hidden local restaurant with few reviews","category":"restaurant","tags":["hidden","local","discovery"]}
+
+[Unique/Fresh]
+{"title":"Silly but Fun, That's Just Us","description":"Pick useless but hilarious gifts for each other at a dollar store","category":"shopping","tags":["shopping","gifts","laughter"]}
+{"title":"Destiny Picks Our Drinks","description":"Close your eyes and randomly point at the cafe menu","category":"cafe","tags":["random","challenge","cafe"]}
+{"title":"Seven Poses, One Perfect Strip","description":"Challenge yourselves to 7 different poses at a photo booth","category":"photo","tags":["photobooth","challenge","photos"]}
+{"title":"To the End of the Line, Our Spontaneous Trip","description":"Hop on the first bus that arrives and ride to the last stop","category":"daytrip","tags":["spontaneous","adventure","trip"]}
+{"title":"A Day with You and Our Furry Friend","description":"Visit a pet-friendly cafe or park with your pet","category":"outdoor","tags":["pet","walk","relaxing"]}
+
+[Relaxation]
+{"title":"Warm Waters, Timeless Moments","description":"Relax and unwind at a spa or hot springs together","category":"wellness","tags":["spa","relaxation","wellness"]}
+{"title":"Turning Pages Together","description":"Read books at a book cafe and share favorite passages","category":"cafe","tags":["bookcafe","reading","cozy"]}
+{"title":"A Scent That's Uniquely You","description":"Create custom perfumes for each other at a fragrance workshop","category":"creative","tags":["perfume","workshop","gift"]}
+
+[Anniversary Special Missions]
+{"title":"Preserving Today, Forever","description":"Order a photo book with today's pictures","category":"anniversary","tags":["anniversary","photobook","memories"]}
+{"title":"Sweet Celebration, Wishes Made","description":"Blow out candles on a custom cake and make wishes together","category":"anniversary","tags":["cake","anniversary","romantic"]}
+{"title":"A Promise Sealed, Together","description":"Pick out matching couple rings or bracelets together","category":"anniversary","tags":["rings","gift","anniversary"]}
+{"title":"Letters to Our Future Selves","description":"Write letters to each other to open in one year","category":"romantic","tags":["timecapsule","letter","promise"]}
+{"title":"Whispered Wishes Under the Stars","description":"Watch the night sky and share wishes with each other","category":"romantic","tags":["stars","nightview","romantic"]}
+
+---
+## Missions When You Can't Meet (One person takes photo on-site for verification)
+
+{"title":"Dreams for Our Tomorrow","description":"Write a bucket list of things to do together next year","category":"online","tags":["bucketlist","planning","photo"]}
+{"title":"Same Page, Different Places","description":"Read the same book and verify with page photos","category":"online","tags":["reading","book","verification"]}
+{"title":"Words from the Heart, Ink on Paper","description":"Write a handwritten letter and share a photo","category":"online","tags":["letter","heartfelt","analog"]}
+{"title":"Same Scene, Different Couches","description":"Watch the same movie simultaneously and verify with screen photos","category":"online","tags":["movie","watching","verification"]}
+{"title":"Same Taste, Miles Apart","description":"Cook the same recipe separately and share result photos","category":"online","tags":["cooking","challenge","verification"]}
+`;
+}
+
+// ============================================
+// User Prompt Generator (Language-specific)
+// ============================================
+
+function getUserPrompt(contextString: string, fewShotExamples: string, language: SupportedLanguage): string {
+  if (language === 'ko') {
+    return `다음 상황의 커플을 위한 데이트 미션 3개를 생성해주세요.
+
+${contextString}
+
+---
+💡 [미션 다양성 유지]
+매번 새롭고 다양한 미션을 생성해주세요:
+- 비슷한 패턴의 미션 반복 금지
+- 창의적이고 신선한 아이디어 우선
+- 다양한 카테고리와 활동 유형을 골고루 활용
+
+---
+참고할 좋은 예시들:
+${fewShotExamples}
+
+---
+위 정보를 바탕으로 이 커플에게 딱 맞는 미션 3개를 JSON으로 생성해주세요.
+반드시 JSON 형식으로만 응답하세요.`;
+  }
+
+  // English prompt
+  return `Please generate 3 date missions for the following couple's situation.
+
+${contextString}
+
+---
+💡 [Mission Diversity]
+Generate fresh and diverse missions each time:
+- Avoid repeating similar patterns
+- Prioritize creative and fresh ideas
+- Use various categories and activity types evenly
+
+---
+Reference examples:
+${fewShotExamples}
+
+---
+Based on the above information, generate 3 perfectly matched missions for this couple in JSON format.
+Respond only in JSON format.`;
+}
 
 // ============================================
 // Main Generation Function
@@ -526,6 +768,9 @@ const FEW_SHOT_EXAMPLES = `
 export async function generateMissionsWithAI(input: MissionGenerationInput): Promise<Mission[]> {
   const openai = getOpenAIClient();
   const { todayMoods } = input.todayAnswers;
+
+  // Get user's language preference
+  const language = useLanguageStore.getState().language;
 
   // Get weather (with fallback)
   let weather: WeatherContext;
@@ -549,31 +794,16 @@ export async function generateMissionsWithAI(input: MissionGenerationInput): Pro
   // Build context with priority
   const contextString = buildContext(input, weather, combinedDateWorries);
 
-  // Build user prompt
-  const userPrompt = `다음 상황의 커플을 위한 데이트 미션 3개를 생성해주세요.
-
-${contextString}
-
----
-💡 [미션 다양성 유지]
-매번 새롭고 다양한 미션을 생성해주세요:
-- 비슷한 패턴의 미션 반복 금지
-- 창의적이고 신선한 아이디어 우선
-- 다양한 카테고리와 활동 유형을 골고루 활용
-
----
-참고할 좋은 예시들:
-${FEW_SHOT_EXAMPLES}
-
----
-위 정보를 바탕으로 이 커플에게 딱 맞는 미션 3개를 JSON으로 생성해주세요.
-반드시 JSON 형식으로만 응답하세요.`;
+  // Get language-specific prompts
+  const systemPrompt = getSystemPrompt(weather.countryCode, language);
+  const fewShotExamples = getFewShotExamples(language);
+  const userPrompt = getUserPrompt(contextString, fewShotExamples, language);
 
   try {
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
       temperature: 0.9,
@@ -633,43 +863,78 @@ ${FEW_SHOT_EXAMPLES}
 }
 
 // ============================================
-// Fallback Function (계절 무관)
+// Fallback Function (Language-aware)
 // ============================================
 
 export function generateMissionsFallback(todayMoods: string[]): Mission[] {
-  // 계절에 상관없이 언제든 할 수 있는 미션들
-  const fallbackMissions: Mission[] = [
-    {
-      id: `fallback-${Date.now()}-1`,
-      title: '네컷사진 챌린지',
-      description: '포토부스에서 다양한 포즈로 네컷사진 찍기',
-      category: 'photo' as MissionCategory,
-      tags: ['네컷사진', '포토부스', '추억'],
-      imageUrl: getRandomImage('photo'),
-      isPremium: false,
-      moodTags: todayMoods as any,
-    },
-    {
-      id: `fallback-${Date.now()}-2`,
-      title: '방탈출 카페 도전',
-      description: '협동해서 방탈출 게임 클리어하기',
-      category: 'game' as MissionCategory,
-      tags: ['방탈출', '게임', '협동'],
-      imageUrl: getRandomImage('game'),
-      isPremium: false,
-      moodTags: todayMoods as any,
-    },
-    {
-      id: `fallback-${Date.now()}-3`,
-      title: '분위기 좋은 카페 탐방',
-      description: '인스타 감성 카페에서 음료 마시며 수다 떨기',
-      category: 'cafe' as MissionCategory,
-      tags: ['카페', '감성', '데이트'],
-      imageUrl: getRandomImage('cafe'),
-      isPremium: false,
-      moodTags: todayMoods as any,
-    },
-  ];
+  const language = useLanguageStore.getState().language;
+
+  // Language-specific fallback missions
+  const fallbackMissions: Mission[] = language === 'ko'
+    ? [
+        {
+          id: `fallback-${Date.now()}-1`,
+          title: '네컷사진 챌린지',
+          description: '포토부스에서 다양한 포즈로 네컷사진 찍기',
+          category: 'photo' as MissionCategory,
+          tags: ['네컷사진', '포토부스', '추억'],
+          imageUrl: getRandomImage('photo'),
+          isPremium: false,
+          moodTags: todayMoods as any,
+        },
+        {
+          id: `fallback-${Date.now()}-2`,
+          title: '방탈출 카페 도전',
+          description: '협동해서 방탈출 게임 클리어하기',
+          category: 'game' as MissionCategory,
+          tags: ['방탈출', '게임', '협동'],
+          imageUrl: getRandomImage('game'),
+          isPremium: false,
+          moodTags: todayMoods as any,
+        },
+        {
+          id: `fallback-${Date.now()}-3`,
+          title: '분위기 좋은 카페 탐방',
+          description: '인스타 감성 카페에서 음료 마시며 수다 떨기',
+          category: 'cafe' as MissionCategory,
+          tags: ['카페', '감성', '데이트'],
+          imageUrl: getRandomImage('cafe'),
+          isPremium: false,
+          moodTags: todayMoods as any,
+        },
+      ]
+    : [
+        {
+          id: `fallback-${Date.now()}-1`,
+          title: 'Photo Booth Adventure',
+          description: 'Strike fun poses at a photo booth and collect memories',
+          category: 'photo' as MissionCategory,
+          tags: ['photobooth', 'photos', 'memories'],
+          imageUrl: getRandomImage('photo'),
+          isPremium: false,
+          moodTags: todayMoods as any,
+        },
+        {
+          id: `fallback-${Date.now()}-2`,
+          title: 'Escape Room Challenge',
+          description: 'Team up to solve puzzles and escape together',
+          category: 'game' as MissionCategory,
+          tags: ['escaperoom', 'game', 'teamwork'],
+          imageUrl: getRandomImage('game'),
+          isPremium: false,
+          moodTags: todayMoods as any,
+        },
+        {
+          id: `fallback-${Date.now()}-3`,
+          title: 'Cozy Cafe Exploration',
+          description: 'Find a charming cafe and enjoy drinks together',
+          category: 'cafe' as MissionCategory,
+          tags: ['cafe', 'cozy', 'date'],
+          imageUrl: getRandomImage('cafe'),
+          isPremium: false,
+          moodTags: todayMoods as any,
+        },
+      ];
 
   return fallbackMissions;
 }

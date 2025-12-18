@@ -64,7 +64,7 @@
   "mission": {
     "title": "오늘의 미션",
     "subtitle": "오늘은 어떤 순간을 함께할까요?",
-    "generate": "미션 생성하기",
+    "generate": "오늘의 미션 받기",
     "generating": "생성 중...",
     "generatingMessage": "미션을 생성하고 있어요",
     "pleaseWait": "잠시만 기다려주세요",
@@ -177,7 +177,15 @@
   "calendar": {
     "title": "캘린더",
     "subtitle": "우리의 시간을 기록해요",
-    "dayNames": ["일", "월", "화", "수", "목", "금", "토"],
+    "dayNames": [
+      "일",
+      "월",
+      "화",
+      "수",
+      "목",
+      "금",
+      "토"
+    ],
     "settings": {
       "title": "캘린더 기능 설정",
       "description": "표시할 기능을 선택하세요"
@@ -236,7 +244,20 @@
     "viewAll": "전체 보기",
     "togetherMoment": "함께한 순간",
     "itemCount": "{{count}}개의 항목",
-    "monthNames": ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"],
+    "monthNames": [
+      "1월",
+      "2월",
+      "3월",
+      "4월",
+      "5월",
+      "6월",
+      "7월",
+      "8월",
+      "9월",
+      "10월",
+      "11월",
+      "12월"
+    ],
     "yearFormat": "{{year}}년",
     "yearMonthFormat": "{{year}}년 {{month}}",
     "filter": {
@@ -430,7 +451,7 @@
       "push": "푸시 알림",
       "pushDesc": "모든 알림 받기",
       "mission": "미션 알림",
-      "missionDesc": "새로운 미션이 도착하면 알림",
+      "missionDesc": "새로운 미션을 생성하면 알림",
       "message": "서로에게 한마디 미작성 알림",
       "messageDesc": "한마디를 작성하지 않으면 알림"
     },
@@ -441,12 +462,18 @@
       "infoDesc": "프로모션 및 할인 정보"
     },
     "other": {
+      "language": "언어",
+      "selectLanguage": "언어 선택",
       "termsOfService": "서비스 이용약관",
+      "locationTerms": "위치정보 이용약관",
       "privacyPolicy": "개인정보 처리방침",
       "version": "버전 {{version}}",
       "latestVersion": "최신버전"
     },
     "account": {
+      "logout": "로그아웃",
+      "logoutTitle": "로그아웃",
+      "logoutMessage": "정말 로그아웃 하시겠습니까?",
       "deleteAccount": "계정 탈퇴",
       "unpair": "페어링 끊기"
     },
@@ -471,14 +498,16 @@
       "button": "페어링 끊기",
       "success": "페어링 해제",
       "successMessage": "페어링이 해제되었습니다.\n30일 이내에 같은 파트너와 재연결하면 기존 데이터가 복구됩니다.",
-      "error": "페어링 해제 중 오류가 발생했습니다."
+      "error": "페어링 해제 중 오류가 발생했습니다.",
+      "notificationTitle": "페어링이 해제되었어요",
+      "notificationBody": "{{nickname}}님이 페어링을 해제했어요. 30일 이내에 재연결하면 데이터를 복구할 수 있어요."
     },
     "deleteAccount": {
       "title": "계정 탈퇴",
       "warningText": "계정을 탈퇴하면 모든 데이터가\n",
       "permanentDelete": "영구적으로 삭제",
       "warningEnd": "됩니다.",
-      "dataList": "삭제되는 데이터:\n• 프로필 정보\n• 커플 연결 정보\n• 완료한 미션 기록\n• 앨범 및 사진\n• 모든 설정",
+      "dataList": "삭제되는 데이터 : 프로필 정보, 커플 연결 정보, 완료한 미션 기록, 앨범 및 사진, 모든 설정",
       "confirmPrompt": "계속하려면 아래에 '계정탈퇴'를 입력해주세요",
       "confirmText": "계정탈퇴",
       "button": "계정 탈퇴",

@@ -209,7 +209,7 @@ export default function MissionScreen() {
     if (isSyncInitialized && missionGenerationStatus === 'generating') {
       // Partner is generating - show loading state
       setIsGenerating(true);
-      setPartnerGeneratingMessage('미션 생성 중입니다...');
+      setPartnerGeneratingMessage(t('mission.generatingMessage'));
     } else if (missionGenerationStatus === 'completed' && sharedMissions.length > 0) {
       // Missions were generated (by partner or self) - hide loading
       setIsGenerating(false);
@@ -252,23 +252,23 @@ export default function MissionScreen() {
 
     if (!hasPermission) {
       Alert.alert(
-        '위치 권한 필요',
-        '미션을 생성하려면 위치 정보 권한이 필요해요.\n위치 권한을 허용해주세요.',
+        t('mission.alerts.locationRequired'),
+        t('mission.alerts.locationRequiredMessage'),
         [
-          { text: '취소', style: 'cancel' },
+          { text: t('common.cancel'), style: 'cancel' },
           {
-            text: '권한 허용',
+            text: t('mission.alerts.allowPermission'),
             onPress: async () => {
               const granted = await requestLocationPermission();
               if (granted) {
                 setShowGenerationModal(true);
               } else {
                 Alert.alert(
-                  '위치 권한 거부됨',
-                  '위치 권한이 거부되었어요. 설정에서 위치 권한을 허용해주세요.',
+                  t('mission.alerts.locationDenied'),
+                  t('mission.alerts.locationDeniedMessage'),
                   [
-                    { text: '취소', style: 'cancel' },
-                    { text: '설정으로 이동', onPress: handleOpenSettings },
+                    { text: t('common.cancel'), style: 'cancel' },
+                    { text: t('mission.alerts.goToSettings'), onPress: handleOpenSettings },
                   ]
                 );
               }
@@ -307,7 +307,7 @@ export default function MissionScreen() {
     // Handle different generation statuses
     if (result && result.status === 'locked') {
       // Partner is already generating - show their message
-      setPartnerGeneratingMessage(result.message || '미션 생성 중입니다...');
+      setPartnerGeneratingMessage(t('mission.generatingMessage'));
       // Don't hide loading - wait for sync update
       return;
     }
@@ -659,7 +659,7 @@ export default function MissionScreen() {
                       styles.whiteTimeOptionLabel,
                       availableTime === time.id && styles.whiteTimeOptionLabelActive,
                     ]}>
-                      {time.label}
+                      {t(`mission.timeOptions.${time.id}`)}
                     </Text>
                   </Pressable>
                 ))}
@@ -688,7 +688,7 @@ export default function MissionScreen() {
                         styles.whiteMoodOptionText,
                         selectedMoods.includes(mood.id) && styles.whiteMoodOptionTextActive,
                       ]}>
-                        {mood.label}
+                        {t(`mission.moodOptions.${mood.id}`)}
                       </Text>
                     </Pressable>
                   );
@@ -737,6 +737,7 @@ interface MissionCardContentProps {
 }
 
 function MissionCardContent({ mission, onStartPress, onKeepPress, isKept, canStart = true, isCompletedToday = false, isAnotherMissionInProgress = false }: MissionCardContentProps) {
+  const { t } = useTranslation();
   const blurHeight = CARD_HEIGHT * 0.8; // Blur covers bottom 55% of card
 
   const handleKeepPress = (e: { stopPropagation: () => void }) => {
@@ -745,9 +746,9 @@ function MissionCardContent({ mission, onStartPress, onKeepPress, isKept, canSta
     // Show message if mission is already completed today
     if (isCompletedToday) {
       Alert.alert(
-        '보관 불가',
-        '이미 완료한 미션은 보관할 수 없어요.',
-        [{ text: '확인' }]
+        t('mission.alerts.cannotKeep'),
+        t('mission.alerts.alreadyCompletedKeep'),
+        [{ text: t('common.confirm') }]
       );
       return;
     }
@@ -758,19 +759,19 @@ function MissionCardContent({ mission, onStartPress, onKeepPress, isKept, canSta
     }
 
     Alert.alert(
-      '미션 보관',
-      `'${mission.title}' 미션을 보관함에 저장할까요?`,
+      t('mission.alerts.keepMission'),
+      t('mission.alerts.keepMissionConfirm', { title: mission.title }),
       [
-        { text: '취소', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: '저장',
+          text: t('common.save'),
           onPress: async () => {
             const success = await onKeepPress?.();
             if (success === false) {
               Alert.alert(
-                '보관 제한',
-                '미션은 최대 5개까지만 보관할 수 있어요.\n보관된 미션을 삭제한 후 다시 시도해주세요.',
-                [{ text: '확인' }]
+                t('mission.alerts.keepLimit'),
+                t('mission.alerts.keepLimitMessage'),
+                [{ text: t('common.confirm') }]
               );
             }
           },
@@ -787,16 +788,16 @@ function MissionCardContent({ mission, onStartPress, onKeepPress, isKept, canSta
       if (isAnotherMissionInProgress) {
         // Another mission is in progress (locked but not completed)
         Alert.alert(
-          '미션 시작 불가',
-          '이미 다른 미션이 진행 중이에요.\n진행 중인 미션을 완료해주세요!',
-          [{ text: '확인' }]
+          t('mission.alerts.cannotStart'),
+          t('mission.alerts.anotherInProgressMessage'),
+          [{ text: t('common.confirm') }]
         );
       } else {
         // Today's mission quota is used (another mission was completed)
         Alert.alert(
-          '미션 시작 불가',
-          '오늘 가능한 미션을 모두 완료했어요.\n내일 다시 도전해보세요!',
-          [{ text: '확인' }]
+          t('mission.alerts.cannotStart'),
+          t('mission.alerts.dailyLimitMessage'),
+          [{ text: t('common.confirm') }]
         );
       }
       return;
@@ -881,7 +882,7 @@ function MissionCardContent({ mission, onStartPress, onKeepPress, isKept, canSta
                   />
                 )}
                 <Text style={styles.keepActionButtonText}>
-                  {isKept ? '보관됨' : 'Keep'}
+                  {isKept ? t('mission.kept') : t('mission.keep')}
                 </Text>
               </View>
             </Pressable>
@@ -898,7 +899,7 @@ function MissionCardContent({ mission, onStartPress, onKeepPress, isKept, canSta
                 styles.startActionButtonText,
                 !canStart && !isCompletedToday && styles.startActionButtonTextDisabled,
               ]}>
-                {isCompletedToday ? '완료' : (isAnotherMissionInProgress ? '다른 미션 진행 중' : '시작하기')}
+                {isCompletedToday ? t('mission.completed') : (isAnotherMissionInProgress ? t('mission.anotherInProgress') : t('mission.start'))}
               </Text>
             </Pressable>
           )}
