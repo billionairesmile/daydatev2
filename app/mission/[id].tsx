@@ -100,12 +100,17 @@ export default function MissionDetailScreen() {
     hasPartnerSubmittedMessage,
     getMissionProgressByMissionId,
     isMissionLocked,
+    sharedBookmarks,
   } = useCoupleSyncStore();
 
-  // Find mission in today's missions, kept missions, or provide a fallback
+  // Find mission in today's missions, kept missions, synced bookmarks, or provide a fallback
+  // Check synced bookmarks (which persist across daily resets)
+  const bookmarkedMission = sharedBookmarks.find((b) => b.mission_id === id)?.mission_data;
+
   const mission: Mission =
     todayMissions.find((m) => m.id === id) ||
     keptMissions.find((m) => m.id === id) ||
+    bookmarkedMission ||
     {
       id: id || 'unknown',
       title: t('missionDetail.notFound.title'),

@@ -17,6 +17,7 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
   LayoutChangeEvent,
+  ActivityIndicator,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -26,8 +27,6 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import * as MediaLibrary from 'expo-media-library';
 import { Paths, File as ExpoFile } from 'expo-file-system';
 import { ChevronDown, MapPin, Clock, X, Plus, ImageIcon, RefreshCw, BookHeart, MoreHorizontal, Edit2, Trash2, Check, Download } from 'lucide-react-native';
-import { useFonts } from 'expo-font';
-import { Jua_400Regular } from '@expo-google-fonts/jua';
 import ReanimatedModule, {
   useSharedValue,
   useAnimatedScrollHandler,
@@ -107,11 +106,6 @@ export default function MemoriesScreen() {
   const [selectedMonth, setSelectedMonth] = useState<MonthData | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<MemoryType | null>(null);
   const [showYearPicker, setShowYearPicker] = useState<string | null>(null);
-
-  // Load fonts
-  const [fontsLoaded] = useFonts({
-    Jua_400Regular,
-  });
 
   // Local albums state (for demo mode fallback)
   const [localAlbums, setLocalAlbums] = useState<Album[]>([]);
@@ -196,6 +190,7 @@ export default function MemoriesScreen() {
   const [fontStyle, setFontStyle] = useState<FontStyleType>(null); // No style selected by default
   const [textColor, setTextColor] = useState<'white' | 'black'>('white'); // Text color for basic font
   const [ransomSeed, setRansomSeed] = useState<number>(() => Math.floor(Math.random() * 1000000)); // Seed for ransom text
+  const [isCreatingAlbum, setIsCreatingAlbum] = useState(false); // Prevent duplicate album creation
 
   // Album detail modal states
   const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
@@ -675,7 +670,11 @@ export default function MemoriesScreen() {
 
   // Create album with closing animation
   const handleCreateAlbum = async () => {
+    // Prevent duplicate submissions
+    if (isCreatingAlbum) return;
+
     if (albumName.trim()) {
+      setIsCreatingAlbum(true);
       let finalCoverPhotoUrl = albumCoverPhoto;
 
       // If syncing and we have a cover photo, upload it first
@@ -748,6 +747,7 @@ export default function MemoriesScreen() {
         setTextScale(1.0); // Reset text scale
         setFontStyle(null); // Reset font style - no selection
         setRansomSeed(Math.floor(Math.random() * 1000000)); // Generate new seed for next album
+        setIsCreatingAlbum(false); // Reset creation state
       });
     }
   };
@@ -1513,7 +1513,7 @@ export default function MemoriesScreen() {
                             />
                           )
                         ) : (
-                          <Text style={[styles.ransomPlaceholder, fontStyle === 'basic' && { fontFamily: 'Jua_400Regular' }]}>{t('memories.album.name')}</Text>
+                          <Text style={[styles.ransomPlaceholder, fontStyle === 'basic' && { fontFamily: 'Jua' }]}>{t('memories.album.name')}</Text>
                         )}
                         {/* Refresh Button for Ransom Style */}
                         {fontStyle === 'ransom' && albumName.length > 0 && (
@@ -1727,15 +1727,19 @@ export default function MemoriesScreen() {
                         <Pressable
                           style={[
                             styles.albumModalButton,
-                            !albumCoverPhoto && styles.albumModalButtonDisabled
+                            (!albumCoverPhoto || isCreatingAlbum) && styles.albumModalButtonDisabled
                           ]}
                           onPress={handleCreateAlbum}
-                          disabled={!albumCoverPhoto}
+                          disabled={!albumCoverPhoto || isCreatingAlbum}
                         >
-                          <Text style={[
-                            styles.albumModalButtonText,
-                            !albumCoverPhoto && styles.albumModalButtonTextDisabled
-                          ]}>{t('common.done')}</Text>
+                          {isCreatingAlbum ? (
+                            <ActivityIndicator size="small" color={COLORS.black} />
+                          ) : (
+                            <Text style={[
+                              styles.albumModalButtonText,
+                              !albumCoverPhoto && styles.albumModalButtonTextDisabled
+                            ]}>{t('common.done')}</Text>
+                          )}
                         </Pressable>
                       </View>
                     </>
@@ -2495,7 +2499,7 @@ export default function MemoriesScreen() {
                               />
                             )
                           ) : (
-                            <Text style={[styles.ransomPlaceholder, editFontStyle === 'basic' && { fontFamily: 'Jua_400Regular' }]}>{t('memories.album.name')}</Text>
+                            <Text style={[styles.ransomPlaceholder, editFontStyle === 'basic' && { fontFamily: 'Jua' }]}>{t('memories.album.name')}</Text>
                           )}
                           {/* Refresh Button for Ransom Style */}
                           {editFontStyle === 'ransom' && editAlbumName.length > 0 && (
@@ -4316,20 +4320,20 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   basicFontPreview: {
-    fontFamily: 'Jua_400Regular',
+    fontFamily: 'Jua',
     fontSize: 28,
     color: COLORS.white,
     textAlign: 'center',
   },
   basicFontOverlay: {
-    fontFamily: 'Jua_400Regular',
+    fontFamily: 'Jua',
     color: COLORS.white,
     textShadowColor: 'rgba(0, 0, 0, 0.75)',
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 3,
   },
   basicFontTiny: {
-    fontFamily: 'Jua_400Regular',
+    fontFamily: 'Jua',
     color: COLORS.white,
     textShadowColor: 'rgba(0, 0, 0, 0.75)',
     textShadowOffset: { width: 0.5, height: 0.5 },
@@ -4904,7 +4908,7 @@ const styles = StyleSheet.create({
   },
   fontStylePreviewBasic: {
     fontSize: 24,
-    fontFamily: 'Jua_400Regular',
+    fontFamily: 'Jua',
     color: COLORS.white,
     marginTop: 4,
     marginBottom: 8,

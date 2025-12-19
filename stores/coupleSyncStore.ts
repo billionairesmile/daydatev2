@@ -333,9 +333,15 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       const bookmark = payload.bookmark as SyncedBookmark;
 
       if (payload.eventType === 'INSERT') {
-        set((state) => ({
-          sharedBookmarks: [bookmark, ...state.sharedBookmarks],
-        }));
+        set((state) => {
+          // Check if bookmark already exists (prevent duplicate from realtime + direct add)
+          if (state.sharedBookmarks.some(b => b.id === bookmark.id)) {
+            return state;
+          }
+          return {
+            sharedBookmarks: [bookmark, ...state.sharedBookmarks],
+          };
+        });
       } else if (payload.eventType === 'DELETE') {
         set((state) => ({
           sharedBookmarks: state.sharedBookmarks.filter((b) => b.id !== bookmark.id),
