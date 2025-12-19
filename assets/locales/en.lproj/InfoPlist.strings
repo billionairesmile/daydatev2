@@ -1,0 +1,8 @@
+/* Camera */
+"NSCameraUsageDescription" = "Daydate needs camera access to capture your special moments together.";
+
+/* Photo Library */
+"NSPhotoLibraryUsageDescription" = "Daydate needs photo library access to save and share your memories.";
+
+/* Location */
+"NSLocationWhenInUseUsageDescription" = "Daydate needs your location to create personalized date missions based on nearby places and activities.";

@@ -55,7 +55,7 @@ export default function SignupScreen() {
       Alert.alert(
         '데모 모드',
         'Supabase가 설정되지 않았습니다. 체험 모드를 이용해주세요.',
-        [{ text: '확인', onPress: () => router.replace('/(auth)/login') }]
+        [{ text: '확인', onPress: () => router.replace('/(auth)/onboarding') }]
       );
       return;
     }
@@ -89,7 +89,7 @@ export default function SignupScreen() {
         Alert.alert(
           '회원가입 완료',
           '이메일을 확인하여 계정을 인증해주세요.',
-          [{ text: '확인', onPress: () => router.replace('/(auth)/login') }]
+          [{ text: '확인', onPress: () => router.replace('/(auth)/onboarding') }]
         );
       }
     } catch (error: unknown) {
@@ -213,7 +213,7 @@ export default function SignupScreen() {
           {/* Login link */}
           <View style={styles.loginContainer}>
             <Text style={styles.loginText}>이미 계정이 있으신가요? </Text>
-            <Link href="/(auth)/login" asChild>
+            <Link href="/(auth)/onboarding" asChild>
               <TouchableOpacity>
                 <Text style={styles.loginLink}>로그인</Text>
               </TouchableOpacity>

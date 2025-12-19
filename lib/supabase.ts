@@ -678,6 +678,9 @@ export const db = {
       title: string;
       date: string;
       is_recurring?: boolean;
+      icon?: string;
+      bg_color?: string;
+      gradient_colors?: string[];
     }) {
       const client = getSupabase();
       const { data, error } = await client
@@ -688,7 +691,14 @@ export const db = {
       return { data, error };
     },
 
-    async update(id: string, updates: Record<string, unknown>) {
+    async update(id: string, updates: {
+      title?: string;
+      date?: string;
+      is_recurring?: boolean;
+      icon?: string;
+      bg_color?: string;
+      gradient_colors?: string[];
+    }) {
       const client = getSupabase();
       const { data, error } = await client
         .from('anniversaries')
@@ -706,6 +716,37 @@ export const db = {
         .delete()
         .eq('id', id);
       return { error };
+    },
+
+    subscribeToAnniversaries(
+      coupleId: string,
+      callback: (payload: { eventType: string; anniversary: unknown }) => void
+    ) {
+      const client = getSupabase();
+      const channel = client
+        .channel(`anniversaries:${coupleId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'anniversaries',
+            filter: `couple_id=eq.${coupleId}`,
+          },
+          (payload) => {
+            callback({
+              eventType: payload.eventType,
+              anniversary: payload.eventType === 'DELETE' ? payload.old : payload.new,
+            });
+          }
+        )
+        .subscribe();
+      return channel;
+    },
+
+    unsubscribe(channel: ReturnType<SupabaseClient['channel']>) {
+      const client = getSupabase();
+      client.removeChannel(channel);
     },
   },
 

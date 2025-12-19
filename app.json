@@ -19,8 +19,15 @@
       "infoPlist": {
         "NSCameraUsageDescription": "Daydate needs camera access to capture your special moments together.",
         "NSPhotoLibraryUsageDescription": "Daydate needs photo library access to save and share your memories.",
-        "NSLocationWhenInUseUsageDescription": "Daydate needs your location to create personalized date missions based on nearby places and activities."
+        "NSLocationWhenInUseUsageDescription": "Daydate needs your location to create personalized date missions based on nearby places and activities.",
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleLocalizations": ["en", "ko"],
+        "CFBundleDevelopmentRegion": "en"
       }
+    },
+    "locales": {
+      "ko": "./assets/locales/ko.lproj/InfoPlist.strings",
+      "en": "./assets/locales/en.lproj/InfoPlist.strings"
     },
     "android": {
       "adaptiveIcon": {
@@ -34,7 +41,8 @@
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -77,8 +85,10 @@
     },
     "extra": {
       "eas": {
-        "projectId": "your-project-id"
-      }
-    }
+        "projectId": "115e6c85-54e5-4c9c-ac72-5714852ef605"
+      },
+      "router": {}
+    },
+    "owner": "usskslsksk"
   }
 }

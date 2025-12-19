@@ -45,7 +45,8 @@
       "lunar": "(Lunar)",
       "christmas": "Christmas",
       "valentinesDay": "Valentine's Day",
-      "whiteDay": "White Day"
+      "whiteDay": "White Day",
+      "selectDate": "Anniversary Date"
     },
     "background": {
       "title": "Change Background",

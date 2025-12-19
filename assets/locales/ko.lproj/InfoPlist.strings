@@ -1,0 +1,8 @@
+/* Camera */
+"NSCameraUsageDescription" = "데이데이트가 소중한 순간을 촬영하기 위해 카메라 접근 권한이 필요합니다.";
+
+/* Photo Library */
+"NSPhotoLibraryUsageDescription" = "데이데이트가 추억을 저장하고 공유하기 위해 사진 라이브러리 접근 권한이 필요합니다.";
+
+/* Location */
+"NSLocationWhenInUseUsageDescription" = "데이데이트가 주변 장소와 활동을 기반으로 맞춤형 데이트 미션을 만들기 위해 위치 정보가 필요합니다.";

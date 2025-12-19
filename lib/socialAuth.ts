@@ -1,5 +1,4 @@
 import { makeRedirectUri } from 'expo-auth-session';
-import * as QueryParams from 'expo-auth-session/build/QueryParams';
 import * as WebBrowser from 'expo-web-browser';
 import { supabase, isDemoMode } from './supabase';
 
@@ -38,6 +37,38 @@ interface AuthSession {
 }
 
 /**
+ * Extract params from URL (handles both query params and hash fragments)
+ */
+const extractParamsFromUrl = (url: string): Record<string, string> => {
+  const params: Record<string, string> = {};
+
+  // Try to get params from hash fragment first (Supabase OAuth uses this)
+  const hashIndex = url.indexOf('#');
+  if (hashIndex !== -1) {
+    const hashParams = url.substring(hashIndex + 1);
+    const searchParams = new URLSearchParams(hashParams);
+    searchParams.forEach((value, key) => {
+      params[key] = value;
+    });
+  }
+
+  // Also check query params
+  const queryIndex = url.indexOf('?');
+  if (queryIndex !== -1) {
+    const endIndex = hashIndex !== -1 ? hashIndex : url.length;
+    const queryString = url.substring(queryIndex + 1, endIndex);
+    const searchParams = new URLSearchParams(queryString);
+    searchParams.forEach((value, key) => {
+      if (!params[key]) {
+        params[key] = value;
+      }
+    });
+  }
+
+  return params;
+};
+
+/**
  * Create a Supabase session from the OAuth callback URL
  */
 export const createSessionFromUrl = async (url: string) => {
@@ -47,19 +78,26 @@ export const createSessionFromUrl = async (url: string) => {
   }
 
   try {
-    const { params, errorCode } = QueryParams.getQueryParams(url);
+    console.log('[SocialAuth] Processing callback URL:', url);
 
-    if (errorCode) {
-      console.error('OAuth error code:', errorCode);
-      throw new Error(errorCode);
+    // Extract params from both hash fragment and query string
+    const params = extractParamsFromUrl(url);
+    console.log('[SocialAuth] Extracted params keys:', Object.keys(params));
+
+    if (params.error) {
+      console.error('OAuth error:', params.error, params.error_description);
+      throw new Error(params.error_description || params.error);
     }
 
     const { access_token, refresh_token } = params;
 
     if (!access_token) {
-      console.log('No access token in URL params');
+      console.log('[SocialAuth] No access token found in URL');
+      console.log('[SocialAuth] URL structure - has hash:', url.includes('#'), 'has query:', url.includes('?'));
       return null;
     }
+
+    console.log('[SocialAuth] Access token found, setting session...');
 
     const { data, error } = await supabase.auth.setSession({
       access_token,
@@ -82,15 +120,32 @@ export const createSessionFromUrl = async (url: string) => {
  * Sign in with a social provider (Google or Kakao)
  */
 export const signInWithProvider = async (provider: SocialProvider): Promise<AuthSession | null> => {
+  console.log(`[SocialAuth] signInWithProvider called for ${provider}`);
+  console.log(`[SocialAuth] isDemoMode: ${isDemoMode}, supabase exists: ${!!supabase}`);
+
   if (isDemoMode || !supabase) {
     console.log('Demo mode - social login not available');
     return null;
   }
 
   try {
+    // Close any existing browser session first to prevent "Another web browser is already open" error
+    // Use Promise.race with timeout to prevent hanging
+    console.log('[SocialAuth] Dismissing any existing browser...');
+    try {
+      await Promise.race([
+        WebBrowser.dismissBrowser(),
+        new Promise((resolve) => setTimeout(resolve, 1000)), // 1 second timeout
+      ]);
+      console.log('[SocialAuth] Browser dismissed (or timed out)');
+    } catch (dismissError) {
+      console.log('[SocialAuth] dismissBrowser error (ignored):', dismissError);
+    }
+
     console.log(`[SocialAuth] Starting ${provider} sign in...`);
     console.log(`[SocialAuth] Redirect URL: ${redirectTo}`);
 
+    console.log('[SocialAuth] Calling supabase.auth.signInWithOAuth...');
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
@@ -102,6 +157,7 @@ export const signInWithProvider = async (provider: SocialProvider): Promise<Auth
         } : undefined,
       },
     });
+    console.log('[SocialAuth] signInWithOAuth returned:', { hasData: !!data, hasError: !!error, url: data?.url?.substring(0, 50) + '...' });
 
     if (error) {
       console.error(`[SocialAuth] ${provider} OAuth error:`, error);
@@ -113,7 +169,7 @@ export const signInWithProvider = async (provider: SocialProvider): Promise<Auth
       return null;
     }
 
-    console.log(`[SocialAuth] Opening auth URL for ${provider}`);
+    console.log(`[SocialAuth] Opening auth URL for ${provider}: ${data.url.substring(0, 100)}...`);
 
     // Open the auth session in a browser
     const result = await WebBrowser.openAuthSessionAsync(

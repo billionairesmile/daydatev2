@@ -45,7 +45,8 @@
       "lunar": "(음력)",
       "christmas": "크리스마스",
       "valentinesDay": "발렌타인데이",
-      "whiteDay": "화이트데이"
+      "whiteDay": "화이트데이",
+      "selectDate": "기념일"
     },
     "background": {
       "title": "배경사진 변경",

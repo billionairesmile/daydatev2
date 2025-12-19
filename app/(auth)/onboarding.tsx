@@ -6,6 +6,7 @@ import {
   ImageBackground,
   Dimensions,
   Pressable,
+  TouchableOpacity,
   TextInput,
   Animated,
   ScrollView,
@@ -582,16 +583,24 @@ export default function OnboardingScreen() {
 // ========== STEP COMPONENTS ==========
 
 // Welcome Step
-function WelcomeStep({ onSocialLogin }: { onSocialLogin: (provider: 'google' | 'kakao') => void }) {
+function WelcomeStep({ onSocialLogin }: { onSocialLogin: (provider: 'google' | 'kakao') => Promise<void> }) {
   const { t } = useTranslation();
   const [isLoading, setIsLoading] = useState<'google' | 'kakao' | null>(null);
 
   const handleSocialLogin = async (provider: 'google' | 'kakao') => {
-    if (isLoading) return;
+    console.log(`[WelcomeStep] Button pressed for ${provider}, isLoading: ${isLoading}, isDemoMode: ${isDemoMode}`);
+
+    if (isLoading) {
+      console.log('[WelcomeStep] Already loading, returning early');
+      return;
+    }
 
     setIsLoading(provider);
+    console.log(`[WelcomeStep] Set loading state to ${provider}`);
+
     try {
       if (isDemoMode) {
+        console.log('[WelcomeStep] isDemoMode is TRUE - showing demo alert');
         Alert.alert(
           t('onboarding.login.demoMode'),
           t('onboarding.login.demoModeMessage'),
@@ -600,7 +609,9 @@ function WelcomeStep({ onSocialLogin }: { onSocialLogin: (provider: 'google' | '
         return;
       }
 
-      onSocialLogin(provider);
+      console.log(`[WelcomeStep] isDemoMode is FALSE, calling onSocialLogin for ${provider}...`);
+      await onSocialLogin(provider);
+      console.log(`[WelcomeStep] onSocialLogin completed for ${provider}`);
     } catch (error) {
       console.error(`[WelcomeStep] ${provider} login error:`, error);
       Alert.alert(
@@ -625,10 +636,11 @@ function WelcomeStep({ onSocialLogin }: { onSocialLogin: (provider: 'google' | '
 
       <View style={styles.socialLoginContainer}>
         {/* Google Login Button */}
-        <Pressable
-          style={[styles.socialButton, styles.googleButton]}
+        <TouchableOpacity
+          style={[styles.socialButton, styles.googleButton, isLoading !== null && styles.disabledButton]}
           onPress={() => handleSocialLogin('google')}
           disabled={isLoading !== null}
+          activeOpacity={0.7}
         >
           {isLoading === 'google' ? (
             <ActivityIndicator size="small" color="#757575" />
@@ -641,13 +653,14 @@ function WelcomeStep({ onSocialLogin }: { onSocialLogin: (provider: 'google' | '
               <Text style={styles.googleButtonText}>{t('onboarding.login.google')}</Text>
             </>
           )}
-        </Pressable>
+        </TouchableOpacity>
 
         {/* Kakao Login Button */}
-        <Pressable
-          style={[styles.socialButton, styles.kakaoButton]}
+        <TouchableOpacity
+          style={[styles.socialButton, styles.kakaoButton, isLoading !== null && styles.disabledButton]}
           onPress={() => handleSocialLogin('kakao')}
           disabled={isLoading !== null}
+          activeOpacity={0.7}
         >
           {isLoading === 'kakao' ? (
             <ActivityIndicator size="small" color="#3C1E1E" />
@@ -660,7 +673,7 @@ function WelcomeStep({ onSocialLogin }: { onSocialLogin: (provider: 'google' | '
               <Text style={styles.kakaoButtonText}>{t('onboarding.login.kakao')}</Text>
             </>
           )}
-        </Pressable>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -1659,13 +1672,18 @@ function PairingStep({
 
     try {
       // Get pairing code with couple_id
+      console.log('[PairingStep] Looking up pairing code:', pairingCode);
       const { data: existingCode, error: findError } = await db.pairingCodes.getWithCouple(pairingCode);
+      console.log('[PairingStep] Found code:', existingCode, 'error:', findError);
 
       if (findError || !existingCode) {
+        console.log('[PairingStep] Code not found or error');
         setError(t('onboarding.pairing.invalidCode'));
         setIsLoading(false);
         return;
       }
+
+      console.log('[PairingStep] Code status:', existingCode.status, 'couple_id:', existingCode.couple_id);
 
       // Check if code already used
       if (existingCode.status === 'connected') {
@@ -1762,13 +1780,16 @@ function PairingStep({
 
       // Normal flow: new pairing (no reconnection)
       // Update pairing code status
+      console.log('[PairingStep] Joining pairing code:', pairingCode, 'with joinerId:', joinerId);
       const { error: joinError } = await db.pairingCodes.join(pairingCode, joinerId);
 
       if (joinError) {
+        console.error('[PairingStep] Join error:', joinError);
         setError(t('onboarding.pairing.connectionError'));
         setIsLoading(false);
         return;
       }
+      console.log('[PairingStep] Successfully joined pairing code');
 
       // Create or update profile for joiner in DB
       const joinerInviteCode = currentUser?.inviteCode || generateUUID().slice(0, 8).toUpperCase();
@@ -2578,6 +2599,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    pointerEvents: 'none',
   },
   whiteBackground: {
     position: 'absolute',
@@ -2586,6 +2608,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: '#FFFFFF',
+    pointerEvents: 'none',
   },
   progressContainer: {
     position: 'absolute',
@@ -2607,6 +2630,7 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    zIndex: 10,
   },
   scrollContent: {
     flexGrow: 1,
@@ -2873,6 +2897,9 @@ const styles = StyleSheet.create({
   },
   kakaoButton: {
     backgroundColor: '#FEE500',
+  },
+  disabledButton: {
+    opacity: 0.5,
   },
   socialIcon: {
     width: 22,
