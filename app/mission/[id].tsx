@@ -117,10 +117,49 @@ export default function MissionDetailScreen() {
   // Check synced bookmarks (which persist across daily resets)
   const bookmarkedMission = sharedBookmarks.find((b) => b.mission_id === id)?.mission_data;
 
-  const mission: Mission =
+  // State for featured mission loaded from DB
+  const [featuredMission, setFeaturedMission] = useState<Mission | null>(null);
+
+  // Check if mission exists in local stores
+  const localMission =
     todayMissions.find((m) => m.id === id) ||
     keptMissions.find((m) => m.id === id) ||
-    bookmarkedMission ||
+    bookmarkedMission;
+
+  // Load featured mission from DB if not found in local stores
+  useEffect(() => {
+    const loadFeaturedMission = async () => {
+      if (localMission || !id || isDemoMode) return;
+
+      try {
+        const { data, error } = await db.featuredMissions.getById(id);
+        if (error || !data) return;
+
+        // Get current language
+        const isEnglish = t('language') === 'en' || t('language') === 'English';
+
+        // Convert to Mission format
+        const converted: Mission = {
+          id: data.id,
+          title: (isEnglish && data.title_en) ? data.title_en : data.title,
+          description: (isEnglish && data.description_en) ? data.description_en : data.description,
+          category: data.category as Mission['category'],
+          tags: (isEnglish && data.tags_en?.length) ? data.tags_en : (data.tags || []),
+          imageUrl: data.image_url || '',
+          isPremium: false,
+        };
+        setFeaturedMission(converted);
+      } catch (error) {
+        console.error('[MissionDetail] Error loading featured mission:', error);
+      }
+    };
+
+    loadFeaturedMission();
+  }, [id, localMission, t]);
+
+  const mission: Mission =
+    localMission ||
+    featuredMission ||
     {
       id: id || 'unknown',
       title: t('missionDetail.notFound.title'),

@@ -191,14 +191,14 @@ export default function MissionScreen() {
       if (data && data.length > 0) {
         const isEnglish = i18n.language === 'en';
 
-        // Convert featured missions to Mission format with language-aware title/description
+        // Convert featured missions to Mission format with language-aware title/description/tags
         const convertedMissions: Mission[] = data.map((fm) => ({
           id: fm.id,
-          // Use English title/description if available and language is English, otherwise fallback to Korean
+          // Use English title/description/tags if available and language is English, otherwise fallback to Korean
           title: isEnglish && fm.title_en ? fm.title_en : fm.title,
           description: isEnglish && fm.description_en ? fm.description_en : fm.description,
           category: fm.category as Mission['category'],
-          tags: fm.tags,
+          tags: isEnglish && fm.tags_en?.length ? fm.tags_en : (fm.tags || []),
           imageUrl: fm.image_url,
           isPremium: false, // Featured missions are free
         }));

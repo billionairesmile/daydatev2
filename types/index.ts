@@ -161,12 +161,9 @@ export interface FeaturedMission {
   titleEn?: string;
   descriptionEn?: string;
   category: MissionCategory;
-  difficulty: MissionDifficulty;
-  locationType: LocationType;
   tags: string[];
-  icon: string;
+  tagsEn?: string[]; // English tags for i18n
   imageUrl: string;
-  estimatedTime: number;
   startDate?: Date;
   endDate?: Date;
   isActive: boolean;

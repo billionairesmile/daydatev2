@@ -125,13 +125,9 @@ export interface FeaturedMission {
   title_en?: string;
   description_en?: string;
   category: string;
-  difficulty: number;
-  duration: string;
-  location_type: 'indoor' | 'outdoor' | 'any';
   tags: string[];
-  icon: string;
+  tags_en?: string[]; // English tags for i18n
   image_url: string;
-  estimated_time: number;
   start_date?: string;
   end_date?: string;
   is_active: boolean;
