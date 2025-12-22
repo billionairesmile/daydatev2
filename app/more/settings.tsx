@@ -35,6 +35,8 @@ import {
   MapPin,
   LogOut,
   Gift,
+  Target,
+  MessageSquare,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -54,7 +56,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const { data, reset: resetOnboarding } = useOnboardingStore();
-  const { signOut, couple, setIsOnboardingComplete } = useAuthStore();
+  const { signOut, couple, user, setIsOnboardingComplete } = useAuthStore();
   const { memories } = useMemoryStore();
   const { language, setLanguage } = useLanguageStore();
 
@@ -64,6 +66,7 @@ export default function SettingsScreen() {
   const [partnerActivity, setPartnerActivity] = useState(true);
   const [newsEnabled, setNewsEnabled] = useState(false);
   const [marketingEnabled, setMarketingEnabled] = useState(false);
+  const [isLoadingSettings, setIsLoadingSettings] = useState(true);
 
   // Account deletion modal
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
@@ -81,6 +84,69 @@ export default function SettingsScreen() {
 
   // Keyboard animation for modals
   const modalAnimatedValue = useRef(new Animated.Value(0)).current;
+
+  // Load notification settings from DB on mount
+  useEffect(() => {
+    const loadSettings = async () => {
+      if (!user?.id || isDemoMode) {
+        setIsLoadingSettings(false);
+        return;
+      }
+
+      try {
+        const { data: profile } = await db.profiles.get(user.id);
+        if (profile) {
+          setPushEnabled(profile.push_enabled ?? true);
+          setMissionAlert(profile.mission_alert_enabled ?? true);
+          setPartnerActivity(profile.message_alert_enabled ?? true);
+          setNewsEnabled(profile.news_agreed ?? false);
+          setMarketingEnabled(profile.marketing_agreed ?? false);
+        }
+      } catch (error) {
+        console.error('[Settings] Error loading notification settings:', error);
+      } finally {
+        setIsLoadingSettings(false);
+      }
+    };
+
+    loadSettings();
+  }, [user?.id]);
+
+  // Handlers to sync notification settings to DB
+  const handlePushEnabledChange = async (value: boolean) => {
+    setPushEnabled(value);
+    if (user?.id && !isDemoMode) {
+      await db.profiles.update(user.id, { push_enabled: value });
+    }
+  };
+
+  const handleMissionAlertChange = async (value: boolean) => {
+    setMissionAlert(value);
+    if (user?.id && !isDemoMode) {
+      await db.profiles.update(user.id, { mission_alert_enabled: value });
+    }
+  };
+
+  const handlePartnerActivityChange = async (value: boolean) => {
+    setPartnerActivity(value);
+    if (user?.id && !isDemoMode) {
+      await db.profiles.update(user.id, { message_alert_enabled: value });
+    }
+  };
+
+  const handleNewsEnabledChange = async (value: boolean) => {
+    setNewsEnabled(value);
+    if (user?.id && !isDemoMode) {
+      await db.profiles.update(user.id, { news_agreed: value });
+    }
+  };
+
+  const handleMarketingEnabledChange = async (value: boolean) => {
+    setMarketingEnabled(value);
+    if (user?.id && !isDemoMode) {
+      await db.profiles.update(user.id, { marketing_agreed: value });
+    }
+  };
 
   useEffect(() => {
     const keyboardWillShow = Keyboard.addListener(
@@ -264,7 +330,7 @@ export default function SettingsScreen() {
             </View>
             <Switch
               value={pushEnabled}
-              onValueChange={setPushEnabled}
+              onValueChange={handlePushEnabledChange}
               trackColor={{ false: '#e0e0e0', true: '#4caf50' }}
               thumbColor={COLORS.white}
             />
@@ -274,7 +340,9 @@ export default function SettingsScreen() {
 
           <View style={styles.settingItem}>
             <View style={styles.settingItemLeft}>
-              <View style={styles.iconWrapperEmpty} />
+              <View style={styles.iconWrapper}>
+                <Target color={COLORS.black} size={20} />
+              </View>
               <View style={styles.settingItemContent}>
                 <Text style={styles.settingItemLabel}>{t('settings.notifications.mission')}</Text>
                 <Text style={styles.settingItemDescription}>{t('settings.notifications.missionDesc')}</Text>
@@ -282,7 +350,7 @@ export default function SettingsScreen() {
             </View>
             <Switch
               value={missionAlert}
-              onValueChange={setMissionAlert}
+              onValueChange={handleMissionAlertChange}
               trackColor={{ false: '#e0e0e0', true: '#4caf50' }}
               thumbColor={COLORS.white}
               disabled={!pushEnabled}
@@ -293,7 +361,9 @@ export default function SettingsScreen() {
 
           <View style={styles.settingItem}>
             <View style={styles.settingItemLeft}>
-              <View style={styles.iconWrapperEmpty} />
+              <View style={styles.iconWrapper}>
+                <MessageSquare color={COLORS.black} size={20} />
+              </View>
               <View style={styles.settingItemContent}>
                 <Text style={styles.settingItemLabel}>{t('settings.notifications.message')}</Text>
                 <Text style={styles.settingItemDescription}>{t('settings.notifications.messageDesc')}</Text>
@@ -301,7 +371,7 @@ export default function SettingsScreen() {
             </View>
             <Switch
               value={partnerActivity}
-              onValueChange={setPartnerActivity}
+              onValueChange={handlePartnerActivityChange}
               trackColor={{ false: '#e0e0e0', true: '#4caf50' }}
               thumbColor={COLORS.white}
               disabled={!pushEnabled}
@@ -324,7 +394,7 @@ export default function SettingsScreen() {
             </View>
             <Switch
               value={newsEnabled}
-              onValueChange={setNewsEnabled}
+              onValueChange={handleNewsEnabledChange}
               trackColor={{ false: '#e0e0e0', true: '#4caf50' }}
               thumbColor={COLORS.white}
             />
@@ -344,7 +414,7 @@ export default function SettingsScreen() {
             </View>
             <Switch
               value={marketingEnabled}
-              onValueChange={setMarketingEnabled}
+              onValueChange={handleMarketingEnabledChange}
               trackColor={{ false: '#e0e0e0', true: '#4caf50' }}
               thumbColor={COLORS.white}
             />
