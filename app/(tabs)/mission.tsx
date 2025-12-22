@@ -73,6 +73,10 @@ export default function MissionScreen() {
   const [isLoadingFeatured, setIsLoadingFeatured] = useState(false);
   const [partnerGeneratingMessage, setPartnerGeneratingMessage] = useState<string | null>(null);
   const [isScrollInitialized, setIsScrollInitialized] = useState(false);
+  const [loadedImagesCount, setLoadedImagesCount] = useState(0);
+  const [totalImagesToLoad, setTotalImagesToLoad] = useState(0);
+  const [isWaitingForImages, setIsWaitingForImages] = useState(false);
+  const isWaitingForImagesRef = useRef(false);
   const scrollX = useRef(new Animated.Value(0)).current;
   const scrollViewRef = useRef<Animated.FlatList<Mission>>(null);
 
@@ -156,7 +160,7 @@ export default function MissionScreen() {
   // Force FlatList to render properly when missions change from empty to populated
   // This handles cases where the list mounts before React has finished updating
   useEffect(() => {
-    if (allMissions.length > 0 && !isGenerating) {
+    if (allMissions.length > 0 && !isGenerating && !isWaitingForImages) {
       // Reset scroll initialization state when missions change
       setIsScrollInitialized(false);
 
@@ -173,7 +177,42 @@ export default function MissionScreen() {
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [allMissions.length, isGenerating]);
+  }, [allMissions.length, isGenerating, isWaitingForImages]);
+
+  // Handle image loading completion - hide loading when all images are loaded
+  useEffect(() => {
+    if (isWaitingForImages && loadedImagesCount >= totalImagesToLoad && totalImagesToLoad > 0) {
+      // All images loaded, hide loading with a small delay for smooth transition
+      const timer = setTimeout(() => {
+        setIsGenerating(false);
+        setIsWaitingForImages(false);
+        isWaitingForImagesRef.current = false;
+        setLoadedImagesCount(0);
+        setTotalImagesToLoad(0);
+
+        // Initialize scroll after images are loaded
+        setCurrentIndex(0);
+        scrollX.setValue(0);
+        setIsScrollInitialized(false);
+
+        setTimeout(() => {
+          if (scrollViewRef.current) {
+            scrollViewRef.current.scrollToOffset({ offset: 1, animated: false });
+            setTimeout(() => {
+              scrollViewRef.current?.scrollToOffset({ offset: 0, animated: false });
+              setIsScrollInitialized(true);
+            }, 50);
+          }
+        }, 150);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [isWaitingForImages, loadedImagesCount, totalImagesToLoad, scrollX]);
+
+  // Callback for when a mission card image loads
+  const handleMissionImageLoad = useCallback(() => {
+    setLoadedImagesCount(prev => prev + 1);
+  }, []);
 
   // Load featured missions on mount and focus
   const loadFeaturedMissions = useCallback(async () => {
@@ -347,45 +386,46 @@ export default function MissionScreen() {
     // Get the newly generated missions
     const newMissions = getTodayMissions();
 
-    // Prefetch all mission images before hiding loading animation
+    // Prefetch all mission images before showing cards
     if (newMissions.length > 0) {
-      try {
-        const imagePromises = newMissions
-          .filter(mission => mission.imageUrl)
-          .map(mission => Image.prefetch(`${mission.imageUrl}?w=800&h=1000&fit=crop`));
+      const imagesToLoad = newMissions.filter(mission => mission.imageUrl);
 
-        // Wait for all images to load (with timeout fallback)
+      try {
+        const imagePromises = imagesToLoad.map(mission =>
+          Image.prefetch(`${mission.imageUrl}?w=800&h=1000&fit=crop`)
+        );
+
+        // Wait for all images to prefetch (with timeout fallback)
         await Promise.race([
           Promise.all(imagePromises),
-          new Promise(resolve => setTimeout(resolve, 5000)), // 5초 타임아웃
+          new Promise(resolve => setTimeout(resolve, 8000)), // 8초 타임아웃
         ]);
       } catch (error) {
         console.log('Image prefetch error:', error);
         // Continue even if prefetch fails
       }
+
+      // Set up image loading tracking - wait for actual render
+      // The loading will hide when all images call onLoad
+      setLoadedImagesCount(0);
+      setTotalImagesToLoad(imagesToLoad.length);
+      setIsWaitingForImages(true);
+      isWaitingForImagesRef.current = true;
+
+      // Set a maximum wait time (10 seconds) as fallback
+      setTimeout(() => {
+        if (isWaitingForImagesRef.current) {
+          setIsGenerating(false);
+          setIsWaitingForImages(false);
+          isWaitingForImagesRef.current = false;
+          setLoadedImagesCount(0);
+          setTotalImagesToLoad(0);
+        }
+      }, 10000);
+    } else {
+      // No missions generated, hide loading immediately
+      setIsGenerating(false);
     }
-
-    // Reset carousel state before showing
-    setCurrentIndex(0);
-    scrollX.setValue(0);
-    setIsScrollInitialized(false);
-
-    // Hide loading animation after images are loaded
-    setIsGenerating(false);
-
-    // Force FlatList to properly initialize by triggering scroll events
-    // Use multiple timeouts to ensure the native driver syncs the scroll position
-    setTimeout(() => {
-      if (scrollViewRef.current) {
-        // First scroll to a tiny offset to trigger the scroll event
-        scrollViewRef.current.scrollToOffset({ offset: 1, animated: false });
-        // Then immediately scroll back to 0 and mark as initialized
-        setTimeout(() => {
-          scrollViewRef.current?.scrollToOffset({ offset: 0, animated: false });
-          setIsScrollInitialized(true);
-        }, 50);
-      }
-    }, 150);
 
     // Reset form
     setCanMeetToday(null);
@@ -473,12 +513,13 @@ export default function MissionScreen() {
               canStart={canStartMission(item.id)}
               isCompletedToday={isTodayCompletedMission(item.id)}
               isAnotherMissionInProgress={isAnotherMissionInProgress(item.id)}
+              onImageLoad={handleMissionImageLoad}
             />
           </View>
         </Animated.View>
       );
     },
-    [scrollX, handleMissionPress, handleKeepMission, checkIsKept, canStartMission, isTodayCompletedMission, lockedMissionId, isScrollInitialized, isAnotherMissionInProgress]
+    [scrollX, handleMissionPress, handleKeepMission, checkIsKept, canStartMission, isTodayCompletedMission, lockedMissionId, isScrollInitialized, isAnotherMissionInProgress, handleMissionImageLoad]
   );
 
   return (
@@ -759,9 +800,10 @@ interface MissionCardContentProps {
   canStart?: boolean;
   isCompletedToday?: boolean;
   isAnotherMissionInProgress?: boolean;
+  onImageLoad?: () => void;
 }
 
-function MissionCardContent({ mission, onStartPress, onKeepPress, isKept, canStart = true, isCompletedToday = false, isAnotherMissionInProgress = false }: MissionCardContentProps) {
+function MissionCardContent({ mission, onStartPress, onKeepPress, isKept, canStart = true, isCompletedToday = false, isAnotherMissionInProgress = false, onImageLoad }: MissionCardContentProps) {
   const { t } = useTranslation();
   const blurHeight = CARD_HEIGHT * 0.8; // Blur covers bottom 55% of card
 
@@ -838,6 +880,7 @@ function MissionCardContent({ mission, onStartPress, onKeepPress, isKept, canSta
         source={{ uri: `${mission.imageUrl}?w=800&h=1000&fit=crop` }}
         style={styles.cardImage}
         resizeMode="cover"
+        onLoad={onImageLoad}
       />
 
       {/* Blur Container with Masked Gradient */}
