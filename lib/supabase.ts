@@ -463,6 +463,31 @@ export const db = {
         .maybeSingle();
       return { data, error };
     },
+
+    // Cleanup orphaned pending couples for a user
+    // Call this when user successfully connects to a new couple
+    async cleanupPendingCouples(userId: string, excludeCoupleId?: string) {
+      const client = getSupabase();
+      let query = client
+        .from('couples')
+        .delete()
+        .eq('user1_id', userId)
+        .eq('status', 'pending')
+        .is('user2_id', null);
+
+      // Exclude the current active couple if provided
+      if (excludeCoupleId) {
+        query = query.neq('id', excludeCoupleId);
+      }
+
+      const { error } = await query;
+      if (error) {
+        console.warn('[couples.cleanupPendingCouples] Error:', error.message);
+      } else {
+        console.log('[couples.cleanupPendingCouples] Cleaned up pending couples for user:', userId);
+      }
+      return { error };
+    },
   },
 
   // Missions

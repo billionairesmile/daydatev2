@@ -1595,6 +1595,10 @@ function PairingStep({
                   await db.pairingCodes.setCoupleId(finalCode, restoredCouple.id);
                 }
 
+                // Cleanup orphaned pending couples for creator
+                console.log('[PairingStep] Creator reconnection cleanup: removing orphaned pending couples');
+                await db.couples.cleanupPendingCouples(creatorUserId, restoredCouple.id);
+
                 // Don't return early - continue to set up realtime subscription
                 // so creator can receive notification when partner joins
               }
@@ -1693,6 +1697,11 @@ function PairingStep({
               status: 'pending',
               createdAt: new Date(),
             });
+
+            // Cleanup any previous orphaned pending couples for this creator
+            // (e.g., from failed pairing attempts)
+            console.log('[PairingStep] Cleaning up old pending couples for creator');
+            await db.couples.cleanupPendingCouples(creatorUserId, newCouple.id);
 
             // Only update user in authStore if not already logged in
             if (!isExistingUser) {
@@ -2255,6 +2264,13 @@ function PairingStep({
                 createdAt: creatorProfile.created_at ? new Date(creatorProfile.created_at) : new Date(),
               });
 
+              // Cleanup orphaned pending couples for both users
+              console.log('[PairingStep] Reconnection cleanup: removing orphaned pending couples');
+              await Promise.all([
+                db.couples.cleanupPendingCouples(joinerId, restoredCouple.id),
+                db.couples.cleanupPendingCouples(partnerId, restoredCouple.id),
+              ]);
+
               // Mark pairing code as used
               await db.pairingCodes.join(pairingCode, joinerId);
 
@@ -2388,6 +2404,15 @@ function PairingStep({
           },
           createdAt: creatorProfile?.created_at ? new Date(creatorProfile.created_at) : new Date(),
         });
+
+        // Cleanup orphaned pending couples for both users
+        // - Joiner might have old pending couples from previous pairing attempts
+        // - Creator might have old pending couples from previous pairing attempts
+        console.log('[PairingStep] Cleaning up orphaned pending couples');
+        await Promise.all([
+          db.couples.cleanupPendingCouples(joinerId, updatedCouple.id),
+          db.couples.cleanupPendingCouples(updatedCouple.user1_id, updatedCouple.id),
+        ]);
       }
 
       console.log('[PairingStep] Setting isPairingConnected to true');
