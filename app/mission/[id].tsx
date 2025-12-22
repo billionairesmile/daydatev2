@@ -44,7 +44,7 @@ const { width, height } = Dimensions.get('window');
 export default function MissionDetailScreen() {
   const router = useRouter();
   const { id, source } = useLocalSearchParams<{ id: string; source?: string }>();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   // Custom back navigation - returns to bookmark page if came from there
   const handleBack = useCallback(() => {
@@ -136,9 +136,9 @@ export default function MissionDetailScreen() {
         if (error || !data) return;
 
         // Get current language
-        const isEnglish = t('language') === 'en' || t('language') === 'English';
+        const isEnglish = i18n.language === 'en';
 
-        // Convert to Mission format
+        // Convert to Mission format with language-aware fields
         const converted: Mission = {
           id: data.id,
           title: (isEnglish && data.title_en) ? data.title_en : data.title,
@@ -155,7 +155,7 @@ export default function MissionDetailScreen() {
     };
 
     loadFeaturedMission();
-  }, [id, localMission, t]);
+  }, [id, localMission, i18n.language]);
 
   const mission: Mission =
     localMission ||
