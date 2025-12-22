@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -43,8 +43,18 @@ const { width, height } = Dimensions.get('window');
 
 export default function MissionDetailScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, source } = useLocalSearchParams<{ id: string; source?: string }>();
   const { t } = useTranslation();
+
+  // Custom back navigation - returns to bookmark page if came from there
+  const handleBack = useCallback(() => {
+    if (source === 'bookmark') {
+      // Navigate to mission tab with bookmark page open
+      router.replace('/(tabs)/mission?showBookmark=true');
+    } else {
+      router.back();
+    }
+  }, [router, source]);
 
   const [photoTaken, setPhotoTaken] = useState(false);
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
@@ -675,7 +685,7 @@ export default function MissionDetailScreen() {
     clearInProgressMission(mission.id);
 
     handleCompleteMission();
-    router.back();
+    handleBack();
   };
 
   const isComplete = photoTaken && user1Message && user2Message;
@@ -956,7 +966,7 @@ export default function MissionDetailScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerContent}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
+          <Pressable onPress={handleBack} style={styles.backButton}>
             <ChevronLeft color={COLORS.white} size={20} />
           </Pressable>
           <Text style={styles.headerTitle}>{t('missionDetail.headerTitle')}</Text>

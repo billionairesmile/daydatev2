@@ -73,7 +73,7 @@
     "completed": "Completed",
     "kept": "Saved",
     "keep": "Keep",
-    "anotherInProgress": "Another mission in progress",
+    "anotherInProgress": "In progress",
     "questions": {
       "canMeetToday": "Can you meet each other today?",
       "yesMeet": "Yeah, we can",
@@ -110,7 +110,7 @@
       "keepLimit": "Save Limit",
       "keepLimitMessage": "You can save up to 5 missions.\nPlease remove some before adding more.",
       "cannotStart": "Cannot Start Mission",
-      "anotherInProgressMessage": "Another mission is already in progress.\nPlease complete it first!",
+      "anotherInProgressMessage": "Another mission is already in progress.",
       "dailyLimitMessage": "You've completed today's mission.\nCome back tomorrow!"
     }
   },
@@ -147,7 +147,7 @@
       "complete": "Done"
     },
     "status": {
-      "anotherInProgress": "Another mission in progress",
+      "anotherInProgress": "In progress",
       "waitingPartner": "Waiting for partner...",
       "waitingPhoto": "Waiting for photo...",
       "writeMessage": "Write a message",
@@ -193,7 +193,7 @@
     },
     "todo": {
       "title": "To-Do",
-      "empty": "No tasks",
+      "empty": "No tasks yet",
       "emptyHint": "Tap to add a task",
       "addPlaceholder": "e.g., Book movie tickets",
       "addTitle": "Enter your task",
@@ -275,7 +275,7 @@
       "fontStyleDesc": "Select a font style for your album title",
       "basicFont": "Basic Font",
       "basicFontDesc": "Clean style",
-      "ransomStyle": "Ransom Note Style",
+      "ransomStyle": "Ransom Note",
       "basicFontHint": "A clean font will be applied",
       "ransomFontHint": "Each character will have a unique style",
       "namePlaceholder": "Enter album name...",
@@ -494,14 +494,18 @@
       "warning1": "Your partner will be notified of the disconnection",
       "warning2": "Mission history is kept in individual accounts",
       "warning3": "You can reconnect with the same partner within 30 days",
-      "confirmPrompt": "To continue, please type 'unpair'\nexactly as shown below",
-      "confirmText": "unpair",
+      "confirmPrompt": "To continue, please type 'Unpair' below",
+      "confirmText": "Unpair",
       "button": "Unpair",
       "success": "Unpaired",
       "successMessage": "You have been unpaired.\nReconnect with the same partner within 30 days to recover your data.",
       "error": "An error occurred while unpairing.",
       "notificationTitle": "You've been unpaired",
-      "notificationBody": "{{nickname}} has unpaired from you. Reconnect within 30 days to recover your data."
+      "notificationBody": "{{nickname}} has unpaired from you. Reconnect within 30 days to recover your data.",
+      "partnerDisconnectedTitle": "Pairing Disconnected",
+      "partnerDisconnectedMessage": "Your partner has disconnected the pairing.\nYou can connect with a new partner or reconnect with the same partner within 30 days.",
+      "partnerDeletedAccountTitle": "Partner Deleted Account",
+      "partnerDeletedAccountMessage": "Your partner has deleted their account and the pairing has been terminated.\nReconnection is not possible, and previous memories and data cannot be recovered."
     },
     "deleteAccount": {
       "title": "Delete Account",
@@ -509,13 +513,15 @@
       "permanentDelete": "permanently delete",
       "warningEnd": " all data.",
       "dataList": "Data to be deleted: Profile information, Couple connection info, Completed mission records, Albums and photos, All settings",
-      "confirmPrompt": "To continue, please type 'delete' below",
-      "confirmText": "delete",
+      "confirmPrompt": "To continue, please type 'Delete' below",
+      "confirmText": "Delete",
       "button": "Delete Account",
       "deleting": "Deleting...",
       "success": "Account Deleted",
       "successMessage": "All data has been deleted.\nThank you for using our service.",
-      "error": "An error occurred while deleting your account."
+      "error": "An error occurred while deleting your account.",
+      "partnerNotificationTitle": "Account Deleted",
+      "partnerNotificationBody": "{{nickname}} has deleted their account."
     },
     "language": "Language",
     "theme": "Theme",

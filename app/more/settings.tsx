@@ -46,6 +46,7 @@ import { useOnboardingStore, useAuthStore, useMemoryStore, useLanguageStore, get
 import type { SupportedLanguage } from '@/stores';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
 import { db, isDemoMode } from '@/lib/supabase';
+import { notifyPartnerUnpaired } from '@/lib/pushNotifications';
 
 const { width } = Dimensions.get('window');
 
@@ -137,9 +138,11 @@ export default function SettingsScreen() {
           text: t('settings.account.logout'),
           style: 'destructive',
           onPress: async () => {
+            // Clear all auth data (user, couple, partner)
+            signOut();
+            // Reset onboarding steps to welcome
             resetOnboarding();
-            setIsOnboardingComplete(false);
-            await AsyncStorage.removeItem('hasSeenHomeTutorial');
+            // Note: Don't clear hasSeenHomeTutorial - it should persist so returning users don't see the tutorial again
             router.replace('/(auth)/onboarding');
           },
         },
@@ -152,15 +155,42 @@ export default function SettingsScreen() {
   };
 
   const handleDeleteAccountConfirm = async () => {
-    if (deleteConfirmText !== t('settings.deleteAccount.confirmText')) return;
+    // Case-insensitive comparison for English (allows 'delete', 'Delete', 'DELETE')
+    if (deleteConfirmText.toLowerCase() !== t('settings.deleteAccount.confirmText').toLowerCase()) return;
 
     setIsDeleting(true);
-    const { user } = useAuthStore.getState();
+    const { user, partner } = useAuthStore.getState();
     const { cleanup: cleanupSync } = useCoupleSyncStore.getState();
+
+    // Get user nickname before clearing state
+    const userNickname = user?.nickname || t('common.partner');
+    const partnerId = partner?.id;
 
     try {
       // Cleanup realtime subscriptions first
       cleanupSync();
+
+      // If user has a couple, disconnect first to notify partner
+      if (!isDemoMode && couple?.id && user?.id) {
+        // Soft disconnect with 'account_deleted' reason - this triggers realtime subscription for partner
+        // The reason helps partner know user deleted their account (not just unpaired)
+        // Note: If couple is already disconnected (user did unpair first), this is a no-op
+        const { error: disconnectError } = await db.couples.disconnect(couple.id, user.id, 'account_deleted');
+        if (disconnectError && disconnectError.message) {
+          console.error('[Settings] Error disconnecting couple before deletion:', disconnectError.message);
+          // Continue with deletion even if disconnect fails
+        }
+
+        // Send push notification to partner about account deletion
+        if (partnerId) {
+          await notifyPartnerUnpaired(
+            partnerId,
+            userNickname,
+            t('settings.deleteAccount.partnerNotificationTitle'),
+            t('settings.deleteAccount.partnerNotificationBody', { nickname: userNickname })
+          );
+        }
+      }
 
       // Delete all data from database
       if (!isDemoMode && user?.id) {
@@ -173,6 +203,10 @@ export default function SettingsScreen() {
       // Clear all local storage
       await db.account.clearLocalStorage();
 
+      // Reset onboarding first (sets step to 'welcome') before signOut
+      // This prevents showing pairing screen briefly during transition
+      resetOnboarding();
+
       // Clear Zustand stores
       signOut();
 
@@ -180,16 +214,16 @@ export default function SettingsScreen() {
       setDeleteConfirmText('');
       setIsDeleting(false);
 
-      Alert.alert(
-        t('settings.deleteAccount.success'),
-        t('settings.deleteAccount.successMessage'),
-        [
-          {
-            text: t('common.confirm'),
-            onPress: () => router.replace('/(auth)/onboarding'),
-          },
-        ]
-      );
+      // Navigate immediately to prevent flash of pairing screen
+      router.replace('/(auth)/onboarding');
+
+      // Show success alert after navigation
+      setTimeout(() => {
+        Alert.alert(
+          t('settings.deleteAccount.success'),
+          t('settings.deleteAccount.successMessage')
+        );
+      }, 100);
     } catch (error) {
       console.error('[Settings] Account deletion error:', error);
       setIsDeleting(false);
@@ -539,10 +573,10 @@ export default function SettingsScreen() {
               <Pressable
                 style={[
                   styles.confirmDeleteButton,
-                  (deleteConfirmText !== t('settings.deleteAccount.confirmText') || isDeleting) && styles.confirmDeleteButtonDisabled,
+                  (deleteConfirmText.toLowerCase() !== t('settings.deleteAccount.confirmText').toLowerCase() || isDeleting) && styles.confirmDeleteButtonDisabled,
                 ]}
                 onPress={handleDeleteAccountConfirm}
-                disabled={deleteConfirmText !== t('settings.deleteAccount.confirmText') || isDeleting}
+                disabled={deleteConfirmText.toLowerCase() !== t('settings.deleteAccount.confirmText').toLowerCase() || isDeleting}
               >
                 {isDeleting ? (
                   <Text style={styles.confirmDeleteButtonText}>{t('settings.deleteAccount.deleting')}</Text>

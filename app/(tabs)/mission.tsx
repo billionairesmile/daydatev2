@@ -20,7 +20,7 @@ import { BlurView } from 'expo-blur';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { easeGradient } from 'react-native-easing-gradient';
 import { Bookmark, Sparkles, X } from 'lucide-react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import * as Location from 'expo-location';
 
 import { COLORS, SPACING, RADIUS } from '@/constants/design';
@@ -49,11 +49,21 @@ const { colors: blurGradientColors, locations: blurGradientLocations } = easeGra
 });
 
 export default function MissionScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const router = useRouter();
+  const { showBookmark } = useLocalSearchParams<{ showBookmark?: string }>();
   const { backgroundImage } = useBackground();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showBookmarkedMissions, setShowBookmarkedMissions] = useState(false);
+
+  // Handle returning from mission detail to bookmark page
+  useEffect(() => {
+    if (showBookmark === 'true') {
+      setShowBookmarkedMissions(true);
+      // Clear the query param to prevent reopening on next focus
+      router.setParams({ showBookmark: undefined });
+    }
+  }, [showBookmark, router]);
   const [showGenerationModal, setShowGenerationModal] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [canMeetToday, setCanMeetToday] = useState<boolean | null>(null);
@@ -134,10 +144,14 @@ export default function MissionScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [generatedMissionData, sharedMissions, isSyncInitialized, hasTodayMissions]);
 
-  // Combine AI-generated missions with featured missions
+  // Combine AI-generated missions with featured missions (only show featured after daily missions are generated)
   const allMissions = React.useMemo(() => {
-    return [...todayMissions, ...featuredMissions];
-  }, [todayMissions, featuredMissions]);
+    // Only include featured missions if today's missions have been generated
+    if (hasGeneratedMissions && todayMissions.length > 0) {
+      return [...todayMissions, ...featuredMissions];
+    }
+    return todayMissions;
+  }, [todayMissions, featuredMissions, hasGeneratedMissions]);
 
   // Force FlatList to render properly when missions change from empty to populated
   // This handles cases where the list mounts before React has finished updating
@@ -175,11 +189,14 @@ export default function MissionScreen() {
       }
 
       if (data && data.length > 0) {
-        // Convert featured missions to Mission format
+        const isEnglish = i18n.language === 'en';
+
+        // Convert featured missions to Mission format with language-aware title/description
         const convertedMissions: Mission[] = data.map((fm) => ({
           id: fm.id,
-          title: fm.title,
-          description: fm.description,
+          // Use English title/description if available and language is English, otherwise fallback to Korean
+          title: isEnglish && fm.title_en ? fm.title_en : fm.title,
+          description: isEnglish && fm.description_en ? fm.description_en : fm.description,
           category: fm.category as Mission['category'],
           tags: fm.tags,
           imageUrl: fm.image_url,
@@ -193,16 +210,24 @@ export default function MissionScreen() {
     } finally {
       setIsLoadingFeatured(false);
     }
-  }, []);
+  }, [i18n.language]);
 
   // Check for date reset on focus
   useFocusEffect(
     useCallback(() => {
       checkAndResetMissions();
-      setShowBookmarkedMissions(false);
+      // Don't reset bookmark view if returning from mission detail with showBookmark param
+      if (showBookmark !== 'true') {
+        setShowBookmarkedMissions(false);
+      }
       loadFeaturedMissions(); // Load featured missions on focus
-    }, [checkAndResetMissions, loadFeaturedMissions])
+    }, [checkAndResetMissions, loadFeaturedMissions, showBookmark])
   );
+
+  // Reload featured missions when language changes
+  useEffect(() => {
+    loadFeaturedMissions();
+  }, [i18n.language, loadFeaturedMissions]);
 
   // Watch for partner generating missions (via real-time sync)
   useEffect(() => {
@@ -504,7 +529,7 @@ export default function MissionScreen() {
 
       {/* Card Carousel or Empty State */}
       <View style={styles.cardContainer}>
-        {hasGeneratedMissions || featuredMissions.length > 0 ? (
+        {hasGeneratedMissions ? (
           <View style={styles.carouselWrapper}>
             <Animated.FlatList
               key={`mission-list-${allMissions.length}`}

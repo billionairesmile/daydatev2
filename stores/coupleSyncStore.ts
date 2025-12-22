@@ -14,6 +14,7 @@ import {
   scheduleMissionReminderNotification,
   cancelMissionReminderNotification,
 } from '@/lib/pushNotifications';
+import { useLanguageStore } from './languageStore';
 
 // Types
 export interface SyncedTodo {
@@ -728,13 +729,15 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       // Send push notification to partner
       if (partnerId && userNickname) {
         console.log('[CoupleSyncStore] Sending mission generated notification to partner:', partnerId);
-        notifyPartnerMissionGenerated(partnerId, userNickname).catch((err) => {
+        const language = useLanguageStore.getState().language;
+        notifyPartnerMissionGenerated(partnerId, userNickname, language).catch((err) => {
           console.error('[CoupleSyncStore] Failed to send notification:', err);
         });
       }
 
       // Schedule a reminder notification for 8 PM if missions aren't completed
-      scheduleMissionReminderNotification(20).catch((err) => {
+      const language = useLanguageStore.getState().language;
+      scheduleMissionReminderNotification(20, language).catch((err) => {
         console.error('[CoupleSyncStore] Failed to schedule reminder notification:', err);
       });
     }
@@ -836,16 +839,19 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       ? activeMissionProgress.user2_id
       : activeMissionProgress.user1_id;
 
+    // Get user's language preference
+    const language = useLanguageStore.getState().language;
+
     // Notify current user if they haven't written
     if (!currentUserHasMessage && userId) {
       console.log('[CoupleSyncStore] Sending reminder to current user:', userId);
-      await notifyMissionReminder(userId, partnerNickname, partnerHasMessage);
+      await notifyMissionReminder(userId, partnerNickname, partnerHasMessage, language);
     }
 
     // Notify partner if they haven't written
     if (!partnerHasMessage && partnerId) {
       console.log('[CoupleSyncStore] Sending reminder to partner:', partnerId);
-      await notifyMissionReminder(partnerId, userNickname, currentUserHasMessage);
+      await notifyMissionReminder(partnerId, userNickname, currentUserHasMessage, language);
     }
   },
 

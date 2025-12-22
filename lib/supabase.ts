@@ -136,8 +136,37 @@ export const db = {
       return { data, error };
     },
 
+    // Delete pending pairing codes by creator ID (cleanup old codes before creating new)
+    async deleteByCreatorId(creatorId: string) {
+      const client = getSupabase();
+      const { error } = await client
+        .from('pairing_codes')
+        .delete()
+        .eq('creator_id', creatorId)
+        .eq('status', 'pending');
+      return { error };
+    },
+
+    // Get valid pending pairing code (not expired, within 24 hours)
+    async getValidPendingCode(creatorId: string) {
+      const client = getSupabase();
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+      const { data, error } = await client
+        .from('pairing_codes')
+        .select('*')
+        .eq('creator_id', creatorId)
+        .eq('status', 'pending')
+        .gte('created_at', twentyFourHoursAgo)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      return { data, error };
+    },
+
     // Subscribe to pairing code changes (for creator to know when joiner connects)
-    subscribeToCode(code: string, callback: (payload: { status: string; joiner_id: string | null; joiner_proceeded_at: string | null }) => void) {
+    subscribeToCode(code: string, callback: (payload: { status: string; joiner_id: string | null; joiner_proceeded_at: string | null; couple_id: string | null }) => void) {
       const client = getSupabase();
       const channel = client
         .channel(`pairing:${code}`)
@@ -150,8 +179,8 @@ export const db = {
             filter: `code=eq.${code}`,
           },
           (payload) => {
-            const newRecord = payload.new as { status: string; joiner_id: string | null; joiner_proceeded_at: string | null };
-            callback({ status: newRecord.status, joiner_id: newRecord.joiner_id, joiner_proceeded_at: newRecord.joiner_proceeded_at });
+            const newRecord = payload.new as { status: string; joiner_id: string | null; joiner_proceeded_at: string | null; couple_id: string | null };
+            callback({ status: newRecord.status, joiner_id: newRecord.joiner_id, joiner_proceeded_at: newRecord.joiner_proceeded_at, couple_id: newRecord.couple_id });
           }
         )
         .subscribe();
@@ -187,12 +216,14 @@ export const db = {
     },
 
     // Get pairing code with couple info (for joiner to get couple_id)
+    // Only returns pending codes - connected codes are considered "already used"
     async getWithCouple(code: string) {
       const client = getSupabase();
       const { data, error } = await client
         .from('pairing_codes')
         .select('*, couple_id')
         .eq('code', code)
+        .eq('status', 'pending')
         .single();
       return { data, error };
     },
@@ -225,7 +256,6 @@ export const db = {
     async create(profile: {
       id: string;
       nickname: string;
-      invite_code: string;
       email?: string;
       preferences?: Record<string, unknown>;
       birth_date?: string; // ISO date string
@@ -257,30 +287,28 @@ export const db = {
     async upsert(profile: {
       id: string;
       nickname?: string;
-      invite_code?: string;
       email?: string;
+      auth_provider?: string;
       preferences?: Record<string, unknown>;
       birth_date?: string;
       location_latitude?: number;
       location_longitude?: number;
       location_city?: string;
       location_district?: string;
+      couple_id?: string;
+      is_onboarding_complete?: boolean;
+      age_verified?: boolean;
+      terms_agreed?: boolean;
+      location_terms_agreed?: boolean;
+      privacy_agreed?: boolean;
+      marketing_agreed?: boolean;
+      consent_given_at?: string;
     }) {
       const client = getSupabase();
       const { data, error } = await client
         .from('profiles')
         .upsert(profile)
         .select()
-        .single();
-      return { data, error };
-    },
-
-    async findByInviteCode(code: string) {
-      const client = getSupabase();
-      const { data, error } = await client
-        .from('profiles')
-        .select('*')
-        .eq('invite_code', code)
         .single();
       return { data, error };
     },
@@ -347,33 +375,38 @@ export const db = {
     },
 
     // Soft delete - disconnect couple (30-day recovery period)
-    async disconnect(coupleId: string, userId: string) {
+    // reason: 'unpaired' (manual disconnect) or 'account_deleted' (user deleted account)
+    async disconnect(coupleId: string, userId: string, reason: 'unpaired' | 'account_deleted' = 'unpaired') {
       const client = getSupabase();
-      const { data, error } = await client
+      // Don't use .select().single() to avoid PGRST116 error when 0 rows match
+      const { error } = await client
         .from('couples')
         .update({
           status: 'disconnected',
           disconnected_at: new Date().toISOString(),
           disconnected_by: userId,
+          disconnect_reason: reason,
         })
         .eq('id', coupleId)
-        .select()
-        .single();
-      return { data, error };
+        .neq('status', 'disconnected'); // Only update if not already disconnected
+      return { data: null, error };
     },
 
     // Find disconnected couple for recovery (within 30 days, same user pair)
+    // Only finds couples that were disconnected by unpair (not account deletion)
     async findDisconnectedCouple(userId1: string, userId2: string) {
       const client = getSupabase();
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
       // Check both combinations (user1+user2 or user2+user1)
+      // Exclude couples where disconnect_reason is 'account_deleted' (no reconnection allowed)
       const { data, error } = await client
         .from('couples')
         .select('*')
         .eq('status', 'disconnected')
         .gte('disconnected_at', thirtyDaysAgo.toISOString())
+        .or('disconnect_reason.is.null,disconnect_reason.eq.unpaired') // Only allow reconnection for unpaired couples
         .or(
           `and(user1_id.eq.${userId1},user2_id.eq.${userId2}),and(user1_id.eq.${userId2},user2_id.eq.${userId1})`
         )
@@ -399,7 +432,7 @@ export const db = {
       return { data, error };
     },
 
-    // Get active couple by user ID (excludes disconnected)
+    // Get active couple by user ID (excludes disconnected, returns most recent)
     async getActiveByUserId(userId: string) {
       const client = getSupabase();
       const { data, error } = await client
@@ -407,6 +440,26 @@ export const db = {
         .select('*')
         .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
         .neq('status', 'disconnected')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return { data, error };
+    },
+
+    // Get disconnected couple by user ID (within 30 days, for reconnection)
+    async getDisconnectedByUserId(userId: string) {
+      const client = getSupabase();
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      const { data, error } = await client
+        .from('couples')
+        .select('*')
+        .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
+        .eq('status', 'disconnected')
+        .gte('disconnected_at', thirtyDaysAgo.toISOString())
+        .order('disconnected_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
       return { data, error };
     },
@@ -947,6 +1000,17 @@ export const db = {
       return { data, error };
     },
 
+    async getActiveByLanguage(language: 'ko' | 'en') {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('announcements')
+        .select('*')
+        .eq('is_active', true)
+        .eq('language', language)
+        .order('created_at', { ascending: false });
+      return { data, error };
+    },
+
     async getAll() {
       const client = getSupabase();
       const { data, error } = await client
@@ -1011,6 +1075,17 @@ export const db = {
         .from('faq_items')
         .select('*')
         .eq('is_active', true)
+        .order('display_order', { ascending: true });
+      return { data, error };
+    },
+
+    async getActiveByLanguage(language: 'ko' | 'en') {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('faq_items')
+        .select('*')
+        .eq('is_active', true)
+        .eq('language', language)
         .order('display_order', { ascending: true });
       return { data, error };
     },
@@ -2288,20 +2363,11 @@ export const db = {
           if (todoError) errors.push(`todos: ${todoError.message}`);
         }
 
-        // 6. Delete couple sync data
-        if (coupleId) {
-          const { error: syncError } = await client
-            .from('couple_sync')
-            .delete()
-            .eq('couple_id', coupleId);
-          if (syncError) errors.push(`couple_sync: ${syncError.message}`);
-        }
-
-        // 7. Delete albums and album photos for the couple
+        // 6. Delete albums and album photos for the couple
         if (coupleId) {
           // First delete album photos
           const { data: albums } = await client
-            .from('albums')
+            .from('couple_albums')
             .select('id')
             .eq('couple_id', coupleId);
 
@@ -2316,27 +2382,27 @@ export const db = {
 
           // Then delete albums
           const { error: albumError } = await client
-            .from('albums')
+            .from('couple_albums')
             .delete()
             .eq('couple_id', coupleId);
-          if (albumError) errors.push(`albums: ${albumError.message}`);
+          if (albumError) errors.push(`couple_albums: ${albumError.message}`);
         }
 
-        // 8. Delete pairing codes created by this user
+        // 7. Delete pairing codes created by this user
         const { error: pcError } = await client
           .from('pairing_codes')
           .delete()
           .eq('creator_id', userId);
         if (pcError) errors.push(`pairing_codes: ${pcError.message}`);
 
-        // 9. Delete onboarding answers
+        // 8. Delete onboarding answers
         const { error: oaError } = await client
           .from('onboarding_answers')
           .delete()
           .eq('user_id', userId);
         if (oaError) errors.push(`onboarding_answers: ${oaError.message}`);
 
-        // 10. Delete the couple record
+        // 9. Delete the couple record
         if (coupleId) {
           const { error: coupleError } = await client
             .from('couples')
@@ -2345,14 +2411,14 @@ export const db = {
           if (coupleError) errors.push(`couples: ${coupleError.message}`);
         }
 
-        // 11. Delete user profile
+        // 10. Delete user profile
         const { error: profileError } = await client
           .from('profiles')
           .delete()
           .eq('id', userId);
         if (profileError) errors.push(`profiles: ${profileError.message}`);
 
-        // 12. Delete storage files (photos, backgrounds, etc.)
+        // 11. Delete storage files (photos, backgrounds, etc.)
         if (coupleId) {
           try {
             // Delete memories folder

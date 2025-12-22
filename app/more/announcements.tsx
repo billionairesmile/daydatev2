@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 
 import { COLORS, SPACING, RADIUS } from '@/constants/design';
 import { db } from '@/lib/supabase';
+import { useLanguageStore, type SupportedLanguage } from '@/stores/languageStore';
 
 type Announcement = {
   id: string;
@@ -26,18 +27,20 @@ type Announcement = {
 export default function AnnouncementsScreen() {
   const router = useRouter();
   const { t } = useTranslation();
+  const { language: appLanguage } = useLanguageStore();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedLanguage, setSelectedLanguage] = useState<SupportedLanguage>(appLanguage);
 
   // Fetch announcements from Supabase
   useEffect(() => {
-    loadAnnouncements();
-  }, []);
+    loadAnnouncements(selectedLanguage);
+  }, [selectedLanguage]);
 
-  const loadAnnouncements = async () => {
+  const loadAnnouncements = useCallback(async (lang: SupportedLanguage) => {
     try {
       setIsLoading(true);
-      const { data, error } = await db.announcements.getActive();
+      const { data, error } = await db.announcements.getActiveByLanguage(lang);
 
       if (error) throw error;
 
@@ -55,6 +58,10 @@ export default function AnnouncementsScreen() {
     } finally {
       setIsLoading(false);
     }
+  }, []);
+
+  const handleLanguageToggle = (lang: SupportedLanguage) => {
+    setSelectedLanguage(lang);
   };
 
   return (
@@ -67,7 +74,41 @@ export default function AnnouncementsScreen() {
           <ChevronLeft color={COLORS.black} size={24} />
         </Pressable>
         <Text style={styles.headerTitle}>{t('more.announcements.title')}</Text>
-        <View style={styles.headerSpacer} />
+        {/* Language Toggle */}
+        <View style={styles.languageToggle}>
+          <Pressable
+            style={[
+              styles.langButton,
+              selectedLanguage === 'ko' && styles.langButtonActive,
+            ]}
+            onPress={() => handleLanguageToggle('ko')}
+          >
+            <Text
+              style={[
+                styles.langButtonText,
+                selectedLanguage === 'ko' && styles.langButtonTextActive,
+              ]}
+            >
+              KR
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[
+              styles.langButton,
+              selectedLanguage === 'en' && styles.langButtonActive,
+            ]}
+            onPress={() => handleLanguageToggle('en')}
+          >
+            <Text
+              style={[
+                styles.langButtonText,
+                selectedLanguage === 'en' && styles.langButtonTextActive,
+              ]}
+            >
+              EN
+            </Text>
+          </Pressable>
+        </View>
       </View>
 
       <ScrollView
@@ -144,8 +185,32 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.black,
   },
-  headerSpacer: {
-    width: 40,
+  languageToggle: {
+    flexDirection: 'row',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    padding: 2,
+  },
+  langButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  langButtonActive: {
+    backgroundColor: COLORS.white,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  langButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#999',
+  },
+  langButtonTextActive: {
+    color: COLORS.black,
   },
   scrollView: {
     flex: 1,

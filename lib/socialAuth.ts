@@ -172,12 +172,14 @@ export const signInWithProvider = async (provider: SocialProvider): Promise<Auth
     console.log(`[SocialAuth] Opening auth URL for ${provider}: ${data.url.substring(0, 100)}...`);
 
     // Open the auth session in a browser
+    // createTask: false forces Chrome Custom Tabs on Android (avoids WebView which Google blocks)
     const result = await WebBrowser.openAuthSessionAsync(
       data.url,
       redirectTo,
       {
         showInRecents: true,
         preferEphemeralSession: false,
+        createTask: false,
       }
     );
 

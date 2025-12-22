@@ -1,6 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'expo-router';
-import * as Notifications from 'expo-notifications';
 import { useAuthStore } from '@/stores';
 import {
   registerForPushNotifications,
@@ -11,16 +10,19 @@ import {
 } from '@/lib/pushNotifications';
 import { isDemoMode } from '@/lib/supabase';
 
+// Subscription type that matches the one from pushNotifications.ts
+type NotificationSubscription = { remove: () => void } | null;
+
 interface UsePushNotificationsOptions {
-  onNotificationReceived?: (notification: Notifications.Notification) => void;
+  onNotificationReceived?: (notification: unknown) => void;
   onNotificationResponse?: (data: Record<string, unknown>) => void;
 }
 
 export function usePushNotifications(options: UsePushNotificationsOptions = {}) {
   const router = useRouter();
   const { user, isOnboardingComplete } = useAuthStore();
-  const notificationReceivedRef = useRef<Notifications.Subscription | null>(null);
-  const notificationResponseRef = useRef<Notifications.Subscription | null>(null);
+  const notificationReceivedRef = useRef<NotificationSubscription>(null);
+  const notificationResponseRef = useRef<NotificationSubscription>(null);
   const isRegistered = useRef(false);
 
   // Register for push notifications
@@ -46,8 +48,18 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
 
   // Handle notification response (user tapped on notification)
   const handleNotificationResponse = useCallback(
-    (response: Notifications.NotificationResponse) => {
-      const data = response.notification.request.content.data as Record<string, unknown>;
+    (response: unknown) => {
+      // Type-safe access to notification response data
+      const typedResponse = response as {
+        notification?: {
+          request?: {
+            content?: {
+              data?: Record<string, unknown>;
+            };
+          };
+        };
+      };
+      const data = typedResponse?.notification?.request?.content?.data || {};
       console.log('[usePushNotifications] Notification tapped:', data);
 
       // Custom handler
@@ -68,8 +80,14 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
 
   // Handle notification received in foreground
   const handleNotificationReceived = useCallback(
-    (notification: Notifications.Notification) => {
-      console.log('[usePushNotifications] Notification received:', notification.request.content);
+    (notification: unknown) => {
+      // Type-safe access to notification data
+      const typedNotification = notification as {
+        request?: {
+          content?: unknown;
+        };
+      };
+      console.log('[usePushNotifications] Notification received:', typedNotification?.request?.content);
 
       if (options.onNotificationReceived) {
         options.onNotificationReceived(notification);

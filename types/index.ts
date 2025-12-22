@@ -6,7 +6,7 @@ export interface User {
   email: string;
   nickname: string;
   avatarUrl?: string;
-  inviteCode: string;
+  inviteCode?: string; // Deprecated - no longer used
   coupleId?: string;
   preferences: UserPreferences;
   birthDate?: Date; // For age-based mission recommendations
@@ -157,6 +157,9 @@ export interface FeaturedMission {
   missionId?: string;
   title: string;
   description: string;
+  // i18n fields for English (optional, falls back to Korean title/description if null)
+  titleEn?: string;
+  descriptionEn?: string;
   category: MissionCategory;
   difficulty: MissionDifficulty;
   locationType: LocationType;

@@ -1,13 +1,23 @@
 // Date utility functions for Daydate app
 
 /**
- * Formats a Date object to YYYY-MM-DD string in local timezone
+ * Formats a Date object or date string to YYYY-MM-DD string in local timezone
  * This avoids the UTC conversion issue that occurs with toISOString()
+ * Handles both Date objects and string inputs (from storage/JSON)
  */
-export const formatDateToLocal = (date: Date): string => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
+export const formatDateToLocal = (date: Date | string): string => {
+  // Handle string inputs (from storage or JSON serialization)
+  const d = date instanceof Date ? date : new Date(date);
+
+  // Validate the date
+  if (isNaN(d.getTime())) {
+    console.warn('[formatDateToLocal] Invalid date received:', date);
+    return '';
+  }
+
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 };
 

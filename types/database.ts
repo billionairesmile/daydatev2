@@ -6,7 +6,6 @@
 export interface Profile {
   id: string;
   nickname: string;
-  invite_code: string;
   preferences?: Record<string, unknown>;
   birth_date?: string; // ISO date string
   location_latitude?: number;
@@ -122,6 +121,9 @@ export interface FeaturedMission {
   mission_id?: string;
   title: string;
   description: string;
+  // i18n fields for English (optional, falls back to Korean title/description if null)
+  title_en?: string;
+  description_en?: string;
   category: string;
   difficulty: number;
   duration: string;

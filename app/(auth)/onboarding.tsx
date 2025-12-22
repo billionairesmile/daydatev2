@@ -27,15 +27,16 @@ import {
   Gift,
   Copy,
   X,
+  LogOut,
 } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as Linking from 'expo-linking';
-import * as Notifications from 'expo-notifications';
 import * as Location from 'expo-location';
+import Constants from 'expo-constants';
 import { WebView } from 'react-native-webview';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { signInWithGoogle, signInWithKakao, onAuthStateChange } from '@/lib/socialAuth';
+import { signInWithGoogle, signInWithKakao, onAuthStateChange, signOut } from '@/lib/socialAuth';
 
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '@/constants/design';
 import { useAuthStore } from '@/stores';
@@ -97,7 +98,7 @@ export default function OnboardingScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const { backgroundImage } = useBackground();
-  const { setIsOnboardingComplete, updateNickname, setCouple, setUser, setPartner, setIsTestMode, user: currentUser, couple } = useAuthStore();
+  const { setIsOnboardingComplete, updateNickname, setCouple, setUser, setPartner, setIsTestMode, user: currentUser, couple, isOnboardingComplete, isAuthenticated } = useAuthStore();
   const {
     currentStep,
     data,
@@ -110,15 +111,57 @@ export default function OnboardingScreen() {
   // Local state
   const [generatedCode, setGeneratedCode] = useState(() => generatePairingCode());
   const [hasExistingPreferences, setHasExistingPreferences] = useState(false);
+  const [isRedirectingToHome, setIsRedirectingToHome] = useState(false);
+  const [isExistingUser, setIsExistingUser] = useState(false);
 
-  // On app restart: If user has a paired couple (both user1Id and user2Id set), skip to basic_info
+  // If user is not authenticated but on a step that requires auth, reset to welcome
+  // This handles the case where user deleted account but persisted step was still 'pairing'
   useEffect(() => {
+    const stepsRequiringAuth = ['pairing', 'basic_info', 'couple_info', 'preferences_intro', 'mbti', 'activity_type', 'date_worries', 'constraints', 'complete'];
+    if (!isAuthenticated && !currentUser?.id && stepsRequiringAuth.includes(currentStep)) {
+      console.log('[Onboarding] User not authenticated, resetting to welcome from:', currentStep);
+      setStep('welcome');
+    }
+  }, [isAuthenticated, currentUser?.id, currentStep, setStep]);
+
+  // Generate a new pairing code when entering pairing step after unpair
+  // This ensures users always get a fresh code when returning to pairing screen
+  useEffect(() => {
+    if (currentStep === 'pairing' && !data.isPairingConnected) {
+      const newCode = generatePairingCode();
+      console.log('[Onboarding] Generating new pairing code for pairing step:', newCode);
+      setGeneratedCode(newCode);
+    }
+  }, [currentStep, data.isPairingConnected]);
+
+  // Set isExistingUser based on currentUser (for users coming from unpair/disconnect)
+  useEffect(() => {
+    if (currentUser?.id && !isExistingUser) {
+      console.log('[Onboarding] Setting isExistingUser based on currentUser');
+      setIsExistingUser(true);
+    }
+  }, [currentUser?.id, isExistingUser]);
+
+  // On app restart: If user has an active paired couple (both user1Id and user2Id set), skip to basic_info
+  // Skip this effect if:
+  // - Already redirecting to home (returning user login)
+  // - Couple is disconnected (user went through unpair flow)
+  // - isOnboardingComplete is false (user is intentionally on onboarding flow, e.g., after unpair)
+  // - isPairingConnected is false (user needs to pair first)
+  useEffect(() => {
+    if (isRedirectingToHome) return;
+    // If onboarding is not complete, don't auto-skip to basic_info (user might have unpaired)
+    if (!isOnboardingComplete) return;
+    // If pairing is not connected in onboarding data, don't skip
+    if (!data.isPairingConnected) return;
+
     const earlySteps = ['welcome', 'login', 'terms', 'pairing'];
-    if (couple?.user1Id && couple?.user2Id && earlySteps.includes(currentStep)) {
-      console.log('[Onboarding] User has paired couple, skipping to basic_info');
+    const isActivePairedCouple = couple?.user1Id && couple?.user2Id && couple?.status !== 'disconnected';
+    if (isActivePairedCouple && earlySteps.includes(currentStep)) {
+      console.log('[Onboarding] User has active paired couple, skipping to basic_info');
       setStep('basic_info');
     }
-  }, [couple?.user1Id, couple?.user2Id, currentStep, setStep]);
+  }, [couple?.user1Id, couple?.user2Id, couple?.status, currentStep, setStep, isRedirectingToHome, isOnboardingComplete, data.isPairingConnected]);
 
   // Check if user has existing onboarding answers (for conditional preference skipping)
   useEffect(() => {
@@ -135,6 +178,24 @@ export default function OnboardingScreen() {
     };
     checkExistingPreferences();
   }, [currentUser?.id]);
+
+  // Check if user has existing profile (for pairing back button behavior)
+  useEffect(() => {
+    const checkExistingProfile = async () => {
+      if (!isInTestMode() && currentUser?.id && currentStep === 'pairing') {
+        try {
+          const { data: profile } = await db.profiles.get(currentUser.id);
+          // User is existing if they have a profile with birth_date or nickname set
+          const hasExistingProfile = !!(profile && (profile.birth_date || profile.nickname));
+          setIsExistingUser(hasExistingProfile);
+          console.log('[Onboarding] Is existing user:', hasExistingProfile);
+        } catch (error) {
+          console.error('[Onboarding] Error checking existing profile:', error);
+        }
+      }
+    };
+    checkExistingProfile();
+  }, [currentUser?.id, currentStep]);
 
   // Animation
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -161,6 +222,18 @@ export default function OnboardingScreen() {
   const handleBack = useCallback(() => {
     animateTransition(() => prevStep());
   }, [animateTransition, prevStep]);
+
+  // Custom back handler for pairing step - existing users go to login, new users go to terms
+  const handlePairingBack = useCallback(() => {
+    if (isExistingUser) {
+      // Existing user - go to login screen to re-authenticate
+      console.log('[Onboarding] Existing user pressing back, going to login');
+      animateTransition(() => setStep('login'));
+    } else {
+      // New user - go to terms (previous step)
+      animateTransition(() => prevStep());
+    }
+  }, [animateTransition, prevStep, setStep, isExistingUser]);
 
   // Social Login Handler
   const handleSocialLogin = useCallback(async (provider: 'google' | 'kakao') => {
@@ -202,12 +275,18 @@ export default function OnboardingScreen() {
           updateData({ nickname: name });
         }
 
-        // Create or update profile in Supabase
+        // Check if user already exists in database (to determine if terms should be shown)
         try {
+          const { data: existingProfile } = await db.profiles.get(session.user.id);
+          const isExistingUser = !!existingProfile;
+          console.log('[Onboarding] Existing user check:', { isExistingUser, existingProfile });
+
+          // Create or update profile in Supabase
           const { error: profileError } = await db.profiles.upsert({
             id: session.user.id,
             nickname: newUser.nickname,
-            invite_code: newUser.inviteCode,
+            email: newUser.email || undefined,
+            auth_provider: provider, // google or kakao
           });
 
           if (profileError) {
@@ -215,10 +294,14 @@ export default function OnboardingScreen() {
           }
 
           // Check if user already has a completed couple (already paired)
-          const { data: existingCouple } = await db.couples.getActiveByUserId(session.user.id);
+          const { data: existingCouple, error: coupleError } = await db.couples.getActiveByUserId(session.user.id);
+          console.log('[Onboarding] Couple check result:', { existingCouple, coupleError });
 
           if (existingCouple && existingCouple.user1_id && existingCouple.user2_id) {
-            console.log('[Onboarding] User already paired, skipping to basic_info');
+            console.log('[Onboarding] User already paired, going directly to home');
+
+            // Set redirecting flag to prevent useEffect from showing basic_info screen
+            setIsRedirectingToHome(true);
 
             // Set couple in auth store
             setCouple({
@@ -250,34 +333,35 @@ export default function OnboardingScreen() {
               });
             }
 
-            // Skip to basic_info step (after pairing)
-            Alert.alert(
-              t('onboarding.login.welcomeBack'),
-              t('onboarding.login.alreadyConnected'),
-              [
-                {
-                  text: t('onboarding.continue'),
-                  onPress: () => animateTransition(() => setStep('basic_info')),
-                },
-              ]
-            );
+            // User has paired couple - go directly to home without showing alert
+            setIsOnboardingComplete(true);
+            router.replace('/(tabs)');
             return;
           }
+
+          // Existing user without paired couple - skip terms, go directly to pairing
+          if (isExistingUser) {
+            console.log('[Onboarding] Existing user without couple, skipping terms to pairing');
+            animateTransition(() => setStep('pairing'));
+            return;
+          }
+
+          // New user - show terms step
+          Alert.alert(
+            t('onboarding.login.success'),
+            t('onboarding.login.successMessage', { provider: provider === 'google' ? 'Google' : 'Kakao' }),
+            [
+              {
+                text: t('onboarding.continue'),
+                onPress: () => animateTransition(() => setStep('terms')),
+              },
+            ]
+          );
         } catch (dbError) {
           console.error('[Onboarding] DB error:', dbError);
+          // On error, fallback to terms step for safety
+          animateTransition(() => setStep('terms'));
         }
-
-        // Move to terms step (for new users)
-        Alert.alert(
-          t('onboarding.login.success'),
-          t('onboarding.login.successMessage', { provider: provider === 'google' ? 'Google' : 'Kakao' }),
-          [
-            {
-              text: t('onboarding.continue'),
-              onPress: () => animateTransition(() => setStep('terms')),
-            },
-          ]
-        );
       }
     } catch (error: any) {
       console.error(`[Onboarding] ${provider} login failed:`, error);
@@ -319,12 +403,30 @@ export default function OnboardingScreen() {
             relationshipType: data.relationshipType,
           };
 
-          // Update profile with birth date and preferences (profile already exists from pairing step)
-          const { error: profileError } = await db.profiles.update(currentUser.id, {
+          // Build update object with core fields
+          const profileUpdate: Record<string, unknown> = {
             nickname: data.nickname,
             birth_date: data.birthDate ? formatDateToLocal(data.birthDate) : null,
             preferences,
-          });
+            couple_id: currentCouple?.id || null,
+            is_onboarding_complete: true,
+          };
+
+          // Only save consent fields if user actually went through terms step (not skipped)
+          // If user skipped terms (existing user), all consent fields are false (default)
+          // We don't want to overwrite their existing true values with false
+          const userCompletedTermsStep = data.ageVerified || data.termsAgreed || data.privacyAgreed;
+          if (userCompletedTermsStep) {
+            profileUpdate.age_verified = data.ageVerified ?? false;
+            profileUpdate.terms_agreed = data.termsAgreed ?? false;
+            profileUpdate.location_terms_agreed = data.locationTermsAgreed ?? false;
+            profileUpdate.privacy_agreed = data.privacyAgreed ?? false;
+            profileUpdate.marketing_agreed = data.marketingAgreed ?? false;
+            profileUpdate.consent_given_at = new Date().toISOString();
+          }
+
+          // Update profile with birth date, preferences, completion status, and consent fields (if applicable)
+          const { error: profileError } = await db.profiles.update(currentUser.id, profileUpdate);
 
           if (profileError) {
             console.error('Profile update error:', profileError);
@@ -334,7 +436,7 @@ export default function OnboardingScreen() {
           console.log('Checking couple update conditions:', {
             hasAnniversaryDate: !!data.anniversaryDate,
             coupleId: currentCouple?.id,
-            anniversaryDate: data.anniversaryDate?.toISOString(),
+            anniversaryDate: data.anniversaryDate instanceof Date ? data.anniversaryDate.toISOString() : data.anniversaryDate,
           });
 
           if (data.anniversaryDate && currentCouple?.id) {
@@ -406,6 +508,18 @@ export default function OnboardingScreen() {
 
   const showProgress = !['welcome', 'login', 'complete'].includes(currentStep);
 
+  // Show loading screen while redirecting to home (for returning users)
+  if (isRedirectingToHome) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.whiteBackground} />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+        </View>
+      </View>
+    );
+  }
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -436,6 +550,27 @@ export default function OnboardingScreen() {
             <View style={[styles.progressFill, { width: `${getProgress() * 100}%` }]} />
           </View>
         </View>
+      )}
+
+      {/* Logout button - shown only on pairing step */}
+      {currentStep === 'pairing' && (
+        <Pressable
+          style={styles.logoutButton}
+          onPress={async () => {
+            try {
+              await signOut();
+              useAuthStore.getState().signOut();
+              useOnboardingStore.getState().reset();
+              setStep('welcome');
+            } catch (error) {
+              console.error('[Onboarding] Logout error:', error);
+            }
+          }}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <LogOut size={18} color={COLORS.white} />
+          <Text style={styles.logoutButtonText}>{t('settings.account.logout')}</Text>
+        </Pressable>
       )}
 
       {/* Content */}
@@ -477,7 +612,7 @@ export default function OnboardingScreen() {
               setIsOnboardingComplete={setIsOnboardingComplete}
               router={router}
               onNext={handleNext}
-              onBack={handleBack}
+              onBack={handlePairingBack}
             />
           )}
           {currentStep === 'basic_info' && (
@@ -912,7 +1047,18 @@ function TermsStep({
   };
 
   const requestNotificationPermission = async () => {
+    // Skip in Expo Go - push notifications not supported in SDK 53+
+    const isExpoGo = Constants.appOwnership === 'expo';
+    if (isExpoGo) {
+      console.log('[Onboarding] Running in Expo Go - skipping notification permission request');
+      return;
+    }
+
     try {
+      // Dynamic import to avoid crash in Expo Go
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const Notifications = require('expo-notifications');
+
       const { status: existingStatus } = await Notifications.getPermissionsAsync();
       let finalStatus = existingStatus;
 
@@ -1211,6 +1357,54 @@ function PairingStep({
   const channelRef = React.useRef<ReturnType<typeof db.pairingCodes.subscribeToCode> | null>(null);
   const timerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
   const pollingRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+  const setupStartedRef = React.useRef<string | null>(null); // Track which code was setup to prevent duplicates
+  const isReconnectionRef = React.useRef<boolean>(false); // Track if this is a 30-day reconnection scenario
+
+  // Reset isPairingConnected on mount based on actual DB state
+  React.useEffect(() => {
+    const checkPairingState = async () => {
+      if (isInTestMode()) return;
+
+      // Get current user ID
+      let userId = currentUser?.id;
+      if (!userId && supabase) {
+        const { data: authData } = await supabase.auth.getUser();
+        userId = authData?.user?.id;
+      }
+
+      if (!userId) {
+        // No user, reset pairing state
+        if (isPairingConnected) {
+          setIsPairingConnected(false);
+        }
+        return;
+      }
+
+      // Check if user has an active couple with partner
+      const { data: existingCouple } = await db.couples.getActiveByUserId(userId);
+
+      if (existingCouple && existingCouple.user1_id && existingCouple.user2_id && existingCouple.status === 'active') {
+        // User has an active paired couple - should not be on pairing screen
+        // But if they are, keep isPairingConnected true
+        console.log('[PairingStep] User has active couple, isPairingConnected: true');
+      } else {
+        // No active paired couple - reset isPairingConnected and clear old couple from store
+        if (isPairingConnected) {
+          console.log('[PairingStep] No active couple, resetting isPairingConnected to false');
+          setIsPairingConnected(false);
+        }
+        // Clear any stale couple data from store (e.g., after account deletion)
+        const currentStoreCouple = useAuthStore.getState().couple;
+        if (currentStoreCouple) {
+          console.log('[PairingStep] Clearing stale couple from store:', currentStoreCouple.id);
+          setCouple(null);
+          setPartner(null);
+        }
+      }
+    };
+
+    checkPairingState();
+  }, []); // Run once on mount
 
   // Format time remaining
   const formatTimeRemaining = React.useCallback((expiresAt: Date) => {
@@ -1258,7 +1452,9 @@ function PairingStep({
 
   // For code creator: Save code to DB, create couple, and subscribe to changes
   React.useEffect(() => {
-    if (isCreatingCode && !isInTestMode() && !isCodeSaved) {
+    // Only run when generatedCode is set and hasn't been setup yet
+    if (isCreatingCode && !isInTestMode() && !isCodeSaved && generatedCode && setupStartedRef.current !== generatedCode) {
+      setupStartedRef.current = generatedCode; // Track which code was setup
       const setupPairing = async (codeToUse: string, retryCount = 0) => {
         try {
           // Get actual auth.uid() from Supabase for RLS compliance
@@ -1283,50 +1479,195 @@ function PairingStep({
 
           console.log('[PairingStep] Creator setup:', { creatorUserId, isExistingUser });
 
-          // Save code to DB
-          const { data: createdCode, error: createError } = await db.pairingCodes.create(codeToUse, creatorUserId);
-          if (createError) {
-            // Handle duplicate key error by generating a new code
-            if (createError.code === '23505' && retryCount < 3) {
-              const newCode = generatePairingCode();
-              setGeneratedCode(newCode);
-              // Retry with new code
-              setupPairing(newCode, retryCount + 1);
+          // First, check if there's an existing valid pending code for this user
+          const { data: existingCode } = await db.pairingCodes.getValidPendingCode(creatorUserId);
+
+          let finalCode = codeToUse;
+          let codeCreatedAt: Date;
+
+          if (existingCode && existingCode.code) {
+            // Use existing valid code
+            console.log('[PairingStep] Found existing valid code:', existingCode.code);
+            finalCode = existingCode.code;
+            setGeneratedCode(finalCode);
+            codeCreatedAt = new Date(existingCode.created_at);
+          } else {
+            // No existing valid code, create a new one
+            console.log('[PairingStep] No existing valid code, creating new one');
+
+            // Clean up any expired pending pairing codes for this user
+            const { error: cleanupError } = await db.pairingCodes.deleteByCreatorId(creatorUserId);
+            if (cleanupError) {
+              console.log('[PairingStep] Cleanup error (non-fatal):', cleanupError);
+            }
+
+            // Save code to DB
+            const { data: createdCode, error: createError } = await db.pairingCodes.create(codeToUse, creatorUserId);
+            if (createError) {
+              // Handle duplicate key error by generating a new code
+              if (createError.code === '23505' && retryCount < 3) {
+                const newCode = generatePairingCode();
+                setGeneratedCode(newCode);
+                // Retry with new code
+                setupPairing(newCode, retryCount + 1);
+                return;
+              }
+              console.error('Error creating pairing code:', createError);
               return;
             }
-            console.error('Error creating pairing code:', createError);
-            return;
+            codeCreatedAt = createdCode?.created_at ? new Date(createdCode.created_at) : new Date();
           }
+
+          // Set expiration time (24 hours from code creation)
+          const expiresAt = new Date(codeCreatedAt.getTime() + 24 * 60 * 60 * 1000);
+          setCodeExpiresAt(expiresAt);
 
           // Create or update profile for creator in DB
           // Only if we have a valid auth.uid() (not a generated UUID)
           const hasAuthUserId = currentUser?.id || (supabase && (await supabase.auth.getUser()).data?.user?.id);
 
-          if (hasAuthUserId) {
-            if (isExistingUser) {
-              // Update existing profile with new invite code
-              const { error: profileError } = await db.profiles.update(creatorUserId, {
-                invite_code: codeToUse,
-              });
-              if (profileError) {
-                console.error('Error updating profile:', profileError);
-              }
-            } else {
-              // Create new profile
-              const { error: profileError } = await db.profiles.create({
-                id: creatorUserId,
-                nickname: '', // Will be updated in handleComplete
-                invite_code: codeToUse,
-              });
-              if (profileError) {
-                console.error('Error creating profile:', profileError);
-              }
+          if (hasAuthUserId && !isExistingUser) {
+            // Create new profile for new users only
+            const { error: profileError } = await db.profiles.create({
+              id: creatorUserId,
+              nickname: '', // Will be updated in handleComplete
+              email: currentUser?.email || undefined,
+            });
+            if (profileError) {
+              console.error('Error creating profile:', profileError);
             }
-          } else {
+          } else if (!hasAuthUserId) {
             console.log('[PairingStep] Skipping profile creation - user not authenticated yet');
           }
 
-          // Create couple for this user (creator is user1)
+          // First, check for disconnected couple within 30 days (reconnection scenario)
+          const { data: disconnectedCouple } = await db.couples.getDisconnectedByUserId(creatorUserId);
+
+          if (disconnectedCouple) {
+            // Check if partner still exists (they might have deleted their account)
+            const partnerId = disconnectedCouple.user1_id === creatorUserId
+              ? disconnectedCouple.user2_id
+              : disconnectedCouple.user1_id;
+
+            let partnerExists = false;
+            if (partnerId) {
+              const { data: partnerProfile } = await db.profiles.get(partnerId);
+              partnerExists = !!partnerProfile;
+            }
+
+            if (!partnerExists) {
+              // Partner deleted their account - delete this orphaned couple and continue to create new one
+              console.log('[PairingStep] Partner deleted account, cleaning up orphaned disconnected couple:', disconnectedCouple.id);
+              if (supabase) {
+                // First, nullify any pairing codes pointing to this orphaned couple
+                await supabase
+                  .from('pairing_codes')
+                  .update({ couple_id: null })
+                  .eq('couple_id', disconnectedCouple.id);
+                // Then delete the orphaned couple
+                await supabase.from('couples').delete().eq('id', disconnectedCouple.id);
+              }
+            } else {
+              // Partner exists, restore the couple for reconnection
+              console.log('[PairingStep] Found disconnected couple, restoring for reconnection:', disconnectedCouple.id);
+              const { data: restoredCouple, error: restoreError } = await db.couples.restoreCouple(disconnectedCouple.id);
+
+              if (!restoreError && restoredCouple) {
+                // Mark this as a reconnection scenario - will skip onboarding when partner joins
+                isReconnectionRef.current = true;
+                console.log('[PairingStep] Marked as reconnection scenario');
+
+                setCouple({
+                  id: restoredCouple.id,
+                  user1Id: restoredCouple.user1_id,
+                  user2Id: restoredCouple.user2_id || undefined,
+                  anniversaryDate: restoredCouple.dating_start_date ? parseDateAsLocal(restoredCouple.dating_start_date) : new Date(),
+                  datingStartDate: restoredCouple.dating_start_date ? parseDateAsLocal(restoredCouple.dating_start_date) : undefined,
+                  weddingDate: restoredCouple.wedding_date ? parseDateAsLocal(restoredCouple.wedding_date) : undefined,
+                  anniversaryType: t('onboarding.anniversary.datingStart'),
+                  relationshipType: restoredCouple.wedding_date ? 'married' : 'dating',
+                  status: restoredCouple.user2_id ? 'active' : 'pending',
+                  createdAt: restoredCouple.created_at ? new Date(restoredCouple.created_at) : new Date(),
+                });
+
+                // Link restored couple to the pairing code
+                if (finalCode) {
+                  await db.pairingCodes.setCoupleId(finalCode, restoredCouple.id);
+                }
+
+                // Don't return early - continue to set up realtime subscription
+                // so creator can receive notification when partner joins
+              }
+            }
+          }
+
+          // Check if user already has an existing couple (pending or active) to prevent duplicate creation
+          const { data: existingCouple } = await db.couples.getActiveByUserId(creatorUserId);
+
+          if (existingCouple && existingCouple.user1_id) {
+            // Check if partner still exists (they might have deleted their account)
+            const partnerId = existingCouple.user1_id === creatorUserId
+              ? existingCouple.user2_id
+              : existingCouple.user1_id;
+
+            if (partnerId) {
+              const { data: partnerProfile } = await db.profiles.get(partnerId);
+              if (!partnerProfile) {
+                // Partner deleted their account - this couple is orphaned
+                console.log('[PairingStep] Partner no longer exists, cleaning up orphaned couple:', existingCouple.id);
+                // Clear local authStore couple since it's orphaned
+                setCouple(null);
+                setPartner(null);
+                // Delete the orphaned couple record
+                if (supabase) {
+                  await supabase.from('couples').delete().eq('id', existingCouple.id);
+                }
+                // Continue to create a new couple below
+              } else {
+                // Partner exists, use the existing couple
+                console.log('[PairingStep] User already has a couple, using existing:', existingCouple.id);
+                setCouple({
+                  id: existingCouple.id,
+                  user1Id: existingCouple.user1_id,
+                  user2Id: existingCouple.user2_id || undefined,
+                  anniversaryDate: existingCouple.dating_start_date ? new Date(existingCouple.dating_start_date) : new Date(),
+                  anniversaryType: t('onboarding.anniversary.datingStart'),
+                  status: existingCouple.user2_id ? 'active' : 'pending',
+                  createdAt: existingCouple.created_at ? new Date(existingCouple.created_at) : new Date(),
+                });
+
+                // Link existing couple to the pairing code if not already linked
+                if (finalCode) {
+                  await db.pairingCodes.setCoupleId(finalCode, existingCouple.id);
+                }
+
+                setIsCodeSaved(true);
+                return;
+              }
+            } else {
+              // No partner yet (pending couple), use existing
+              console.log('[PairingStep] User has pending couple, using existing:', existingCouple.id);
+              setCouple({
+                id: existingCouple.id,
+                user1Id: existingCouple.user1_id,
+                user2Id: undefined,
+                anniversaryDate: existingCouple.dating_start_date ? new Date(existingCouple.dating_start_date) : new Date(),
+                anniversaryType: t('onboarding.anniversary.datingStart'),
+                status: 'pending',
+                createdAt: existingCouple.created_at ? new Date(existingCouple.created_at) : new Date(),
+              });
+
+              // Link existing couple to the pairing code if not already linked
+              if (finalCode) {
+                await db.pairingCodes.setCoupleId(finalCode, existingCouple.id);
+              }
+
+              setIsCodeSaved(true);
+              return;
+            }
+          }
+
+          // Create couple for this user (creator is user1) - only if no existing couple
           const { data: newCouple, error: coupleError } = await db.couples.create({
             user1_id: creatorUserId,
           });
@@ -1335,7 +1676,13 @@ function PairingStep({
             console.error('Error creating couple:', coupleError);
           } else if (newCouple) {
             // Link couple_id to pairing code
-            await db.pairingCodes.setCoupleId(codeToUse, newCouple.id);
+            console.log('[PairingStep] Created couple:', newCouple.id, 'linking to code:', finalCode);
+            const { error: linkError } = await db.pairingCodes.setCoupleId(finalCode, newCouple.id);
+            if (linkError) {
+              console.error('[PairingStep] Error linking couple to code:', linkError);
+            } else {
+              console.log('[PairingStep] Successfully linked couple to code');
+            }
 
             // Set couple in authStore
             setCouple({
@@ -1353,7 +1700,7 @@ function PairingStep({
                 id: creatorUserId,
                 email: '',
                 nickname: '',
-                inviteCode: codeToUse,
+                inviteCode: finalCode,
                 preferences: {
                   weekendActivity: '',
                   dateEnergy: '',
@@ -1373,13 +1720,8 @@ function PairingStep({
 
           setIsCodeSaved(true);
 
-          // Set expiration time (24 hours from now)
-          const expiresAt = new Date();
-          expiresAt.setHours(expiresAt.getHours() + 24);
-          setCodeExpiresAt(expiresAt);
-
-          // Subscribe to changes (realtime)
-          channelRef.current = db.pairingCodes.subscribeToCode(codeToUse, async (payload) => {
+          // Subscribe to changes (realtime) - use finalCode which might be existing or new
+          channelRef.current = db.pairingCodes.subscribeToCode(finalCode, async (payload) => {
             // When joiner proceeds to next screen, auto-follow
             if (payload.joiner_proceeded_at) {
               onNext();
@@ -1387,11 +1729,18 @@ function PairingStep({
             }
 
             if (payload.status === 'connected' && payload.joiner_id) {
-              // Fetch updated couple data
-              const { data: pairingData } = await db.pairingCodes.getWithCouple(codeToUse);
-              if (pairingData?.couple_id) {
-                const { data: coupleData } = await db.couples.get(pairingData.couple_id);
+              console.log('[PairingStep] Creator: Realtime detected partner connection');
+
+              // Use couple_id from pairing code payload (not from store - store might have old data)
+              const coupleId = payload.couple_id;
+              let disconnectReason: string | null = null;
+
+              if (coupleId) {
+                // Fetch updated couple data
+                const { data: coupleData } = await db.couples.get(coupleId);
                 if (coupleData) {
+                  disconnectReason = coupleData.disconnect_reason || null;
+
                   // Update couple with user2Id
                   setCouple({
                     id: coupleData.id,
@@ -1430,7 +1779,42 @@ function PairingStep({
                   }
                 }
               }
+
               setIsPairingConnected(true);
+
+              // Check if this is a 30-day reconnection scenario
+              // Use both ref and disconnect_reason from DB as backup
+              const isReconnection = isReconnectionRef.current || disconnectReason === 'unpaired';
+              console.log('[PairingStep] Realtime reconnection check:', {
+                isReconnectionRef: isReconnectionRef.current,
+                disconnectReason,
+                isReconnection
+              });
+
+              if (isReconnection) {
+                console.log('[PairingStep] Creator: Partner reconnected within 30 days, skipping onboarding');
+                // Clear disconnect_reason since reconnection is complete
+                if (coupleId) {
+                  await db.couples.update(coupleId, { disconnect_reason: null });
+                }
+                // Show reconnection alert and go directly to home
+                Alert.alert(
+                  t('onboarding.pairing.reconnected'),
+                  t('onboarding.pairing.reconnectedMessage'),
+                  [
+                    {
+                      text: t('onboarding.confirm'),
+                      onPress: () => {
+                        setIsOnboardingComplete(true);
+                        router.replace('/(tabs)');
+                      },
+                    },
+                  ]
+                );
+              } else {
+                console.log('[PairingStep] Creator: Partner connected, navigating to next screen');
+                onNext(); // Auto-navigate when partner joins (normal new pairing)
+              }
             }
           });
         } catch (err) {
@@ -1543,17 +1927,103 @@ function PairingStep({
               });
 
               setIsPairingConnected(true);
+
+              // Clear polling interval before navigating
+              if (pollingRef.current) {
+                clearInterval(pollingRef.current);
+                pollingRef.current = null;
+              }
+
+              onNext();
             }
           } else if (supabase) {
             // Production mode: poll Supabase
             const { data: checkData } = await supabase
               .from('pairing_codes')
-              .select('status')
+              .select('status, joiner_id, couple_id')
               .eq('code', generatedCode)
               .single();
 
-            if (checkData?.status === 'connected') {
+            if (checkData?.status === 'connected' && checkData.joiner_id) {
+              console.log('[PairingStep] Polling detected partner connection');
+
+              // Use couple_id from pairing code (not from store - store might have old data)
+              const coupleId = checkData.couple_id;
+              let disconnectReason: string | null = null;
+
+              if (coupleId) {
+                const { data: coupleData } = await db.couples.get(coupleId);
+                if (coupleData) {
+                  disconnectReason = coupleData.disconnect_reason || null;
+
+                  setCouple({
+                    id: coupleData.id,
+                    user1Id: coupleData.user1_id,
+                    user2Id: coupleData.user2_id,
+                    anniversaryDate: coupleData.dating_start_date ? parseDateAsLocal(coupleData.dating_start_date) : new Date(),
+                    datingStartDate: coupleData.dating_start_date ? parseDateAsLocal(coupleData.dating_start_date) : undefined,
+                    anniversaryType: t('onboarding.anniversary.datingStart'),
+                    status: 'active',
+                    createdAt: coupleData.created_at ? new Date(coupleData.created_at) : new Date(),
+                  });
+
+                  // Fetch joiner's profile
+                  if (coupleData.user2_id) {
+                    const { data: joinerProfile } = await db.profiles.get(coupleData.user2_id);
+                    setPartner({
+                      id: coupleData.user2_id,
+                      email: joinerProfile?.email || '',
+                      nickname: joinerProfile?.nickname || '',
+                      inviteCode: '',
+                      birthDate: joinerProfile?.birth_date ? parseDateAsLocal(joinerProfile.birth_date) : undefined,
+                      preferences: joinerProfile?.preferences || {},
+                      createdAt: joinerProfile?.created_at ? new Date(joinerProfile.created_at) : new Date(),
+                    });
+                  }
+                }
+              }
+
               setIsPairingConnected(true);
+
+              // Clear polling interval before navigating
+              if (pollingRef.current) {
+                clearInterval(pollingRef.current);
+                pollingRef.current = null;
+              }
+
+              // Check if this is a 30-day reconnection scenario
+              // Use both ref and disconnect_reason from DB as backup
+              const isReconnection = isReconnectionRef.current || disconnectReason === 'unpaired';
+              console.log('[PairingStep] Polling reconnection check:', {
+                isReconnectionRef: isReconnectionRef.current,
+                disconnectReason,
+                isReconnection
+              });
+
+              if (isReconnection) {
+                console.log('[PairingStep] Polling: Partner reconnected within 30 days, skipping onboarding');
+                // Clear disconnect_reason since reconnection is complete
+                if (coupleId) {
+                  await db.couples.update(coupleId, { disconnect_reason: null });
+                }
+                // Show reconnection alert and go directly to home
+                Alert.alert(
+                  t('onboarding.pairing.reconnected'),
+                  t('onboarding.pairing.reconnectedMessage'),
+                  [
+                    {
+                      text: t('onboarding.confirm'),
+                      onPress: () => {
+                        setIsOnboardingComplete(true);
+                        router.replace('/(tabs)');
+                      },
+                    },
+                  ]
+                );
+              } else {
+                console.log('[PairingStep] Polling: Partner connected, navigating to next screen');
+                onNext();
+              }
             }
           }
         } catch (pollErr) {
@@ -1583,6 +2053,16 @@ function PairingStep({
 
   // Handle join (for code enterer)
   const handleJoin = async () => {
+    // Guard: Don't try to join again if already connected or already loading
+    if (isPairingConnected) {
+      console.log('[PairingStep] Already connected, skipping join');
+      return;
+    }
+    if (isLoading) {
+      console.log('[PairingStep] Already loading, skipping duplicate join');
+      return;
+    }
+
     if (isInTestMode()) {
       // Test mode: Join with deterministic IDs based on the code
       // No lookup needed - both devices get matching IDs from the same code
@@ -1677,20 +2157,16 @@ function PairingStep({
       console.log('[PairingStep] Found code:', existingCode, 'error:', findError);
 
       if (findError || !existingCode) {
-        console.log('[PairingStep] Code not found or error');
+        // getWithCouple only returns pending codes, so if not found it means:
+        // 1. Code never existed, OR
+        // 2. Code was already used (connected status)
+        console.log('[PairingStep] Code not found or already used, error:', findError);
         setError(t('onboarding.pairing.invalidCode'));
         setIsLoading(false);
         return;
       }
 
-      console.log('[PairingStep] Code status:', existingCode.status, 'couple_id:', existingCode.couple_id);
-
-      // Check if code already used
-      if (existingCode.status === 'connected') {
-        setError(t('onboarding.pairing.alreadyPaired'));
-        setIsLoading(false);
-        return;
-      }
+      console.log('[PairingStep] Found pending code with couple_id:', existingCode.couple_id);
 
       // Check if couple_id exists
       if (!existingCode.couple_id) {
@@ -1712,68 +2188,93 @@ function PairingStep({
         const { data: disconnectedCouple } = await db.couples.findDisconnectedCouple(joinerId, creatorId);
 
         if (disconnectedCouple) {
-          console.log('[PairingStep] Found disconnected couple, restoring...', disconnectedCouple.id);
+          // Check if BOTH profiles exist (reconnection only valid if neither deleted their account)
+          const { data: joinerProfile } = await db.profiles.get(joinerId);
+          const { data: creatorProfile } = await db.profiles.get(creatorId);
 
-          // Restore the disconnected couple
-          const { data: restoredCouple, error: restoreError } = await db.couples.restoreCouple(disconnectedCouple.id);
+          if (!joinerProfile || !creatorProfile) {
+            // One of the users deleted their account - clean up orphaned couple and proceed with normal pairing
+            console.log('[PairingStep] One of the users deleted account, cleaning up orphaned couple:', disconnectedCouple.id);
+            if (supabase) {
+              // First, nullify any pairing codes pointing to this orphaned couple
+              await supabase
+                .from('pairing_codes')
+                .update({ couple_id: null })
+                .eq('couple_id', disconnectedCouple.id);
+              // Then delete the orphaned couple
+              await supabase.from('couples').delete().eq('id', disconnectedCouple.id);
+            }
+          } else {
+            console.log('[PairingStep] Found disconnected couple, restoring...', disconnectedCouple.id);
 
-          if (restoreError) {
-            console.error('[PairingStep] Error restoring couple:', restoreError);
-            setError(t('onboarding.pairing.coupleRestoreError'));
-            setIsLoading(false);
-            return;
-          }
+            // Restore the disconnected couple
+            const { data: restoredCouple, error: restoreError } = await db.couples.restoreCouple(disconnectedCouple.id);
 
-          if (restoredCouple) {
-            // Set couple in authStore
-            setCouple({
-              id: restoredCouple.id,
-              user1Id: restoredCouple.user1_id,
-              user2Id: restoredCouple.user2_id,
-              anniversaryDate: restoredCouple.dating_start_date ? parseDateAsLocal(restoredCouple.dating_start_date) : new Date(),
-              datingStartDate: restoredCouple.dating_start_date ? parseDateAsLocal(restoredCouple.dating_start_date) : undefined,
-              weddingDate: restoredCouple.wedding_date ? parseDateAsLocal(restoredCouple.wedding_date) : undefined,
-              anniversaryType: t('onboarding.anniversary.datingStart'),
-              relationshipType: restoredCouple.wedding_date ? 'married' : 'dating',
-              status: 'active',
-              createdAt: restoredCouple.created_at ? new Date(restoredCouple.created_at) : new Date(),
-            });
-
-            // Fetch partner profile
-            const partnerId = restoredCouple.user1_id === joinerId ? restoredCouple.user2_id : restoredCouple.user1_id;
-            const { data: partnerProfile } = await db.profiles.get(partnerId);
-
-            if (partnerProfile) {
-              setPartner({
-                id: partnerId,
-                email: partnerProfile.email || '',
-                nickname: partnerProfile.nickname || '',
-                inviteCode: '',
-                birthDate: partnerProfile.birth_date ? parseDateAsLocal(partnerProfile.birth_date) : undefined,
-                preferences: partnerProfile.preferences || {},
-                createdAt: partnerProfile.created_at ? new Date(partnerProfile.created_at) : new Date(),
-              });
+            if (restoreError) {
+              console.error('[PairingStep] Error restoring couple:', restoreError);
+              setError(t('onboarding.pairing.coupleRestoreError'));
+              setIsLoading(false);
+              return;
             }
 
-            // Mark pairing code as used
-            await db.pairingCodes.join(pairingCode, joinerId);
+            if (restoredCouple) {
+              // Set couple in authStore
+              setCouple({
+                id: restoredCouple.id,
+                user1Id: restoredCouple.user1_id,
+                user2Id: restoredCouple.user2_id,
+                anniversaryDate: restoredCouple.dating_start_date ? parseDateAsLocal(restoredCouple.dating_start_date) : new Date(),
+                datingStartDate: restoredCouple.dating_start_date ? parseDateAsLocal(restoredCouple.dating_start_date) : undefined,
+                weddingDate: restoredCouple.wedding_date ? parseDateAsLocal(restoredCouple.wedding_date) : undefined,
+                anniversaryType: t('onboarding.anniversary.datingStart'),
+                relationshipType: restoredCouple.wedding_date ? 'married' : 'dating',
+                status: 'active',
+                createdAt: restoredCouple.created_at ? new Date(restoredCouple.created_at) : new Date(),
+              });
 
-            // 30일 내 재연결: 온보딩 스킵하고 바로 홈으로
-            Alert.alert(
-              t('onboarding.pairing.reconnected'),
-              t('onboarding.pairing.reconnectedMessage'),
-              [
-                {
-                  text: t('onboarding.confirm'),
-                  onPress: () => {
-                    setIsOnboardingComplete(true);
-                    router.replace('/(tabs)');
+              // Fetch current user (joiner) profile to restore user data - we already checked it exists above
+              setUser({
+                id: joinerId,
+                email: joinerProfile.email || '',
+                nickname: joinerProfile.nickname || '',
+                coupleId: restoredCouple.id,
+                birthDate: joinerProfile.birth_date ? parseDateAsLocal(joinerProfile.birth_date) : undefined,
+                preferences: joinerProfile.preferences || {},
+                createdAt: joinerProfile.created_at ? new Date(joinerProfile.created_at) : new Date(),
+              });
+
+              // Fetch partner profile - we already checked it exists above
+              const partnerId = restoredCouple.user1_id === joinerId ? restoredCouple.user2_id : restoredCouple.user1_id;
+              setPartner({
+                id: partnerId,
+                email: creatorProfile.email || '',
+                nickname: creatorProfile.nickname || '',
+                inviteCode: '',
+                birthDate: creatorProfile.birth_date ? parseDateAsLocal(creatorProfile.birth_date) : undefined,
+                preferences: creatorProfile.preferences || {},
+                createdAt: creatorProfile.created_at ? new Date(creatorProfile.created_at) : new Date(),
+              });
+
+              // Mark pairing code as used
+              await db.pairingCodes.join(pairingCode, joinerId);
+
+              // 30일 내 재연결: 온보딩 스킵하고 바로 홈으로
+              Alert.alert(
+                t('onboarding.pairing.reconnected'),
+                t('onboarding.pairing.reconnectedMessage'),
+                [
+                  {
+                    text: t('onboarding.confirm'),
+                    onPress: () => {
+                      setIsOnboardingComplete(true);
+                      router.replace('/(tabs)');
+                    },
                   },
-                },
-              ]
-            );
-            setIsLoading(false);
-            return;
+                ]
+              );
+              setIsLoading(false);
+              return;
+            }
           }
         }
       }
@@ -1791,9 +2292,16 @@ function PairingStep({
       }
       console.log('[PairingStep] Successfully joined pairing code');
 
-      // Create or update profile for joiner in DB
-      const joinerInviteCode = currentUser?.inviteCode || generateUUID().slice(0, 8).toUpperCase();
+      // Clean up any pending pairing codes that this joiner might have created
+      // (e.g., user created a code but then decided to join someone else's code)
+      const { error: cleanupError } = await db.pairingCodes.deleteByCreatorId(joinerId);
+      if (cleanupError) {
+        console.log('[PairingStep] Cleanup of joiner pending codes (non-fatal):', cleanupError);
+      } else {
+        console.log('[PairingStep] Cleaned up any pending codes created by joiner');
+      }
 
+      // Create or update profile for joiner in DB
       if (isExistingUser) {
         // Update existing profile's couple_id will be handled by joinCouple
         console.log('[PairingStep] Using existing user profile:', joinerId);
@@ -1802,7 +2310,7 @@ function PairingStep({
         const { error: profileError } = await db.profiles.create({
           id: joinerId,
           nickname: '', // Will be updated in handleComplete
-          invite_code: joinerInviteCode,
+          email: currentUser?.email || undefined,
         });
 
         if (profileError) {
@@ -1811,10 +2319,12 @@ function PairingStep({
       }
 
       // Add joiner to couple as user2
+      console.log('[PairingStep] Joining couple:', existingCode.couple_id, 'with joiner:', joinerId);
       const { data: updatedCouple, error: coupleJoinError } = await db.couples.joinCouple(existingCode.couple_id, joinerId);
+      console.log('[PairingStep] joinCouple result:', { updatedCouple, coupleJoinError });
 
       if (coupleJoinError) {
-        console.error('Error joining couple:', coupleJoinError);
+        console.error('[PairingStep] Error joining couple:', coupleJoinError);
         setError(t('onboarding.pairing.coupleConnectionError'));
         setIsLoading(false);
         return;
@@ -1826,7 +2336,6 @@ function PairingStep({
           id: joinerId,
           email: '',
           nickname: '',
-          inviteCode: joinerInviteCode,
           preferences: {
             weekendActivity: '',
             dateEnergy: '',
@@ -1881,14 +2390,46 @@ function PairingStep({
         });
       }
 
+      console.log('[PairingStep] Setting isPairingConnected to true');
       setIsPairingConnected(true);
 
       // Mark that joiner has proceeded (for creator to auto-follow)
+      console.log('[PairingStep] Marking joiner proceeded');
       await db.pairingCodes.markJoinerProceeded(pairingCode);
 
-      // Navigation will be handled by useEffect that detects paired couple
+      // Check if this is a reconnection based on disconnect_reason
+      // If the couple was previously disconnected (has disconnect_reason), skip onboarding
+      const isReconnection = updatedCouple?.disconnect_reason === 'unpaired';
+      console.log('[PairingStep] Reconnection check:', { disconnect_reason: updatedCouple?.disconnect_reason, isReconnection });
+
+      if (isReconnection) {
+        console.log('[PairingStep] Joiner: Reconnection detected, skipping onboarding and going to home');
+        setIsLoading(false);
+        // Show reconnection alert and go directly to home
+        // Note: Don't clear disconnect_reason here - let Creator detect it first
+        // It will be cleared by Creator's realtime/polling callback
+        Alert.alert(
+          t('onboarding.pairing.reconnected'),
+          t('onboarding.pairing.reconnectedMessage'),
+          [
+            {
+              text: t('onboarding.confirm'),
+              onPress: () => {
+                setIsOnboardingComplete(true);
+                router.replace('/(tabs)');
+              },
+            },
+          ]
+        );
+        return;
+      }
+
+      console.log('[PairingStep] Join flow completed successfully, navigating to next screen');
+      setIsLoading(false);
+      onNext(); // Navigate to next screen immediately after successful join (new pairing)
+      return;
     } catch (err) {
-      console.error('Join error:', err);
+      console.error('[PairingStep] Join error (catch block):', err);
       setError(t('onboarding.pairing.connectionError'));
     } finally {
       setIsLoading(false);
@@ -1896,11 +2437,68 @@ function PairingStep({
   };
 
   // Handle connect button press
-  const handleConnect = () => {
+  const handleConnect = async () => {
     if (isCreatingCode) {
       // In test mode, creator can proceed after code is saved (no cross-device detection)
       // In production mode, wait for partner to connect via realtime
       if (isPairingConnected || (isInTestMode() && isCodeSaved)) {
+        // Check if this is a reconnection (user already has preferences)
+        const userId = currentUser?.id;
+        if (userId && !isInTestMode()) {
+          const { data: profile } = await db.profiles.get(userId);
+          const hasPreferences = profile?.preferences && Object.keys(profile.preferences).length > 0;
+
+          if (hasPreferences && profile) {
+            // This is a reconnection - restore user data and skip onboarding
+            console.log('[PairingStep] Creator reconnection detected, skipping onboarding');
+
+            // Get current couple from authStore (already set by realtime subscription)
+            const currentCouple = useAuthStore.getState().couple;
+
+            // Restore current user data
+            setUser({
+              id: userId,
+              email: profile.email || '',
+              nickname: profile.nickname || '',
+              coupleId: currentCouple?.id,
+              birthDate: profile.birth_date ? parseDateAsLocal(profile.birth_date) : undefined,
+              preferences: profile.preferences || {},
+              createdAt: profile.created_at ? new Date(profile.created_at) : new Date(),
+            });
+
+            // Fetch and set partner data
+            const partnerId = currentCouple?.user2Id;
+            if (partnerId) {
+              const { data: partnerProfile } = await db.profiles.get(partnerId);
+              if (partnerProfile) {
+                setPartner({
+                  id: partnerId,
+                  email: partnerProfile.email || '',
+                  nickname: partnerProfile.nickname || '',
+                  inviteCode: '',
+                  birthDate: partnerProfile.birth_date ? parseDateAsLocal(partnerProfile.birth_date) : undefined,
+                  preferences: partnerProfile.preferences || {},
+                  createdAt: partnerProfile.created_at ? new Date(partnerProfile.created_at) : new Date(),
+                });
+              }
+            }
+
+            Alert.alert(
+              t('onboarding.pairing.reconnected'),
+              t('onboarding.pairing.reconnectedMessage'),
+              [
+                {
+                  text: t('onboarding.confirm'),
+                  onPress: () => {
+                    setIsOnboardingComplete(true);
+                    router.replace('/(tabs)');
+                  },
+                },
+              ]
+            );
+            return;
+          }
+        }
         onNext();
       }
     } else {
@@ -1989,12 +2587,12 @@ function PairingStep({
                 style={[styles.textInput, styles.codeInput]}
                 value={pairingCode}
                 onChangeText={(text) => {
-                  setPairingCode(text.toUpperCase());
+                  setPairingCode(text.toUpperCase().trim());
                   setError(null);
                 }}
                 autoCapitalize="characters"
                 maxLength={6}
-                editable={!isLoading}
+                editable={!isLoading && !isPairingConnected}
               />
               <Text style={styles.codeInputHint}>{t('onboarding.pairing.enterCodePlaceholder')}</Text>
               {error && (
@@ -2017,9 +2615,9 @@ function PairingStep({
           <Text style={[styles.secondaryButtonText, (isLoading || isPairingConnected) && styles.secondaryButtonTextDisabled]}>{t('onboarding.previous')}</Text>
         </Pressable>
         <Pressable
-          style={[styles.primaryButton, styles.buttonFlex, !isValid && styles.primaryButtonDisabled]}
+          style={[styles.primaryButton, styles.buttonFlex, (!isValid || isPairingConnected) && styles.primaryButtonDisabled]}
           onPress={handleConnect}
-          disabled={!isValid || isLoading}
+          disabled={!isValid || isLoading || isPairingConnected}
         >
           <Text style={styles.primaryButtonText}>
             {isLoading ? t('onboarding.pairing.connecting') : (isCreatingCode && !isPairingConnected && !isInTestMode()) ? t('onboarding.pairing.waitingConnection') : t('onboarding.pairing.connect')}
@@ -2610,6 +3208,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     pointerEvents: 'none',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   progressContainer: {
     position: 'absolute',
     top: 60,
@@ -2684,8 +3287,10 @@ const styles = StyleSheet.create({
     height: 100,
   },
   welcomeLogoContainer: {
+    flex: 1,
     alignItems: 'center',
-    paddingTop: 220,
+    justifyContent: 'center',
+    paddingBottom: 60,
   },
   welcomeSubtitle: {
     fontFamily: TYPOGRAPHY.fontFamily.display,
@@ -3052,6 +3657,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: SPACING.sm,
+  },
+  logoutButton: {
+    position: 'absolute',
+    top: 72,
+    left: SPACING.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    paddingVertical: SPACING.sm,
+    zIndex: 20,
+  },
+  logoutButtonText: {
+    color: COLORS.white,
+    fontSize: 14,
+    fontWeight: '500',
   },
   copyToastOverlay: {
     position: 'absolute',

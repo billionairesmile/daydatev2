@@ -1444,7 +1444,9 @@ export default function MemoriesScreen() {
                           ]}
                           onPress={() => setFontStyle('basic')}
                         >
-                          <Text style={styles.fontStylePreviewBasic}>{t('memories.album.basicFont')}</Text>
+                          <View style={styles.fontStylePreviewContainer}>
+                            <Text style={styles.fontStylePreviewBasic}>{t('memories.album.basicFont')}</Text>
+                          </View>
                           <Text style={styles.fontStyleLabel}>{t('memories.album.basicFontDesc')}</Text>
                         </Pressable>
 
@@ -1462,7 +1464,7 @@ export default function MemoriesScreen() {
                             }
                           }}
                         >
-                          <View style={styles.fontStylePreviewRansom}>
+                          <View style={styles.fontStylePreviewContainer}>
                             <RansomText
                               text="FONT"
                               seed={12345}
@@ -1616,6 +1618,7 @@ export default function MemoriesScreen() {
                                   styles.basicFontOverlay,
                                   {
                                     fontSize: 16 * textScale,
+                                    lineHeight: 16 * textScale * 1.3,
                                     color: textColor === 'black' ? '#000000' : COLORS.white,
                                   }
                                 ]}>{albumName}</Text>
@@ -2428,7 +2431,9 @@ export default function MemoriesScreen() {
                             ]}
                             onPress={() => setEditFontStyle('basic')}
                           >
-                            <Text style={styles.fontStylePreviewBasic}>{t('memories.album.basicFont')}</Text>
+                            <View style={styles.fontStylePreviewContainer}>
+                              <Text style={styles.fontStylePreviewBasic}>{t('memories.album.basicFont')}</Text>
+                            </View>
                             <Text style={styles.fontStyleLabel}>{t('memories.album.basicFontDesc')}</Text>
                           </Pressable>
 
@@ -2446,18 +2451,20 @@ export default function MemoriesScreen() {
                               }
                             }}
                           >
-                            <View style={styles.fontStylePreviewRansom}>
-                              <View style={[styles.ransomMiniBox, { backgroundColor: '#FFE4E1', transform: [{ rotate: '-5deg' }] }]}>
-                                <Text style={[styles.ransomMiniText, { fontFamily: 'PermanentMarker_400Regular' }]}>F</Text>
-                              </View>
-                              <View style={[styles.ransomMiniBox, { backgroundColor: '#E6F3FF', transform: [{ rotate: '3deg' }], borderRadius: 12 }]}>
-                                <Text style={[styles.ransomMiniText, { fontFamily: 'Pacifico_400Regular' }]}>O</Text>
-                              </View>
-                              <View style={[styles.ransomMiniBox, { backgroundColor: '#FFFACD', transform: [{ rotate: '-2deg' }] }]}>
-                                <Text style={[styles.ransomMiniText, { fontFamily: 'SpecialElite_400Regular' }]}>N</Text>
-                              </View>
-                              <View style={[styles.ransomMiniBox, { backgroundColor: '#E8F5E9', transform: [{ rotate: '4deg' }] }]}>
-                                <Text style={[styles.ransomMiniText, { fontFamily: 'RockSalt_400Regular' }]}>T</Text>
+                            <View style={styles.fontStylePreviewContainer}>
+                              <View style={styles.fontStylePreviewRansom}>
+                                <View style={[styles.ransomMiniBox, { backgroundColor: '#FFE4E1', transform: [{ rotate: '-5deg' }] }]}>
+                                  <Text style={[styles.ransomMiniText, { fontFamily: 'PermanentMarker_400Regular' }]}>F</Text>
+                                </View>
+                                <View style={[styles.ransomMiniBox, { backgroundColor: '#E6F3FF', transform: [{ rotate: '3deg' }], borderRadius: 12 }]}>
+                                  <Text style={[styles.ransomMiniText, { fontFamily: 'Pacifico_400Regular' }]}>O</Text>
+                                </View>
+                                <View style={[styles.ransomMiniBox, { backgroundColor: '#FFFACD', transform: [{ rotate: '-2deg' }] }]}>
+                                  <Text style={[styles.ransomMiniText, { fontFamily: 'SpecialElite_400Regular' }]}>N</Text>
+                                </View>
+                                <View style={[styles.ransomMiniBox, { backgroundColor: '#E8F5E9', transform: [{ rotate: '4deg' }] }]}>
+                                  <Text style={[styles.ransomMiniText, { fontFamily: 'RockSalt_400Regular' }]}>T</Text>
+                                </View>
                               </View>
                             </View>
                             <Text style={styles.fontStyleLabel}>{t('memories.album.ransomStyle')}</Text>
@@ -2601,6 +2608,7 @@ export default function MemoriesScreen() {
                                     styles.basicFontOverlay,
                                     {
                                       fontSize: 16 * editTextScale,
+                                      lineHeight: 16 * editTextScale * 1.3,
                                       color: textColor === 'black' ? '#000000' : COLORS.white,
                                     }
                                   ]}>{editAlbumName}</Text>
@@ -4906,22 +4914,23 @@ const styles = StyleSheet.create({
     borderColor: COLORS.white,
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
   },
+  fontStylePreviewContainer: {
+    height: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
   fontStylePreviewBasic: {
     fontSize: 24,
     fontFamily: 'Jua',
     color: COLORS.white,
-    marginTop: 4,
-    marginBottom: 8,
     textAlign: 'center',
   },
   fontStylePreviewRansom: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 29,
     gap: 2,
-    marginTop: -1,
-    marginBottom: 8,
     overflow: 'visible',
   },
   fontStyleLabel: {

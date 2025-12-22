@@ -6,13 +6,14 @@ import { JustMeAgainDownHere_400Regular } from '@expo-google-fonts/just-me-again
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { StyleSheet, AppState, AppStateStatus } from 'react-native';
+import { StyleSheet, AppState, AppStateStatus, Alert } from 'react-native';
 import 'react-native-reanimated';
 
 // Initialize i18n (must be imported before any component that uses translations)
 import '@/lib/i18n';
+import { useTranslation } from 'react-i18next';
 
-import { useAuthStore } from '@/stores';
+import { useAuthStore, useOnboardingStore } from '@/stores';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
 import { BackgroundProvider, useBackground } from '@/contexts';
 import { preloadCharacterAssets } from '@/utils';
@@ -132,8 +133,10 @@ function BackgroundLoadedHandler({ setBackgroundLoaded }: { setBackgroundLoaded:
 function RootLayoutNav() {
   const router = useRouter();
   const segments = useSegments();
+  const { t } = useTranslation();
   const { isAuthenticated, isOnboardingComplete, setIsOnboardingComplete, couple, user, setCouple, setPartner, partner } = useAuthStore();
   const { initializeSync, cleanup: cleanupSync, processPendingOperations } = useCoupleSyncStore();
+  const { setStep: setOnboardingStep, updateData: updateOnboardingData } = useOnboardingStore();
   const [isNavigationReady, setIsNavigationReady] = useState(false);
   const appState = useRef(AppState.currentState);
   const lastFetchTime = useRef<number>(0);
@@ -361,7 +364,7 @@ function RootLayoutNav() {
           table: 'couples',
           filter: `id=eq.${couple.id}`,
         },
-        (payload) => {
+        async (payload) => {
           // Couple data was updated, refresh the data
           const coupleData = payload.new as {
             id: string;
@@ -372,12 +375,15 @@ function RootLayoutNav() {
             status?: string;
             disconnected_at?: string;
             disconnected_by?: string;
+            disconnect_reason?: 'unpaired' | 'account_deleted';
           };
 
           if (coupleData) {
             // Check if couple was disconnected by partner
             if (coupleData.status === 'disconnected') {
-              console.log('[Layout] Couple disconnected, redirecting to pairing screen');
+              // Check if disconnected by partner (not by self)
+              const disconnectedByPartner = coupleData.disconnected_by && coupleData.disconnected_by !== user?.id;
+              console.log('[Layout] Couple disconnected', { disconnectedByPartner, disconnectedBy: coupleData.disconnected_by, userId: user?.id });
 
               // Cleanup realtime subscriptions
               cleanupSync();
@@ -386,11 +392,50 @@ function RootLayoutNav() {
               setCouple(null);
               setPartner(null);
 
-              // Set onboarding incomplete to show pairing screen
+              // Set onboarding incomplete and go directly to pairing screen
               setIsOnboardingComplete(false);
+              setOnboardingStep('pairing');
+              // Reset all pairing state so user can pair with a new partner
+              updateOnboardingData({
+                isPairingConnected: false,
+                isCreatingCode: true,
+                pairingCode: '', // Clear any previously entered code
+              });
 
-              // Navigate to onboarding
-              router.replace('/(auth)/onboarding');
+              // Show alert if disconnected by partner
+              if (disconnectedByPartner) {
+                // Check disconnect_reason to determine the appropriate message
+                console.log('[Layout] Partner disconnected, reason:', coupleData.disconnect_reason);
+
+                if (coupleData.disconnect_reason === 'account_deleted') {
+                  // Partner deleted their account - no reconnection possible
+                  Alert.alert(
+                    t('settings.unpair.partnerDeletedAccountTitle'),
+                    t('settings.unpair.partnerDeletedAccountMessage'),
+                    [
+                      {
+                        text: t('common.confirm'),
+                        onPress: () => router.replace('/(auth)/onboarding'),
+                      },
+                    ]
+                  );
+                } else {
+                  // Partner unpaired but still has account - can reconnect within 30 days
+                  Alert.alert(
+                    t('settings.unpair.partnerDisconnectedTitle'),
+                    t('settings.unpair.partnerDisconnectedMessage'),
+                    [
+                      {
+                        text: t('common.confirm'),
+                        onPress: () => router.replace('/(auth)/onboarding'),
+                      },
+                    ]
+                  );
+                }
+              } else {
+                // Navigate to onboarding directly
+                router.replace('/(auth)/onboarding');
+              }
               return;
             }
 
@@ -414,7 +459,7 @@ function RootLayoutNav() {
     return () => {
       supabase?.removeChannel(channel);
     };
-  }, [isOnboardingComplete, couple?.id, setCouple, setPartner, setIsOnboardingComplete, cleanupSync, router]);
+  }, [isOnboardingComplete, couple?.id, setCouple, setPartner, setIsOnboardingComplete, cleanupSync, router, setOnboardingStep, updateOnboardingData]);
 
   // Wait for navigation to be ready before redirecting
   useEffect(() => {

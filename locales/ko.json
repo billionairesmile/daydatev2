@@ -501,7 +501,11 @@
       "successMessage": "페어링이 해제되었습니다.\n30일 이내에 같은 파트너와 재연결하면 기존 데이터가 복구됩니다.",
       "error": "페어링 해제 중 오류가 발생했습니다.",
       "notificationTitle": "페어링이 해제되었어요",
-      "notificationBody": "{{nickname}}님이 페어링을 해제했어요. 30일 이내에 재연결하면 데이터를 복구할 수 있어요."
+      "notificationBody": "{{nickname}}님이 페어링을 해제했어요. 30일 이내에 재연결하면 데이터를 복구할 수 있어요.",
+      "partnerDisconnectedTitle": "페어링이 해제되었어요",
+      "partnerDisconnectedMessage": "상대방이 페어링을 끊었습니다.\n새로운 파트너와 연결하거나, 30일 이내에 같은 파트너와 재연결할 수 있어요.",
+      "partnerDeletedAccountTitle": "상대방이 계정을 탈퇴했어요",
+      "partnerDeletedAccountMessage": "상대방이 계정을 탈퇴하여 페어링이 해제되었습니다.\n재연결이 불가능하며, 기존 추억과 데이터는 복구할 수 없습니다."
     },
     "deleteAccount": {
       "title": "계정 탈퇴",
@@ -515,7 +519,9 @@
       "deleting": "삭제 중...",
       "success": "계정 탈퇴 완료",
       "successMessage": "모든 데이터가 삭제되었습니다.\n이용해 주셔서 감사합니다.",
-      "error": "계정 탈퇴 중 오류가 발생했습니다."
+      "error": "계정 탈퇴 중 오류가 발생했습니다.",
+      "partnerNotificationTitle": "계정 탈퇴 알림",
+      "partnerNotificationBody": "{{nickname}}님이 계정을 탈퇴했습니다."
     },
     "language": "언어",
     "theme": "테마",
@@ -606,8 +612,8 @@
     },
     "relationship": {
       "title": "관계 유형을 선택해주세요",
-      "dating": "연애",
-      "married": "결혼"
+      "dating": "연인",
+      "married": "부부"
     },
     "coupleInfo": {
       "title": "커플 정보를\n입력해주세요",

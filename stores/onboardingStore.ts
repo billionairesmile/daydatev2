@@ -189,6 +189,7 @@ export const useOnboardingStore = create<OnboardingState & OnboardingActions>()(
       name: 'daydate-onboarding-storage',
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({
+        currentStep: state.currentStep,
         data: state.data,
       }),
     }

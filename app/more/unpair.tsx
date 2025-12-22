@@ -26,7 +26,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { COLORS, SPACING, RADIUS } from '@/constants/design';
-import { useAuthStore, useMemoryStore } from '@/stores';
+import { useAuthStore, useMemoryStore, useOnboardingStore } from '@/stores';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
 import { db, isDemoMode } from '@/lib/supabase';
 import { notifyPartnerUnpaired } from '@/lib/pushNotifications';
@@ -97,12 +97,14 @@ export default function UnpairScreen() {
   };
 
   const handleUnpairConfirm = async () => {
-    if (confirmText === t('settings.unpair.confirmText')) {
+    // Case-insensitive comparison for English (allows 'unpair', 'Unpair', 'UNPAIR')
+    if (confirmText.toLowerCase() === t('settings.unpair.confirmText').toLowerCase()) {
       setShowConfirmModal(false);
       setConfirmText('');
 
       const { user, partner, setCouple, setPartner, setIsOnboardingComplete } = useAuthStore.getState();
       const { cleanup: cleanupSync } = useCoupleSyncStore.getState();
+      const { setStep: setOnboardingStep, updateData: updateOnboardingData } = useOnboardingStore.getState();
 
       // Get user nickname before clearing state
       const userNickname = user?.nickname || t('common.partner');
@@ -136,8 +138,15 @@ export default function UnpairScreen() {
         setCouple(null);
         setPartner(null);
 
-        // Set onboarding incomplete to show pairing screen
+        // Set onboarding incomplete and go directly to pairing screen
         setIsOnboardingComplete(false);
+        setOnboardingStep('pairing');
+        // Reset all pairing state so user can pair with a new partner
+        updateOnboardingData({
+          isPairingConnected: false,
+          isCreatingCode: true,
+          pairingCode: '', // Clear any previously entered code
+        });
 
         Alert.alert(
           t('settings.unpair.success'),
@@ -294,10 +303,10 @@ export default function UnpairScreen() {
               <Pressable
                 style={[
                   styles.confirmUnpairButton,
-                  confirmText !== t('settings.unpair.confirmText') && styles.confirmUnpairButtonDisabled,
+                  confirmText.toLowerCase() !== t('settings.unpair.confirmText').toLowerCase() && styles.confirmUnpairButtonDisabled,
                 ]}
                 onPress={handleUnpairConfirm}
-                disabled={confirmText !== t('settings.unpair.confirmText')}
+                disabled={confirmText.toLowerCase() !== t('settings.unpair.confirmText').toLowerCase()}
               >
                 <Text style={styles.confirmUnpairButtonText}>{t('settings.unpair.button')}</Text>
               </Pressable>

@@ -64,7 +64,8 @@ export function BookmarkedMissionsPage({ onBack }: BookmarkedMissionsPageProps) 
       return;
     }
 
-    router.push(`/mission/${missionId}`);
+    // Pass source=bookmark to return to bookmark page on back
+    router.push(`/mission/${missionId}?source=bookmark`);
   }, [router, canStartMission, isTodayCompletedMission, t]);
 
   const handleRemove = useCallback((bookmark: BookmarkItem, title: string) => {

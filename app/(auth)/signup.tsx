@@ -76,12 +76,10 @@ export default function SignupScreen() {
 
       if (data.user) {
         // Create user profile
-        const inviteCode = generateInviteCode();
         const { error: profileError } = await supabase.from('profiles').insert({
           id: data.user.id,
           email,
           nickname,
-          invite_code: inviteCode,
         });
 
         if (profileError) throw profileError;
@@ -98,15 +96,6 @@ export default function SignupScreen() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const generateInviteCode = () => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let code = '';
-    for (let i = 0; i < 6; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return code;
   };
 
   return (

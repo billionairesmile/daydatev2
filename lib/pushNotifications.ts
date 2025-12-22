@@ -1,19 +1,36 @@
-import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { db, supabase, isDemoMode } from './supabase';
 
-// Configure notification behavior
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+// Check if running in Expo Go (push notifications don't work in Expo Go as of SDK 53)
+const isExpoGo = Constants.appOwnership === 'expo';
+
+// Conditionally import notifications to avoid crashes in Expo Go
+let Notifications: typeof import('expo-notifications') | null = null;
+
+if (!isExpoGo) {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    Notifications = require('expo-notifications');
+    // Configure notification behavior
+    if (Notifications) {
+      Notifications.setNotificationHandler({
+        handleNotification: async () => ({
+          shouldShowAlert: true,
+          shouldPlaySound: true,
+          shouldSetBadge: true,
+          shouldShowBanner: true,
+          shouldShowList: true,
+        }),
+      });
+    }
+  } catch (error) {
+    console.log('[Push] expo-notifications not available:', error);
+  }
+} else {
+  console.log('[Push] Running in Expo Go - push notifications are disabled');
+}
 
 export interface PushNotificationResult {
   success: boolean;
@@ -25,6 +42,12 @@ export interface PushNotificationResult {
  * Register for push notifications and get the Expo push token
  */
 export async function registerForPushNotifications(): Promise<PushNotificationResult> {
+  // Check if notifications are available (not in Expo Go)
+  if (!Notifications) {
+    console.log('[Push] Notifications not available (running in Expo Go)');
+    return { success: false, error: 'Notifications not available in Expo Go' };
+  }
+
   if (isDemoMode) {
     console.log('[Push] Demo mode - skipping push notification registration');
     return { success: false, error: 'Demo mode' };
@@ -175,6 +198,44 @@ export interface SendNotificationParams {
   data?: Record<string, unknown>;
 }
 
+// Notification message translations
+const notificationMessages = {
+  missionGenerated: {
+    ko: {
+      title: '오늘의 미션이 도착했어요!',
+      body: (nickname: string) => `${nickname}님이 오늘의 미션을 생성했어요. 확인해보세요!`,
+    },
+    en: {
+      title: "Today's mission has arrived!",
+      body: (nickname: string) => `${nickname} has created today's mission. Check it out!`,
+    },
+  },
+  missionReminder: {
+    ko: {
+      title: '미션 완료까지 한 걸음!',
+      bodyWithPartner: (nickname: string) => `${nickname}님이 메시지를 남겼어요. 당신의 메시지도 작성해주세요!`,
+      bodyWithoutPartner: '서로에게 한마디를 작성해야 미션이 완료돼요!',
+    },
+    en: {
+      title: 'One step to complete the mission!',
+      bodyWithPartner: (nickname: string) => `${nickname} left a message. Please write your message too!`,
+      bodyWithoutPartner: 'Write a message to each other to complete the mission!',
+    },
+  },
+  scheduledReminder: {
+    ko: {
+      title: '오늘의 미션을 완료해보세요!',
+      body: '아직 완료하지 않은 미션이 있어요. 연인과 함께 특별한 추억을 만들어보세요 💕',
+    },
+    en: {
+      title: "Complete today's mission!",
+      body: "You have an incomplete mission. Create special memories with your partner 💕",
+    },
+  },
+} as const;
+
+type SupportedLanguage = 'ko' | 'en';
+
 /**
  * Send push notification via Supabase Edge Function
  */
@@ -213,13 +274,15 @@ export async function sendPushNotification(params: SendNotificationParams): Prom
  */
 export async function notifyPartnerMissionGenerated(
   partnerId: string,
-  generatorNickname: string
+  generatorNickname: string,
+  language: SupportedLanguage = 'ko'
 ): Promise<boolean> {
+  const messages = notificationMessages.missionGenerated[language];
   return sendPushNotification({
     targetUserId: partnerId,
     type: 'mission_generated',
-    title: '오늘의 미션이 도착했어요!',
-    body: `${generatorNickname}님이 오늘의 미션을 생성했어요. 확인해보세요!`,
+    title: messages.title,
+    body: messages.body(generatorNickname),
     data: { screen: 'mission' },
   });
 }
@@ -230,16 +293,18 @@ export async function notifyPartnerMissionGenerated(
 export async function notifyMissionReminder(
   userId: string,
   partnerNickname: string,
-  hasPartnerWritten: boolean
+  hasPartnerWritten: boolean,
+  language: SupportedLanguage = 'ko'
 ): Promise<boolean> {
+  const messages = notificationMessages.missionReminder[language];
   const body = hasPartnerWritten
-    ? `${partnerNickname}님이 메시지를 남겼어요. 당신의 메시지도 작성해주세요!`
-    : '서로에게 한마디를 작성해야 미션이 완료돼요!';
+    ? messages.bodyWithPartner(partnerNickname)
+    : messages.bodyWithoutPartner;
 
   return sendPushNotification({
     targetUserId: userId,
     type: 'mission_reminder',
-    title: '미션 완료까지 한 걸음!',
+    title: messages.title,
     body,
     data: { screen: 'mission' },
   });
@@ -263,12 +328,16 @@ export async function notifyPartnerUnpaired(
   });
 }
 
+// Subscription type for when Notifications is available
+type NotificationSubscription = { remove: () => void } | null;
+
 /**
  * Add notification response listener
  */
 export function addNotificationResponseListener(
-  callback: (response: Notifications.NotificationResponse) => void
-): Notifications.Subscription {
+  callback: (response: unknown) => void
+): NotificationSubscription {
+  if (!Notifications) return null;
   return Notifications.addNotificationResponseReceivedListener(callback);
 }
 
@@ -276,22 +345,26 @@ export function addNotificationResponseListener(
  * Add notification received listener (foreground)
  */
 export function addNotificationReceivedListener(
-  callback: (notification: Notifications.Notification) => void
-): Notifications.Subscription {
+  callback: (notification: unknown) => void
+): NotificationSubscription {
+  if (!Notifications) return null;
   return Notifications.addNotificationReceivedListener(callback);
 }
 
 /**
  * Remove notification subscription
  */
-export function removeNotificationSubscription(subscription: Notifications.Subscription): void {
-  subscription.remove();
+export function removeNotificationSubscription(subscription: NotificationSubscription): void {
+  if (subscription) {
+    subscription.remove();
+  }
 }
 
 /**
  * Get badge count
  */
 export async function getBadgeCount(): Promise<number> {
+  if (!Notifications) return 0;
   return Notifications.getBadgeCountAsync();
 }
 
@@ -299,6 +372,7 @@ export async function getBadgeCount(): Promise<number> {
  * Set badge count
  */
 export async function setBadgeCount(count: number): Promise<void> {
+  if (!Notifications) return;
   await Notifications.setBadgeCountAsync(count);
 }
 
@@ -306,6 +380,7 @@ export async function setBadgeCount(count: number): Promise<void> {
  * Clear all notifications
  */
 export async function clearAllNotifications(): Promise<void> {
+  if (!Notifications) return;
   await Notifications.dismissAllNotificationsAsync();
   await setBadgeCount(0);
 }
@@ -317,7 +392,15 @@ const MISSION_REMINDER_NOTIFICATION_ID = 'mission-reminder-scheduled';
  * Schedule a local notification for mission reminder at a specific hour
  * Default: 8 PM (20:00)
  */
-export async function scheduleMissionReminderNotification(hour: number = 20): Promise<string | null> {
+export async function scheduleMissionReminderNotification(
+  hour: number = 20,
+  language: SupportedLanguage = 'ko'
+): Promise<string | null> {
+  if (!Notifications) {
+    console.log('[Push] Notifications not available - skipping scheduled notification');
+    return null;
+  }
+
   if (isDemoMode) {
     console.log('[Push] Demo mode - skipping scheduled notification');
     return null;
@@ -337,10 +420,11 @@ export async function scheduleMissionReminderNotification(hour: number = 20): Pr
       return null;
     }
 
+    const messages = notificationMessages.scheduledReminder[language];
     const identifier = await Notifications.scheduleNotificationAsync({
       content: {
-        title: '오늘의 미션을 완료해보세요!',
-        body: '아직 완료하지 않은 미션이 있어요. 연인과 함께 특별한 추억을 만들어보세요 💕',
+        title: messages.title,
+        body: messages.body,
         data: { screen: 'mission', type: 'mission_incomplete_reminder' },
         sound: 'default',
       },
@@ -363,6 +447,7 @@ export async function scheduleMissionReminderNotification(hour: number = 20): Pr
  * Cancel scheduled mission reminder notification
  */
 export async function cancelMissionReminderNotification(): Promise<void> {
+  if (!Notifications) return;
   try {
     await Notifications.cancelScheduledNotificationAsync(MISSION_REMINDER_NOTIFICATION_ID);
     console.log('[Push] Cancelled scheduled mission reminder');
@@ -375,6 +460,7 @@ export async function cancelMissionReminderNotification(): Promise<void> {
  * Cancel all scheduled notifications
  */
 export async function cancelAllScheduledNotifications(): Promise<void> {
+  if (!Notifications) return;
   try {
     await Notifications.cancelAllScheduledNotificationsAsync();
     console.log('[Push] Cancelled all scheduled notifications');
@@ -386,6 +472,7 @@ export async function cancelAllScheduledNotifications(): Promise<void> {
 /**
  * Get all scheduled notifications (for debugging)
  */
-export async function getScheduledNotifications(): Promise<Notifications.NotificationRequest[]> {
+export async function getScheduledNotifications(): Promise<unknown[]> {
+  if (!Notifications) return [];
   return Notifications.getAllScheduledNotificationsAsync();
 }
