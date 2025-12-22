@@ -667,6 +667,53 @@ export const db = {
       return { error };
     },
 
+    // Get mission history summary for deduplication (hybrid approach)
+    // Returns recent titles and category counts - optimized for token efficiency
+    async getMissionHistorySummary(coupleId: string, limit: number = 30): Promise<{
+      recentTitles: string[];
+      categoryStats: Record<string, number>;
+      totalCompleted: number;
+    }> {
+      const client = getSupabase();
+
+      // Get recent missions (last N missions)
+      const { data, error } = await client
+        .from('completed_missions')
+        .select('mission_data, completed_at')
+        .eq('couple_id', coupleId)
+        .order('completed_at', { ascending: false })
+        .limit(limit);
+
+      if (error || !data) {
+        console.error('[getMissionHistorySummary] Error:', error);
+        return { recentTitles: [], categoryStats: {}, totalCompleted: 0 };
+      }
+
+      // Extract titles and count categories
+      const recentTitles: string[] = [];
+      const categoryStats: Record<string, number> = {};
+
+      for (const mission of data) {
+        const missionData = mission.mission_data as { title?: string; category?: string } | null;
+        if (missionData) {
+          // Add title (if exists)
+          if (missionData.title) {
+            recentTitles.push(missionData.title);
+          }
+          // Count category
+          if (missionData.category) {
+            categoryStats[missionData.category] = (categoryStats[missionData.category] || 0) + 1;
+          }
+        }
+      }
+
+      return {
+        recentTitles,
+        categoryStats,
+        totalCompleted: data.length,
+      };
+    },
+
     // Subscribe to completed missions changes for real-time sync
     subscribeToCompletedMissions(
       coupleId: string,

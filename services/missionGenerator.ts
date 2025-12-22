@@ -18,11 +18,19 @@ export interface WeatherContext {
   countryCode: CountryCode;
 }
 
+// Mission history summary for deduplication (hybrid approach)
+export interface MissionHistorySummary {
+  recentTitles: string[];       // Last 30 mission titles
+  categoryStats: Record<string, number>;  // Category counts
+  totalCompleted: number;
+}
+
 interface MissionGenerationInput {
   userAPreferences?: OnboardingData;
   userBPreferences?: OnboardingData;
   todayAnswers: MissionGenerationAnswers;
   location?: { latitude: number; longitude: number };
+  missionHistory?: MissionHistorySummary;  // For deduplication
 }
 
 interface GeneratedMissionData {
@@ -432,6 +440,63 @@ function analyzeMBTICombination(mbtiA?: string, mbtiB?: string): string {
 }
 
 // ============================================
+// Deduplication Context Builder (Token-Efficient)
+// ============================================
+
+function buildDeduplicationContext(history: MissionHistorySummary | undefined, language: SupportedLanguage): string {
+  if (!history || history.totalCompleted === 0) {
+    return '';
+  }
+
+  const parts: string[] = [];
+
+  // 1. Recent titles (max 20 for token efficiency, ~100-200 tokens)
+  if (history.recentTitles.length > 0) {
+    const titlesToInclude = history.recentTitles.slice(0, 20);
+    if (language === 'ko') {
+      parts.push(`\n🚫 [최근 완료한 미션 - 중복 금지!]`);
+      parts.push(`  ${titlesToInclude.join(', ')}`);
+    } else {
+      parts.push(`\n🚫 [Recently Completed Missions - Avoid Duplicates!]`);
+      parts.push(`  ${titlesToInclude.join(', ')}`);
+    }
+  }
+
+  // 2. Category statistics (very token efficient, ~30-50 tokens)
+  if (Object.keys(history.categoryStats).length > 0) {
+    // Sort by count (descending) to show most used categories
+    const sortedCategories = Object.entries(history.categoryStats)
+      .sort((a, b) => b[1] - a[1]);
+
+    // Find underutilized categories
+    const allCategories = ['cafe', 'restaurant', 'outdoor', 'home', 'game', 'creative', 'culture', 'photo', 'romantic', 'online'];
+    const underusedCategories = allCategories.filter(cat =>
+      !history.categoryStats[cat] || history.categoryStats[cat] <= 1
+    );
+
+    if (language === 'ko') {
+      const statsStr = sortedCategories.map(([cat, count]) => `${cat}(${count})`).join(', ');
+      parts.push(`\n📊 [카테고리별 완료 현황]`);
+      parts.push(`  ${statsStr}`);
+
+      if (underusedCategories.length > 0) {
+        parts.push(`  💡 덜 해본 카테고리: ${underusedCategories.slice(0, 5).join(', ')} → 우선 추천!`);
+      }
+    } else {
+      const statsStr = sortedCategories.map(([cat, count]) => `${cat}(${count})`).join(', ');
+      parts.push(`\n📊 [Category Completion Stats]`);
+      parts.push(`  ${statsStr}`);
+
+      if (underusedCategories.length > 0) {
+        parts.push(`  💡 Less explored: ${underusedCategories.slice(0, 5).join(', ')} → Prioritize these!`);
+      }
+    }
+  }
+
+  return parts.join('\n');
+}
+
+// ============================================
 // Culture-Specific Prompts
 // ============================================
 
@@ -466,88 +531,87 @@ const CULTURE_PROMPTS: Record<string, { culture: string; trends: string; activit
 };
 
 // ============================================
-// System Prompt Generator
+// System Prompt Generator (Hybrid: EN headers + localized content)
 // ============================================
 
 function getSystemPrompt(countryCode: CountryCode, language: SupportedLanguage): string {
   const cultureData = CULTURE_PROMPTS[countryCode] || CULTURE_PROMPTS.DEFAULT;
+  const isKo = language === 'ko';
 
-  if (language === 'ko') {
-    return `당신은 ${cultureData.culture} 2030 커플의 데이트 플래너입니다.
-인스타그램, 유튜브, 틱톡 트렌드에 밝고, 소소하지만 특별한 순간을 만드는 데 탁월합니다.
+  // Language-specific content
+  const L = isKo ? {
+    role: `당신은 ${cultureData.culture} 2030 커플의 데이트 플래너입니다. 인스타그램, 유튜브, 틱톡 트렌드에 밝고, 소소하지만 특별한 순간을 만드는 데 탁월합니다.`,
+    philosophy: [
+      '"이거 해보고 싶다!" 설렘을 주는 아이디어',
+      '자연스럽게 사진 찍고 싶어지는 순간 설계',
+      '완료 후 "우리만의 추억"이 남는 경험',
+      '대화가 자연스럽게 이어지는 상황',
+    ],
+    titleRule: 'title: 감성적이고 시적인 문구 (15~25자)',
+    titleGood: '"반짝이는 트리 아래, 우리의 겨울", "함께 외치는 응원의 순간"',
+    titleBad: '"카페 가기", "방탈출 하기" (너무 직접적)',
+    titleHint: '미션명만으로 활동 유추 가능, 구체적 내용은 description에서',
+    descRule: 'description: 80자 이내, 구체적으로 "무엇을 하는 미션인지" 설명',
+    descExample: '"반짝이는 트리 아래, 우리의 겨울" → "크리스마스 트리 명소에서 함께 사진 찍기"',
+    noPrice: '금액 언급 금지 (X: "3000원으로")',
+    noFiller: '"후기 나누기", "이야기 나누기" 금지',
+    photoNatural: '사진 인증이 자연스러운 활동으로 구성',
+    remoteIntro: '커플 중 한 명만 현장에서 직접 사진 촬영하여 인증. 앨범 업로드 불가.',
+    remoteStructure: '"둘이 같은 걸 각자 하고, 한 명이 인증" 구조',
+    remoteExamples: '같은 책 읽기→페이지 인증, 같은 요리→결과물 인증, 손편지→사진 인증',
+    roleMain: '미션1 (메인): 사용자 고민/기분에 가장 적합',
+    roleAlt: '미션2 (대안): 비슷하지만 살짝 다른 방향',
+    roleSurprise: '미션3 (서프라이즈): 예상 못한 신선한 제안',
+    categoryNote: '세 미션의 카테고리는 서로 겹치지 않게!',
+    categoryDetails: [
+      'creative: DIY, 공예, 원데이클래스, 캔들/향수 만들기, 도자기, 그림, 가죽공예 등',
+      'culture: 전시회, 미술관, 박물관, 공연, 콘서트, 연극',
+      'learning: 언어교환, 스터디, 강연, 세미나',
+      'wellness: 스파, 마사지, 온천, 명상, 요가',
+    ],
+    categoryWarning: '위 목록에 없는 카테고리(diy, craft, workshop 등) 절대 금지!',
+    respond: '반드시 한국어로 응답하세요.',
+  } : {
+    role: `You are a date planner for couples in their 20s-30s familiar with ${cultureData.culture} culture. You excel at creating small but special moments, keeping up with Instagram, YouTube, and TikTok trends.`,
+    philosophy: [
+      'Ideas that spark excitement: "I want to try this!"',
+      'Design moments that naturally make couples want to take photos',
+      'Experiences that create "our special memories" after completion',
+      'Situations where conversation flows naturally',
+    ],
+    titleRule: 'title: Emotional, poetic phrase (8-15 words)',
+    titleGood: '"Under the Sparkling Lights, Our Winter Story", "Cheering Together, Hearts United"',
+    titleBad: '"Go to a cafe", "Do escape room" (too direct)',
+    titleHint: 'Title alone should hint at activity, details go in description',
+    descRule: 'description: Under 80 chars, clearly explain "what the mission is"',
+    descExample: '"Under the Sparkling Lights, Our Winter Story" → "Take photos together at a popular Christmas tree spot"',
+    noPrice: 'Never mention prices (X: "for $5")',
+    noFiller: 'No filler phrases like "share thoughts"',
+    photoNatural: 'Activities should naturally lend themselves to photo verification',
+    remoteIntro: 'Only one partner takes a photo on-site for verification. No album uploads.',
+    remoteStructure: 'Structure: "Both do the same thing separately, one verifies"',
+    remoteExamples: 'Same book→verify page, Same recipe→verify result, Handwritten letter→photo',
+    roleMain: 'Mission 1 (Main): Best match for user concerns/mood',
+    roleAlt: 'Mission 2 (Alternative): Similar but slightly different',
+    roleSurprise: 'Mission 3 (Surprise): Unexpected fresh suggestion',
+    categoryNote: 'Three missions should have different categories!',
+    categoryDetails: [
+      'creative: DIY, crafts, one-day classes, candle/perfume making, pottery, painting, leather crafts',
+      'culture: Exhibitions, art museums, museums, performances, concerts, theater',
+      'learning: Language exchange, study sessions, lectures, seminars',
+      'wellness: Spa, massage, hot springs, meditation, yoga',
+    ],
+    categoryWarning: 'Categories not in list (diy, craft, workshop, etc.) strictly prohibited!',
+    respond: 'Respond in English.',
+  };
 
-## 미션 설계 철학
-1. "이거 해보고 싶다!" 설렘을 주는 아이디어
-2. 자연스럽게 사진 찍고 싶어지는 순간 설계
-3. 완료 후 "우리만의 추억"이 남는 경험
-4. 대화가 자연스럽게 이어지는 상황
-
-## ${cultureData.culture} 데이트 문화 반영
-- 트렌드: ${cultureData.trends}
-- 소확행: ${cultureData.smallJoys}
-- 계절: ${cultureData.seasonal}
-- 야경: ${cultureData.nightViews}
-- 활동: ${cultureData.activities}
-- 먹거리: ${cultureData.food}
-
-## 미션 작성 규칙
-1. title: 감성적이고 시적인 문구로 작성 (15~25자)
-   - 좋은 예: "반짝이는 트리 아래, 우리의 겨울", "함께 외치는 응원의 순간", "우리, 그리고 반려견과의 하루"
-   - 나쁜 예: "카페 가기", "방탈출 하기", "맛집 탐방" (너무 직접적이고 평범함)
-   - 미션명만으로도 어떤 활동인지 유추 가능해야 함 (구체적인 내용은 description에서 보충)
-   - 단어가 중간에 끊기지 않도록 작성 (한 단어가 줄에 다 안 들어가면 그 단어 전체를 다음 줄에 작성)
-2. description: 80자 이내, 미션이 무엇인지 구체적으로 설명
-   - 미션명이 감성적인 만큼 description은 명확하게 "무엇을 하는 미션인지" 설명
-   - 예: title "반짝이는 트리 아래, 우리의 겨울" → description "크리스마스 트리 명소에서 함께 사진 찍기"
-3. 금액 언급 절대 금지 (X: "3000원으로", "무료로")
-4. "후기 나누기", "이야기 나누기" 같은 부가 설명 금지
-5. 사진 인증이 자연스러운 활동으로 구성
-
-## 만나지 못할 때 미션 규칙 (중요!)
-- 커플 중 한 명만 현장에서 직접 사진 촬영하여 인증
-- 앨범에서 기존 사진 업로드 불가능
-- "둘이 같은 걸 각자 하고, 한 명이 인증" 구조
-- 예시:
-  - 같은 책 읽기 → 읽고 있는 페이지 인증
-  - 같은 요리 만들기 → 결과물 인증
-  - 손편지 쓰기 → 편지 사진 인증
-  - 같은 영화 보기 → 보는 중 화면 인증
-
-## 미션 역할 분담 (3개 생성 시)
-- 미션1 (메인): 사용자 고민과 기분에 가장 적합한 추천
-- 미션2 (대안): 비슷하지만 살짝 다른 방향의 옵션
-- 미션3 (서프라이즈): 예상 못한 신선한 제안, 약간의 도전
-
-※ 세 미션의 카테고리는 서로 겹치지 않게!
-
-## 카테고리 목록 (반드시 이 중 하나만 사용!)
-Food: cafe, restaurant, streetfood, dessert, cooking, drink, brunch
-Place: outdoor, home, travel, daytrip, drive, night, nature
-Activity: culture, movie, sports, fitness, wellness, creative, game, shopping, photo, learning
-Special: romantic, anniversary, surprise, memory
-Online: online, challenge
-
-### 카테고리 상세 설명 (중요!)
-- creative: DIY, 공예, 원데이클래스, 캔들/향수/비누 만들기, 도자기, 그림, 꽃꽂이, 가죽공예, 뜨개질, 레진아트, 네일아트 등 모든 만들기/체험 활동
-- culture: 전시회, 미술관, 박물관, 공연, 콘서트, 연극 등 문화생활
-- learning: 언어교환, 스터디, 강연, 세미나 등 학습 활동
-- wellness: 스파, 마사지, 온천, 명상, 요가 등 힐링 활동
-
-⚠️ 위 목록에 없는 카테고리(diy, craft, workshop, class 등)는 절대 사용 금지!
-
-## JSON 출력 형식
-{"missions":[{"title":"","description":"","category":"","tags":["","",""]}]}`;
-  }
-
-  // English prompt
-  return `You are a date planner for couples in their 20s-30s familiar with ${cultureData.culture} culture.
-You excel at creating small but special moments, keeping up with Instagram, YouTube, and TikTok trends.
+  return `${L.role}
 
 ## Mission Design Philosophy
-1. Ideas that spark excitement: "I want to try this!"
-2. Design moments that naturally make couples want to take photos
-3. Experiences that create "our special memories" after completion
-4. Situations where conversation flows naturally
+1. ${L.philosophy[0]}
+2. ${L.philosophy[1]}
+3. ${L.philosophy[2]}
+4. ${L.philosophy[3]}
 
 ## ${cultureData.culture} Date Culture
 - Trends: ${cultureData.trends}
@@ -558,111 +622,54 @@ You excel at creating small but special moments, keeping up with Instagram, YouT
 - Food: ${cultureData.food}
 
 ## Mission Writing Rules
-1. title: Write in an emotional, poetic phrase (8-15 words)
-   - Good: "Under the Sparkling Lights, Our Winter Story", "Cheering Together, Hearts United", "A Day with You and Our Furry Friend"
-   - Bad: "Go to a cafe", "Do escape room", "Food tour" (too direct and plain)
-   - The title alone should hint at the activity (details go in description)
-2. description: Under 80 characters, clearly explain what the mission is
-   - Since the title is emotional, description should clearly state "what the mission is about"
-   - Example: title "Under the Sparkling Lights, Our Winter Story" → description "Take photos together at a popular Christmas tree spot"
-3. Never mention prices (X: "for $5", "for free")
-4. No filler phrases like "share thoughts", "talk about it"
-5. Activities should naturally lend themselves to photo verification
+1. ${L.titleRule}
+   - Good: ${L.titleGood}
+   - Bad: ${L.titleBad}
+   - ${L.titleHint}
+2. ${L.descRule}
+   - Example: ${L.descExample}
+3. ${L.noPrice}
+4. ${L.noFiller}
+5. ${L.photoNatural}
 
-## Rules for When You Can't Meet (Important!)
-- Only one partner takes a photo on-site for verification
-- Cannot upload existing photos from album
-- Structure: "Both do the same thing separately, one verifies"
-- Examples:
-  - Read the same book → Verify page being read
-  - Cook the same recipe → Verify the result
-  - Write a handwritten letter → Verify with photo
-  - Watch the same movie → Verify with screen showing
+## Remote Mission Rules (Important!)
+- ${L.remoteIntro}
+- ${L.remoteStructure}
+- Examples: ${L.remoteExamples}
 
-## Mission Role Distribution (When generating 3)
-- Mission 1 (Main): Best match for user's concerns and mood
-- Mission 2 (Alternative): Similar but slightly different option
-- Mission 3 (Surprise): Unexpected fresh suggestion, slight challenge
+## Mission Role Distribution
+- ${L.roleMain}
+- ${L.roleAlt}
+- ${L.roleSurprise}
+※ ${L.categoryNote}
 
-※ Three missions should have different categories!
-
-## Category List (Must use one from this list!)
+## Category List (Must use one!)
 Food: cafe, restaurant, streetfood, dessert, cooking, drink, brunch
 Place: outdoor, home, travel, daytrip, drive, night, nature
 Activity: culture, movie, sports, fitness, wellness, creative, game, shopping, photo, learning
 Special: romantic, anniversary, surprise, memory
 Online: online, challenge
 
-### Category Details (Important!)
-- creative: DIY, crafts, one-day classes, candle/perfume/soap making, pottery, painting, flower arrangement, leather crafts, knitting, resin art, nail art, etc.
-- culture: Exhibitions, art museums, museums, performances, concerts, theater
-- learning: Language exchange, study sessions, lectures, seminars
-- wellness: Spa, massage, hot springs, meditation, yoga
-
-⚠️ Categories not in the list above (diy, craft, workshop, class, etc.) are strictly prohibited!
+### Category Details
+- ${L.categoryDetails[0]}
+- ${L.categoryDetails[1]}
+- ${L.categoryDetails[2]}
+- ${L.categoryDetails[3]}
+⚠️ ${L.categoryWarning}
 
 ## JSON Output Format
-{"missions":[{"title":"","description":"","category":"","tags":["","",""]}]}`;
+{"missions":[{"title":"","description":"","category":"","tags":["","",""]}]}
+
+${L.respond}`;
 }
 
 // ============================================
 // Few-shot Examples (Language-specific)
 // ============================================
 
-function getFewShotExamples(language: SupportedLanguage): string {
-  if (language === 'ko') {
-    return `
-## 좋은 미션 예시 (만났을 때) - 감성적인 title + 구체적인 description
-
-[감성/로맨틱]
-{"title":"반짝이는 트리 아래, 우리의 겨울","description":"올해 뜨는 크리스마스 트리 명소에서 함께 인증샷 남기기","category":"romantic","tags":["크리스마스","트리","핫플"]}
-{"title":"고즈넉한 처마 아래, 차 한 잔","description":"한옥카페에서 따뜻한 전통차 마시며 겨울 풍경 감상하기","category":"cafe","tags":["한옥","카페","감성"]}
-{"title":"도시의 밤, 너와 건배","description":"야경이 보이는 루프탑바에서 시그니처 칵테일 즐기기","category":"drink","tags":["루프탑","야경","칵테일"]}
-{"title":"찰칵, 우리의 순간들","description":"요즘 뜨는 포토부스 돌면서 네컷사진 컬렉션 만들기","category":"photo","tags":["포토부스","네컷","투어"]}
-
-[액티비티]
-{"title":"함께 풀어가는 비밀의 방","description":"둘이서 머리 맞대고 방탈출 게임 클리어하기","category":"game","tags":["방탈출","협동","게임"]}
-{"title":"현실을 넘어, 가상의 모험","description":"VR 게임존에서 가상현실 속 데이트 즐기기","category":"game","tags":["VR","게임","체험"]}
-{"title":"우리가 만든 한 끼의 행복","description":"원데이 쿠킹클래스에서 함께 요리 배우기","category":"cooking","tags":["쿠킹클래스","요리","체험"]}
-{"title":"진지한 승부, 웃긴 결말","description":"오락실에서 다트, 볼링, 사격 대결하기. 진 사람이 다음 데이트 계획!","category":"game","tags":["오락실","대결","볼링"]}
-{"title":"함께 외치는 응원의 순간","description":"야구장이나 경기장에서 같이 응원하며 열정 폭발하기","category":"sports","tags":["경기관람","응원","스포츠"]}
-
-[먹거리]
-{"title":"골목 사이로 번지는 추억의 맛","description":"전통시장 돌아다니며 길거리 음식 먹방 투어하기","category":"streetfood","tags":["전통시장","먹방","투어"]}
-{"title":"우리만의 레시피, 편의점 에디션","description":"편의점에서 각자 조합 메뉴 만들어서 맛 평가 대결하기","category":"streetfood","tags":["편의점","조합","대결"]}
-{"title":"아무도 모르는 우리만의 맛집","description":"리뷰 10개 미만의 숨은 로컬 맛집 탐방하기","category":"restaurant","tags":["맛집","로컬","탐방"]}
-
-[이색/신선]
-{"title":"쓸데없지만 웃긴, 그게 우리야","description":"다이소에서 서로에게 쓸데없지만 웃긴 선물 골라주기","category":"shopping","tags":["다이소","선물","웃음"]}
-{"title":"운명에 맡긴 오늘의 음료","description":"카페에서 눈 감고 메뉴판 짚어서 나온 거 마시기","category":"cafe","tags":["랜덤","도전","카페"]}
-{"title":"7가지 표정, 하나의 네컷","description":"인생네컷에서 7가지 다른 포즈 챌린지 도전하기","category":"photo","tags":["인생네컷","챌린지","사진"]}
-{"title":"종점까지, 우리의 즉흥 여행","description":"먼저 오는 버스 타고 종점까지 떠나보기","category":"daytrip","tags":["즉흥","버스","모험"]}
-{"title":"우리, 그리고 반려견과의 하루","description":"반려동물과 함께 펫프렌들리 카페나 공원 나들이하기","category":"outdoor","tags":["반려동물","산책","힐링"]}
-
-[힐링]
-{"title":"따뜻한 물 속, 흘러가는 시간","description":"온천이나 스파에서 따뜻하게 릴랙스하기","category":"wellness","tags":["스파","온천","힐링"]}
-{"title":"같은 페이지를 넘기는 우리","description":"북카페에서 같이 책 읽다가 좋은 구절 공유하기","category":"cafe","tags":["북카페","독서","감성"]}
-{"title":"너를 담은 향기 한 병","description":"향수 공방에서 서로에게 어울리는 향수 직접 만들어주기","category":"creative","tags":["향수","공방","선물"]}
-
-[기념일 당일 특별 미션]
-{"title":"오늘을 영원히 담아두는 법","description":"오늘 찍은 사진들로 포토북 주문해두기","category":"anniversary","tags":["기념일","포토북","추억"]}
-{"title":"달콤한 축하, 촛불 앞의 소원","description":"레터링 케이크 앞에서 함께 촛불 끄고 소원 빌기","category":"anniversary","tags":["케이크","기념일","로맨틱"]}
-{"title":"손끝에 새기는 우리의 약속","description":"기념일 기념 커플링이나 팔찌 함께 고르러 가기","category":"anniversary","tags":["커플링","선물","기념일"]}
-{"title":"미래의 우리에게 보내는 편지","description":"서로에게 편지 써서 1년 뒤 열어보기로 약속하기","category":"romantic","tags":["타임캡슐","편지","약속"]}
-{"title":"밤하늘 아래, 속삭이는 소원","description":"야경 좋은 곳에서 별 보며 서로 소원 말해주기","category":"romantic","tags":["별","야경","로맨틱"]}
-
----
-## 만나지 못할 때 미션 예시 (한 명이 현장에서 직접 촬영하여 인증)
-
-{"title":"내년의 우리를 그리며","description":"내년에 함께 하고 싶은 버킷리스트 적어서 사진 찍기","category":"online","tags":["버킷리스트","계획","사진"]}
-{"title":"같은 페이지, 다른 공간","description":"같은 책 정해서 각자 읽고 읽는 중인 페이지 인증하기","category":"online","tags":["독서","책","인증"]}
-{"title":"펜 끝에서 전해지는 마음","description":"손으로 직접 편지 써서 사진 찍어 보내기","category":"online","tags":["손편지","감동","아날로그"]}
-{"title":"같은 장면, 다른 소파","description":"같은 영화 동시에 틀어놓고 보는 중 화면 인증하기","category":"online","tags":["영화","동시시청","인증"]}
-{"title":"떨어져 있어도 같은 맛","description":"같은 레시피로 각자 요리해서 결과물 인증하기","category":"online","tags":["요리","챌린지","인증"]}
-`;
-  }
-
-  // English examples
+function getFewShotExamples(_language: SupportedLanguage): string {
+  // Note: Korean cultural nuances are provided via CULTURE_PROMPTS.KR
+  // English examples are sufficient for teaching JSON format structure
   return `
 ## Good Mission Examples (When Meeting) - Emotional title + Specific description
 
@@ -718,18 +725,24 @@ function getFewShotExamples(language: SupportedLanguage): string {
 // User Prompt Generator (Language-specific)
 // ============================================
 
-function getUserPrompt(contextString: string, fewShotExamples: string, language: SupportedLanguage): string {
+function getUserPrompt(
+  contextString: string,
+  fewShotExamples: string,
+  language: SupportedLanguage,
+  deduplicationContext: string
+): string {
   if (language === 'ko') {
     return `다음 상황의 커플을 위한 데이트 미션 3개를 생성해주세요.
 
 ${contextString}
+${deduplicationContext}
 
 ---
-💡 [미션 다양성 유지]
-매번 새롭고 다양한 미션을 생성해주세요:
-- 비슷한 패턴의 미션 반복 금지
+💡 [미션 다양성 유지 - 중요!]
+- 🚫 위 "최근 완료한 미션"과 비슷한 미션 절대 금지
+- 💡 "덜 해본 카테고리" 위주로 새로운 경험 추천
 - 창의적이고 신선한 아이디어 우선
-- 다양한 카테고리와 활동 유형을 골고루 활용
+- 같은 장소/활동 유형 반복 금지
 
 ---
 참고할 좋은 예시들:
@@ -744,13 +757,14 @@ ${fewShotExamples}
   return `Please generate 3 date missions for the following couple's situation.
 
 ${contextString}
+${deduplicationContext}
 
 ---
-💡 [Mission Diversity]
-Generate fresh and diverse missions each time:
-- Avoid repeating similar patterns
-- Prioritize creative and fresh ideas
-- Use various categories and activity types evenly
+💡 [Mission Diversity - Important!]
+- 🚫 NEVER suggest missions similar to "Recently Completed" above
+- 💡 Prioritize "Less explored" categories for new experiences
+- Focus on creative and fresh ideas
+- Avoid repeating same places/activity types
 
 ---
 Reference examples:
@@ -794,10 +808,13 @@ export async function generateMissionsWithAI(input: MissionGenerationInput): Pro
   // Build context with priority
   const contextString = buildContext(input, weather, combinedDateWorries);
 
+  // Build deduplication context from mission history (token-efficient)
+  const deduplicationContext = buildDeduplicationContext(input.missionHistory, language);
+
   // Get language-specific prompts
   const systemPrompt = getSystemPrompt(weather.countryCode, language);
   const fewShotExamples = getFewShotExamples(language);
-  const userPrompt = getUserPrompt(contextString, fewShotExamples, language);
+  const userPrompt = getUserPrompt(contextString, fewShotExamples, language, deduplicationContext);
 
   try {
     const completion = await openai.chat.completions.create({

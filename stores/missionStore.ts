@@ -2,7 +2,8 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { DailyMission, Mission, MissionState, KeptMission, TodayCompletedMission } from '@/types';
-import { generateMissionsWithAI, generateMissionsFallback } from '@/services/missionGenerator';
+import { generateMissionsWithAI, generateMissionsFallback, type MissionHistorySummary } from '@/services/missionGenerator';
+import { db, isDemoMode } from '@/lib/supabase';
 import {
   useOnboardingStore,
   type OnboardingData,
@@ -353,11 +354,24 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
             };
           }
 
+          // Fetch mission history for deduplication (hybrid approach)
+          let missionHistory: MissionHistorySummary | undefined;
+          if (!isDemoMode && couple?.id) {
+            try {
+              missionHistory = await db.completedMissions.getMissionHistorySummary(couple.id, 30);
+              console.log(`[MissionStore] Loaded history: ${missionHistory.totalCompleted} missions, ${missionHistory.recentTitles.length} titles`);
+            } catch (historyError) {
+              console.warn('[MissionStore] Failed to load mission history:', historyError);
+              // Continue without history - deduplication will be skipped
+            }
+          }
+
           // Try to generate missions with AI
           const aiMissions = await generateMissionsWithAI({
             userAPreferences: onboardingData,
             userBPreferences: partnerPreferences as OnboardingData | undefined,
             todayAnswers: answers,
+            missionHistory, // Pass history for deduplication
           });
 
           // Save to local state

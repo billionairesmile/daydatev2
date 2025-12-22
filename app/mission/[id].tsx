@@ -13,6 +13,7 @@ import {
   Alert,
   Image as RNImage,
   GestureResponderEvent,
+  ActivityIndicator,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { BlurView } from 'expo-blur';
@@ -119,6 +120,7 @@ export default function MissionDetailScreen() {
 
   // State for featured mission loaded from DB
   const [featuredMission, setFeaturedMission] = useState<Mission | null>(null);
+  const [isLoadingFeaturedMission, setIsLoadingFeaturedMission] = useState(false);
 
   // Check if mission exists in local stores
   const localMission =
@@ -131,9 +133,13 @@ export default function MissionDetailScreen() {
     const loadFeaturedMission = async () => {
       if (localMission || !id || isDemoMode) return;
 
+      setIsLoadingFeaturedMission(true);
       try {
         const { data, error } = await db.featuredMissions.getById(id);
-        if (error || !data) return;
+        if (error || !data) {
+          setIsLoadingFeaturedMission(false);
+          return;
+        }
 
         // Get current language
         const isEnglish = i18n.language === 'en';
@@ -151,6 +157,8 @@ export default function MissionDetailScreen() {
         setFeaturedMission(converted);
       } catch (error) {
         console.error('[MissionDetail] Error loading featured mission:', error);
+      } finally {
+        setIsLoadingFeaturedMission(false);
       }
     };
 
@@ -465,6 +473,7 @@ export default function MissionDetailScreen() {
   const getCurrentLocationName = async (): Promise<string> => {
     try {
       setIsLoadingLocation(true);
+      const isEnglish = i18n.language === 'en';
 
       // Request location permission
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -485,34 +494,36 @@ export default function MissionDetailScreen() {
       });
 
       if (address) {
-        // Build location string (Korean format: district + city or name)
-        const parts: string[] = [];
+        // Format: city + district only (e.g., "대전광역시 도룡동" or "Daejeon, Doryong-dong")
+        // Priority: city + district (동) - no street address for privacy
 
-        // Try to get the most specific location name
-        if (address.name && !address.name.match(/^\d/)) {
-          // If name exists and doesn't start with number (not just street number)
-          parts.push(address.name);
-        } else if (address.street) {
-          parts.push(address.street);
-        }
+        let city = '';
+        let district = '';
 
-        if (address.district) {
-          parts.push(address.district);
-        } else if (address.subregion) {
-          parts.push(address.subregion);
-        }
-
+        // Get city name (시/광역시)
         if (address.city) {
-          parts.push(address.city);
+          city = address.city;
+        } else if (address.region) {
+          city = address.region;
         }
 
-        // Return formatted location (최대 2-3 요소만)
-        if (parts.length > 0) {
-          return parts.slice(0, 2).join(', ');
+        // Get district name (동/읍/면)
+        if (address.district) {
+          district = address.district;
+        } else if (address.subregion) {
+          // subregion is usually 구/군 level, use it if no district
+          district = address.subregion;
         }
 
-        // Fallback to region if no specific location
-        if (address.region) {
+        // Build location string based on available data
+        if (city && district) {
+          // For English users, use comma separator; for Korean, use space
+          return isEnglish ? `${city}, ${district}` : `${city} ${district}`;
+        } else if (city) {
+          return city;
+        } else if (district) {
+          return district;
+        } else if (address.region) {
           return address.region;
         }
       }
@@ -820,6 +831,16 @@ export default function MissionDetailScreen() {
     addMemory,
     clearInProgressMission,
   ]);
+
+  // Loading state for featured missions from DB
+  if (isLoadingFeaturedMission && !localMission) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={COLORS.white} />
+        <Text style={styles.loadingText}>{t('common.loading')}</Text>
+      </View>
+    );
+  }
 
   // Camera UI
   if (showCamera) {
@@ -1298,6 +1319,18 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.black,
+  },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: COLORS.black,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    color: COLORS.white,
+    fontSize: 14,
+    marginTop: 12,
+    opacity: 0.7,
   },
   backgroundImage: {
     position: 'absolute',
