@@ -52,6 +52,8 @@ import {
   type DateWorry,
   type Constraint,
   type CalendarType,
+  type Gender,
+  type OnboardingData,
 } from '@/stores/onboardingStore';
 import { useBackground } from '@/contexts';
 import { db, isDemoMode, isInTestMode, supabase } from '@/lib/supabase';
@@ -250,47 +252,67 @@ export default function OnboardingScreen() {
       if (session && session.user) {
         console.log(`[Onboarding] ${provider} login successful:`, session.user.id);
 
-        // Extract user info from session
+        // Extract user info from session (OAuth metadata)
         const userMetadata = (session.user.user_metadata || {}) as Record<string, string | undefined>;
-        const email = session.user.email || userMetadata.email || '';
-        const name = userMetadata.full_name || userMetadata.name || '';
-        const avatarUrl = userMetadata.avatar_url || userMetadata.picture || '';
+        const oauthEmail = session.user.email || userMetadata.email || '';
+        const oauthName = userMetadata.full_name || userMetadata.name || '';
+        const oauthAvatarUrl = userMetadata.avatar_url || userMetadata.picture || '';
 
-        // Create a basic user object
-        const newUser = {
-          id: session.user.id,
-          email,
-          nickname: name || email.split('@')[0] || t('onboarding.defaultUser'),
-          avatarUrl,
-          inviteCode: generatePairingCode(),
-          preferences: {} as any,
-          createdAt: new Date(),
-        };
-
-        // Set user in auth store
-        setUser(newUser);
-
-        // Update nickname in onboarding data
-        if (name) {
-          updateData({ nickname: name });
-        }
-
-        // Check if user already exists in database (to determine if terms should be shown)
+        // Check if user already exists in database FIRST (before creating user object)
         try {
           const { data: existingProfile } = await db.profiles.get(session.user.id);
           const isExistingUser = !!existingProfile;
           console.log('[Onboarding] Existing user check:', { isExistingUser, existingProfile });
 
-          // Create or update profile in Supabase
-          const { error: profileError } = await db.profiles.upsert({
-            id: session.user.id,
-            nickname: newUser.nickname,
-            email: newUser.email || undefined,
-            auth_provider: provider, // google or kakao
-          });
+          // Create user object - prioritize DB data over OAuth metadata for existing users
+          // Extract birthDateCalendarType from preferences (stored in DB as preferences.birthDateCalendarType)
+          const dbPreferences = existingProfile?.preferences as Record<string, unknown> | undefined;
+          const birthDateCalendarType = (dbPreferences?.birthDateCalendarType as 'solar' | 'lunar') || 'solar';
 
-          if (profileError) {
-            console.error('[Onboarding] Profile upsert error:', profileError);
+          const userObject = {
+            id: session.user.id,
+            email: existingProfile?.email || oauthEmail,
+            // Use DB nickname if exists, otherwise fall back to OAuth name
+            nickname: existingProfile?.nickname || oauthName || oauthEmail.split('@')[0] || t('onboarding.defaultUser'),
+            avatarUrl: oauthAvatarUrl,
+            inviteCode: generatePairingCode(),
+            // Restore preferences from DB if exists
+            birthDate: existingProfile?.birth_date ? parseDateAsLocal(existingProfile.birth_date) : undefined,
+            birthDateCalendarType,
+            preferences: existingProfile?.preferences || {} as any,
+            createdAt: existingProfile?.created_at ? new Date(existingProfile.created_at) : new Date(),
+          };
+
+          // Set user in auth store with restored data
+          setUser(userObject);
+
+          // Update nickname in onboarding data (use DB value if exists)
+          if (existingProfile?.nickname) {
+            updateData({ nickname: existingProfile.nickname });
+          } else if (oauthName) {
+            updateData({ nickname: oauthName });
+          }
+
+          // For new users: create profile. For existing users: only update auth_provider (don't overwrite other fields)
+          if (isExistingUser) {
+            // Only update auth_provider for existing users (don't overwrite nickname, preferences, etc.)
+            const { error: profileError } = await db.profiles.update(session.user.id, {
+              auth_provider: provider,
+            });
+            if (profileError) {
+              console.error('[Onboarding] Profile update error:', profileError);
+            }
+          } else {
+            // Create new profile for new users
+            const { error: profileError } = await db.profiles.upsert({
+              id: session.user.id,
+              nickname: userObject.nickname,
+              email: userObject.email || undefined,
+              auth_provider: provider,
+            });
+            if (profileError) {
+              console.error('[Onboarding] Profile upsert error:', profileError);
+            }
           }
 
           // Check if user already has a completed couple (already paired)
@@ -298,12 +320,24 @@ export default function OnboardingScreen() {
           console.log('[Onboarding] Couple check result:', { existingCouple, coupleError });
 
           if (existingCouple && existingCouple.user1_id && existingCouple.user2_id) {
-            console.log('[Onboarding] User already paired, going directly to home');
+            console.log('[Onboarding] User already paired');
 
-            // Set redirecting flag to prevent useEffect from showing basic_info screen
-            setIsRedirectingToHome(true);
+            // Check if profile is complete (has birthDate and preferences)
+            const hasCompleteBirthDate = !!existingProfile?.birth_date;
+            const hasCompletePreferences = existingProfile?.preferences &&
+              Object.keys(existingProfile.preferences).length > 0 &&
+              existingProfile.preferences.mbti; // Check for at least mbti as indicator of completed preferences
+            const isProfileComplete = hasCompleteBirthDate && hasCompletePreferences;
 
-            // Set couple in auth store
+            console.log('[Onboarding] Profile completeness check:', {
+              hasCompleteBirthDate,
+              hasCompletePreferences,
+              isProfileComplete,
+              birth_date: existingProfile?.birth_date,
+              preferences: existingProfile?.preferences
+            });
+
+            // Set couple in auth store (needed for both complete and incomplete profiles)
             setCouple({
               id: existingCouple.id,
               user1Id: existingCouple.user1_id,
@@ -333,10 +367,49 @@ export default function OnboardingScreen() {
               });
             }
 
-            // User has paired couple - go directly to home without showing alert
-            setIsOnboardingComplete(true);
-            router.replace('/(tabs)');
-            return;
+            if (isProfileComplete) {
+              // Profile is complete - go directly to home
+              console.log('[Onboarding] Profile complete, going directly to home');
+
+              // Restore data to onboardingStore so profile page can display it
+              const prefs = existingProfile?.preferences as Record<string, unknown> | undefined;
+              updateData({
+                nickname: existingProfile?.nickname || '',
+                birthDate: existingProfile?.birth_date ? parseDateAsLocal(existingProfile.birth_date) : undefined,
+                birthDateCalendarType: (prefs?.birthDateCalendarType as CalendarType) || 'solar',
+                mbti: (prefs?.mbti as string) || '',
+                gender: (prefs?.gender as Gender) || null,
+                activityTypes: (prefs?.activityTypes as ActivityType[]) || [],
+                dateWorries: (prefs?.dateWorries as DateWorry[]) || [],
+                constraints: (prefs?.constraints as Constraint[]) || [],
+                relationshipType: (prefs?.relationshipType as RelationshipType) || 'dating',
+                anniversaryDate: existingCouple.dating_start_date ? parseDateAsLocal(existingCouple.dating_start_date) : undefined,
+                isPairingConnected: true,
+              });
+
+              setIsRedirectingToHome(true);
+              setIsOnboardingComplete(true);
+              router.replace('/(tabs)');
+              return;
+            } else {
+              // Profile is incomplete - user needs to complete onboarding
+              console.log('[Onboarding] Profile incomplete, continuing onboarding from basic_info');
+
+              // Set isPairingConnected so the auto-skip useEffect will work
+              updateData({ isPairingConnected: true });
+
+              // Restore any existing data to onboardingStore
+              if (existingProfile?.birth_date) {
+                updateData({ birthDate: parseDateAsLocal(existingProfile.birth_date) });
+              }
+              if (existingCouple.dating_start_date) {
+                updateData({ anniversaryDate: parseDateAsLocal(existingCouple.dating_start_date) });
+              }
+
+              // Go to basic_info step to complete profile
+              animateTransition(() => setStep('basic_info'));
+              return;
+            }
           }
 
           // Existing user without paired couple - skip terms, go directly to pairing
@@ -613,6 +686,7 @@ export default function OnboardingScreen() {
               router={router}
               onNext={handleNext}
               onBack={handlePairingBack}
+              updateData={updateData}
             />
           )}
           {currentStep === 'basic_info' && (
@@ -1329,6 +1403,7 @@ function PairingStep({
   router,
   onNext,
   onBack,
+  updateData,
 }: {
   isCreatingCode: boolean;
   setIsCreatingCode: (value: boolean) => void;
@@ -1346,6 +1421,7 @@ function PairingStep({
   router: ReturnType<typeof useRouter>;
   onNext: () => void;
   onBack: () => void;
+  updateData: (data: Partial<OnboardingData>) => void;
 }) {
   const { t } = useTranslation();
   const [isLoading, setIsLoading] = React.useState(false);
@@ -2242,12 +2318,14 @@ function PairingStep({
               });
 
               // Fetch current user (joiner) profile to restore user data - we already checked it exists above
+              const joinerPrefs = joinerProfile.preferences as Record<string, unknown> | undefined;
               setUser({
                 id: joinerId,
                 email: joinerProfile.email || '',
                 nickname: joinerProfile.nickname || '',
                 coupleId: restoredCouple.id,
                 birthDate: joinerProfile.birth_date ? parseDateAsLocal(joinerProfile.birth_date) : undefined,
+                birthDateCalendarType: (joinerPrefs?.birthDateCalendarType as 'solar' | 'lunar') || 'solar',
                 preferences: joinerProfile.preferences || {},
                 createdAt: joinerProfile.created_at ? new Date(joinerProfile.created_at) : new Date(),
               });
@@ -2274,22 +2352,59 @@ function PairingStep({
               // Mark pairing code as used
               await db.pairingCodes.join(pairingCode, joinerId);
 
-              // 30일 내 재연결: 온보딩 스킵하고 바로 홈으로
-              Alert.alert(
-                t('onboarding.pairing.reconnected'),
-                t('onboarding.pairing.reconnectedMessage'),
-                [
-                  {
-                    text: t('onboarding.confirm'),
-                    onPress: () => {
-                      setIsOnboardingComplete(true);
-                      router.replace('/(tabs)');
+              // Check if joiner's profile is complete
+              const hasCompleteBirthDate = !!joinerProfile.birth_date;
+              const hasCompletePreferences = joinerProfile.preferences &&
+                Object.keys(joinerProfile.preferences).length > 0 &&
+                joinerProfile.preferences.mbti;
+              const isProfileComplete = hasCompleteBirthDate && hasCompletePreferences;
+
+              console.log('[PairingStep] Joiner (30-day restore) profile completeness:', {
+                hasCompleteBirthDate,
+                hasCompletePreferences,
+                isProfileComplete
+              });
+
+              if (isProfileComplete) {
+                // 30일 내 재연결 with complete profile: 온보딩 스킵하고 바로 홈으로
+                // Restore data to onboardingStore so profile page can display it
+                updateData({
+                  nickname: joinerProfile.nickname || '',
+                  birthDate: joinerProfile.birth_date ? parseDateAsLocal(joinerProfile.birth_date) : undefined,
+                  birthDateCalendarType: (joinerPrefs?.birthDateCalendarType as CalendarType) || 'solar',
+                  mbti: (joinerPrefs?.mbti as string) || '',
+                  gender: (joinerPrefs?.gender as Gender) || null,
+                  activityTypes: (joinerPrefs?.activityTypes as ActivityType[]) || [],
+                  dateWorries: (joinerPrefs?.dateWorries as DateWorry[]) || [],
+                  constraints: (joinerPrefs?.constraints as Constraint[]) || [],
+                  relationshipType: (joinerPrefs?.relationshipType as RelationshipType) || 'dating',
+                  anniversaryDate: restoredCouple.dating_start_date ? parseDateAsLocal(restoredCouple.dating_start_date) : undefined,
+                  isPairingConnected: true,
+                });
+
+                Alert.alert(
+                  t('onboarding.pairing.reconnected'),
+                  t('onboarding.pairing.reconnectedMessage'),
+                  [
+                    {
+                      text: t('onboarding.confirm'),
+                      onPress: () => {
+                        setIsOnboardingComplete(true);
+                        router.replace('/(tabs)');
+                      },
                     },
-                  },
-                ]
-              );
-              setIsLoading(false);
-              return;
+                  ]
+                );
+                setIsLoading(false);
+                return;
+              } else {
+                // Profile incomplete - continue onboarding
+                console.log('[PairingStep] Joiner profile incomplete, continuing onboarding');
+                setIsPairingConnected(true);
+                setIsLoading(false);
+                onNext();
+                return;
+              }
             }
           }
         }
@@ -2423,30 +2538,67 @@ function PairingStep({
       await db.pairingCodes.markJoinerProceeded(pairingCode);
 
       // Check if this is a reconnection based on disconnect_reason
-      // If the couple was previously disconnected (has disconnect_reason), skip onboarding
+      // If the couple was previously disconnected (has disconnect_reason), skip onboarding IF profile is complete
       const isReconnection = updatedCouple?.disconnect_reason === 'unpaired';
       console.log('[PairingStep] Reconnection check:', { disconnect_reason: updatedCouple?.disconnect_reason, isReconnection });
 
-      if (isReconnection) {
-        console.log('[PairingStep] Joiner: Reconnection detected, skipping onboarding and going to home');
-        setIsLoading(false);
-        // Show reconnection alert and go directly to home
-        // Note: Don't clear disconnect_reason here - let Creator detect it first
-        // It will be cleared by Creator's realtime/polling callback
-        Alert.alert(
-          t('onboarding.pairing.reconnected'),
-          t('onboarding.pairing.reconnectedMessage'),
-          [
-            {
-              text: t('onboarding.confirm'),
-              onPress: () => {
-                setIsOnboardingComplete(true);
-                router.replace('/(tabs)');
+      if (isReconnection && isExistingUser) {
+        // Fetch joiner's profile to check completeness
+        const { data: joinerProfile } = await db.profiles.get(joinerId);
+        const hasCompleteBirthDate = !!joinerProfile?.birth_date;
+        const hasCompletePreferences = joinerProfile?.preferences &&
+          Object.keys(joinerProfile.preferences).length > 0 &&
+          joinerProfile.preferences.mbti;
+        const isProfileComplete = hasCompleteBirthDate && hasCompletePreferences;
+
+        console.log('[PairingStep] Joiner (disconnect_reason) profile completeness:', {
+          hasCompleteBirthDate,
+          hasCompletePreferences,
+          isProfileComplete
+        });
+
+        if (isProfileComplete && joinerProfile) {
+          console.log('[PairingStep] Joiner: Reconnection with complete profile, going to home');
+
+          // Restore data to onboardingStore so profile page can display it
+          const joinerPrefs = joinerProfile.preferences as Record<string, unknown> | undefined;
+          updateData({
+            nickname: joinerProfile.nickname || '',
+            birthDate: joinerProfile.birth_date ? parseDateAsLocal(joinerProfile.birth_date) : undefined,
+            birthDateCalendarType: (joinerPrefs?.birthDateCalendarType as CalendarType) || 'solar',
+            mbti: (joinerPrefs?.mbti as string) || '',
+            gender: (joinerPrefs?.gender as Gender) || null,
+            activityTypes: (joinerPrefs?.activityTypes as ActivityType[]) || [],
+            dateWorries: (joinerPrefs?.dateWorries as DateWorry[]) || [],
+            constraints: (joinerPrefs?.constraints as Constraint[]) || [],
+            relationshipType: (joinerPrefs?.relationshipType as RelationshipType) || 'dating',
+            anniversaryDate: updatedCouple?.dating_start_date ? parseDateAsLocal(updatedCouple.dating_start_date) : undefined,
+            isPairingConnected: true,
+          });
+
+          setIsLoading(false);
+          // Show reconnection alert and go directly to home
+          // Note: Don't clear disconnect_reason here - let Creator detect it first
+          // It will be cleared by Creator's realtime/polling callback
+          Alert.alert(
+            t('onboarding.pairing.reconnected'),
+            t('onboarding.pairing.reconnectedMessage'),
+            [
+              {
+                text: t('onboarding.confirm'),
+                onPress: () => {
+                  setIsOnboardingComplete(true);
+                  router.replace('/(tabs)');
+                },
               },
-            },
-          ]
-        );
-        return;
+            ]
+          );
+          return;
+        } else {
+          // Profile incomplete - continue onboarding instead of going home
+          console.log('[PairingStep] Joiner: Reconnection but profile incomplete, continuing onboarding');
+          // Fall through to normal flow (onNext)
+        }
       }
 
       console.log('[PairingStep] Join flow completed successfully, navigating to next screen');
@@ -2467,28 +2619,55 @@ function PairingStep({
       // In test mode, creator can proceed after code is saved (no cross-device detection)
       // In production mode, wait for partner to connect via realtime
       if (isPairingConnected || (isInTestMode() && isCodeSaved)) {
-        // Check if this is a reconnection (user already has preferences)
+        // Check if this is a reconnection (user already has complete profile)
         const userId = currentUser?.id;
         if (userId && !isInTestMode()) {
           const { data: profile } = await db.profiles.get(userId);
-          const hasPreferences = profile?.preferences && Object.keys(profile.preferences).length > 0;
+          const hasCompleteBirthDate = !!profile?.birth_date;
+          const hasCompletePreferences = profile?.preferences &&
+            Object.keys(profile.preferences).length > 0 &&
+            profile.preferences.mbti; // Check for at least mbti as indicator of completed preferences
+          const isProfileComplete = hasCompleteBirthDate && hasCompletePreferences;
 
-          if (hasPreferences && profile) {
-            // This is a reconnection - restore user data and skip onboarding
-            console.log('[PairingStep] Creator reconnection detected, skipping onboarding');
+          console.log('[PairingStep] Creator profile completeness check:', {
+            hasCompleteBirthDate,
+            hasCompletePreferences,
+            isProfileComplete
+          });
+
+          if (isProfileComplete && profile) {
+            // This is a reconnection with complete profile - restore user data and skip onboarding
+            console.log('[PairingStep] Creator reconnection with complete profile, skipping onboarding');
 
             // Get current couple from authStore (already set by realtime subscription)
             const currentCouple = useAuthStore.getState().couple;
 
             // Restore current user data
+            const creatorPrefs = profile.preferences as Record<string, unknown> | undefined;
             setUser({
               id: userId,
               email: profile.email || '',
               nickname: profile.nickname || '',
               coupleId: currentCouple?.id,
               birthDate: profile.birth_date ? parseDateAsLocal(profile.birth_date) : undefined,
+              birthDateCalendarType: (creatorPrefs?.birthDateCalendarType as 'solar' | 'lunar') || 'solar',
               preferences: profile.preferences || {},
               createdAt: profile.created_at ? new Date(profile.created_at) : new Date(),
+            });
+
+            // Restore data to onboardingStore so profile page can display it
+            updateData({
+              nickname: profile.nickname || '',
+              birthDate: profile.birth_date ? parseDateAsLocal(profile.birth_date) : undefined,
+              birthDateCalendarType: (creatorPrefs?.birthDateCalendarType as CalendarType) || 'solar',
+              mbti: (creatorPrefs?.mbti as string) || '',
+              gender: (creatorPrefs?.gender as Gender) || null,
+              activityTypes: (creatorPrefs?.activityTypes as ActivityType[]) || [],
+              dateWorries: (creatorPrefs?.dateWorries as DateWorry[]) || [],
+              constraints: (creatorPrefs?.constraints as Constraint[]) || [],
+              relationshipType: (creatorPrefs?.relationshipType as RelationshipType) || 'dating',
+              anniversaryDate: currentCouple?.anniversaryDate,
+              isPairingConnected: true,
             });
 
             // Fetch and set partner data
@@ -3308,14 +3487,14 @@ const styles = StyleSheet.create({
     paddingBottom: 140,
   },
   welcomeLogo: {
-    width: 200,
-    height: 100,
+    width: 240,
+    height: 80,
   },
   welcomeLogoContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingBottom: 60,
+    paddingBottom: 100,
   },
   welcomeSubtitle: {
     fontFamily: TYPOGRAPHY.fontFamily.display,
@@ -3515,7 +3694,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    width: '100%',
+    alignSelf: 'center',
+    width: '85%',
     paddingVertical: 14,
     borderRadius: 12,
     marginBottom: SPACING.lg,

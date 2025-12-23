@@ -209,6 +209,10 @@ const notificationMessages = {
       title: "Today's mission has arrived!",
       body: (nickname: string) => `${nickname} has created today's mission. Check it out!`,
     },
+    es: {
+      title: '¡La misión de hoy ha llegado!',
+      body: (nickname: string) => `${nickname} ha creado la misión de hoy. ¡Échale un vistazo!`,
+    },
   },
   missionReminder: {
     ko: {
@@ -221,6 +225,11 @@ const notificationMessages = {
       bodyWithPartner: (nickname: string) => `${nickname} left a message. Please write your message too!`,
       bodyWithoutPartner: 'Write a message to each other to complete the mission!',
     },
+    es: {
+      title: '¡Un paso más para completar la misión!',
+      bodyWithPartner: (nickname: string) => `${nickname} dejó un mensaje. ¡Escribe el tuyo también!`,
+      bodyWithoutPartner: '¡Escríbanse un mensaje para completar la misión!',
+    },
   },
   scheduledReminder: {
     ko: {
@@ -231,10 +240,14 @@ const notificationMessages = {
       title: "Complete today's mission!",
       body: "You have an incomplete mission. Create special memories with your partner 💕",
     },
+    es: {
+      title: '¡Completa la misión de hoy!',
+      body: 'Tienes una misión sin completar. Crea recuerdos especiales con tu pareja 💕',
+    },
   },
 } as const;
 
-type SupportedLanguage = 'ko' | 'en';
+type SupportedLanguage = 'ko' | 'en' | 'es';
 
 /**
  * Send push notification via Supabase Edge Function

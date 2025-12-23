@@ -138,6 +138,26 @@ export const useMemoryStore = create<MemoryState & MemoryActions>()(
 
 // Sample memories for development/testing
 export const SAMPLE_MEMORIES: CompletedMission[] = [
+  // 2026년 1월 테스트 샘플 (연도 표시 테스트용)
+  {
+    id: '2026-01-sample',
+    coupleId: 'sample-couple',
+    missionId: '2026-01',
+    mission: {
+      id: '2026-01',
+      title: '새해 첫 데이트',
+      description: '2026년의 첫 데이트를 함께 즐겨보세요.',
+      category: 'outdoor' as MissionCategory,
+      tags: ['새해', '2026', '첫데이트'],
+      imageUrl: 'https://i.postimg.cc/VNbTxMsK/Gemini-Generated-Image-61p7xg61p7xg61p7.png',
+      isPremium: false,
+    },
+    photoUrl: 'https://i.postimg.cc/VNbTxMsK/Gemini-Generated-Image-61p7xg61p7xg61p7.png',
+    user1Message: '2026년 첫 데이트! 올해도 너와 함께여서 행복해.',
+    user2Message: '새해 첫날부터 너랑 함께라니 올해도 좋은 일만 가득할 것 같아.',
+    location: '서울 용산구',
+    completedAt: new Date(2026, 0, 15, 14, 30), // 2026년 1월 15일
+  },
   {
     id: '2',
     coupleId: 'sample-couple',

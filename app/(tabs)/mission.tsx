@@ -103,6 +103,7 @@ export default function MissionScreen() {
     isBookmarked,
     lockedMissionId,
     allMissionProgress,
+    coupleId,
   } = useCoupleSyncStore();
 
   // Use synced bookmark check if initialized, otherwise local
@@ -228,19 +229,31 @@ export default function MissionScreen() {
       }
 
       if (data && data.length > 0) {
+        // Get completed mission IDs to filter out already completed featured missions
+        let completedMissionIds: string[] = [];
+        if (coupleId) {
+          const { data: completedIds } = await db.completedMissions.getCompletedMissionIds(coupleId);
+          if (completedIds) {
+            completedMissionIds = completedIds;
+          }
+        }
+
         const isEnglish = i18n.language === 'en';
 
         // Convert featured missions to Mission format with language-aware title/description/tags
-        const convertedMissions: Mission[] = data.map((fm) => ({
-          id: fm.id,
-          // Use English title/description/tags if available and language is English, otherwise fallback to Korean
-          title: isEnglish && fm.title_en ? fm.title_en : fm.title,
-          description: isEnglish && fm.description_en ? fm.description_en : fm.description,
-          category: fm.category as Mission['category'],
-          tags: isEnglish && fm.tags_en?.length ? fm.tags_en : (fm.tags || []),
-          imageUrl: fm.image_url,
-          isPremium: false, // Featured missions are free
-        }));
+        // Filter out missions that have already been completed
+        const convertedMissions: Mission[] = data
+          .filter((fm) => !completedMissionIds.includes(fm.id))
+          .map((fm) => ({
+            id: fm.id,
+            // Use English title/description/tags if available and language is English, otherwise fallback to Korean
+            title: isEnglish && fm.title_en ? fm.title_en : fm.title,
+            description: isEnglish && fm.description_en ? fm.description_en : fm.description,
+            category: fm.category as Mission['category'],
+            tags: isEnglish && fm.tags_en?.length ? fm.tags_en : (fm.tags || []),
+            imageUrl: fm.image_url,
+            isPremium: false, // Featured missions are free
+          }));
 
         setFeaturedMissions(convertedMissions);
       }
@@ -249,7 +262,7 @@ export default function MissionScreen() {
     } finally {
       setIsLoadingFeatured(false);
     }
-  }, [i18n.language]);
+  }, [i18n.language, coupleId]);
 
   // Check for date reset on focus
   useFocusEffect(

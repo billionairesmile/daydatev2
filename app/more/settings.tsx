@@ -180,6 +180,7 @@ export default function SettingsScreen() {
   const AVAILABLE_LANGUAGES: { code: SupportedLanguage; name: string; nativeName: string }[] = [
     { code: 'ko', name: 'Korean', nativeName: '한국어' },
     { code: 'en', name: 'English', nativeName: 'English' },
+    { code: 'es', name: 'Spanish', nativeName: 'Español' },
   ];
 
   const handleLanguageSelect = (langCode: SupportedLanguage) => {

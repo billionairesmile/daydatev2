@@ -714,6 +714,34 @@ export const db = {
       };
     },
 
+    // Get all completed mission IDs (for filtering out already completed missions)
+    async getCompletedMissionIds(coupleId: string): Promise<{ data: string[] | null; error: Error | null }> {
+      const client = getSupabase();
+      try {
+        const { data, error } = await client
+          .from('completed_missions')
+          .select('mission_data')
+          .eq('couple_id', coupleId);
+
+        if (error) {
+          return { data: null, error };
+        }
+
+        // Extract mission IDs from mission_data
+        const missionIds: string[] = [];
+        for (const row of data || []) {
+          const missionData = row.mission_data as { id?: string } | null;
+          if (missionData?.id) {
+            missionIds.push(missionData.id);
+          }
+        }
+
+        return { data: missionIds, error: null };
+      } catch (err) {
+        return { data: null, error: err as Error };
+      }
+    },
+
     // Subscribe to completed missions changes for real-time sync
     subscribeToCompletedMissions(
       coupleId: string,
@@ -1072,7 +1100,7 @@ export const db = {
       return { data, error };
     },
 
-    async getActiveByLanguage(language: 'ko' | 'en') {
+    async getActiveByLanguage(language: 'ko' | 'en' | 'es') {
       const client = getSupabase();
       const { data, error } = await client
         .from('announcements')
@@ -1133,96 +1161,6 @@ export const db = {
       const client = getSupabase();
       const { error } = await client
         .from('announcements')
-        .delete()
-        .eq('id', id);
-      return { error };
-    },
-  },
-
-  // FAQ Items
-  faqItems: {
-    async getActive() {
-      const client = getSupabase();
-      const { data, error } = await client
-        .from('faq_items')
-        .select('*')
-        .eq('is_active', true)
-        .order('display_order', { ascending: true });
-      return { data, error };
-    },
-
-    async getActiveByLanguage(language: 'ko' | 'en') {
-      const client = getSupabase();
-      const { data, error } = await client
-        .from('faq_items')
-        .select('*')
-        .eq('is_active', true)
-        .eq('language', language)
-        .order('display_order', { ascending: true });
-      return { data, error };
-    },
-
-    async getAll() {
-      const client = getSupabase();
-      const { data, error } = await client
-        .from('faq_items')
-        .select('*')
-        .order('display_order', { ascending: true });
-      return { data, error };
-    },
-
-    async getByCategory(category: string) {
-      const client = getSupabase();
-      const { data, error } = await client
-        .from('faq_items')
-        .select('*')
-        .eq('category', category)
-        .eq('is_active', true)
-        .order('display_order', { ascending: true });
-      return { data, error };
-    },
-
-    async getById(id: string) {
-      const client = getSupabase();
-      const { data, error } = await client
-        .from('faq_items')
-        .select('*')
-        .eq('id', id)
-        .single();
-      return { data, error };
-    },
-
-    async create(faqItem: {
-      question: string;
-      answer: string;
-      category?: string;
-      display_order?: number;
-      is_active?: boolean;
-    }) {
-      const client = getSupabase();
-      const { data, error } = await client
-        .from('faq_items')
-        .insert(faqItem)
-        .select()
-        .single();
-      return { data, error };
-    },
-
-    async update(id: string, updates: Record<string, unknown>) {
-      const client = getSupabase();
-      const { data, error } = await client
-        .from('faq_items')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
-      return { data, error };
-    },
-
-    async delete(id: string) {
-      const client = getSupabase();
-      const { error } = await client
-        .from('faq_items')
         .delete()
         .eq('id', id);
       return { error };

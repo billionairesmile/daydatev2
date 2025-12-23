@@ -472,9 +472,9 @@
       "latestVersion": "Latest"
     },
     "account": {
-      "logout": "Log Out",
-      "logoutTitle": "Log Out",
-      "logoutMessage": "Are you sure you want to log out?",
+      "logout": "Sign out",
+      "logoutTitle": "Sign out",
+      "logoutMessage": "Are you sure you want to sign out?",
       "deleteAccount": "Delete Account",
       "unpair": "Unpair"
     },

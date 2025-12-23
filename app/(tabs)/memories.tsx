@@ -105,7 +105,8 @@ export default function MemoriesScreen() {
 
   const [selectedMonth, setSelectedMonth] = useState<MonthData | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<MemoryType | null>(null);
-  const [showYearPicker, setShowYearPicker] = useState<string | null>(null);
+  const [showYearPicker, setShowYearPicker] = useState(false);
+  const [selectedYear, setSelectedYear] = useState<string | null>(null);
 
   // Local albums state (for demo mode fallback)
   const [localAlbums, setLocalAlbums] = useState<Album[]>([]);
@@ -174,7 +175,7 @@ export default function MemoriesScreen() {
     Object.values(albumPhotos).forEach(photos => {
       photos.forEach(photo => {
         if (photo.photoUrl) {
-          ExpoImage.prefetch(photo.photoUrl).catch(() => {});
+          ExpoImage.prefetch(photo.photoUrl).catch(() => { });
         }
       });
     });
@@ -496,6 +497,15 @@ export default function MemoriesScreen() {
 
   const groupedMissions = groupByYearMonth(completedMemories);
   const years = Object.keys(groupedMissions).sort((a, b) => parseInt(b) - parseInt(a));
+
+  // Set initial selectedYear to the newest year, or update if current selection is no longer valid
+  useEffect(() => {
+    if (years.length > 0) {
+      if (!selectedYear || !years.includes(selectedYear)) {
+        setSelectedYear(years[0]); // Default to newest year
+      }
+    }
+  }, [years, selectedYear]);
 
   // Sync selectedMonth with current groupedMissions when memories change (real-time sync from partner)
   useEffect(() => {
@@ -1060,77 +1070,83 @@ export default function MemoriesScreen() {
           bounces={true}
           alwaysBounceVertical={true}
         >
-          {/* Year Groups */}
-          {years.map((year) => {
-            const months = Object.keys(groupedMissions[year]).sort(
-              (a, b) => parseInt(b) - parseInt(a)
-            );
-
-            return (
-              <View key={year} style={styles.yearSection}>
-                {/* Year Header */}
-                <View style={styles.yearHeader}>
-                  <Text style={styles.yearTitle}>{i18n.language === 'ko' ? `${year}년` : year}</Text>
+          {/* Selected Year Section */}
+          {selectedYear && groupedMissions[selectedYear] && (
+            <View style={styles.yearSection}>
+              {/* Year Header with Dropdown */}
+              <View style={styles.yearHeader}>
+                <Pressable
+                  onPress={() => years.length > 1 && setShowYearPicker(!showYearPicker)}
+                  style={styles.yearTitleButton}
+                >
+                  <Text style={styles.yearTitle}>
+                    {i18n.language === 'ko' ? `${selectedYear}년` : selectedYear}
+                  </Text>
                   {years.length > 1 && (
-                    <Pressable
-                      onPress={() => setShowYearPicker(showYearPicker === year ? null : year)}
-                      style={styles.yearPickerButton}
-                    >
-                      <ChevronDown
-                        color={COLORS.white}
-                        size={16}
-                        style={{
-                          transform: [{ rotate: showYearPicker === year ? '180deg' : '0deg' }],
-                        }}
-                      />
-                    </Pressable>
+                    <ChevronDown
+                      color={COLORS.white}
+                      size={16}
+                      style={{
+                        marginLeft: 4,
+                        transform: [{ rotate: showYearPicker ? '180deg' : '0deg' }],
+                      }}
+                    />
                   )}
-                </View>
+                </Pressable>
 
-                {/* Year Picker Dropdown */}
-                {showYearPicker === year && (
+                {/* Year Picker Dropdown (Overlay) */}
+                {showYearPicker && (
                   <View style={styles.yearPickerDropdown}>
                     {years.map((y) => (
                       <Pressable
                         key={y}
                         onPress={() => {
-                          setShowYearPicker(null);
+                          setSelectedYear(y);
+                          setShowYearPicker(false);
                         }}
                         style={[
                           styles.yearPickerItem,
-                          y === year && styles.yearPickerItemActive,
+                          y === selectedYear && styles.yearPickerItemActive,
                         ]}
                       >
                         <Text
                           style={[
                             styles.yearPickerItemText,
-                            y === year && styles.yearPickerItemTextActive,
+                            y === selectedYear && styles.yearPickerItemTextActive,
                           ]}
                         >
                           {i18n.language === 'ko' ? `${y}년` : y}
                         </Text>
+                        {y === selectedYear && (
+                          <View style={styles.yearPickerCheckCircle}>
+                            <Check size={12} color="#FFF" strokeWidth={3} />
+                          </View>
+                        )}
                       </Pressable>
                     ))}
                   </View>
                 )}
+              </View>
 
-                {/* Horizontal Month Cards */}
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.monthCardsContainer}
-                >
-                  {months.map((month) => {
-                    const missions = groupedMissions[year][month];
+              {/* Horizontal Month Cards */}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.monthCardsContainer}
+              >
+                {Object.keys(groupedMissions[selectedYear])
+                  .sort((a, b) => parseInt(b) - parseInt(a))
+                  .map((month) => {
+                    const missions = groupedMissions[selectedYear][month];
                     const representativeMission = missions[0];
                     const hasMultiple = missions.length > 1;
 
                     return (
                       <Pressable
-                        key={`${year}-${month}`}
+                        key={`${selectedYear}-${month}`}
                         style={styles.monthCard}
                         onPress={() => setSelectedMonth({
-                          year,
+                          year: selectedYear,
                           month,
                           monthName: getMonthName(month),
                           missions,
@@ -1165,10 +1181,9 @@ export default function MemoriesScreen() {
                       </Pressable>
                     );
                   })}
-                </ScrollView>
-              </View>
-            );
-          })}
+              </ScrollView>
+            </View>
+          )}
 
           {/* Photo Collage Section */}
           <View style={styles.collageSection}>
@@ -1180,78 +1195,82 @@ export default function MemoriesScreen() {
             </View>
             <Text style={styles.collageSectionSubtitle}>{t('memories.album.subtitle')}</Text>
 
-            {/* Created Albums List */}
+            {/* Created Albums - 5 per row, each row scrollable */}
             {albums.length > 0 && (
-              <View style={styles.albumsListContainer}>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.albumsList}
-                >
-                  {albums.map((album) => (
-                    <Pressable
-                      key={album.id}
-                      style={styles.albumItem}
-                      onPress={() => {
-                        setSelectedAlbum(album);
-                        setShowAlbumDetailModal(true);
-                      }}
-                    >
-                      <View style={styles.hardcoverBook}>
-                        {/* Full Photo Background */}
-                        {album.coverPhoto ? (
-                          <ExpoImage source={{ uri: album.coverPhoto }} style={styles.bookFullPhoto} contentFit="cover" cachePolicy="memory-disk" transition={100} />
-                        ) : (
-                          <View style={styles.bookPlaceholder}>
-                            <ImageIcon color="rgba(255,255,255,0.3)" size={24} />
-                          </View>
-                        )}
+              <View style={styles.albumsContainer}>
+                {/* Group albums into rows of 5 */}
+                {Array.from({ length: Math.ceil(albums.length / 5) }, (_, rowIndex) => (
+                  <ScrollView
+                    key={`album-row-${rowIndex}`}
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.albumRow}
+                  >
+                    {albums.slice(rowIndex * 5, rowIndex * 5 + 5).map((album) => (
+                      <Pressable
+                        key={album.id}
+                        style={styles.albumItem}
+                        onPress={() => {
+                          setSelectedAlbum(album);
+                          setShowAlbumDetailModal(true);
+                        }}
+                      >
+                        <View style={styles.hardcoverBook}>
+                          {/* Full Photo Background */}
+                          {album.coverPhoto ? (
+                            <ExpoImage source={{ uri: album.coverPhoto }} style={styles.bookFullPhoto} contentFit="cover" cachePolicy="memory-disk" transition={100} />
+                          ) : (
+                            <View style={styles.bookPlaceholder}>
+                              <ImageIcon color="rgba(255,255,255,0.3)" size={24} />
+                            </View>
+                          )}
 
-                        {/* Book Spine - Inward Curve Effect */}
-                        <LinearGradient
-                          colors={['rgba(0, 0, 0, 0.65)', 'rgba(0, 0, 0, 0.35)', 'rgba(0, 0, 0, 0.12)', 'rgba(255, 255, 255, 0.08)', 'transparent']}
-                          locations={[0, 0.25, 0.55, 0.8, 1]}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 0 }}
-                          style={styles.bookSpineCurve}
-                        />
+                          {/* Book Spine - Inward Curve Effect */}
+                          <LinearGradient
+                            colors={['rgba(0, 0, 0, 0.65)', 'rgba(0, 0, 0, 0.35)', 'rgba(0, 0, 0, 0.12)', 'rgba(255, 255, 255, 0.08)', 'transparent']}
+                            locations={[0, 0.25, 0.55, 0.8, 1]}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={styles.bookSpineCurve}
+                          />
 
-                        {/* Main Cover Area */}
-                        <View style={styles.albumCoverWrapper}>
-                          {/* Cover Texture Overlay */}
-                          <View style={styles.coverTextureOverlay} pointerEvents="none" />
+                          {/* Main Cover Area */}
+                          <View style={styles.albumCoverWrapper}>
+                            {/* Cover Texture Overlay */}
+                            <View style={styles.coverTextureOverlay} pointerEvents="none" />
 
-                          {/* Cover Edge Highlight */}
-                          <View style={styles.coverEdgeHighlight} pointerEvents="none" />
+                            {/* Cover Edge Highlight */}
+                            <View style={styles.coverEdgeHighlight} pointerEvents="none" />
 
-                          {/* Album Name - Basic or Ransom Style */}
-                          <View style={[
-                            styles.albumNameOverlay,
-                            {
-                              left: (album.namePosition?.x ?? 30) * ALBUM_SCALE_RATIO,
-                              top: (album.namePosition?.y ?? 16) * ALBUM_SCALE_RATIO,
-                            }
-                          ]}>
-                            {album.fontStyle === 'basic' ? (
-                              // Basic Jua Font Style
-                              <Text style={[styles.basicFontTiny, { fontSize: 16 * (album.textScale || 1) * ALBUM_SCALE_RATIO }]}>{album.name}</Text>
-                            ) : (
-                              // Ransom Style - Image-based
-                              <RansomText
-                                text={album.name}
-                                seed={album.ransomSeed || 12345}
-                                characterSize={18 * (album.textScale || 1) * ALBUM_SCALE_RATIO}
-                                spacing={-4 * ALBUM_SCALE_RATIO}
-                                enableRotation={true}
-                                enableYOffset={true}
-                              />
-                            )}
+                            {/* Album Name - Basic or Ransom Style */}
+                            <View style={[
+                              styles.albumNameOverlay,
+                              {
+                                left: (album.namePosition?.x ?? 30) * ALBUM_SCALE_RATIO,
+                                top: (album.namePosition?.y ?? 16) * ALBUM_SCALE_RATIO,
+                              }
+                            ]}>
+                              {album.fontStyle === 'basic' ? (
+                                // Basic Jua Font Style
+                                <Text style={[styles.basicFontTiny, { fontSize: 16 * (album.textScale || 1) * ALBUM_SCALE_RATIO }]}>{album.name}</Text>
+                              ) : (
+                                // Ransom Style - Image-based
+                                <RansomText
+                                  text={album.name}
+                                  seed={album.ransomSeed || 12345}
+                                  characterSize={18 * (album.textScale || 1) * ALBUM_SCALE_RATIO}
+                                  spacing={-4 * ALBUM_SCALE_RATIO}
+                                  enableRotation={true}
+                                  enableYOffset={true}
+                                />
+                              )}
+                            </View>
                           </View>
                         </View>
-                      </View>
-                    </Pressable>
-                  ))}
-                </ScrollView>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                ))}
               </View>
             )}
           </View>
@@ -3000,7 +3019,7 @@ function PhotoDetailView({
   useEffect(() => {
     missions.forEach(mission => {
       if (mission.photoUrl) {
-        ExpoImage.prefetch(mission.photoUrl).catch(() => {});
+        ExpoImage.prefetch(mission.photoUrl).catch(() => { });
       }
     });
   }, [missions]);
@@ -3411,10 +3430,12 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xl,
   },
   yearHeader: {
+    position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: SPACING.lg,
     marginBottom: SPACING.md,
+    zIndex: 10,
   },
   yearTitle: {
     fontSize: 20,
@@ -3428,29 +3449,51 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginLeft: SPACING.xs,
   },
+  yearTitleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   yearPickerDropdown: {
-    marginHorizontal: SPACING.lg,
-    marginBottom: SPACING.md,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    position: 'absolute',
+    top: 36,
+    left: SPACING.lg,
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    padding: SPACING.xs,
-    width: 128,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+    minWidth: 160,
+    zIndex: 100,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
   },
   yearPickerItem: {
-    paddingVertical: 10,
-    paddingHorizontal: SPACING.md,
-    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 16,
   },
   yearPickerItemActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(0, 0, 0, 0.06)',
   },
   yearPickerItemText: {
-    fontSize: 15,
-    color: COLORS.white,
-    textAlign: 'center',
+    fontSize: 17,
+    color: '#1A1A1A',
   },
   yearPickerItemTextActive: {
-    fontWeight: '600',
+    fontWeight: '700',
+  },
+  yearPickerCheckCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#000',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   monthCardsContainer: {
     paddingHorizontal: SPACING.lg,
@@ -3952,10 +3995,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   // Album List Styles
-  albumsListContainer: {
+  albumsContainer: {
+    marginTop: SPACING.sm,
     marginHorizontal: -SPACING.lg,
+    gap: 12,
   },
-  albumsList: {
+  albumRow: {
     paddingHorizontal: SPACING.lg,
     gap: 12,
   },

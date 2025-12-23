@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,6 @@ import {
   SafeAreaView,
   StatusBar,
   Linking,
-  ActivityIndicator,
 } from 'react-native';
 import {
   ChevronLeft,
@@ -20,50 +19,18 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { COLORS, SPACING, RADIUS } from '@/constants/design';
-import { db } from '@/lib/supabase';
+import { FAQ_DATA, type FAQItem } from '@/constants/faqData';
 import { useLanguageStore, type SupportedLanguage } from '@/stores/languageStore';
-
-type FAQItem = {
-  id: string;
-  question: string;
-  answer: string;
-};
 
 export default function CustomerServiceScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const { language: appLanguage } = useLanguageStore();
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [faqItems, setFaqItems] = useState<FAQItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [selectedLanguage, setSelectedLanguage] = useState<SupportedLanguage>(appLanguage);
 
-  // Fetch FAQ items from Supabase
-  useEffect(() => {
-    loadFaqItems(selectedLanguage);
-  }, [selectedLanguage]);
-
-  const loadFaqItems = useCallback(async (lang: SupportedLanguage) => {
-    try {
-      setIsLoading(true);
-      const { data, error } = await db.faqItems.getActiveByLanguage(lang);
-
-      if (error) throw error;
-
-      if (data) {
-        const formattedFaqItems: FAQItem[] = data.map((item) => ({
-          id: item.id,
-          question: item.question,
-          answer: item.answer,
-        }));
-        setFaqItems(formattedFaqItems);
-      }
-    } catch (error) {
-      console.error('Error loading FAQ items:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  // Get FAQ items from hardcoded data based on selected language
+  const faqItems = FAQ_DATA[selectedLanguage] || FAQ_DATA.en;
 
   const toggleExpand = (id: string) => {
     setExpandedId(expandedId === id ? null : id);
@@ -122,6 +89,22 @@ export default function CustomerServiceScreen() {
               EN
             </Text>
           </Pressable>
+          <Pressable
+            style={[
+              styles.langButton,
+              selectedLanguage === 'es' && styles.langButtonActive,
+            ]}
+            onPress={() => handleLanguageToggle('es')}
+          >
+            <Text
+              style={[
+                styles.langButtonText,
+                selectedLanguage === 'es' && styles.langButtonTextActive,
+              ]}
+            >
+              ES
+            </Text>
+          </Pressable>
         </View>
       </View>
 
@@ -132,38 +115,32 @@ export default function CustomerServiceScreen() {
       >
         {/* FAQ Section */}
         <Text style={styles.sectionTitle}>{t('more.customerService.faqTitle')}</Text>
-        {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={COLORS.primary} />
-          </View>
-        ) : (
-          <View style={styles.faqContainer}>
-            {faqItems.map((item, index) => {
-              const isExpanded = expandedId === item.id;
-              const isLast = index === faqItems.length - 1;
-              return (
-                <View key={item.id}>
-                  <Pressable
-                    style={[styles.faqItem, !isLast && !isExpanded && styles.faqItemBorder]}
-                    onPress={() => toggleExpand(item.id)}
-                  >
-                    <Text style={styles.faqQuestion}>{item.question}</Text>
-                    {isExpanded ? (
-                      <ChevronUp color="#999" size={20} />
-                    ) : (
-                      <ChevronDown color="#999" size={20} />
-                    )}
-                  </Pressable>
-                  {isExpanded && (
-                    <View style={[styles.faqAnswer, !isLast && styles.faqAnswerBorder]}>
-                      <Text style={styles.faqAnswerText}>{item.answer}</Text>
-                    </View>
+        <View style={styles.faqContainer}>
+          {faqItems.map((item, index) => {
+            const isExpanded = expandedId === item.id;
+            const isLast = index === faqItems.length - 1;
+            return (
+              <View key={item.id}>
+                <Pressable
+                  style={[styles.faqItem, !isLast && !isExpanded && styles.faqItemBorder]}
+                  onPress={() => toggleExpand(item.id)}
+                >
+                  <Text style={styles.faqQuestion}>{item.question}</Text>
+                  {isExpanded ? (
+                    <ChevronUp color="#999" size={20} />
+                  ) : (
+                    <ChevronDown color="#999" size={20} />
                   )}
-                </View>
-              );
-            })}
-          </View>
-        )}
+                </Pressable>
+                {isExpanded && (
+                  <View style={[styles.faqAnswer, !isLast && styles.faqAnswerBorder]}>
+                    <Text style={styles.faqAnswerText}>{item.answer}</Text>
+                  </View>
+                )}
+              </View>
+            );
+          })}
+        </View>
 
         {/* Kakao Inquiry Section */}
         <View style={styles.inquiryContainer}>
@@ -331,10 +308,5 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#000',
-  },
-  loadingContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 80,
   },
 });

@@ -1,0 +1,700 @@
+{
+  "common": {
+    "confirm": "Confirmar",
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "done": "Listo",
+    "add": "Añadir",
+    "reset": "Restablecer",
+    "close": "Cerrar",
+    "next": "Siguiente",
+    "back": "Atrás",
+    "yes": "Sí",
+    "no": "No",
+    "loading": "Cargando...",
+    "error": "Error",
+    "success": "¡Listo!",
+    "today": "Hoy",
+    "partner": "Pareja",
+    "me": "Yo",
+    "days": "días",
+    "daysCount": "días"
+  },
+  "tabs": {
+    "home": "Inicio",
+    "mission": "Misión",
+    "calendar": "Calendario",
+    "memories": "Recuerdos",
+    "more": "Más"
+  },
+  "home": {
+    "anniversary": {
+      "title": "Aniversario",
+      "add": "Añadir Aniversario",
+      "edit": "Editar Aniversario",
+      "delete": "Eliminar Aniversario",
+      "deleteConfirm": "¿Eliminar el aniversario \"{{name}}\"?",
+      "name": "Aniversario",
+      "namePlaceholder": "Nombre del aniversario",
+      "date": "Fecha",
+      "weddingAnniversary": "Aniversario de Boda",
+      "datingAnniversary": "Noviazgo",
+      "birthday": "Cumpleaños",
+      "lunar": "(Lunar)",
+      "christmas": "Navidad",
+      "valentinesDay": "San Valentín",
+      "whiteDay": "Día Blanco",
+      "selectDate": "Fecha del Aniversario"
+    },
+    "background": {
+      "title": "Cambiar Fondo",
+      "description": "La imagen seleccionada se aplicará como fondo en todas las páginas",
+      "selectFromGallery": "Seleccionar de Galería",
+      "resetToDefault": "Restablecer por Defecto",
+      "uploadFailed": "Error al Subir",
+      "uploadFailedMessage": "No se pudo subir la imagen. Inténtalo de nuevo.",
+      "uploadError": "Ocurrió un error al subir la imagen."
+    },
+    "tutorial": {
+      "title": "Cambia tu foto de fondo",
+      "description": "Toca este botón para personalizar\nel fondo con tu foto de pareja"
+    }
+  },
+  "mission": {
+    "title": "Misión",
+    "subtitle": "¿Qué momentos compartirán hoy?",
+    "generate": "Obtener Misiones",
+    "generating": "Generando...",
+    "generatingMessage": "Creando tu misión",
+    "pleaseWait": "Espera un momento",
+    "start": "Comenzar",
+    "completed": "Completada",
+    "kept": "Guardada",
+    "keep": "Guardar",
+    "anotherInProgress": "En progreso",
+    "questions": {
+      "canMeetToday": "¿Pueden verse hoy?",
+      "yesMeet": "Sí, podemos",
+      "noMeet": "No",
+      "availableTime": "¿Cuánto tiempo tienen juntos hoy?",
+      "todayMood": "¿Cómo se sienten hoy? (Selecciona todos)"
+    },
+    "timeOptions": {
+      "30min": "30 min",
+      "1hour": "1 hora",
+      "2hour": "2+ horas",
+      "allday": "Todo el día"
+    },
+    "moodOptions": {
+      "fun": "Quiero reír",
+      "deep_talk": "Necesito hablar",
+      "active": "Activo",
+      "healing": "Relajarme",
+      "culture": "Cultura",
+      "adventure": "Nuevo Reto",
+      "romantic": "Romántico"
+    },
+    "alerts": {
+      "locationRequired": "Ubicación Necesaria",
+      "locationRequiredMessage": "Se necesita permiso de ubicación para generar misiones.\nPor favor, permite el acceso.",
+      "allowPermission": "Permitir",
+      "locationDenied": "Ubicación Denegada",
+      "locationDeniedMessage": "El permiso de ubicación fue denegado. Por favor, actívalo en ajustes.",
+      "goToSettings": "Ir a Ajustes",
+      "cannotKeep": "No Se Puede Guardar",
+      "alreadyCompletedKeep": "Las misiones completadas no se pueden guardar.",
+      "keepMission": "Guardar Misión",
+      "keepMissionConfirm": "¿Guardar '{{title}}' en tu colección?",
+      "keepLimit": "Límite de Guardado",
+      "keepLimitMessage": "Puedes guardar hasta 5 misiones.\nElimina alguna antes de añadir más.",
+      "cannotStart": "No Se Puede Iniciar",
+      "anotherInProgressMessage": "Ya hay otra misión en progreso.",
+      "dailyLimitMessage": "Ya completaste la misión de hoy.\n¡Vuelve mañana!"
+    }
+  },
+  "missionDetail": {
+    "headerTitle": "Detalles de Misión",
+    "notFound": {
+      "title": "Misión no encontrada",
+      "description": "Esta misión ya no está disponible."
+    },
+    "camera": {
+      "title": "Tomar Foto",
+      "confirmTitle": "Confirmar Foto",
+      "permissionRequired": "Permiso de Cámara Necesario",
+      "permissionMessage": "Se necesita permiso de cámara para tomar fotos.",
+      "photoError": "Error al tomar la foto. Inténtalo de nuevo.",
+      "usePhoto": "Usar Foto",
+      "retake": "Repetir"
+    },
+    "location": {
+      "noInfo": "Ubicación no disponible"
+    },
+    "steps": {
+      "photo": {
+        "title": "Toma una Foto",
+        "description": "Captura tu momento especial juntos.",
+        "hint": "Captura la emoción y felicidad de este momento\ny conviértelo en un recuerdo."
+      },
+      "message": {
+        "title": "Escríbanse un Mensaje",
+        "description": "Deja un mensaje sincero para tu pareja. Un mensaje de corazón crea\nrecuerdos más especiales.",
+        "written": "Escrito",
+        "notWritten": "No escrito"
+      },
+      "complete": "Listo"
+    },
+    "status": {
+      "anotherInProgress": "En progreso",
+      "waitingPartner": "Esperando a tu pareja...",
+      "waitingPhoto": "Esperando foto...",
+      "writeMessage": "Escribe un mensaje",
+      "takePhoto": "Tomar Foto"
+    },
+    "modal": {
+      "title": "Mensaje para tu Pareja",
+      "placeholder": "Escribe lo que quieras decirle a tu pareja"
+    },
+    "defaultPartnerMessage": "Soy feliz a tu lado 💕",
+    "completed": "Completada",
+    "completeButton": "¡Misión Completada! 🎉",
+    "writeMessage": "Escribir Mensaje",
+    "messagePlaceholder": "Registra la misión de hoy juntos",
+    "submitMission": "Completar Misión",
+    "partnerMessage": "Mensaje de tu Pareja",
+    "myMessage": "Mi Mensaje",
+    "waitingPartner": "Esperando mensaje de tu pareja",
+    "viewMemory": "Ver Recuerdo"
+  },
+  "bookmark": {
+    "title": "Misiones Guardadas",
+    "empty": "No hay misiones guardadas",
+    "emptyHint": "Guarda las misiones que te gusten",
+    "deleteMission": "Eliminar Misión",
+    "deleteConfirm": "¿Eliminar '{{title}}'?"
+  },
+  "calendar": {
+    "title": "Calendario",
+    "subtitle": "Registra nuestro tiempo juntos",
+    "dayNames": [
+      "Dom",
+      "Lun",
+      "Mar",
+      "Mié",
+      "Jue",
+      "Vie",
+      "Sáb"
+    ],
+    "settings": {
+      "title": "Ajustes del Calendario",
+      "description": "Elige qué funciones mostrar"
+    },
+    "todo": {
+      "title": "Pendientes",
+      "empty": "Aún no hay tareas",
+      "emptyHint": "Toca para añadir una tarea",
+      "addPlaceholder": "Ej: Reservar entradas de cine",
+      "addTitle": "Escribe tu tarea",
+      "add": "Añadir Tarea"
+    },
+    "period": {
+      "title": "Info del Período",
+      "calendar": "Calendario Menstrual",
+      "calendarDesc": "Registra y predice tu ciclo menstrual",
+      "inputTitle": "Ingresa información del período",
+      "settingsTitle": "Ajustes del Período",
+      "startDate": "Inicio del Período",
+      "lastStartDate": "Último Inicio del Período",
+      "averageCycle": "Ciclo Promedio",
+      "cycleLength": "Duración del Ciclo",
+      "periodLength": "Duración del Período",
+      "cycleHint": "Un ciclo típico dura entre 21-35 días",
+      "nextDate": "Próxima Fecha Esperada",
+      "lastDate": "Última Fecha de Inicio",
+      "daysUnit": "días",
+      "legend": {
+        "period": "Período",
+        "fertile": "Ventana Fértil",
+        "ovulation": "Ovulación"
+      },
+      "selectDate": "Seleccionar Fecha"
+    },
+    "holidays": {
+      "newYear": "Año Nuevo",
+      "lunarNewYear": "Año Nuevo Lunar",
+      "lunarNewYearHoliday": "Feriado de Año Nuevo Lunar",
+      "independenceDay": "Día de la Independencia",
+      "childrenDay": "Día del Niño",
+      "buddhasBirthday": "Cumpleaños de Buda",
+      "memorialDay": "Día de los Caídos",
+      "liberationDay": "Día de la Liberación",
+      "foundationDay": "Día de la Fundación",
+      "chuseok": "Chuseok",
+      "chuseokHoliday": "Feriado de Chuseok",
+      "hangulDay": "Día del Hangul",
+      "christmas": "Navidad"
+    }
+  },
+  "memories": {
+    "title": "Recuerdos",
+    "subtitle": "Momentos que compartimos juntos",
+    "empty": "No hay misiones completadas",
+    "emptyHint": "Completa misiones y escríbanse mensajes",
+    "viewAll": "Ver Todo",
+    "togetherMoment": "Momento juntos",
+    "itemCount": "{{count}} elementos",
+    "monthNames": [
+      "Ene",
+      "Feb",
+      "Mar",
+      "Abr",
+      "May",
+      "Jun",
+      "Jul",
+      "Ago",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dic"
+    ],
+    "yearFormat": "{{year}}",
+    "yearMonthFormat": "{{month}} {{year}}",
+    "filter": {
+      "all": "Todo",
+      "thisMonth": "Este Mes",
+      "thisYear": "Este Año"
+    },
+    "album": {
+      "title": "Álbumes",
+      "subtitle": "Crea álbumes de tus momentos memorables",
+      "name": "Nombre del Álbum",
+      "coverPhoto": "Foto de Portada",
+      "fontStyle": "Estilo de Fuente",
+      "fontStyleDesc": "Selecciona un estilo de fuente para el título",
+      "basicFont": "Fuente Básica",
+      "basicFontDesc": "Estilo limpio",
+      "ransomStyle": "Estilo Recorte",
+      "basicFontHint": "Se aplicará una fuente limpia",
+      "ransomFontHint": "Cada letra tendrá un estilo único",
+      "namePlaceholder": "Nombre del álbum...",
+      "ransomPlaceholder": "Solo inglés (A-Z, 0-9)",
+      "selectPhoto": "Seleccionar Foto",
+      "dragHint": "Arrastra para ajustar la posición del texto",
+      "coverEditHint": "Selecciona una foto y arrastra para ajustar el texto",
+      "color": "Color",
+      "size": "Tamaño",
+      "textSize": "Tamaño del Texto",
+      "addPhoto": "Añadir Foto",
+      "editCover": "Editar Portada",
+      "deleteAlbum": "Eliminar Álbum",
+      "deleteAlbumConfirm": "¿Estás seguro de eliminar este álbum?"
+    },
+    "photo": {
+      "select": "Seleccionar",
+      "delete": "Eliminar",
+      "deleteTitle": "Eliminar Foto",
+      "deleteConfirm": "¿Estás seguro de eliminar {{count}} fotos?",
+      "deleteSingleConfirm": "¿Estás seguro de eliminar esta foto?",
+      "save": "Guardar Foto",
+      "tapToFlip": "Toca para ver el reverso",
+      "tapToView": "Toca para ver la foto"
+    },
+    "permission": {
+      "required": "Permiso Requerido",
+      "photoAccess": "Se necesita acceso a la galería de fotos.",
+      "saveAccess": "Se necesita acceso a la galería para guardar fotos.",
+      "saveSuccess": "Guardado",
+      "saveSuccessMessage": "La foto se guardó en la galería.",
+      "saveFailed": "Error al Guardar",
+      "saveFailedMessage": "Ocurrió un error al guardar la foto."
+    }
+  },
+  "more": {
+    "title": "Más",
+    "sections": {
+      "profile": "Perfil",
+      "settings": "Ajustes",
+      "support": "Soporte",
+      "developer": "Desarrollador"
+    },
+    "menu": {
+      "myProfile": "Mi Perfil",
+      "coupleProfile": "Perfil de Pareja",
+      "settings": "Ajustes",
+      "announcements": "Anuncios",
+      "customerService": "Atención al Cliente",
+      "onboardingReset": "Reiniciar Configuración",
+      "missionReset": "Reiniciar Misiones",
+      "fullReset": "Reinicio Completo",
+      "logout": "Cerrar Sesión"
+    },
+    "announcements": {
+      "title": "Anuncios",
+      "empty": "Aún no hay anuncios"
+    },
+    "help": {
+      "title": "Ayuda",
+      "inquiry": "Contáctanos",
+      "faq": "Preguntas Frecuentes"
+    },
+    "customerService": {
+      "title": "Atención al Cliente",
+      "faqTitle": "Preguntas Frecuentes",
+      "inquiryTitle": "¿Aún tienes preguntas?",
+      "inquiryDescription": "Envíanos una consulta por KakaoTalk\ny te responderemos pronto.",
+      "kakaoButton": "Contactar Soporte"
+    },
+    "others": {
+      "title": "Otros",
+      "termsOfService": "Términos de Servicio",
+      "privacyPolicy": "Política de Privacidad"
+    },
+    "alerts": {
+      "devReset": "Reinicio de Desarrollador",
+      "devResetMessage": "¿Reiniciar configuración inicial y empezar de nuevo?",
+      "missionReset": "Reiniciar Misiones",
+      "missionResetMessage": "¿Reiniciar todas las misiones de hoy y su estado?",
+      "missionResetComplete": "Reinicio Completado",
+      "missionResetCompleteMessage": "Las misiones se reiniciaron. Ve a la pestaña Misión para crear nuevas.",
+      "fullReset": "⚠️ Reinicio Completo",
+      "fullResetMessage": "Esto eliminará todos los datos:\n\n• Datos de configuración\n• Info de pareja\n• Datos sincronizados\n• Datos de misiones\n• Todo el almacenamiento local\n\n¿Estás seguro?",
+      "fullResetComplete": "Reinicio Completado",
+      "fullResetCompleteMessage": "Todos los datos fueron eliminados. Reiniciando app.",
+      "logout": "Cerrar Sesión",
+      "logoutMessage": "¿Estás seguro de cerrar sesión?"
+    }
+  },
+  "profile": {
+    "myProfile": "Mi Perfil",
+    "coupleProfile": "Perfil de Pareja",
+    "nickname": "Apodo",
+    "birthDate": "Fecha de Nacimiento",
+    "mbti": "MBTI",
+    "anniversaryDate": "Aniversario",
+    "relationshipType": "Tipo de Relación",
+    "dating": "Noviazgo",
+    "married": "Casados",
+    "inviteCode": "Código de Invitación",
+    "copyCode": "Copiar Código",
+    "codeCopied": "Código copiado",
+    "disconnect": "Desconectar",
+    "disconnectConfirm": "¿Estás seguro de desconectarte?",
+    "disconnectWarning": "Todos los datos de pareja se eliminarán al desconectar.",
+    "notSet": "No establecido",
+    "dateFormat": "{{day}} de {{month}}, {{year}}",
+    "solar": "Solar",
+    "lunar": "Lunar",
+    "preferences": "Preferencias",
+    "preferredActivities": "Actividades Preferidas",
+    "dateConcerns": "Preocupaciones de Cita",
+    "constraints": "Restricciones",
+    "activitiesCount": "{{count}} actividades",
+    "noPreferences": "Sin preferencias establecidas",
+    "editNickname": {
+      "title": "Cambiar Apodo",
+      "description": "Este es el nombre que verá tu pareja",
+      "placeholder": "Ingresa tu apodo"
+    },
+    "editBirthday": {
+      "title": "Editar Fecha de Nacimiento",
+      "description": "Por favor ingresa tu fecha de nacimiento exacta",
+      "selectDate": "Por favor selecciona una fecha"
+    },
+    "editPreferences": {
+      "title": "Preferencias",
+      "editTitle": "Editar Preferencias",
+      "button": "Editar"
+    },
+    "couple": {
+      "title": "Perfil de Pareja",
+      "anniversary": "Aniversario",
+      "accountInfo": "Info de Cuenta",
+      "myAccountInfo": "Info de cuenta de {{nickname}}",
+      "myAccount": "Mi Cuenta",
+      "partnerAccountInfo": "Info de cuenta de {{nickname}}",
+      "partnerAccount": "Cuenta de Pareja",
+      "datingLabel": "Juntos Desde",
+      "marriedLabel": "Aniversario de Boda",
+      "datingType": "Novios",
+      "marriedType": "Casados",
+      "editAnniversary": {
+        "title": "Cambiar Aniversario",
+        "description": "Edita tu fecha especial",
+        "relationshipLabel": "Tipo de Relación",
+        "selectDate": "Por favor selecciona una fecha",
+        "datingStart": "Inicio del Noviazgo",
+        "marriedAnniversary": "Aniversario de Boda"
+      },
+      "accountDetail": {
+        "me": "Yo",
+        "partner": "Pareja",
+        "nickname": "Apodo",
+        "email": "Email",
+        "joinDate": "Fecha de Registro",
+        "noInfo": "Sin info",
+        "defaultPartnerEmail": "Pareja conectada"
+      }
+    },
+    "me": "Yo",
+    "partner": "Pareja"
+  },
+  "settings": {
+    "title": "Ajustes",
+    "sections": {
+      "notifications": "Notificaciones",
+      "marketing": "Marketing",
+      "other": "Otros",
+      "account": "Cuenta"
+    },
+    "notifications": {
+      "push": "Notificaciones Push",
+      "pushDesc": "Recibir todas las notificaciones",
+      "mission": "Notificaciones de Misión",
+      "missionDesc": "Recibe alertas cuando lleguen nuevas misiones",
+      "message": "Recordatorio de Mensaje",
+      "messageDesc": "Recibe alertas si no has escrito un mensaje"
+    },
+    "marketing": {
+      "news": "Notificaciones de Noticias",
+      "newsDesc": "Eventos y actualizaciones",
+      "info": "Información de Marketing",
+      "infoDesc": "Promociones y descuentos"
+    },
+    "other": {
+      "language": "Idioma",
+      "selectLanguage": "Seleccionar Idioma",
+      "termsOfService": "Términos de Servicio",
+      "locationTerms": "Términos de Ubicación",
+      "privacyPolicy": "Política de Privacidad",
+      "version": "Versión {{version}}",
+      "latestVersion": "Última"
+    },
+    "account": {
+      "logout": "Cerrar sesión",
+      "logoutTitle": "Cerrar sesión",
+      "logoutMessage": "¿Estás seguro de cerrar sesión?",
+      "deleteAccount": "Eliminar Cuenta",
+      "unpair": "Desemparejar"
+    },
+    "unpair": {
+      "title": "Desemparejar",
+      "confirmTitle": "Confirmar Desemparejamiento",
+      "warningTitle": "¿Estás seguro de desemparejarte?",
+      "warningText": "Desemparejarte te desconectará de tu pareja,\ny algunos datos podrían ser inaccesibles.",
+      "checkTitle": "Por favor revisa antes de desconectarte",
+      "daysTogether": "Días Juntos",
+      "daysUnit": "días",
+      "completedMissions": "Misiones Completadas",
+      "missionsUnit": "",
+      "recoveryPeriod": "Período de Recuperación",
+      "recoveryHint": "Los datos pueden recuperarse en 30 días",
+      "warningsTitle": "Advertencias",
+      "warning1": "Tu pareja será notificada de la desconexión",
+      "warning2": "El historial de misiones se guarda en cuentas individuales",
+      "warning3": "Puedes reconectarte con la misma pareja en 30 días",
+      "confirmPrompt": "Para continuar, escribe 'Desemparejar' abajo",
+      "confirmText": "Desemparejar",
+      "button": "Desemparejar",
+      "success": "Desemparejado",
+      "successMessage": "Te has desemparejado.\nReconéctate con la misma pareja en 30 días para recuperar tus datos.",
+      "error": "Ocurrió un error al desemparejarte.",
+      "notificationTitle": "Te han desemparejado",
+      "notificationBody": "{{nickname}} se ha desemparejado de ti. Reconéctate en 30 días para recuperar tus datos.",
+      "partnerDisconnectedTitle": "Emparejamiento Desconectado",
+      "partnerDisconnectedMessage": "Tu pareja ha desconectado el emparejamiento.\nPuedes conectarte con una nueva pareja o reconectarte en 30 días.",
+      "partnerDeletedAccountTitle": "Pareja Eliminó su Cuenta",
+      "partnerDeletedAccountMessage": "Tu pareja eliminó su cuenta y el emparejamiento terminó.\nNo es posible reconectarse, y los recuerdos anteriores no pueden recuperarse."
+    },
+    "deleteAccount": {
+      "title": "Eliminar Cuenta",
+      "warningText": "Eliminar tu cuenta\n",
+      "permanentDelete": "eliminará permanentemente",
+      "warningEnd": " todos los datos.",
+      "dataList": "Datos a eliminar: Información de perfil, Info de conexión de pareja, Registros de misiones completadas, Álbumes y fotos, Todos los ajustes",
+      "confirmPrompt": "Para continuar, escribe 'Eliminar' abajo",
+      "confirmText": "Eliminar",
+      "button": "Eliminar Cuenta",
+      "deleting": "Eliminando...",
+      "success": "Cuenta Eliminada",
+      "successMessage": "Todos los datos fueron eliminados.\nGracias por usar nuestro servicio.",
+      "error": "Ocurrió un error al eliminar tu cuenta.",
+      "partnerNotificationTitle": "Cuenta Eliminada",
+      "partnerNotificationBody": "{{nickname}} ha eliminado su cuenta."
+    },
+    "language": "Idioma",
+    "theme": "Tema",
+    "darkMode": "Modo Oscuro",
+    "version": "Versión",
+    "termsOfService": "Términos de Servicio",
+    "privacyPolicy": "Política de Privacidad",
+    "licenses": "Licencias de Código Abierto"
+  },
+  "onboarding": {
+    "welcome": "Bienvenido",
+    "welcomeTitle": "Bienvenido a\nDaydate",
+    "welcomeSubtitle": "Registra y comparte tus momentos especiales\njuntos como pareja",
+    "start": "Comenzar",
+    "skip": "Omitir",
+    "complete": "Completar",
+    "next": "Siguiente",
+    "previous": "Anterior",
+    "continue": "Continuar",
+    "confirm": "OK",
+    "defaultUser": "Usuario",
+    "login": {
+      "google": "Iniciar con Google",
+      "kakao": "Iniciar con Kakao",
+      "or": "o",
+      "success": "Inicio de Sesión Exitoso",
+      "successMessage": "Iniciaste sesión con tu cuenta de {{provider}}.",
+      "failed": "Inicio de Sesión Fallido",
+      "failedMessage": "Ocurrió un error al iniciar sesión. Inténtalo de nuevo.",
+      "failedProvider": "Fallo el inicio con {{provider}}. Inténtalo de nuevo.",
+      "demoMode": "Modo Demo",
+      "demoModeMessage": "El inicio de sesión social no está disponible en modo demo.\n\nConfigura las variables de entorno para conectar Supabase.",
+      "welcomeBack": "¡Bienvenido de vuelta!",
+      "alreadyConnected": "Ya estás conectado con tu pareja. Continuando desde info básica."
+    },
+    "testMode": {
+      "title": "Modo de Prueba",
+      "message": "En modo de prueba, los datos se guardan solo localmente y no se sincronizarán con el servidor.\n\nUsa esto solo para pruebas de desarrollo.",
+      "confirm": "Iniciar en Modo de Prueba",
+      "button": "Iniciar en Modo de Prueba",
+      "divider": "Desarrollador",
+      "hint": "Los datos se guardan solo localmente"
+    },
+    "basicInfo": {
+      "title": "Ingresa tu\ninformación básica",
+      "nickname": "Apodo",
+      "nicknamePlaceholder": "Ingresa tu apodo",
+      "gender": "Género",
+      "male": "Masculino",
+      "female": "Femenino",
+      "birthDate": "Fecha de Nacimiento",
+      "birthDatePlaceholder": "Selecciona fecha de nacimiento",
+      "solar": "Solar",
+      "lunar": "Lunar"
+    },
+    "terms": {
+      "title": "Acuerdo de Términos",
+      "subtitle": "Acepta los términos para usar el servicio",
+      "agreeAll": "Aceptar Todo",
+      "ageRequired": "[Requerido] Tengo 14 años o más",
+      "ageRequiredDesc": "Debes tener 14 años o más para usar este servicio. Usuarios menores de 14 años tienen uso restringido.",
+      "serviceTerms": "[Requerido] Acuerdo de Términos de Servicio",
+      "serviceTermsTitle": "Términos de Servicio",
+      "locationTerms": "[Requerido] Acuerdo de Términos de Ubicación",
+      "locationTermsTitle": "Términos de Servicio de Ubicación",
+      "privacyTerms": "[Requerido] Acuerdo de Política de Privacidad",
+      "privacyTermsTitle": "Política de Privacidad",
+      "marketingTerms": "[Opcional] Acuerdo de Notificaciones de Marketing"
+    },
+    "location": {
+      "permissionRequired": "Permiso de Ubicación Requerido",
+      "permissionMessage": "Se necesita permiso de ubicación para servicios basados en ubicación. Por favor permite el acceso en ajustes.",
+      "goToSettings": "Ir a Ajustes"
+    },
+    "nickname": {
+      "title": "Ingresa tu apodo",
+      "placeholder": "Apodo",
+      "hint": "Este nombre lo verá tu pareja"
+    },
+    "birthDate": {
+      "title": "Ingresa tu fecha de nacimiento",
+      "solar": "Solar",
+      "lunar": "Lunar"
+    },
+    "mbti": {
+      "title": "Selecciona tu\nMBTI",
+      "skip": "No lo sé"
+    },
+    "relationship": {
+      "title": "Selecciona tu tipo de relación",
+      "dating": "Noviazgo",
+      "married": "Casados"
+    },
+    "coupleInfo": {
+      "title": "Ingresa información\nde pareja",
+      "relationship": "Relación",
+      "datingLabel": "Primera Cita",
+      "marriedLabel": "Aniversario de Boda",
+      "selectDate": "Seleccionar {{label}}"
+    },
+    "anniversary": {
+      "title": "Ingresa tu aniversario",
+      "datingStart": "Primera Cita",
+      "weddingDate": "Fecha de Boda"
+    },
+    "pairing": {
+      "title": "Conéctate con\ntu pareja",
+      "subtitle": "Comparte datos con tu pareja usando un código de emparejamiento",
+      "generateCode": "Generar Código",
+      "enterCode": "Ingresar Código",
+      "myCode": "Código para compartir con tu pareja",
+      "enterCodePlaceholder": "Ingresa el código que generó tu pareja",
+      "connect": "Conectar",
+      "connecting": "Conectando...",
+      "waitingConnection": "Esperando",
+      "shareCode": "Compartir Código",
+      "waitingPartner": "Tu pareja se conectará\ncuando ingrese este código",
+      "connected": "¡Conectado con tu pareja!\nProcede al siguiente paso",
+      "invalidCode": "Código inválido. Por favor revisa el código.",
+      "alreadyPaired": "Este código ya fue usado.",
+      "partnerNotReady": "Tu pareja aún no está lista. Inténtalo más tarde.",
+      "connectionError": "Ocurrió un error al conectar. Inténtalo de nuevo.",
+      "coupleRestoreError": "Ocurrió un error al restaurar datos de pareja.",
+      "coupleConnectionError": "Ocurrió un error al conectar pareja.",
+      "copied": "Copiado",
+      "reconnected": "¡Qué bueno verte de nuevo! 💕",
+      "reconnectedMessage": "Tus datos fueron restaurados desde la reconexión en 30 días."
+    },
+    "preferences": {
+      "title": "Selecciona tus actividades\npreferidas",
+      "subtitle": "Selecciona todas las que apliquen",
+      "indoor": "Interior",
+      "outdoor": "Exterior",
+      "active": "Activo",
+      "relaxing": "Relajante",
+      "food": "Tours de Comida",
+      "cafe": "Cafetería",
+      "culture": "Cultura",
+      "travel": "Viajes"
+    },
+    "concerns": {
+      "title": "¿Cuáles son tus\npreocupaciones de cita?",
+      "subtitle": "Selecciona todas las que apliquen",
+      "noIdeas": "Sin ideas de citas",
+      "sameRoutine": "Misma rutina siempre",
+      "budget": "Preocupaciones de presupuesto",
+      "time": "No hay suficiente tiempo",
+      "distance": "Larga distancia"
+    },
+    "constraints": {
+      "title": "¿Alguna restricción\npara las misiones?",
+      "subtitle": "Selecciona todas las que apliquen"
+    },
+    "preferencesIntro": {
+      "title": "Cuéntanos tus preferencias\npara misiones personalizadas",
+      "subtitle": "Analizaremos tus preferencias\npara recomendarte misiones de cita adecuadas",
+      "hint": "Toma cerca de 1 minuto,\nPuedes editar cuando quieras en\n'Más > Mi Perfil'",
+      "startAnalysis": "Iniciar Análisis de Preferencias"
+    },
+    "completeStep": {
+      "title": "¡Bienvenido, {{nickname}}!",
+      "subtitle": "¡La configuración está completa!\n¡Creemos momentos especiales juntos!"
+    },
+    "dataRecovery": {
+      "title": "Datos Recuperados 💕",
+      "message": "Se encontraron tus datos de preferencias anteriores.\nOmitiendo entrada de preferencias."
+    }
+  },
+  "errors": {
+    "networkError": "Error de red",
+    "tryAgain": "Por favor inténtalo de nuevo",
+    "somethingWrong": "Algo salió mal",
+    "sessionExpired": "Sesión expirada",
+    "unauthorized": "No autorizado"
+  }
+}

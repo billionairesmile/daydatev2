@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import i18n from '@/lib/i18n';
 
 // Supported languages
-export type SupportedLanguage = 'ko' | 'en';
+export type SupportedLanguage = 'ko' | 'en' | 'es';
 
 // Country codes for culture-specific content
 export type CountryCode = 'KR' | 'US' | 'GB' | 'AU' | 'CA' | 'DEFAULT';
@@ -31,6 +31,7 @@ const getDeviceLanguage = (): SupportedLanguage => {
     if (locales && locales.length > 0) {
       const languageCode = locales[0].languageCode;
       if (languageCode === 'ko') return 'ko';
+      if (languageCode === 'es') return 'es';
     }
   } catch (e) {
     console.log('[LanguageStore] Failed to get device language:', e);
@@ -95,6 +96,8 @@ export const getLanguageDisplayName = (language: SupportedLanguage): string => {
       return '한국어';
     case 'en':
       return 'English';
+    case 'es':
+      return 'Español';
     default:
       return 'English';
   }
