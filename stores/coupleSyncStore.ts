@@ -125,6 +125,7 @@ interface CoupleSyncState {
 
   // Mission sync
   sharedMissions: Mission[];
+  sharedMissionsDate: string | null; // Track the date missions were generated (YYYY-MM-DD)
   missionGenerationStatus: MissionGenerationStatus;
   generatingUserId: string | null;
   lastMissionUpdate: Date | null;
@@ -172,6 +173,7 @@ interface CoupleSyncActions {
   saveSharedMissions: (missions: Mission[], answers: unknown, partnerId?: string, userNickname?: string) => Promise<void>;
   loadSharedMissions: () => Promise<Mission[] | null>;
   resetAllMissions: () => Promise<void>;
+  checkAndResetSharedMissions: () => void;
 
   // Mission reminder notification
   sendMissionReminderNotifications: (userNickname: string, partnerNickname: string) => Promise<void>;
@@ -256,6 +258,7 @@ const initialState: CoupleSyncState = {
   coupleId: null,
   userId: null,
   sharedMissions: [],
+  sharedMissionsDate: null,
   missionGenerationStatus: 'idle',
   generatingUserId: null,
   lastMissionUpdate: null,
@@ -709,8 +712,10 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
 
   saveSharedMissions: async (missions: Mission[], answers: unknown, partnerId?: string, userNickname?: string) => {
     const { coupleId, userId } = get();
+    const today = formatDateToLocal(new Date());
+
     if (!coupleId || !userId || isInTestMode()) {
-      set({ sharedMissions: missions, lastMissionUpdate: new Date() });
+      set({ sharedMissions: missions, sharedMissionsDate: today, lastMissionUpdate: new Date() });
       return;
     }
 
@@ -722,6 +727,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     if (!error) {
       set({
         sharedMissions: missions,
+        sharedMissionsDate: today,
         lastMissionUpdate: new Date(),
         missionGenerationStatus: 'completed',
       });
@@ -754,15 +760,28 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     const { data, error } = await db.coupleMissions.getToday(coupleId);
     set({ isLoadingMissions: false });
 
+    const today = formatDateToLocal(new Date());
+
     if (!error && data) {
       const missions = data.missions as Mission[];
       set({
         sharedMissions: missions,
+        sharedMissionsDate: today,
         lastMissionUpdate: new Date(data.generated_at),
         missionGenerationStatus: 'completed',
         generatingUserId: data.generated_by,
       });
       return missions;
+    }
+
+    // No missions found for today - clear any stale persisted missions
+    if (!error && !data) {
+      set({
+        sharedMissions: [],
+        sharedMissionsDate: null,
+        missionGenerationStatus: 'idle',
+        generatingUserId: null,
+      });
     }
 
     // Also check lock status
@@ -862,6 +881,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     // Clear local state first
     set({
       sharedMissions: [],
+      sharedMissionsDate: null,
       missionGenerationStatus: 'idle',
       activeMissionProgress: null,
       allMissionProgress: [],
@@ -883,6 +903,36 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       } catch (error) {
         console.error('Error resetting missions in database:', error);
       }
+    }
+  },
+
+  // Check and reset shared missions if date changed (called from missionStore.checkAndResetMissions)
+  checkAndResetSharedMissions: () => {
+    const { sharedMissionsDate, sharedMissions, allMissionProgress } = get();
+    const today = formatDateToLocal(new Date());
+
+    // Reset shared missions if date changed
+    if (sharedMissions.length > 0 && sharedMissionsDate && sharedMissionsDate !== today) {
+      console.log('[CoupleSyncStore] Date changed, resetting shared missions. Old date:', sharedMissionsDate, 'Today:', today);
+      set({
+        sharedMissions: [],
+        sharedMissionsDate: null,
+        missionGenerationStatus: 'idle',
+        generatingUserId: null,
+      });
+    }
+
+    // Also reset mission progress if date changed
+    const progressFromOtherDays = allMissionProgress.filter(p => p.date !== today);
+    if (progressFromOtherDays.length > 0) {
+      console.log('[CoupleSyncStore] Date changed, clearing old mission progress');
+      const todayProgress = allMissionProgress.filter(p => p.date === today);
+      const lockedProgress = todayProgress.find(p => p.is_message_locked);
+      set({
+        allMissionProgress: todayProgress,
+        activeMissionProgress: lockedProgress || todayProgress[0] || null,
+        lockedMissionId: lockedProgress?.mission_id || null,
+      });
     }
   },
 
@@ -1946,6 +1996,9 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       albumPhotosMap: state.albumPhotosMap,
       backgroundImageUrl: state.backgroundImageUrl,
       menstrualSettings: state.menstrualSettings,
+      // Mission state (with date tracking for proper reset)
+      sharedMissions: state.sharedMissions,
+      sharedMissionsDate: state.sharedMissionsDate,
       // Mission progress state
       allMissionProgress: state.allMissionProgress,
       lockedMissionId: state.lockedMissionId,

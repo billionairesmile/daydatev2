@@ -95,6 +95,7 @@ export const db = {
     },
 
     // Find pairing code by code string
+    // Uses maybeSingle() to avoid PGRST116 error when code doesn't exist
     async findByCode(code: string) {
       const client = getSupabase();
       const { data, error } = await client
@@ -102,7 +103,7 @@ export const db = {
         .select('*')
         .eq('code', code)
         .eq('status', 'pending')
-        .single();
+        .maybeSingle();
       return { data, error };
     },
 
@@ -124,6 +125,7 @@ export const db = {
     },
 
     // Get pairing status by creator ID
+    // Uses maybeSingle() to avoid PGRST116 error when no codes exist
     async getByCreatorId(creatorId: string) {
       const client = getSupabase();
       const { data, error } = await client
@@ -132,7 +134,7 @@ export const db = {
         .eq('creator_id', creatorId)
         .order('created_at', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
       return { data, error };
     },
 
@@ -148,10 +150,37 @@ export const db = {
     },
 
     // Get valid pending pairing code (not expired, within 24 hours)
+    // Prioritizes codes with couple_id set (fully initialized) over orphaned codes
+    // Uses maybeSingle() to avoid PGRST116 error when no valid code exists
     async getValidPendingCode(creatorId: string) {
       const client = getSupabase();
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
+      // First, try to find a code with couple_id set (properly linked code)
+      const { data: linkedCode, error: linkedError } = await client
+        .from('pairing_codes')
+        .select('*')
+        .eq('creator_id', creatorId)
+        .eq('status', 'pending')
+        .not('couple_id', 'is', null)
+        .gte('created_at', twentyFourHoursAgo)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (linkedCode) {
+        // Clean up any orphaned codes (codes without couple_id) for this user
+        await client
+          .from('pairing_codes')
+          .delete()
+          .eq('creator_id', creatorId)
+          .eq('status', 'pending')
+          .is('couple_id', null);
+
+        return { data: linkedCode, error: linkedError };
+      }
+
+      // If no linked code found, return the most recent code (might be orphaned)
       const { data, error } = await client
         .from('pairing_codes')
         .select('*')
@@ -160,9 +189,21 @@ export const db = {
         .gte('created_at', twentyFourHoursAgo)
         .order('created_at', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       return { data, error };
+    },
+
+    // Clean up orphaned pairing codes (codes without couple_id) for a user
+    async cleanupOrphanedCodes(creatorId: string) {
+      const client = getSupabase();
+      const { error } = await client
+        .from('pairing_codes')
+        .delete()
+        .eq('creator_id', creatorId)
+        .eq('status', 'pending')
+        .is('couple_id', null);
+      return { error };
     },
 
     // Subscribe to pairing code changes (for creator to know when joiner connects)
@@ -204,6 +245,7 @@ export const db = {
     },
 
     // Update couple_id on pairing code (called after creator creates couple)
+    // Uses maybeSingle() to avoid error if code was already deleted/expired
     async setCoupleId(code: string, coupleId: string) {
       const client = getSupabase();
       const { data, error } = await client
@@ -211,12 +253,13 @@ export const db = {
         .update({ couple_id: coupleId })
         .eq('code', code)
         .select()
-        .single();
+        .maybeSingle();
       return { data, error };
     },
 
     // Get pairing code with couple info (for joiner to get couple_id)
     // Only returns pending codes - connected codes are considered "already used"
+    // Uses maybeSingle() to avoid PGRST116 error when code doesn't exist
     async getWithCouple(code: string) {
       const client = getSupabase();
       const { data, error } = await client
@@ -224,7 +267,7 @@ export const db = {
         .select('*, couple_id')
         .eq('code', code)
         .eq('status', 'pending')
-        .single();
+        .maybeSingle();
       return { data, error };
     },
 
@@ -312,6 +355,46 @@ export const db = {
         .single();
       return { data, error };
     },
+
+    // Subscribe to profile changes (for partner nickname/birthday sync)
+    subscribeToProfile(
+      userId: string,
+      callback: (payload: {
+        id: string;
+        nickname: string;
+        birth_date: string | null;
+        preferences: Record<string, unknown> | null;
+      }) => void
+    ) {
+      const client = getSupabase();
+      const channel = client
+        .channel(`profile:${userId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'profiles',
+            filter: `id=eq.${userId}`,
+          },
+          (payload) => {
+            const newData = payload.new as {
+              id: string;
+              nickname: string;
+              birth_date: string | null;
+              preferences: Record<string, unknown> | null;
+            };
+            callback(newData);
+          }
+        )
+        .subscribe();
+      return channel;
+    },
+
+    unsubscribe(channel: ReturnType<SupabaseClient['channel']>) {
+      const client = getSupabase();
+      client.removeChannel(channel);
+    },
   },
 
   // Couples
@@ -322,7 +405,7 @@ export const db = {
         .from('couples')
         .select('*')
         .eq('id', coupleId)
-        .single();
+        .maybeSingle();
       return { data, error };
     },
 
@@ -417,6 +500,8 @@ export const db = {
     },
 
     // Restore a disconnected couple
+    // Note: disconnect_reason is NOT cleared here - it's used as a flag for reconnection detection
+    // The creator's realtime handler will clear it after detecting the reconnection
     async restoreCouple(coupleId: string) {
       const client = getSupabase();
       const { data, error } = await client
@@ -425,6 +510,7 @@ export const db = {
           status: 'active',
           disconnected_at: null,
           disconnected_by: null,
+          // Don't clear disconnect_reason - needed for reconnection detection
         })
         .eq('id', coupleId)
         .select()
@@ -2226,12 +2312,16 @@ export const db = {
         const file = new ExpoFile(uri);
         const base64 = await file.base64();
 
-        const fileName = `${coupleId}/${Date.now()}.jpg`;
+        // Detect file format from URI or default to PNG for better quality
+        const isPng = uri.toLowerCase().includes('.png') || !uri.toLowerCase().includes('.jpg');
+        const extension = isPng ? 'png' : 'jpg';
+        const contentType = isPng ? 'image/png' : 'image/jpeg';
+        const fileName = `${coupleId}/${Date.now()}.${extension}`;
 
         const { data, error } = await client.storage
           .from('memories')
           .upload(fileName, decode(base64), {
-            contentType: 'image/jpeg',
+            contentType,
           });
 
         if (error) {

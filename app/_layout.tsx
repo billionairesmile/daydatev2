@@ -164,19 +164,141 @@ function RootLayoutNav() {
 
   // Reusable function to fetch couple and partner data
   const fetchCoupleAndPartnerData = useCallback(async (forceRefresh = false) => {
-    if (!isOnboardingComplete || !couple?.id || !user?.id || isDemoMode) return;
+    console.log('[Layout] fetchCoupleAndPartnerData called:', {
+      isOnboardingComplete,
+      coupleId: couple?.id,
+      userId: user?.id,
+      isDemoMode,
+      forceRefresh,
+    });
+
+    if (!isOnboardingComplete || !couple?.id || !user?.id || isDemoMode) {
+      console.log('[Layout] fetchCoupleAndPartnerData early return - conditions not met');
+      return;
+    }
 
     // Throttle fetches to at most once every 5 seconds (unless force refresh)
     const now = Date.now();
-    if (!forceRefresh && now - lastFetchTime.current < 5000) return;
+    if (!forceRefresh && now - lastFetchTime.current < 5000) {
+      console.log('[Layout] fetchCoupleAndPartnerData throttled');
+      return;
+    }
     lastFetchTime.current = now;
 
     try {
       // Fetch latest couple data from DB
+      console.log('[Layout] Fetching couple data for id:', couple.id);
       const { data: coupleData, error: coupleError } = await db.couples.get(couple.id);
+      console.log('[Layout] Couple data fetched:', { coupleData, coupleError });
 
       if (coupleError) {
         console.error('Error fetching couple:', coupleError);
+        return;
+      }
+
+      // Couple record was deleted (partner deleted their account)
+      if (!coupleData) {
+        console.log('[Layout] Couple record not found - partner may have deleted their account');
+
+        // Show alert FIRST, then handle state changes on confirm
+        // This prevents navigation from happening before alert is shown
+        Alert.alert(
+          t('settings.unpair.partnerDeletedAccountTitle'),
+          t('settings.unpair.partnerDeletedAccountMessage'),
+          [
+            {
+              text: t('common.confirm'),
+              onPress: async () => {
+                // Cleanup realtime subscriptions
+                cleanupSync();
+
+                // Clear couple and partner from local state
+                setCouple(null);
+                setPartner(null);
+
+                // Delete any existing pending pairing codes for this user
+                // This ensures a fresh code with full 24-hour timer will be created
+                if (user?.id) {
+                  console.log('[Layout] Deleting pending pairing codes for user:', user.id);
+                  await db.pairingCodes.deleteByCreatorId(user.id);
+                }
+
+                // Set onboarding incomplete and go directly to pairing screen
+                setIsOnboardingComplete(false);
+                setOnboardingStep('pairing');
+                // Reset all pairing state so user can pair with a new partner
+                // Clear anniversaryDate to prevent old date from being applied to new couple
+                updateOnboardingData({
+                  isPairingConnected: false,
+                  isCreatingCode: true,
+                  pairingCode: '', // Clear any previously entered code
+                  anniversaryDate: null, // Clear old anniversary date
+                  relationshipType: 'dating', // Reset relationship type
+                });
+                // Navigation is handled by the useEffect that watches isOnboardingComplete
+                // Don't navigate here to avoid duplicate navigation
+              },
+            },
+          ],
+          { cancelable: false } // Prevent dismissing by tapping outside
+        );
+        return;
+      }
+
+      // Note: disconnect_reason being set while status is 'active' is EXPECTED during reconnection flow
+      // It's used as a flag for creator's realtime handler to detect reconnection
+      // The creator's handler will clear it after detection - don't clear it here
+
+      // Check if couple was disconnected (soft delete from unpair)
+      console.log('[Layout] Checking couple status:', coupleData?.status);
+      if (coupleData && coupleData.status === 'disconnected') {
+        console.log('[Layout] Couple is disconnected - partner unpaired, showing alert');
+
+        // Get disconnected_by to show appropriate message
+        const wasDisconnectedByPartner = coupleData.disconnected_by && coupleData.disconnected_by !== user?.id;
+
+        Alert.alert(
+          wasDisconnectedByPartner
+            ? t('settings.unpair.partnerDisconnectedTitle')
+            : t('settings.unpair.partnerDeletedAccountTitle'),
+          wasDisconnectedByPartner
+            ? t('settings.unpair.partnerDisconnectedMessage')
+            : t('settings.unpair.partnerDeletedAccountMessage'),
+          [
+            {
+              text: t('common.confirm'),
+              onPress: async () => {
+                // Cleanup realtime subscriptions
+                cleanupSync();
+
+                // Clear couple and partner from local state
+                setCouple(null);
+                setPartner(null);
+
+                // Delete any existing pending pairing codes for this user
+                if (user?.id) {
+                  console.log('[Layout] Deleting pending pairing codes for user:', user.id);
+                  await db.pairingCodes.deleteByCreatorId(user.id);
+                }
+
+                // Set onboarding incomplete and go directly to pairing screen
+                setIsOnboardingComplete(false);
+                setOnboardingStep('pairing');
+                // Clear anniversaryDate to prevent old date from being applied to new couple
+                updateOnboardingData({
+                  isPairingConnected: false,
+                  isCreatingCode: true,
+                  pairingCode: '',
+                  anniversaryDate: null, // Clear old anniversary date
+                  relationshipType: 'dating', // Reset relationship type
+                });
+                // Navigation is handled by the useEffect that watches isOnboardingComplete
+                // Don't navigate here to avoid duplicate navigation
+              },
+            },
+          ],
+          { cancelable: false }
+        );
         return;
       }
 
@@ -185,11 +307,13 @@ function RootLayoutNav() {
         const relationshipType = coupleData.wedding_date ? 'married' : 'dating';
 
         // Update couple in authStore with DB data
+        // IMPORTANT: Do NOT fall back to old couple values for dates - always use DB as source of truth
+        // This prevents old anniversary dates from previous relationships from appearing
         setCouple({
           ...couple,
           user1Id: coupleData.user1_id,
           user2Id: coupleData.user2_id,
-          anniversaryDate: coupleData.dating_start_date ? parseDateAsLocal(coupleData.dating_start_date) : couple.anniversaryDate,
+          anniversaryDate: coupleData.dating_start_date ? parseDateAsLocal(coupleData.dating_start_date) : undefined,
           datingStartDate: coupleData.dating_start_date ? parseDateAsLocal(coupleData.dating_start_date) : undefined,
           weddingDate: coupleData.wedding_date ? parseDateAsLocal(coupleData.wedding_date) : undefined,
           relationshipType,
@@ -226,7 +350,7 @@ function RootLayoutNav() {
     } catch (error) {
       console.error('Error fetching couple/partner data:', error);
     }
-  }, [isOnboardingComplete, couple, user?.id, setCouple, setPartner]);
+  }, [isOnboardingComplete, couple, user?.id, setCouple, setPartner, cleanupSync, setIsOnboardingComplete, setOnboardingStep, updateOnboardingData, t, router]);
 
   // Update user location in DB (silently, no alerts)
   const updateUserLocation = useCallback(async () => {
@@ -301,7 +425,42 @@ function RootLayoutNav() {
 
     // Determine partner's user_id
     const partnerId = couple.user1Id === user.id ? couple.user2Id : couple.user1Id;
-    if (!partnerId) return;
+    if (!partnerId) {
+      console.log('[Layout] Partner subscription skipped - no partnerId yet');
+      return;
+    }
+
+    console.log('[Layout] Setting up partner profile subscription for partnerId:', partnerId);
+
+    // Fetch partner data immediately when subscription is set up
+    // This ensures we have the latest data even if no UPDATE event has been received yet
+    (async () => {
+      try {
+        const { data: partnerData, error } = await db.profiles.get(partnerId);
+        if (!error && partnerData) {
+          const partnerPreferences = partnerData.preferences || {};
+          const birthDateCalendarType = (partnerPreferences as Record<string, unknown>).birthDateCalendarType as 'solar' | 'lunar' | undefined;
+
+          console.log('[Layout] Initial partner fetch:', {
+            nickname: partnerData.nickname,
+            birthDate: partnerData.birth_date,
+          });
+
+          setPartner({
+            id: partnerData.id,
+            email: partnerData.email || '',
+            nickname: partnerData.nickname || '',
+            inviteCode: partnerData.invite_code || '',
+            preferences: partnerPreferences,
+            birthDate: partnerData.birth_date ? parseDateAsLocal(partnerData.birth_date) : undefined,
+            birthDateCalendarType: birthDateCalendarType || 'solar',
+            createdAt: partnerData.created_at ? new Date(partnerData.created_at) : new Date(),
+          });
+        }
+      } catch (err) {
+        console.error('[Layout] Error fetching partner data:', err);
+      }
+    })();
 
     // Subscribe to partner's profile changes
     const channel = supabase
@@ -315,6 +474,7 @@ function RootLayoutNav() {
           filter: `id=eq.${partnerId}`,
         },
         (payload) => {
+          console.log('[Layout] Partner profile realtime update received:', payload);
           // Partner profile was updated, refresh the data
           const partnerData = payload.new as {
             id: string;
@@ -330,6 +490,12 @@ function RootLayoutNav() {
             const prefs = partnerData.preferences || {};
             const birthDateCalendarType = prefs.birthDateCalendarType as 'solar' | 'lunar' | undefined;
 
+            console.log('[Layout] Updating partner state with:', {
+              nickname: partnerData.nickname,
+              birthDate: partnerData.birth_date,
+              birthDateCalendarType,
+            });
+
             setPartner({
               id: partnerData.id,
               email: partnerData.email || '',
@@ -343,9 +509,12 @@ function RootLayoutNav() {
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[Layout] Partner profile subscription status:', status);
+      });
 
     return () => {
+      console.log('[Layout] Cleaning up partner profile subscription for partnerId:', partnerId);
       supabase?.removeChannel(channel);
     };
   }, [isOnboardingComplete, couple?.id, couple?.user1Id, couple?.user2Id, user?.id, setPartner]);
@@ -353,6 +522,8 @@ function RootLayoutNav() {
   // Subscribe to couple data changes for real-time sync (anniversary updates + disconnect detection)
   useEffect(() => {
     if (!isOnboardingComplete || !couple?.id || isDemoMode || !supabase) return;
+
+    console.log('[Layout] Setting up couple subscription for coupleId:', couple.id);
 
     const channel = supabase
       .channel(`couple-${couple.id}`)
@@ -365,6 +536,7 @@ function RootLayoutNav() {
           filter: `id=eq.${couple.id}`,
         },
         async (payload) => {
+          console.log('[Layout] Couple realtime update received:', payload);
           // Couple data was updated, refresh the data
           const coupleData = payload.new as {
             id: string;
@@ -385,6 +557,14 @@ function RootLayoutNav() {
               const disconnectedByPartner = coupleData.disconnected_by && coupleData.disconnected_by !== user?.id;
               console.log('[Layout] Couple disconnected', { disconnectedByPartner, disconnectedBy: coupleData.disconnected_by, userId: user?.id });
 
+              // If disconnect was initiated by current user (e.g., during account deletion or self-unpair),
+              // don't redirect to pairing here - let the initiating flow handle navigation
+              // This prevents brief flash of pairing screen during account deletion
+              if (!disconnectedByPartner) {
+                console.log('[Layout] Disconnect initiated by self, skipping pairing redirect');
+                return;
+              }
+
               // Cleanup realtime subscriptions
               cleanupSync();
 
@@ -396,13 +576,16 @@ function RootLayoutNav() {
               setIsOnboardingComplete(false);
               setOnboardingStep('pairing');
               // Reset all pairing state so user can pair with a new partner
+              // Clear anniversaryDate to prevent old date from being applied to new couple
               updateOnboardingData({
                 isPairingConnected: false,
                 isCreatingCode: true,
                 pairingCode: '', // Clear any previously entered code
+                anniversaryDate: null, // Clear old anniversary date
+                relationshipType: 'dating', // Reset relationship type
               });
 
-              // Show alert if disconnected by partner
+              // Show alert if disconnected by partner (always true at this point since we returned above otherwise)
               if (disconnectedByPartner) {
                 // Check disconnect_reason to determine the appropriate message
                 console.log('[Layout] Partner disconnected, reason:', coupleData.disconnect_reason);
@@ -415,7 +598,7 @@ function RootLayoutNav() {
                     [
                       {
                         text: t('common.confirm'),
-                        onPress: () => router.replace('/(auth)/onboarding'),
+                        // Navigation is handled by the useEffect that watches isOnboardingComplete
                       },
                     ]
                   );
@@ -427,36 +610,50 @@ function RootLayoutNav() {
                     [
                       {
                         text: t('common.confirm'),
-                        onPress: () => router.replace('/(auth)/onboarding'),
+                        // Navigation is handled by the useEffect that watches isOnboardingComplete
                       },
                     ]
                   );
                 }
-              } else {
-                // Navigate to onboarding directly
-                router.replace('/(auth)/onboarding');
               }
+              // Navigation is handled by the useEffect that watches isOnboardingComplete
+              // Don't navigate here to avoid duplicate navigation
               return;
             }
 
             const relationshipType = coupleData.wedding_date ? 'married' : 'dating';
 
-            setCouple({
-              ...couple,
-              user1Id: coupleData.user1_id,
-              user2Id: coupleData.user2_id,
-              anniversaryDate: coupleData.dating_start_date ? parseDateAsLocal(coupleData.dating_start_date) : couple.anniversaryDate,
-              datingStartDate: coupleData.dating_start_date ? parseDateAsLocal(coupleData.dating_start_date) : undefined,
-              weddingDate: coupleData.wedding_date ? parseDateAsLocal(coupleData.wedding_date) : undefined,
-              relationshipType,
-              status: (coupleData.status as 'pending' | 'active') || 'active',
-            });
+            // Get latest couple from store to avoid stale closure
+            const currentCouple = useAuthStore.getState().couple;
+            if (currentCouple) {
+              console.log('[Layout] Updating couple state with:', {
+                user2Id: coupleData.user2_id,
+                datingStartDate: coupleData.dating_start_date,
+                weddingDate: coupleData.wedding_date,
+                status: coupleData.status,
+              });
+
+              // IMPORTANT: Do NOT fall back to old couple values for dates - always use DB as source of truth
+              setCouple({
+                ...currentCouple,
+                user1Id: coupleData.user1_id,
+                user2Id: coupleData.user2_id,
+                anniversaryDate: coupleData.dating_start_date ? parseDateAsLocal(coupleData.dating_start_date) : undefined,
+                datingStartDate: coupleData.dating_start_date ? parseDateAsLocal(coupleData.dating_start_date) : undefined,
+                weddingDate: coupleData.wedding_date ? parseDateAsLocal(coupleData.wedding_date) : undefined,
+                relationshipType,
+                status: (coupleData.status as 'pending' | 'active') || 'active',
+              });
+            }
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[Layout] Couple subscription status:', status);
+      });
 
     return () => {
+      console.log('[Layout] Cleaning up couple subscription for coupleId:', couple.id);
       supabase?.removeChannel(channel);
     };
   }, [isOnboardingComplete, couple?.id, setCouple, setPartner, setIsOnboardingComplete, cleanupSync, router, setOnboardingStep, updateOnboardingData]);

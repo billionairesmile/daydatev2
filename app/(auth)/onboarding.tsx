@@ -93,14 +93,14 @@ const parseDateAsLocal = (dateString: string): Date => {
 };
 
 // Step configuration for progress bar
-const STEP_A = ['terms', 'pairing', 'basic_info', 'couple_info'];
+const STEP_A = ['pairing', 'basic_info', 'couple_info'];
 const STEP_B = ['mbti', 'activity_type', 'date_worries', 'constraints'];
 
 export default function OnboardingScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const { backgroundImage } = useBackground();
-  const { setIsOnboardingComplete, updateNickname, setCouple, setUser, setPartner, setIsTestMode, user: currentUser, couple, isOnboardingComplete, isAuthenticated } = useAuthStore();
+  const { setIsOnboardingComplete, updateNickname, setCouple, setUser, setPartner, setIsTestMode, user: currentUser, couple, isOnboardingComplete, isAuthenticated, _hasHydrated } = useAuthStore();
   const {
     currentStep,
     data,
@@ -108,6 +108,7 @@ export default function OnboardingScreen() {
     nextStep,
     prevStep,
     updateData,
+    _hasHydrated: onboardingHydrated,
   } = useOnboardingStore();
 
   // Local state
@@ -116,15 +117,30 @@ export default function OnboardingScreen() {
   const [isRedirectingToHome, setIsRedirectingToHome] = useState(false);
   const [isExistingUser, setIsExistingUser] = useState(false);
 
-  // If user is not authenticated but on a step that requires auth, reset to welcome
-  // This handles the case where user deleted account but persisted step was still 'pairing'
+  // Steps that require authentication - used for both synchronous check and useEffect
+  const stepsRequiringAuth = ['pairing', 'basic_info', 'couple_info', 'preferences_intro', 'mbti', 'activity_type', 'date_worries', 'constraints', 'complete'];
+
+  // Both stores must be hydrated before we can determine the correct step
+  const isFullyHydrated = _hasHydrated && onboardingHydrated;
+
+  // Wait for hydration to complete before computing effective step
+  // This prevents flash of pairing screen before auth state is loaded from storage
+  const shouldShowWelcome = isFullyHydrated && !isAuthenticated && !currentUser?.id && stepsRequiringAuth.includes(currentStep);
+
+  // CRITICAL: If not fully hydrated, always show 'welcome' to prevent flash of auth-requiring screens
+  // This handles account deletion flow where AsyncStorage is cleared and states are resetting
+  const effectiveStep = !isFullyHydrated
+    ? 'welcome'
+    : (shouldShowWelcome ? 'welcome' : currentStep);
+
+  // Also update the store to match (for consistency and future renders)
+  // This useEffect ensures the store state is corrected after the synchronous render fix
   useEffect(() => {
-    const stepsRequiringAuth = ['pairing', 'basic_info', 'couple_info', 'preferences_intro', 'mbti', 'activity_type', 'date_worries', 'constraints', 'complete'];
-    if (!isAuthenticated && !currentUser?.id && stepsRequiringAuth.includes(currentStep)) {
+    if (shouldShowWelcome) {
       console.log('[Onboarding] User not authenticated, resetting to welcome from:', currentStep);
       setStep('welcome');
     }
-  }, [isAuthenticated, currentUser?.id, currentStep, setStep]);
+  }, [shouldShowWelcome, currentStep, setStep]);
 
   // Generate a new pairing code when entering pairing step after unpair
   // This ensures users always get a fresh code when returning to pairing screen
@@ -145,6 +161,14 @@ export default function OnboardingScreen() {
   }, [currentUser?.id, isExistingUser]);
 
   // On app restart: If user has an active paired couple (both user1Id and user2Id set), skip to basic_info
+  // Redirect from removed steps (login, terms) to welcome
+  useEffect(() => {
+    if (currentStep === 'login' || currentStep === 'terms') {
+      console.log('[Onboarding] Redirecting from removed step to welcome:', currentStep);
+      setStep('welcome');
+    }
+  }, [currentStep, setStep]);
+
   // Skip this effect if:
   // - Already redirecting to home (returning user login)
   // - Couple is disconnected (user went through unpair flow)
@@ -157,7 +181,7 @@ export default function OnboardingScreen() {
     // If pairing is not connected in onboarding data, don't skip
     if (!data.isPairingConnected) return;
 
-    const earlySteps = ['welcome', 'login', 'terms', 'pairing'];
+    const earlySteps = ['welcome', 'login', 'pairing'];
     const isActivePairedCouple = couple?.user1Id && couple?.user2Id && couple?.status !== 'disconnected';
     if (isActivePairedCouple && earlySteps.includes(currentStep)) {
       console.log('[Onboarding] User has active paired couple, skipping to basic_info');
@@ -225,17 +249,130 @@ export default function OnboardingScreen() {
     animateTransition(() => prevStep());
   }, [animateTransition, prevStep]);
 
-  // Custom back handler for pairing step - existing users go to login, new users go to terms
-  const handlePairingBack = useCallback(() => {
-    if (isExistingUser) {
-      // Existing user - go to login screen to re-authenticate
-      console.log('[Onboarding] Existing user pressing back, going to login');
-      animateTransition(() => setStep('login'));
-    } else {
-      // New user - go to terms (previous step)
-      animateTransition(() => prevStep());
+  // Save anniversary date immediately when leaving couple_info step
+  // This ensures the creator sees the correct date even if joiner hasn't completed onboarding yet
+  const saveAnniversaryDateImmediately = useCallback(async () => {
+    const currentCouple = useAuthStore.getState().couple;
+
+    if (!data.anniversaryDate || !currentCouple?.id) {
+      console.warn('[Onboarding] Skipping immediate anniversary save - missing data:', {
+        anniversaryDate: data.anniversaryDate,
+        coupleId: currentCouple?.id,
+      });
+      return;
     }
-  }, [animateTransition, prevStep, setStep, isExistingUser]);
+
+    if (!isInTestMode()) {
+      try {
+        console.log('[Onboarding] Saving anniversary date immediately:', {
+          coupleId: currentCouple.id,
+          anniversaryDate: data.anniversaryDate,
+          relationshipType: data.relationshipType,
+        });
+
+        const { error: coupleError } = await db.couples.update(currentCouple.id, {
+          dating_start_date: formatDateToLocal(data.anniversaryDate),
+          wedding_date: data.relationshipType === 'married' ? formatDateToLocal(data.anniversaryDate) : null,
+        });
+
+        if (coupleError) {
+          console.error('[Onboarding] Error saving anniversary date immediately:', coupleError);
+        } else {
+          console.log('[Onboarding] Anniversary date saved immediately');
+
+          // Update couple in authStore
+          setCouple({
+            ...currentCouple,
+            anniversaryDate: data.anniversaryDate,
+            datingStartDate: data.anniversaryDate,
+            weddingDate: data.relationshipType === 'married' ? data.anniversaryDate : undefined,
+          });
+        }
+      } catch (error) {
+        console.error('[Onboarding] Error in immediate anniversary save:', error);
+      }
+    } else {
+      // Demo mode: just update authStore
+      setCouple({
+        ...currentCouple,
+        anniversaryDate: data.anniversaryDate,
+        datingStartDate: data.anniversaryDate,
+        weddingDate: data.relationshipType === 'married' ? data.anniversaryDate : undefined,
+      });
+    }
+  }, [data.anniversaryDate, data.relationshipType, setCouple]);
+
+  // Save profile data immediately when leaving basic_info step
+  // This ensures the partner sees the correct nickname/birthdate even if user hasn't completed onboarding yet
+  const saveProfileDataImmediately = useCallback(async () => {
+    const currentUser = useAuthStore.getState().user;
+
+    if (!data.nickname || !currentUser?.id) {
+      console.warn('[Onboarding] Skipping immediate profile save - missing data:', {
+        nickname: data.nickname,
+        userId: currentUser?.id,
+      });
+      return;
+    }
+
+    // ALWAYS update user in authStore first (before DB save)
+    // This ensures the nickname is immediately reflected in the UI
+    const currentPreferences = currentUser.preferences || {};
+    setUser({
+      ...currentUser,
+      nickname: data.nickname,
+      birthDate: data.birthDate || undefined,
+      birthDateCalendarType: data.birthDateCalendarType,
+      preferences: currentPreferences,
+    });
+    console.log('[Onboarding] Updated user nickname in authStore:', data.nickname);
+
+    // Then save to DB (non-blocking for UI)
+    if (!isInTestMode()) {
+      try {
+        console.log('[Onboarding] Saving profile data to DB:', {
+          userId: currentUser.id,
+          nickname: data.nickname,
+          birthDate: data.birthDate,
+          birthDateCalendarType: data.birthDateCalendarType,
+        });
+
+        const { error: profileError } = await db.profiles.update(currentUser.id, {
+          nickname: data.nickname,
+          birth_date: data.birthDate ? formatDateToLocal(data.birthDate) : null,
+          preferences: {
+            ...currentPreferences,
+            birthDateCalendarType: data.birthDateCalendarType,
+          },
+        });
+
+        if (profileError) {
+          console.error('[Onboarding] Error saving profile data to DB:', profileError);
+        } else {
+          console.log('[Onboarding] Profile data saved to DB successfully');
+        }
+      } catch (error) {
+        console.error('[Onboarding] Error in immediate profile save:', error);
+      }
+    }
+  }, [data.nickname, data.birthDate, data.birthDateCalendarType, setUser]);
+
+  // Custom back handler for pairing step - log out and go to welcome
+  const handlePairingBack = useCallback(async () => {
+    // Log out and go to welcome screen (terms step removed)
+    console.log('[Onboarding] Pairing back pressed, logging out and going to welcome');
+    try {
+      await signOut();
+      useAuthStore.getState().signOut();
+      useOnboardingStore.getState().reset();
+      setIsExistingUser(false);
+      animateTransition(() => setStep('welcome'));
+    } catch (error) {
+      console.error('[Onboarding] Logout error:', error);
+      // Even if logout fails, go to welcome screen
+      animateTransition(() => setStep('welcome'));
+    }
+  }, [animateTransition, setStep]);
 
   // Social Login Handler
   const handleSocialLogin = useCallback(async (provider: 'google' | 'kakao') => {
@@ -342,7 +479,7 @@ export default function OnboardingScreen() {
               id: existingCouple.id,
               user1Id: existingCouple.user1_id,
               user2Id: existingCouple.user2_id,
-              anniversaryDate: existingCouple.dating_start_date ? parseDateAsLocal(existingCouple.dating_start_date) : new Date(),
+              anniversaryDate: existingCouple.dating_start_date ? parseDateAsLocal(existingCouple.dating_start_date) : undefined,
               datingStartDate: existingCouple.dating_start_date ? parseDateAsLocal(existingCouple.dating_start_date) : undefined,
               anniversaryType: t('onboarding.anniversary.datingStart'),
               status: 'active',
@@ -412,28 +549,22 @@ export default function OnboardingScreen() {
             }
           }
 
-          // Existing user without paired couple - skip terms, go directly to pairing
-          if (isExistingUser) {
-            console.log('[Onboarding] Existing user without couple, skipping terms to pairing');
-            animateTransition(() => setStep('pairing'));
-            return;
-          }
-
-          // New user - show terms step
+          // Go directly to pairing (terms removed from flow)
+          console.log('[Onboarding] User login success, going to pairing');
           Alert.alert(
             t('onboarding.login.success'),
             t('onboarding.login.successMessage', { provider: provider === 'google' ? 'Google' : 'Kakao' }),
             [
               {
                 text: t('onboarding.continue'),
-                onPress: () => animateTransition(() => setStep('terms')),
+                onPress: () => animateTransition(() => setStep('pairing')),
               },
             ]
           );
         } catch (dbError) {
           console.error('[Onboarding] DB error:', dbError);
-          // On error, fallback to terms step for safety
-          animateTransition(() => setStep('terms'));
+          // On error, fallback to pairing step for safety
+          animateTransition(() => setStep('pairing'));
         }
       }
     } catch (error: any) {
@@ -559,19 +690,19 @@ export default function OnboardingScreen() {
     router.replace('/(tabs)');
   }, [data, updateNickname, setIsOnboardingComplete, router, setUser, setCouple]);
 
-  // Progress calculation
+  // Progress calculation - use effectiveStep for rendering
   const getProgress = () => {
-    if (currentStep === 'welcome' || currentStep === 'login') return 0;
-    if (currentStep === 'complete') return 1;
+    if (effectiveStep === 'welcome' || effectiveStep === 'login') return 0;
+    if (effectiveStep === 'complete') return 1;
 
-    const stepAIndex = STEP_A.indexOf(currentStep);
+    const stepAIndex = STEP_A.indexOf(effectiveStep);
     if (stepAIndex !== -1) {
       return (stepAIndex + 1) / STEP_A.length * 0.5;
     }
 
-    if (currentStep === 'preferences_intro') return 0.5;
+    if (effectiveStep === 'preferences_intro') return 0.5;
 
-    const stepBIndex = STEP_B.indexOf(currentStep);
+    const stepBIndex = STEP_B.indexOf(effectiveStep);
     if (stepBIndex !== -1) {
       return 0.5 + ((stepBIndex + 1) / STEP_B.length * 0.5);
     }
@@ -579,7 +710,7 @@ export default function OnboardingScreen() {
     return 0;
   };
 
-  const showProgress = !['welcome', 'login', 'complete'].includes(currentStep);
+  const showProgress = !['welcome', 'login', 'complete'].includes(effectiveStep);
 
   // Show loading screen while redirecting to home (for returning users)
   if (isRedirectingToHome) {
@@ -598,10 +729,10 @@ export default function OnboardingScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-      enabled={currentStep !== 'basic_info' && currentStep !== 'pairing'}
+      enabled={effectiveStep !== 'basic_info' && effectiveStep !== 'pairing'}
     >
       {/* Background - White for welcome step, image for others */}
-      {currentStep !== 'welcome' && (
+      {effectiveStep !== 'welcome' && (
         <>
           <ImageBackground
             source={backgroundImage}
@@ -612,7 +743,7 @@ export default function OnboardingScreen() {
           <View style={styles.overlay} />
         </>
       )}
-      {currentStep === 'welcome' && (
+      {effectiveStep === 'welcome' && (
         <View style={styles.whiteBackground} />
       )}
 
@@ -626,7 +757,7 @@ export default function OnboardingScreen() {
       )}
 
       {/* Logout button - shown only on pairing step */}
-      {currentStep === 'pairing' && (
+      {effectiveStep === 'pairing' && (
         <Pressable
           style={styles.logoutButton}
           onPress={async () => {
@@ -656,19 +787,12 @@ export default function OnboardingScreen() {
         bounces={false}
       >
         <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
-          {currentStep === 'welcome' && (
+          {effectiveStep === 'welcome' && (
             <WelcomeStep
               onSocialLogin={handleSocialLogin}
             />
           )}
-          {currentStep === 'terms' && (
-            <TermsStep
-              onNext={handleNext}
-              onBack={() => animateTransition(() => setStep('welcome'))}
-              updateData={updateData}
-            />
-          )}
-          {currentStep === 'pairing' && (
+          {effectiveStep === 'pairing' && (
             <PairingStep
               isCreatingCode={data.isCreatingCode}
               setIsCreatingCode={(value) => updateData({ isCreatingCode: value })}
@@ -687,9 +811,10 @@ export default function OnboardingScreen() {
               onNext={handleNext}
               onBack={handlePairingBack}
               updateData={updateData}
+              hideBackButton={isExistingUser}
             />
           )}
-          {currentStep === 'basic_info' && (
+          {effectiveStep === 'basic_info' && (
             <BasicInfoStep
               nickname={data.nickname}
               setNickname={(name) => updateData({ nickname: name })}
@@ -697,7 +822,10 @@ export default function OnboardingScreen() {
               setBirthDate={(date) => updateData({ birthDate: date })}
               calendarType={data.birthDateCalendarType}
               setCalendarType={(type) => updateData({ birthDateCalendarType: type })}
-              onNext={() => {
+              onNext={async () => {
+                // Save profile data immediately to trigger realtime sync with partner
+                await saveProfileDataImmediately();
+
                 // Creator (isCreatingCode): Skip couple_info, go directly to preferences_intro
                 // Joiner (!isCreatingCode): Go to couple_info to enter anniversary date
                 if (data.isCreatingCode) {
@@ -718,13 +846,17 @@ export default function OnboardingScreen() {
               onBack={handleBack}
             />
           )}
-          {currentStep === 'couple_info' && (
+          {effectiveStep === 'couple_info' && (
             <CoupleInfoStep
               relationshipType={data.relationshipType}
               setRelationshipType={(type) => updateData({ relationshipType: type })}
               anniversaryDate={data.anniversaryDate}
               setAnniversaryDate={(date) => updateData({ anniversaryDate: date })}
-              onNext={() => {
+              onNext={async () => {
+                // Save anniversary date immediately so creator can see it right away
+                // This prevents the sync issue where creator sees wrong date before joiner completes onboarding
+                await saveAnniversaryDateImmediately();
+
                 // If user already has preference data, skip to complete
                 if (hasExistingPreferences) {
                   Alert.alert(
@@ -739,13 +871,13 @@ export default function OnboardingScreen() {
               onBack={handleBack}
             />
           )}
-          {currentStep === 'preferences_intro' && (
+          {effectiveStep === 'preferences_intro' && (
             <PreferencesIntroStep
               onNext={handleNext}
               onBack={handleBack}
             />
           )}
-          {currentStep === 'mbti' && (
+          {effectiveStep === 'mbti' && (
             <MBTIStep
               mbti={data.mbti}
               setMbti={(mbti) => updateData({ mbti })}
@@ -753,7 +885,7 @@ export default function OnboardingScreen() {
               onBack={handleBack}
             />
           )}
-          {currentStep === 'activity_type' && (
+          {effectiveStep === 'activity_type' && (
             <ActivityTypeStep
               activityTypes={data.activityTypes}
               setActivityTypes={(types) => updateData({ activityTypes: types })}
@@ -761,7 +893,7 @@ export default function OnboardingScreen() {
               onBack={handleBack}
             />
           )}
-          {currentStep === 'date_worries' && (
+          {effectiveStep === 'date_worries' && (
             <DateWorriesStep
               dateWorries={data.dateWorries || []}
               setDateWorries={(worries) => updateData({ dateWorries: worries })}
@@ -769,7 +901,7 @@ export default function OnboardingScreen() {
               onBack={handleBack}
             />
           )}
-          {currentStep === 'constraints' && (
+          {effectiveStep === 'constraints' && (
             <ConstraintsStep
               constraints={data.constraints}
               setConstraints={(cons) => updateData({ constraints: cons })}
@@ -777,7 +909,7 @@ export default function OnboardingScreen() {
               onBack={handleBack}
             />
           )}
-          {currentStep === 'complete' && (
+          {effectiveStep === 'complete' && (
             <CompleteStep
               nickname={data.nickname}
               onComplete={handleComplete}
@@ -883,6 +1015,37 @@ function WelcomeStep({ onSocialLogin }: { onSocialLogin: (provider: 'google' | '
             </>
           )}
         </TouchableOpacity>
+      </View>
+
+      {/* Terms disclaimer */}
+      <View style={styles.termsDisclaimerContainer}>
+        <Text style={styles.termsDisclaimerText}>
+          {t('onboarding.login.termsDisclaimer.prefix')}
+          <Text
+            style={styles.termsDisclaimerLink}
+            onPress={() => Linking.openURL('https://daydate.my/policy/privacy')}
+            suppressHighlighting={true}
+          >
+            {t('onboarding.login.termsDisclaimer.privacy')}
+          </Text>
+          {t('onboarding.login.termsDisclaimer.comma')}
+          <Text
+            style={styles.termsDisclaimerLink}
+            onPress={() => Linking.openURL('https://daydate.my/policy/terms')}
+            suppressHighlighting={true}
+          >
+            {t('onboarding.login.termsDisclaimer.terms')}
+          </Text>
+          {',\n'}
+          <Text
+            style={styles.termsDisclaimerLink}
+            onPress={() => Linking.openURL('https://daydate.my/policy/location')}
+            suppressHighlighting={true}
+          >
+            {t('onboarding.login.termsDisclaimer.location')}
+          </Text>
+          {t('onboarding.login.termsDisclaimer.suffix')}
+        </Text>
       </View>
     </View>
   );
@@ -1404,6 +1567,7 @@ function PairingStep({
   onNext,
   onBack,
   updateData,
+  hideBackButton = false,
 }: {
   isCreatingCode: boolean;
   setIsCreatingCode: (value: boolean) => void;
@@ -1422,6 +1586,7 @@ function PairingStep({
   onNext: () => void;
   onBack: () => void;
   updateData: (data: Partial<OnboardingData>) => void;
+  hideBackButton?: boolean;
 }) {
   const { t } = useTranslation();
   const [isLoading, setIsLoading] = React.useState(false);
@@ -1434,6 +1599,8 @@ function PairingStep({
   const timerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
   const pollingRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
   const setupStartedRef = React.useRef<string | null>(null); // Track which code was setup to prevent duplicates
+  const setupInProgressRef = React.useRef<boolean>(false); // Mutex to prevent concurrent setup calls
+  const coupleCreationInProgressRef = React.useRef<boolean>(false); // Mutex to prevent duplicate couple creation
   const isReconnectionRef = React.useRef<boolean>(false); // Track if this is a 30-day reconnection scenario
 
   // Reset isPairingConnected on mount based on actual DB state
@@ -1529,8 +1696,11 @@ function PairingStep({
   // For code creator: Save code to DB, create couple, and subscribe to changes
   React.useEffect(() => {
     // Only run when generatedCode is set and hasn't been setup yet
-    if (isCreatingCode && !isInTestMode() && !isCodeSaved && generatedCode && setupStartedRef.current !== generatedCode) {
+    // Use both code check AND mutex to prevent race conditions (React Strict Mode double-mount)
+    if (isCreatingCode && !isInTestMode() && !isCodeSaved && generatedCode &&
+        setupStartedRef.current !== generatedCode && !setupInProgressRef.current) {
       setupStartedRef.current = generatedCode; // Track which code was setup
+      setupInProgressRef.current = true; // Set mutex immediately before any async work
       const setupPairing = async (codeToUse: string, retryCount = 0) => {
         try {
           // Get actual auth.uid() from Supabase for RLS compliance
@@ -1547,10 +1717,14 @@ function PairingStep({
           }
 
           // If still no userId, user needs to authenticate first
+          // DO NOT create code with temporary UUID - it will cause issues when user logs in
           if (!creatorUserId) {
-            console.log('[PairingStep] No authenticated user, skipping profile creation');
-            // Still create pairing code with a temporary ID for the code itself
-            creatorUserId = generateUUID();
+            console.log('[PairingStep] No authenticated user, waiting for authentication');
+            // Reset mutex so we can retry when user is authenticated
+            setupInProgressRef.current = false;
+            setupStartedRef.current = '';
+            // Don't create code - wait for authentication
+            return;
           }
 
           console.log('[PairingStep] Creator setup:', { creatorUserId, isExistingUser });
@@ -1596,6 +1770,11 @@ function PairingStep({
 
           // Set expiration time (24 hours from code creation)
           const expiresAt = new Date(codeCreatedAt.getTime() + 24 * 60 * 60 * 1000);
+          console.log('[PairingStep] Code expiration set:', {
+            codeCreatedAt: codeCreatedAt.toISOString(),
+            expiresAt: expiresAt.toISOString(),
+            hoursRemaining: ((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60)).toFixed(2),
+          });
           setCodeExpiresAt(expiresAt);
 
           // Create or update profile for creator in DB
@@ -1631,6 +1810,15 @@ function PairingStep({
               partnerExists = !!partnerProfile;
             }
 
+            // Check who disconnected the couple
+            const wasDisconnectedByCurrentUser = disconnectedCouple.disconnected_by === creatorUserId;
+            console.log('[PairingStep] Disconnected couple check:', {
+              disconnectedBy: disconnectedCouple.disconnected_by,
+              currentUser: creatorUserId,
+              wasDisconnectedByCurrentUser,
+              partnerExists,
+            });
+
             if (!partnerExists) {
               // Partner deleted their account - delete this orphaned couple and continue to create new one
               console.log('[PairingStep] Partner deleted account, cleaning up orphaned disconnected couple:', disconnectedCouple.id);
@@ -1644,40 +1832,14 @@ function PairingStep({
                 await supabase.from('couples').delete().eq('id', disconnectedCouple.id);
               }
             } else {
-              // Partner exists, restore the couple for reconnection
-              console.log('[PairingStep] Found disconnected couple, restoring for reconnection:', disconnectedCouple.id);
-              const { data: restoredCouple, error: restoreError } = await db.couples.restoreCouple(disconnectedCouple.id);
-
-              if (!restoreError && restoredCouple) {
-                // Mark this as a reconnection scenario - will skip onboarding when partner joins
-                isReconnectionRef.current = true;
-                console.log('[PairingStep] Marked as reconnection scenario');
-
-                setCouple({
-                  id: restoredCouple.id,
-                  user1Id: restoredCouple.user1_id,
-                  user2Id: restoredCouple.user2_id || undefined,
-                  anniversaryDate: restoredCouple.dating_start_date ? parseDateAsLocal(restoredCouple.dating_start_date) : new Date(),
-                  datingStartDate: restoredCouple.dating_start_date ? parseDateAsLocal(restoredCouple.dating_start_date) : undefined,
-                  weddingDate: restoredCouple.wedding_date ? parseDateAsLocal(restoredCouple.wedding_date) : undefined,
-                  anniversaryType: t('onboarding.anniversary.datingStart'),
-                  relationshipType: restoredCouple.wedding_date ? 'married' : 'dating',
-                  status: restoredCouple.user2_id ? 'active' : 'pending',
-                  createdAt: restoredCouple.created_at ? new Date(restoredCouple.created_at) : new Date(),
-                });
-
-                // Link restored couple to the pairing code
-                if (finalCode) {
-                  await db.pairingCodes.setCoupleId(finalCode, restoredCouple.id);
-                }
-
-                // Cleanup orphaned pending couples for creator
-                console.log('[PairingStep] Creator reconnection cleanup: removing orphaned pending couples');
-                await db.couples.cleanupPendingCouples(creatorUserId, restoredCouple.id);
-
-                // Don't return early - continue to set up realtime subscription
-                // so creator can receive notification when partner joins
-              }
+              // Partner exists but couple was unpaired (by either user)
+              // Don't auto-restore and don't delete - leave disconnected couple for partner to see
+              // Partner will see 'disconnected' status and get the correct alert when they open app
+              // Disconnected couples auto-expire after 30 days
+              console.log('[PairingStep] Couple was unpaired, leaving disconnected for partner to see:', disconnectedCouple.id);
+              // Just clear local couple state so user can create new pairing
+              setCouple(null);
+              setPartner(null);
             }
           }
 
@@ -1710,7 +1872,8 @@ function PairingStep({
                   id: existingCouple.id,
                   user1Id: existingCouple.user1_id,
                   user2Id: existingCouple.user2_id || undefined,
-                  anniversaryDate: existingCouple.dating_start_date ? new Date(existingCouple.dating_start_date) : new Date(),
+                  anniversaryDate: existingCouple.dating_start_date ? new Date(existingCouple.dating_start_date) : undefined,
+                  datingStartDate: existingCouple.dating_start_date ? new Date(existingCouple.dating_start_date) : undefined,
                   anniversaryType: t('onboarding.anniversary.datingStart'),
                   status: existingCouple.user2_id ? 'active' : 'pending',
                   createdAt: existingCouple.created_at ? new Date(existingCouple.created_at) : new Date(),
@@ -1731,7 +1894,8 @@ function PairingStep({
                 id: existingCouple.id,
                 user1Id: existingCouple.user1_id,
                 user2Id: undefined,
-                anniversaryDate: existingCouple.dating_start_date ? new Date(existingCouple.dating_start_date) : new Date(),
+                anniversaryDate: existingCouple.dating_start_date ? new Date(existingCouple.dating_start_date) : undefined,
+                datingStartDate: existingCouple.dating_start_date ? new Date(existingCouple.dating_start_date) : undefined,
                 anniversaryType: t('onboarding.anniversary.datingStart'),
                 status: 'pending',
                 createdAt: existingCouple.created_at ? new Date(existingCouple.created_at) : new Date(),
@@ -1748,36 +1912,76 @@ function PairingStep({
           }
 
           // Create couple for this user (creator is user1) - only if no existing couple
-          const { data: newCouple, error: coupleError } = await db.couples.create({
-            user1_id: creatorUserId,
-          });
+          // Use mutex to prevent race condition where effect runs twice before first completes
+          if (coupleCreationInProgressRef.current) {
+            console.log('[PairingStep] Couple creation already in progress, skipping duplicate');
+            return;
+          }
+          coupleCreationInProgressRef.current = true;
 
-          if (coupleError) {
-            console.error('Error creating couple:', coupleError);
-          } else if (newCouple) {
-            // Link couple_id to pairing code
-            console.log('[PairingStep] Created couple:', newCouple.id, 'linking to code:', finalCode);
-            const { error: linkError } = await db.pairingCodes.setCoupleId(finalCode, newCouple.id);
-            if (linkError) {
-              console.error('[PairingStep] Error linking couple to code:', linkError);
-            } else {
-              console.log('[PairingStep] Successfully linked couple to code');
+          try {
+            // Double-check for existing couple after acquiring mutex (to prevent race condition)
+            const { data: doubleCheckCouple } = await db.couples.getActiveByUserId(creatorUserId);
+            if (doubleCheckCouple) {
+              console.log('[PairingStep] Couple already exists after mutex check:', doubleCheckCouple.id);
+              // Link existing couple to the pairing code
+              if (finalCode) {
+                await db.pairingCodes.setCoupleId(finalCode, doubleCheckCouple.id);
+              }
+              setCouple({
+                id: doubleCheckCouple.id,
+                user1Id: doubleCheckCouple.user1_id,
+                user2Id: doubleCheckCouple.user2_id || undefined,
+                anniversaryDate: doubleCheckCouple.dating_start_date ? new Date(doubleCheckCouple.dating_start_date) : undefined,
+                datingStartDate: doubleCheckCouple.dating_start_date ? new Date(doubleCheckCouple.dating_start_date) : undefined,
+                anniversaryType: t('onboarding.anniversary.datingStart'),
+                status: doubleCheckCouple.user2_id ? 'active' : 'pending',
+                createdAt: doubleCheckCouple.created_at ? new Date(doubleCheckCouple.created_at) : new Date(),
+              });
+              setIsCodeSaved(true);
+              return;
             }
 
-            // Set couple in authStore
-            setCouple({
-              id: newCouple.id,
-              user1Id: creatorUserId,
-              anniversaryDate: new Date(),
-              anniversaryType: t('onboarding.anniversary.datingStart'),
-              status: 'pending',
-              createdAt: new Date(),
+            const { data: newCouple, error: coupleError } = await db.couples.create({
+              user1_id: creatorUserId,
             });
 
-            // Cleanup any previous orphaned pending couples for this creator
-            // (e.g., from failed pairing attempts)
-            console.log('[PairingStep] Cleaning up old pending couples for creator');
-            await db.couples.cleanupPendingCouples(creatorUserId, newCouple.id);
+            if (coupleError) {
+              console.error('Error creating couple:', coupleError);
+            } else if (newCouple) {
+              // Link couple_id to pairing code
+              console.log('[PairingStep] Created couple:', newCouple.id, 'linking to code:', finalCode);
+              const { error: linkError } = await db.pairingCodes.setCoupleId(finalCode, newCouple.id);
+              if (linkError) {
+                console.error('[PairingStep] Error linking couple to code:', linkError);
+              } else {
+                console.log('[PairingStep] Successfully linked couple to code');
+
+                // Re-fetch the valid code to ensure we display the one with couple_id
+                // This handles race conditions where multiple codes were created
+                const { data: validCode } = await db.pairingCodes.getValidPendingCode(creatorUserId);
+                if (validCode && validCode.code !== finalCode) {
+                  console.log('[PairingStep] Updating displayed code from', finalCode, 'to', validCode.code);
+                  setGeneratedCode(validCode.code);
+                  finalCode = validCode.code;
+                }
+              }
+
+              // Set couple in authStore - no anniversaryDate/datingStartDate until user sets it
+              setCouple({
+                id: newCouple.id,
+                user1Id: creatorUserId,
+                anniversaryDate: undefined,
+                datingStartDate: undefined,
+                anniversaryType: t('onboarding.anniversary.datingStart'),
+                status: 'pending',
+                createdAt: new Date(),
+              });
+
+              // Cleanup any previous orphaned pending couples for this creator
+              // (e.g., from failed pairing attempts)
+              console.log('[PairingStep] Cleaning up old pending couples for creator');
+              await db.couples.cleanupPendingCouples(creatorUserId, newCouple.id);
 
             // Only update user in authStore if not already logged in
             if (!isExistingUser) {
@@ -1801,6 +2005,9 @@ function PairingStep({
                 createdAt: new Date(),
               });
             }
+            }
+          } finally {
+            coupleCreationInProgressRef.current = false;
           }
 
           setIsCodeSaved(true);
@@ -1831,7 +2038,7 @@ function PairingStep({
                     id: coupleData.id,
                     user1Id: coupleData.user1_id,
                     user2Id: coupleData.user2_id,
-                    anniversaryDate: coupleData.dating_start_date ? parseDateAsLocal(coupleData.dating_start_date) : new Date(),
+                    anniversaryDate: coupleData.dating_start_date ? parseDateAsLocal(coupleData.dating_start_date) : undefined,
                     datingStartDate: coupleData.dating_start_date ? parseDateAsLocal(coupleData.dating_start_date) : undefined,
                     anniversaryType: t('onboarding.anniversary.datingStart'),
                     status: 'active',
@@ -1904,6 +2111,7 @@ function PairingStep({
           });
         } catch (err) {
           console.error('Pairing setup error:', err);
+          setupInProgressRef.current = false; // Release mutex on error
         }
       };
 
@@ -1975,6 +2183,8 @@ function PairingStep({
       if (channelRef.current) {
         db.pairingCodes.unsubscribe(channelRef.current);
       }
+      // Reset setup mutex on unmount so it can run again if component remounts
+      setupInProgressRef.current = false;
     };
   }, [isCreatingCode, generatedCode, isCodeSaved, setIsPairingConnected, setGeneratedCode, codeExpiresAt, setCouple, setUser, currentUser?.id]);
 
@@ -2045,7 +2255,7 @@ function PairingStep({
                     id: coupleData.id,
                     user1Id: coupleData.user1_id,
                     user2Id: coupleData.user2_id,
-                    anniversaryDate: coupleData.dating_start_date ? parseDateAsLocal(coupleData.dating_start_date) : new Date(),
+                    anniversaryDate: coupleData.dating_start_date ? parseDateAsLocal(coupleData.dating_start_date) : undefined,
                     datingStartDate: coupleData.dating_start_date ? parseDateAsLocal(coupleData.dating_start_date) : undefined,
                     anniversaryType: t('onboarding.anniversary.datingStart'),
                     status: 'active',
@@ -2262,7 +2472,23 @@ function PairingStep({
 
       // Get creator's user ID from the couple
       const { data: creatorCouple } = await db.couples.get(existingCode.couple_id);
-      const creatorId = creatorCouple?.user1_id;
+
+      // Check if couple exists (might have been deleted due to race condition or cleanup)
+      if (!creatorCouple) {
+        console.log('[PairingStep] Couple not found for couple_id:', existingCode.couple_id);
+        // Clear the invalid couple_id from the pairing code
+        if (supabase) {
+          await supabase
+            .from('pairing_codes')
+            .update({ couple_id: null })
+            .eq('code', pairingCode);
+        }
+        setError(t('onboarding.pairing.partnerNotReady'));
+        setIsLoading(false);
+        return;
+      }
+
+      const creatorId = creatorCouple.user1_id;
 
       // Use existing user ID if logged in via social login, otherwise generate new one
       const joinerId = currentUser?.id || generateUUID();
@@ -2290,6 +2516,15 @@ function PairingStep({
               await supabase.from('couples').delete().eq('id', disconnectedCouple.id);
             }
           } else {
+            // Both profiles exist - allow reconnection regardless of who disconnected
+            // Creator made a new code = open to pairing, Joiner entered code = wants to pair
+            // If they were previously paired, reconnection preserves their data (30-day feature)
+            console.log('[PairingStep] handleJoinCode: both users exist, allowing reconnection:', {
+              disconnectedBy: disconnectedCouple.disconnected_by,
+              joinerId,
+              creatorId,
+            });
+
             console.log('[PairingStep] Found disconnected couple, restoring...', disconnectedCouple.id);
 
             // Restore the disconnected couple
@@ -2308,7 +2543,7 @@ function PairingStep({
                 id: restoredCouple.id,
                 user1Id: restoredCouple.user1_id,
                 user2Id: restoredCouple.user2_id,
-                anniversaryDate: restoredCouple.dating_start_date ? parseDateAsLocal(restoredCouple.dating_start_date) : new Date(),
+                anniversaryDate: restoredCouple.dating_start_date ? parseDateAsLocal(restoredCouple.dating_start_date) : undefined,
                 datingStartDate: restoredCouple.dating_start_date ? parseDateAsLocal(restoredCouple.dating_start_date) : undefined,
                 weddingDate: restoredCouple.wedding_date ? parseDateAsLocal(restoredCouple.wedding_date) : undefined,
                 anniversaryType: t('onboarding.anniversary.datingStart'),
@@ -2348,6 +2583,10 @@ function PairingStep({
                 db.couples.cleanupPendingCouples(joinerId, restoredCouple.id),
                 db.couples.cleanupPendingCouples(partnerId, restoredCouple.id),
               ]);
+
+              // Update pairing code's couple_id to point to the restored couple
+              // This is important for creator's realtime handler to find the correct couple
+              await db.pairingCodes.setCoupleId(pairingCode, restoredCouple.id);
 
               // Mark pairing code as used
               await db.pairingCodes.join(pairingCode, joinerId);
@@ -2489,7 +2728,7 @@ function PairingStep({
           id: updatedCouple.id,
           user1Id: updatedCouple.user1_id,
           user2Id: joinerId,
-          anniversaryDate: updatedCouple.dating_start_date ? parseDateAsLocal(updatedCouple.dating_start_date) : new Date(),
+          anniversaryDate: updatedCouple.dating_start_date ? parseDateAsLocal(updatedCouple.dating_start_date) : undefined,
           datingStartDate: updatedCouple.dating_start_date ? parseDateAsLocal(updatedCouple.dating_start_date) : undefined,
           anniversaryType: t('onboarding.anniversary.datingStart'),
           status: 'active',
@@ -2811,15 +3050,17 @@ function PairingStep({
 
       {/* Buttons fixed at bottom */}
       <View style={styles.buttonRow}>
+        {!hideBackButton && (
+          <Pressable
+            style={[styles.secondaryButton, (isLoading || isPairingConnected) && styles.secondaryButtonDisabled]}
+            onPress={onBack}
+            disabled={isLoading || isPairingConnected}
+          >
+            <Text style={[styles.secondaryButtonText, (isLoading || isPairingConnected) && styles.secondaryButtonTextDisabled]}>{t('onboarding.previous')}</Text>
+          </Pressable>
+        )}
         <Pressable
-          style={[styles.secondaryButton, (isLoading || isPairingConnected) && styles.secondaryButtonDisabled]}
-          onPress={onBack}
-          disabled={isLoading || isPairingConnected}
-        >
-          <Text style={[styles.secondaryButtonText, (isLoading || isPairingConnected) && styles.secondaryButtonTextDisabled]}>{t('onboarding.previous')}</Text>
-        </Pressable>
-        <Pressable
-          style={[styles.primaryButton, styles.buttonFlex, (!isValid || isPairingConnected) && styles.primaryButtonDisabled]}
+          style={[styles.primaryButton, hideBackButton ? { flex: 1 } : styles.buttonFlex, (!isValid || isPairingConnected) && styles.primaryButtonDisabled]}
           onPress={handleConnect}
           disabled={!isValid || isLoading || isPairingConnected}
         >
@@ -3494,6 +3735,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingTop: 60,
     paddingBottom: 100,
   },
   welcomeSubtitle: {
@@ -3731,6 +3973,22 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#3C1E1E',
     fontWeight: '500',
+  },
+  // Terms disclaimer styles
+  termsDisclaimerContainer: {
+    marginTop: SPACING.sm,
+    width: '85%',
+    alignSelf: 'center',
+  },
+  termsDisclaimerText: {
+    fontSize: 12,
+    color: 'rgba(0, 0, 0, 0.5)',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  termsDisclaimerLink: {
+    color: 'rgba(0, 0, 0, 0.7)',
+    textDecorationLine: 'underline',
   },
   dividerContainer: {
     flexDirection: 'row',

@@ -480,6 +480,8 @@
     },
     "unpair": {
       "title": "Unpair",
+      "confirmAlertTitle": "Unpair",
+      "confirmAlertMessage": "Are you sure you want to unpair?",
       "confirmTitle": "Confirm Unpairing",
       "warningTitle": "Are you sure you want to unpair?",
       "warningText": "Unpairing will disconnect you from your partner,\nand some data may become inaccessible.",
@@ -497,6 +499,8 @@
       "confirmPrompt": "To continue, please type 'Unpair' below",
       "confirmText": "Unpair",
       "button": "Unpair",
+      "finalConfirmTitle": "Final Confirmation",
+      "finalConfirmMessage": "Are you sure you want to unpair?\nThis action cannot be undone.",
       "success": "Unpaired",
       "successMessage": "You have been unpaired.\nReconnect with the same partner within 30 days to recover your data.",
       "error": "An error occurred while unpairing.",
@@ -509,6 +513,8 @@
     },
     "deleteAccount": {
       "title": "Delete Account",
+      "confirmAlertTitle": "Delete Account",
+      "confirmAlertMessage": "Are you sure you want to delete your account?",
       "warningText": "Deleting your account will\n",
       "permanentDelete": "permanently delete",
       "warningEnd": " all data.",
@@ -516,6 +522,8 @@
       "confirmPrompt": "To continue, please type 'Delete' below",
       "confirmText": "Delete",
       "button": "Delete Account",
+      "finalConfirmTitle": "Final Confirmation",
+      "finalConfirmMessage": "Are you sure you want to delete your account?\nAll data will be permanently deleted.",
       "deleting": "Deleting...",
       "success": "Account Deleted",
       "successMessage": "All data has been deleted.\nThank you for using our service.",
@@ -555,7 +563,15 @@
       "demoMode": "Demo Mode",
       "demoModeMessage": "Social login is not available in demo mode.\n\nPlease configure environment variables to connect Supabase.",
       "welcomeBack": "Welcome back!",
-      "alreadyConnected": "You are already connected with your partner. Continuing from basic info."
+      "alreadyConnected": "You are already connected with your partner. Continuing from basic info.",
+      "termsDisclaimer": {
+        "prefix": "By logging in, you confirm you are 16 years or older and agree to our ",
+        "privacy": "Privacy Policy",
+        "terms": "Terms of Service",
+        "location": "Location Service Terms",
+        "comma": ", ",
+        "suffix": "."
+      }
     },
     "testMode": {
       "title": "Test Mode",

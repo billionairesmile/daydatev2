@@ -99,77 +99,116 @@ export default function UnpairScreen() {
   const handleUnpairConfirm = async () => {
     // Case-insensitive comparison for English (allows 'unpair', 'Unpair', 'UNPAIR')
     if (confirmText.toLowerCase() === t('settings.unpair.confirmText').toLowerCase()) {
-      setShowConfirmModal(false);
-      setConfirmText('');
+      // Show final confirmation alert before proceeding
+      Alert.alert(
+        t('settings.unpair.finalConfirmTitle'),
+        t('settings.unpair.finalConfirmMessage'),
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          {
+            text: t('common.confirm'),
+            style: 'destructive',
+            onPress: () => executeUnpair(),
+          },
+        ]
+      );
+    }
+  };
 
-      const { user, partner, setCouple, setPartner, setIsOnboardingComplete } = useAuthStore.getState();
-      const { cleanup: cleanupSync } = useCoupleSyncStore.getState();
-      const { setStep: setOnboardingStep, updateData: updateOnboardingData } = useOnboardingStore.getState();
+  const executeUnpair = async () => {
+    setShowConfirmModal(false);
+    setConfirmText('');
 
-      // Get user nickname before clearing state
-      const userNickname = user?.nickname || t('common.partner');
-      const partnerId = partner?.id;
+    const { user, partner, setCouple, setPartner, setIsOnboardingComplete } = useAuthStore.getState();
+    const { cleanup: cleanupSync } = useCoupleSyncStore.getState();
+    const { setStep: setOnboardingStep, updateData: updateOnboardingData } = useOnboardingStore.getState();
 
-      try {
-        // Soft delete - disconnect couple in database (30-day recovery period)
-        if (!isDemoMode && couple?.id && user?.id) {
-          const { error } = await db.couples.disconnect(couple.id, user.id);
-          if (error) {
-            console.error('[Unpair] Error disconnecting couple:', error);
-            Alert.alert(t('common.error'), t('settings.unpair.error'));
-            return;
-          }
+    // Get user nickname before clearing state
+    const userNickname = user?.nickname || t('common.partner');
+    const partnerId = partner?.id;
 
-          // Send push notification to partner
-          if (partnerId) {
-            await notifyPartnerUnpaired(
-              partnerId,
-              userNickname,
-              t('settings.unpair.notificationTitle'),
-              t('settings.unpair.notificationBody', { nickname: userNickname })
-            );
-          }
+    try {
+      // Soft delete - disconnect couple in database (30-day recovery period)
+      if (!isDemoMode && couple?.id && user?.id) {
+        const { error } = await db.couples.disconnect(couple.id, user.id);
+        if (error) {
+          console.error('[Unpair] Error disconnecting couple:', error);
+          Alert.alert(t('common.error'), t('settings.unpair.error'));
+          return;
         }
 
-        // Cleanup realtime subscriptions
-        cleanupSync();
+        // Send push notification to partner
+        if (partnerId) {
+          await notifyPartnerUnpaired(
+            partnerId,
+            userNickname,
+            t('settings.unpair.notificationTitle'),
+            t('settings.unpair.notificationBody', { nickname: userNickname })
+          );
+        }
 
-        // Clear couple and partner from local state (but keep user logged in)
-        setCouple(null);
-        setPartner(null);
-
-        // Set onboarding incomplete and go directly to pairing screen
-        setIsOnboardingComplete(false);
-        setOnboardingStep('pairing');
-        // Reset all pairing state so user can pair with a new partner
-        updateOnboardingData({
-          isPairingConnected: false,
-          isCreatingCode: true,
-          pairingCode: '', // Clear any previously entered code
-        });
-
-        Alert.alert(
-          t('settings.unpair.success'),
-          t('settings.unpair.successMessage'),
-          [
-            {
-              text: t('common.confirm'),
-              onPress: () => {
-                router.replace('/(auth)/onboarding');
-              },
-            },
-          ]
-        );
-      } catch (error) {
-        console.error('[Unpair] Unpair error:', error);
-        Alert.alert(t('common.error'), t('settings.unpair.error'));
+        // Delete any existing pending pairing codes for this user
+        // This ensures a fresh code with full 24-hour timer will be created
+        console.log('[Unpair] Deleting pending pairing codes for user:', user.id);
+        await db.pairingCodes.deleteByCreatorId(user.id);
       }
+
+      // Cleanup realtime subscriptions
+      cleanupSync();
+
+      // Clear couple and partner from local state (but keep user logged in)
+      setCouple(null);
+      setPartner(null);
+
+      // Set onboarding incomplete and go directly to pairing screen
+      setIsOnboardingComplete(false);
+      setOnboardingStep('pairing');
+      // Reset all pairing state so user can pair with a new partner
+      // Clear anniversaryDate to prevent old date from being applied to new couple
+      updateOnboardingData({
+        isPairingConnected: false,
+        isCreatingCode: true,
+        pairingCode: '', // Clear any previously entered code
+        anniversaryDate: null, // Clear old anniversary date
+        relationshipType: 'dating', // Reset relationship type
+      });
+
+      Alert.alert(
+        t('settings.unpair.success'),
+        t('settings.unpair.successMessage'),
+        [
+          {
+            text: t('common.confirm'),
+            // Navigation is handled by _layout.tsx when isOnboardingComplete becomes false
+            // Don't navigate here to avoid duplicate navigation
+          },
+        ]
+      );
+    } catch (error) {
+      console.error('[Unpair] Unpair error:', error);
+      Alert.alert(t('common.error'), t('settings.unpair.error'));
     }
   };
 
   const closeConfirmModal = () => {
     setShowConfirmModal(false);
     setConfirmText('');
+  };
+
+  // Show initial confirmation alert before showing the text-input modal
+  const handleUnpairButtonPress = () => {
+    Alert.alert(
+      t('settings.unpair.confirmAlertTitle'),
+      t('settings.unpair.confirmAlertMessage'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('common.confirm'),
+          style: 'destructive',
+          onPress: () => setShowConfirmModal(true),
+        },
+      ]
+    );
   };
 
   return (
@@ -258,7 +297,7 @@ export default function UnpairScreen() {
       <View style={styles.bottomButton}>
         <Pressable
           style={styles.unpairButton}
-          onPress={() => setShowConfirmModal(true)}
+          onPress={handleUnpairButtonPress}
         >
           <Link2Off color={COLORS.white} size={20} />
           <Text style={styles.unpairButtonText}>{t('settings.unpair.button')}</Text>

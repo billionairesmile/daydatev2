@@ -475,11 +475,13 @@
       "logout": "로그아웃",
       "logoutTitle": "로그아웃",
       "logoutMessage": "정말 로그아웃 하시겠습니까?",
-      "deleteAccount": "계정 탈퇴",
+      "deleteAccount": "계정탈퇴",
       "unpair": "페어링 끊기"
     },
     "unpair": {
       "title": "페어링 끊기",
+      "confirmAlertTitle": "페어링 끊기",
+      "confirmAlertMessage": "정말 페어링을 끊으시겠습니까?",
       "confirmTitle": "페어링 끊기 확인",
       "warningTitle": "정말 페어링을 끊으시겠어요?",
       "warningText": "페어링을 끊으면 파트너와의 연결이 해제되고,\n일부 데이터에 접근할 수 없게 됩니다.",
@@ -497,6 +499,8 @@
       "confirmPrompt": "계속하려면 아래에 '페어링끊기'를\n정확히 입력해주세요",
       "confirmText": "페어링끊기",
       "button": "페어링 끊기",
+      "finalConfirmTitle": "최종 확인",
+      "finalConfirmMessage": "정말로 페어링을 끊으시겠습니까?\n이 작업은 되돌릴 수 없습니다.",
       "success": "페어링 해제",
       "successMessage": "페어링이 해제되었습니다.\n30일 이내에 같은 파트너와 재연결하면 기존 데이터가 복구됩니다.",
       "error": "페어링 해제 중 오류가 발생했습니다.",
@@ -509,6 +513,8 @@
     },
     "deleteAccount": {
       "title": "계정 탈퇴",
+      "confirmAlertTitle": "계정탈퇴",
+      "confirmAlertMessage": "정말 계정을 탈퇴하시겠습니까?",
       "warningText": "계정을 탈퇴하면 모든 데이터가\n",
       "permanentDelete": "영구적으로 삭제",
       "warningEnd": "됩니다.",
@@ -516,6 +522,8 @@
       "confirmPrompt": "계속하려면 아래에 '계정탈퇴'를 입력해주세요",
       "confirmText": "계정탈퇴",
       "button": "계정 탈퇴",
+      "finalConfirmTitle": "최종 확인",
+      "finalConfirmMessage": "정말로 계정을 탈퇴하시겠습니까?\n모든 데이터가 영구적으로 삭제됩니다.",
       "deleting": "삭제 중...",
       "success": "계정 탈퇴 완료",
       "successMessage": "모든 데이터가 삭제되었습니다.\n이용해 주셔서 감사합니다.",
@@ -555,7 +563,15 @@
       "demoMode": "데모 모드",
       "demoModeMessage": "소셜 로그인은 데모 모드에서 사용할 수 없습니다.\n\n환경 변수를 설정하여 Supabase를 연결해주세요.",
       "welcomeBack": "다시 오셨군요!",
-      "alreadyConnected": "이미 상대방과 연결되어 있습니다. 기본정보 입력부터 계속합니다."
+      "alreadyConnected": "이미 상대방과 연결되어 있습니다. 기본정보 입력부터 계속합니다.",
+      "termsDisclaimer": {
+        "prefix": "로그인 시 만 16세 이상이며, ",
+        "privacy": "개인정보 처리방침",
+        "terms": "이용약관",
+        "location": "위치정보 서비스 이용약관",
+        "comma": ", ",
+        "suffix": "에 동의한 것으로 간주됩니다."
+      }
     },
     "testMode": {
       "title": "테스트 모드",

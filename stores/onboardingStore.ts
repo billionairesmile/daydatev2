@@ -90,6 +90,7 @@ export type OnboardingStep =
 interface OnboardingState {
   currentStep: OnboardingStep;
   data: OnboardingData;
+  _hasHydrated: boolean;
 }
 
 interface OnboardingActions {
@@ -99,6 +100,7 @@ interface OnboardingActions {
   updateData: (data: Partial<OnboardingData>) => void;
   reset: () => void;
   skipPreferences: () => void;
+  setHasHydrated: (hasHydrated: boolean) => void;
 }
 
 const initialData: OnboardingData = {
@@ -129,13 +131,13 @@ const initialData: OnboardingData = {
 const initialState: OnboardingState = {
   currentStep: 'welcome',
   data: initialData,
+  _hasHydrated: false,
 };
 
 // Step order for navigation
 const stepOrderA: OnboardingStep[] = [
   'welcome',
   'login',
-  'terms',
   'pairing',
   'basic_info',
   'couple_info',
@@ -179,11 +181,16 @@ export const useOnboardingStore = create<OnboardingState & OnboardingActions>()(
         }));
       },
 
-      reset: () => set(initialState),
+      reset: () => set({
+        ...initialState,
+        _hasHydrated: true, // Preserve hydration state when resetting to avoid pairing screen flash
+      }),
 
       skipPreferences: () => {
         set({ currentStep: 'complete' });
       },
+
+      setHasHydrated: (hasHydrated) => set({ _hasHydrated: hasHydrated }),
     }),
     {
       name: 'daydate-onboarding-storage',
@@ -192,6 +199,9 @@ export const useOnboardingStore = create<OnboardingState & OnboardingActions>()(
         currentStep: state.currentStep,
         data: state.data,
       }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     }
   )
 );

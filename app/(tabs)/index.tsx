@@ -318,7 +318,7 @@ export default function HomeScreen() {
   const { t, i18n } = useTranslation();
   const { backgroundImage, setBackgroundImage, resetToDefault } = useBackground();
   const { data: onboardingData } = useOnboardingStore();
-  const { user, partner, couple } = useAuthStore();
+  const { user, partner, couple, setPartner, setCouple } = useAuthStore();
   const { coupleId } = useCoupleSyncStore();
 
   // Determine nicknames - always show "나 ❤️ 파트너" from current user's perspective
@@ -342,6 +342,54 @@ export default function HomeScreen() {
   // Custom anniversaries added by user (yearly repeating) - loaded from DB/local storage
   const [customAnniversaries, setCustomAnniversaries] = useState<Anniversary[]>([]);
   const [isLoadingAnniversaries, setIsLoadingAnniversaries] = useState(true);
+
+  // Fetch latest partner and couple data on mount for real-time sync
+  useEffect(() => {
+    const fetchLatestData = async () => {
+      if (!couple?.id || !user?.id) return;
+
+      try {
+        // Fetch latest couple data
+        const { data: coupleData } = await db.couples.get(couple.id);
+        if (coupleData) {
+          const currentCouple = useAuthStore.getState().couple;
+          if (currentCouple) {
+            setCouple({
+              ...currentCouple,
+              anniversaryDate: coupleData.dating_start_date ? parseDateAsLocal(coupleData.dating_start_date) : undefined,
+              datingStartDate: coupleData.dating_start_date ? parseDateAsLocal(coupleData.dating_start_date) : undefined,
+              weddingDate: coupleData.wedding_date ? parseDateAsLocal(coupleData.wedding_date) : undefined,
+              relationshipType: coupleData.wedding_date ? 'married' : 'dating',
+            });
+          }
+        }
+
+        // Fetch latest partner data
+        const partnerId = couple.user1Id === user.id ? couple.user2Id : couple.user1Id;
+        if (partnerId) {
+          const { data: partnerData } = await db.profiles.get(partnerId);
+          if (partnerData) {
+            const prefs = partnerData.preferences as Record<string, unknown> || {};
+            const birthDateCalendarType = prefs.birthDateCalendarType as 'solar' | 'lunar' | undefined;
+            setPartner({
+              id: partnerData.id,
+              email: partnerData.email || '',
+              nickname: partnerData.nickname || '',
+              inviteCode: partnerData.invite_code || '',
+              preferences: prefs as unknown as import('@/types').UserPreferences,
+              birthDate: partnerData.birth_date ? parseDateAsLocal(partnerData.birth_date) : undefined,
+              birthDateCalendarType: birthDateCalendarType || 'solar',
+              createdAt: partnerData.created_at ? new Date(partnerData.created_at) : new Date(),
+            });
+          }
+        }
+      } catch (error) {
+        console.error('[HomeScreen] Error fetching latest data:', error);
+      }
+    };
+
+    fetchLatestData();
+  }, [couple?.id, user?.id, couple?.user1Id, couple?.user2Id, setCouple, setPartner]);
 
   // Load custom anniversaries from service on mount
   useEffect(() => {
@@ -602,16 +650,16 @@ export default function HomeScreen() {
     setAnniversaryModalStep('edit');
   };
 
-  // Calculate D-day using couple's datingStartDate (synced from DB) or fallback to onboarding data
-  // Priority: couple.datingStartDate (database) > onboardingData.anniversaryDate (local) > fallback
+  // Calculate D-day using couple's datingStartDate (synced from DB)
+  // When a new couple is formed and anniversary date is not yet set, show "-" instead of old data
+  // This ensures user A doesn't see the old partner's day count when pairing with new person B
   const anniversaryDate = couple?.datingStartDate
     ? new Date(couple.datingStartDate)
-    : onboardingData.anniversaryDate
-      ? new Date(onboardingData.anniversaryDate)
-      : new Date(2022, 3, 15); // Fallback to April 15, 2022
+    : null;
   const today = new Date();
-  const diffTime = today.getTime() - anniversaryDate.getTime();
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to count from day 1
+  const diffDays = anniversaryDate
+    ? Math.floor((today.getTime() - anniversaryDate.getTime()) / (1000 * 60 * 60 * 24)) + 1 // +1 to count from day 1
+    : null;
 
   // Helper function to calculate D-day (compare dates without time)
   const calculateDDay = (targetDate: Date) => {
@@ -660,30 +708,33 @@ export default function HomeScreen() {
       // For married couples: use wedding date for anniversary calculation
       const weddingDate = couple?.weddingDate
         ? new Date(couple.weddingDate)
-        : anniversaryDate; // Fallback to anniversary date
+        : anniversaryDate; // Fallback to anniversary date (can be null)
 
-      // Only show the nearest upcoming wedding anniversary
-      for (let year = 1; year <= 50; year++) {
-        const yearlyDate = new Date(weddingDate);
-        yearlyDate.setFullYear(weddingDate.getFullYear() + year);
-        if (yearlyDate > today) {
-          const weddingLabel = i18n.language === 'ko'
-            ? `${t('home.anniversary.weddingAnniversary')} ${year}주년`
-            : `${year}${year === 1 ? 'st' : year === 2 ? 'nd' : year === 3 ? 'rd' : 'th'} ${t('home.anniversary.weddingAnniversary')}`;
-          baseAnniversaries.push({
-            id: idCounter++,
-            label: weddingLabel,
-            targetDate: yearlyDate,
-            icon: year === 1 ? '💍' : '💖',
-            bgColor: 'rgba(168, 85, 247, 0.25)',
-            gradientColors: ['#A855F7', '#EC4899'] as const,
-            isYearly: true,
-          });
-          break; // Only add the nearest upcoming anniversary
+      // Only show the nearest upcoming wedding anniversary if we have a valid date
+      if (weddingDate) {
+        for (let year = 1; year <= 50; year++) {
+          const yearlyDate = new Date(weddingDate);
+          yearlyDate.setFullYear(weddingDate.getFullYear() + year);
+          if (yearlyDate > today) {
+            const weddingLabel = i18n.language === 'ko'
+              ? `${t('home.anniversary.weddingAnniversary')} ${year}주년`
+              : `${year}${year === 1 ? 'st' : year === 2 ? 'nd' : year === 3 ? 'rd' : 'th'} ${t('home.anniversary.weddingAnniversary')}`;
+            baseAnniversaries.push({
+              id: idCounter++,
+              label: weddingLabel,
+              targetDate: yearlyDate,
+              icon: year === 1 ? '💍' : '💖',
+              bgColor: 'rgba(168, 85, 247, 0.25)',
+              gradientColors: ['#A855F7', '#EC4899'] as const,
+              isYearly: true,
+            });
+            break; // Only add the nearest upcoming anniversary
+          }
         }
       }
-    } else {
+    } else if (anniversaryDate) {
       // For dating: 100-day intervals up to 1000, then 500-day intervals
+      // Only calculate when anniversaryDate is set (not null)
       // Calculate days passed since anniversary
       const daysPassed = Math.floor((today.getTime() - anniversaryDate.getTime()) / (24 * 60 * 60 * 1000)) + 1;
 
@@ -739,6 +790,7 @@ export default function HomeScreen() {
         }
       }
     }
+    // When anniversaryDate is null (new pairing, anniversary not yet set), skip milestone calculations
 
     // Add birthday if birthDate exists (current user)
     if (onboardingData.birthDate) {
@@ -853,7 +905,7 @@ export default function HomeScreen() {
       mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [3, 4],
-      quality: 0.8,
+      quality: 1.0,
     });
 
     if (!result.canceled && result.assets[0]) {
@@ -1040,9 +1092,9 @@ export default function HomeScreen() {
             onPress={openAnniversaryModal}
             style={styles.anniversaryButton}
           >
-            {/* Day count in row */}
+            {/* Day count in row - show "-" when anniversary date is not set */}
             <View style={styles.dDayRow}>
-              <Text style={styles.dDayNumber}>{diffDays}</Text>
+              <Text style={styles.dDayNumber}>{diffDays !== null ? diffDays : '-'}</Text>
               <Text style={styles.dDayUnit}>{t('common.daysCount')}</Text>
             </View>
           </Pressable>

@@ -48,6 +48,7 @@ import { useOnboardingStore, useAuthStore, useMemoryStore, useLanguageStore, get
 import type { SupportedLanguage } from '@/stores';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
 import { db, isDemoMode } from '@/lib/supabase';
+import { signOut as supabaseSignOut } from '@/lib/socialAuth';
 import { notifyPartnerUnpaired } from '@/lib/pushNotifications';
 
 const { width } = Dimensions.get('window');
@@ -218,16 +219,45 @@ export default function SettingsScreen() {
   };
 
   const handleAccountDeletion = () => {
-    setShowDeleteAccountModal(true);
+    // Show confirmation alert before opening the text-input modal
+    Alert.alert(
+      t('settings.deleteAccount.confirmAlertTitle'),
+      t('settings.deleteAccount.confirmAlertMessage'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('common.confirm'),
+          style: 'destructive',
+          onPress: () => setShowDeleteAccountModal(true),
+        },
+      ]
+    );
   };
 
   const handleDeleteAccountConfirm = async () => {
     // Case-insensitive comparison for English (allows 'delete', 'Delete', 'DELETE')
     if (deleteConfirmText.toLowerCase() !== t('settings.deleteAccount.confirmText').toLowerCase()) return;
 
+    // Show final confirmation alert before proceeding
+    Alert.alert(
+      t('settings.deleteAccount.finalConfirmTitle'),
+      t('settings.deleteAccount.finalConfirmMessage'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('common.confirm'),
+          style: 'destructive',
+          onPress: () => executeAccountDeletion(),
+        },
+      ]
+    );
+  };
+
+  const executeAccountDeletion = async () => {
     setIsDeleting(true);
     const { user, partner } = useAuthStore.getState();
     const { cleanup: cleanupSync } = useCoupleSyncStore.getState();
+    const { setStep: setOnboardingStep } = useOnboardingStore.getState();
 
     // Get user nickname before clearing state
     const userNickname = user?.nickname || t('common.partner');
@@ -267,24 +297,50 @@ export default function SettingsScreen() {
         }
       }
 
-      // Clear all local storage
-      await db.account.clearLocalStorage();
-
-      // Reset onboarding first (sets step to 'welcome') before signOut
-      // This prevents showing pairing screen briefly during transition
-      resetOnboarding();
-
-      // Clear Zustand stores
-      signOut();
-
+      // Close modal and reset UI state first
       setShowDeleteAccountModal(false);
       setDeleteConfirmText('');
       setIsDeleting(false);
 
-      // Navigate immediately to prevent flash of pairing screen
+      // CRITICAL ORDER FOR AVOIDING PAIRING SCREEN FLASH:
+      // 1. Sign out from Supabase FIRST to invalidate the session
+      // 2. Clear AsyncStorage so persist middleware can't restore old state
+      // 3. Reset in-memory stores to 'welcome'
+      // 4. Wait for React to process state changes
+      // 5. Finally signOut from Zustand (which triggers navigation)
+      // This ensures that when onboarding screen mounts, user is definitely not authenticated
+
+      // Step 1: Sign out from Supabase to invalidate the session
+      // This prevents any auth listeners from detecting an active session
+      if (!isDemoMode) {
+        try {
+          await supabaseSignOut();
+        } catch (supabaseError) {
+          console.error('[Settings] Supabase signOut error:', supabaseError);
+          // Continue even if Supabase signOut fails
+        }
+      }
+
+      // Step 2: Clear all AsyncStorage
+      await db.account.clearLocalStorage();
+
+      // Step 3: Reset onboarding state to 'welcome' (in-memory)
+      setOnboardingStep('welcome');
+      resetOnboarding();
+
+      // Step 4: Wait for React to process the state changes before triggering navigation
+      // This ensures the 'welcome' step is fully committed to the store
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      // Step 5: Clear Zustand auth stores - this sets isOnboardingComplete to false
+      signOut();
+
+      // Step 6: Explicitly navigate to onboarding screen immediately
+      // This prevents the brief flash of intermediate screens that would occur
+      // if we relied on _layout.tsx useEffect to handle navigation
       router.replace('/(auth)/onboarding');
 
-      // Show success alert after navigation
+      // Show success alert after navigation completes
       setTimeout(() => {
         Alert.alert(
           t('settings.deleteAccount.success'),

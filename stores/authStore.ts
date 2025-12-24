@@ -13,6 +13,7 @@ interface AuthActions {
   setIsLoading: (isLoading: boolean) => void;
   setError: (error: string | null) => void;
   setIsTestMode: (isTestMode: boolean) => void;
+  setHasHydrated: (hasHydrated: boolean) => void;
 
   // User actions
   updateUserPreferences: (preferences: Partial<UserPreferences>) => void;
@@ -27,7 +28,7 @@ interface AuthActions {
   reset: () => void;
 }
 
-const initialState: AuthState & { isTestMode: boolean } = {
+const initialState: AuthState & { isTestMode: boolean; _hasHydrated: boolean } = {
   user: null,
   couple: null,
   partner: null,
@@ -36,9 +37,10 @@ const initialState: AuthState & { isTestMode: boolean } = {
   isLoading: false,
   error: null,
   isTestMode: false,
+  _hasHydrated: false,
 };
 
-export const useAuthStore = create<AuthState & { isTestMode: boolean } & AuthActions>()(
+export const useAuthStore = create<AuthState & { isTestMode: boolean; _hasHydrated: boolean } & AuthActions>()(
   persist(
     (set, get) => ({
       ...initialState,
@@ -52,6 +54,7 @@ export const useAuthStore = create<AuthState & { isTestMode: boolean } & AuthAct
       setIsLoading: (isLoading) => set({ isLoading }),
       setError: (error) => set({ error }),
       setIsTestMode: (isTestMode) => set({ isTestMode }),
+      setHasHydrated: (hasHydrated) => set({ _hasHydrated: hasHydrated }),
 
       // User actions
       updateUserPreferences: (preferences) => {
@@ -109,9 +112,12 @@ export const useAuthStore = create<AuthState & { isTestMode: boolean } & AuthAct
 
       // Session
       signOut: () => {
+        // Keep _hasHydrated: true because we're intentionally clearing state, not re-hydrating
+        // This ensures shouldShowWelcome logic in onboarding.tsx works correctly
         set({
           ...initialState,
           isOnboardingComplete: false,
+          _hasHydrated: true, // Preserve hydration state to avoid pairing screen flash
         });
       },
 
@@ -128,6 +134,9 @@ export const useAuthStore = create<AuthState & { isTestMode: boolean } & AuthAct
         isOnboardingComplete: state.isOnboardingComplete,
         isTestMode: state.isTestMode,
       }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     }
   )
 );

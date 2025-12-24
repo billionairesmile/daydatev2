@@ -434,39 +434,20 @@ export default function MemoriesScreen() {
     closeCoverPhotoPicker();
   };
 
-  // Animation for album detail modal (scale + fade + slide)
-  const albumDetailScaleAnim = useRef(new Animated.Value(0.92)).current;
+  // Animation for album detail modal (fade only)
   const albumDetailOpacityAnim = useRef(new Animated.Value(0)).current;
-  const albumDetailTranslateYAnim = useRef(new Animated.Value(30)).current;
 
   useEffect(() => {
     if (showAlbumDetailModal) {
-      // Scale up + fade in + slide up animation (iOS-like natural feel)
-      Animated.parallel([
-        Animated.spring(albumDetailScaleAnim, {
-          toValue: 1,
-          useNativeDriver: true,
-          tension: 65,
-          friction: 11,
-        }),
-        Animated.spring(albumDetailOpacityAnim, {
-          toValue: 1,
-          useNativeDriver: true,
-          tension: 65,
-          friction: 11,
-        }),
-        Animated.spring(albumDetailTranslateYAnim, {
-          toValue: 0,
-          useNativeDriver: true,
-          tension: 65,
-          friction: 11,
-        }),
-      ]).start();
+      // Fade in animation
+      Animated.timing(albumDetailOpacityAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
     } else {
-      // Reset animations
-      albumDetailScaleAnim.setValue(0.92);
+      // Reset animation
       albumDetailOpacityAnim.setValue(0);
-      albumDetailTranslateYAnim.setValue(30);
     }
   }, [showAlbumDetailModal]);
 
@@ -840,27 +821,13 @@ export default function MemoriesScreen() {
     });
   };
 
-  // Close album detail modal with fade-out + scale-down + slide-down animation
+  // Close album detail modal with fade-out animation
   const closeAlbumDetailModal = () => {
-    Animated.parallel([
-      Animated.spring(albumDetailScaleAnim, {
-        toValue: 0.92,
-        useNativeDriver: true,
-        tension: 65,
-        friction: 9,
-      }),
-      Animated.timing(albumDetailOpacityAnim, {
-        toValue: 0,
-        duration: 180,
-        useNativeDriver: true,
-      }),
-      Animated.spring(albumDetailTranslateYAnim, {
-        toValue: 30,
-        useNativeDriver: true,
-        tension: 65,
-        friction: 9,
-      }),
-    ]).start(() => {
+    Animated.timing(albumDetailOpacityAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
       setShowAlbumDetailModal(false);
       setShowAlbumMenu(false);
       setSelectedAlbum(null);
@@ -1830,13 +1797,7 @@ export default function MemoriesScreen() {
         <Animated.View
           style={[
             styles.albumDetailFullScreen,
-            {
-              opacity: albumDetailOpacityAnim,
-              transform: [
-                { scale: albumDetailScaleAnim },
-                { translateY: albumDetailTranslateYAnim },
-              ],
-            },
+            { opacity: albumDetailOpacityAnim },
           ]}
         >
           <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000000' }]} />

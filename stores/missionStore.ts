@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Alert } from 'react-native';
 import type { DailyMission, Mission, MissionState, KeptMission, TodayCompletedMission } from '@/types';
 import { generateMissionsWithAI, generateMissionsFallback, type MissionHistorySummary } from '@/services/missionGenerator';
 import { db, isDemoMode } from '@/lib/supabase';
@@ -88,7 +89,7 @@ interface MissionActions {
   getTodayCompletedMissionId: () => string | null;
   isTodayCompletedMission: (missionId: string) => boolean;
   // Mission generation actions
-  generateTodayMissions: (answers: MissionGenerationAnswers) => Promise<{ status: 'success' | 'locked' | 'exists' | 'location_required'; message?: string }>;
+  generateTodayMissions: (answers: MissionGenerationAnswers) => Promise<{ status: 'success' | 'locked' | 'exists' | 'location_required' | 'preferences_required'; message?: string }>;
   hasTodayMissions: () => boolean;
   getTodayMissions: () => Mission[];
   checkAndResetMissions: () => void;
@@ -281,11 +282,29 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
       },
 
       // Generate today's missions based on user answers (with AI)
-      // Returns: { status: 'success' | 'locked' | 'error' | 'location_required', message?: string }
+      // Returns: { status: 'success' | 'locked' | 'error' | 'location_required' | 'preferences_required', message?: string }
       generateTodayMissions: async (answers) => {
         const today = getTodayDateString();
         const syncStore = useCoupleSyncStore.getState();
         const { user, partner } = useAuthStore.getState();
+
+        // Check if partner has completed onboarding (required for mission generation)
+        if (partner?.id) {
+          const { data: partnerProfile } = await db.profiles.get(partner.id);
+
+          if (!partnerProfile?.is_onboarding_complete) {
+            // Partner hasn't completed onboarding yet
+            Alert.alert(
+              '파트너 온보딩 필요',
+              '파트너가 온보딩을 완료한 후 미션을 생성할 수 있습니다.',
+              [{ text: '확인' }]
+            );
+            return {
+              status: 'preferences_required' as const,
+              message: '파트너가 온보딩을 완료해야 합니다.',
+            };
+          }
+        }
 
         // Check location status for both users (required)
         if (user?.id && partner?.id) {
@@ -486,6 +505,9 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
         if (hasChanges) {
           set({ inProgressMissions: currentInProgress });
         }
+
+        // Also check and reset shared missions in coupleSyncStore
+        useCoupleSyncStore.getState().checkAndResetSharedMissions();
 
         // Note: todayCompletedMission already checks date in its getters
       },

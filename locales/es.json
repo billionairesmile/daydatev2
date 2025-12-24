@@ -480,6 +480,8 @@
     },
     "unpair": {
       "title": "Desemparejar",
+      "confirmAlertTitle": "Desemparejar",
+      "confirmAlertMessage": "¿Estás seguro de que quieres desemparejarte?",
       "confirmTitle": "Confirmar Desemparejamiento",
       "warningTitle": "¿Estás seguro de desemparejarte?",
       "warningText": "Desemparejarte te desconectará de tu pareja,\ny algunos datos podrían ser inaccesibles.",
@@ -497,6 +499,8 @@
       "confirmPrompt": "Para continuar, escribe 'Desemparejar' abajo",
       "confirmText": "Desemparejar",
       "button": "Desemparejar",
+      "finalConfirmTitle": "Confirmación Final",
+      "finalConfirmMessage": "¿Estás seguro de que quieres desemparejarte?\nEsta acción no se puede deshacer.",
       "success": "Desemparejado",
       "successMessage": "Te has desemparejado.\nReconéctate con la misma pareja en 30 días para recuperar tus datos.",
       "error": "Ocurrió un error al desemparejarte.",
@@ -509,6 +513,8 @@
     },
     "deleteAccount": {
       "title": "Eliminar Cuenta",
+      "confirmAlertTitle": "Eliminar Cuenta",
+      "confirmAlertMessage": "¿Estás seguro de que quieres eliminar tu cuenta?",
       "warningText": "Eliminar tu cuenta\n",
       "permanentDelete": "eliminará permanentemente",
       "warningEnd": " todos los datos.",
@@ -516,6 +522,8 @@
       "confirmPrompt": "Para continuar, escribe 'Eliminar' abajo",
       "confirmText": "Eliminar",
       "button": "Eliminar Cuenta",
+      "finalConfirmTitle": "Confirmación Final",
+      "finalConfirmMessage": "¿Estás seguro de que quieres eliminar tu cuenta?\nTodos los datos serán eliminados permanentemente.",
       "deleting": "Eliminando...",
       "success": "Cuenta Eliminada",
       "successMessage": "Todos los datos fueron eliminados.\nGracias por usar nuestro servicio.",
@@ -555,7 +563,15 @@
       "demoMode": "Modo Demo",
       "demoModeMessage": "El inicio de sesión social no está disponible en modo demo.\n\nConfigura las variables de entorno para conectar Supabase.",
       "welcomeBack": "¡Bienvenido de vuelta!",
-      "alreadyConnected": "Ya estás conectado con tu pareja. Continuando desde info básica."
+      "alreadyConnected": "Ya estás conectado con tu pareja. Continuando desde info básica.",
+      "termsDisclaimer": {
+        "prefix": "Al iniciar sesión, confirmas que tienes 16 años o más y aceptas nuestra ",
+        "privacy": "Política de Privacidad",
+        "terms": "Términos de Servicio",
+        "location": "Términos del Servicio de Ubicación",
+        "comma": ", ",
+        "suffix": "."
+      }
     },
     "testMode": {
       "title": "Modo de Prueba",

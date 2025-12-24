@@ -28,6 +28,8 @@ import {
   User,
   SwitchCamera,
   X,
+  Zap,
+  ZapOff,
 } from 'lucide-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -67,6 +69,7 @@ export default function MissionDetailScreen() {
   const [user1Message, setUser1Message] = useState<string | null>(null);
   const [user2Message, setUser2Message] = useState<string | null>(null);
   const [facing, setFacing] = useState<'front' | 'back'>('back');
+  const [flashEnabled, setFlashEnabled] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
 
   // Track if current user is the photo taker (user1 in mission progress)
@@ -433,12 +436,27 @@ export default function MissionDetailScreen() {
                 manipulations.push({ flip: ImageManipulator.FlipType.Horizontal });
               }
 
-              // Apply all manipulations
+              // Step 5: Ensure minimum resolution for quality
+              // If the cropped image width is less than 1500px, resize to 1500x2000 (3:4)
+              const minWidth = 1500;
+              if (cropWidth < minWidth) {
+                manipulations.push({
+                  resize: { width: minWidth, height: Math.round(minWidth / targetAspect) },
+                });
+              }
+
+              // Apply all manipulations with lossless PNG format for maximum quality
+              // PNG is lossless, providing better quality than JPEG (larger file size)
               const result = await ImageManipulator.manipulateAsync(
                 photo.uri,
                 manipulations,
-                { compress: 0.95, format: ImageManipulator.SaveFormat.JPEG } // High quality compression
+                { format: ImageManipulator.SaveFormat.PNG }
               );
+
+              // Log final image dimensions for quality debugging
+              console.log('[Camera] Original:', originalWidth, 'x', originalHeight);
+              console.log('[Camera] Crop area:', cropWidth, 'x', cropHeight);
+              console.log('[Camera] Final dimensions:', result.width, 'x', result.height);
 
               // Set the cropped image - always 3:4 portrait
               setPhotoAspectRatio(3 / 4);
@@ -939,6 +957,7 @@ export default function MissionDetailScreen() {
             facing={facing}
             mode="picture"
             zoom={zoom}
+            enableTorch={flashEnabled && facing === 'back'}
           />
         </View>
 
@@ -974,12 +993,25 @@ export default function MissionDetailScreen() {
             <X color={COLORS.white} size={24} />
           </Pressable>
           <Text style={styles.cameraTitle}>{t('missionDetail.camera.title')}</Text>
-          <Pressable
-            onPress={toggleCameraFacing}
-            style={styles.cameraBackButton}
-          >
-            <SwitchCamera color={COLORS.white} size={24} />
-          </Pressable>
+          <View style={styles.cameraHeaderRight}>
+            <Pressable
+              onPress={() => setFlashEnabled(!flashEnabled)}
+              style={[styles.cameraBackButton, facing === 'front' && styles.cameraButtonDisabled]}
+              disabled={facing === 'front'}
+            >
+              {flashEnabled ? (
+                <Zap color={facing === 'front' ? '#666' : '#FFD700'} size={24} />
+              ) : (
+                <ZapOff color={facing === 'front' ? '#666' : COLORS.white} size={24} />
+              )}
+            </Pressable>
+            <Pressable
+              onPress={toggleCameraFacing}
+              style={styles.cameraBackButton}
+            >
+              <SwitchCamera color={COLORS.white} size={24} />
+            </Pressable>
+          </View>
         </View>
 
         {/* Zoom Level Indicator - 1.0x to 4.0x */}
@@ -1657,6 +1689,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.4)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  cameraHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  cameraButtonDisabled: {
+    opacity: 0.5,
   },
   cameraTitle: {
     fontSize: 16,
