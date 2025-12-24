@@ -681,16 +681,29 @@ export default function CalendarScreen() {
 
   const getCurrentDateTodos = () => {
     const today = new Date();
-    const targetDay = selectedDate || today.getDate();
-    return getTodosForDate(targetDay);
+    if (selectedDate) {
+      // Use selected date with current displayed month/year
+      const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(selectedDate).padStart(2, '0')}`;
+      return todos.filter((todo) => todo.date === dateKey);
+    } else {
+      // Use actual today's date (not the displayed month)
+      const dateKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      return todos.filter((todo) => todo.date === dateKey);
+    }
   };
 
   const handleAddTodo = async () => {
     if (todoText.trim()) {
       const today = new Date();
-      const targetDay = selectedDate || today.getDate();
-      // Format date as YYYY-MM-DD
-      const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(targetDay).padStart(2, '0')}`;
+      let dateKey: string;
+
+      if (selectedDate) {
+        // User selected a specific date - use displayed month/year with selected day
+        dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(selectedDate).padStart(2, '0')}`;
+      } else {
+        // No date selected - use actual today's date (not displayed month/year)
+        dateKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      }
 
       if (isSyncInitialized) {
         // Use synced todo
@@ -803,7 +816,6 @@ export default function CalendarScreen() {
             style={styles.monthNavButton}
             onPress={() => {
               setCurrentDate(new Date(year, month - 1, 1));
-              setSelectedDate(null);
             }}
           >
             <ChevronLeft color={COLORS.white} size={20} strokeWidth={2} />
@@ -815,7 +827,6 @@ export default function CalendarScreen() {
             style={styles.monthNavButton}
             onPress={() => {
               setCurrentDate(new Date(year, month + 1, 1));
-              setSelectedDate(null);
             }}
           >
             <ChevronRight color={COLORS.white} size={20} strokeWidth={2} />
