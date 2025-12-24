@@ -580,6 +580,16 @@ export default function MissionDetailScreen() {
           const uploadedPhotoUrl = await db.storage.uploadPhoto(couple.id, previewPhoto);
 
           if (uploadedPhotoUrl) {
+            // Update capturedPhoto state to the remote URL to prevent duplicate uploads
+            // when handleCompleteAndClose or auto-save runs later
+            setCapturedPhoto(uploadedPhotoUrl);
+
+            // Also update in-progress data with the remote URL
+            saveInProgressMission({
+              missionId: mission.id,
+              capturedPhoto: uploadedPhotoUrl,
+            });
+
             if (!thisMissionProgress) {
               // No progress for this mission - start new mission progress
               const progress = await startMissionProgress(mission.id, mission);
