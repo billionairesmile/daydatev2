@@ -36,6 +36,7 @@ Asset.fromModule(DEFAULT_BACKGROUND_IMAGE).downloadAsync();
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '@/constants/design';
 import { useBackground } from '@/contexts';
 import { useOnboardingStore, useAuthStore } from '@/stores';
+import { BannerAdView } from '@/components/ads';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
 import { db } from '@/lib/supabase';
 import { anniversaryService } from '@/services/anniversaryService';
@@ -1147,6 +1148,9 @@ export default function HomeScreen() {
         </View>
       </View>
 
+      {/* Banner Ad - Fixed at bottom */}
+      <BannerAdView placement="home" style={styles.bannerAd} />
+
       {/* Anniversary Modal with Blur - Single modal with step-based content */}
       <Modal
         visible={showAnniversaryModal}
@@ -1761,6 +1765,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.black,
+  },
+  bannerAd: {
+    position: 'absolute',
+    bottom: 90,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
   },
   backgroundImage: {
     position: 'absolute',

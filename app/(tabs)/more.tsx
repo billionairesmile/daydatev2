@@ -19,6 +19,7 @@ import {
   Megaphone,
   Headphones,
   Trash2,
+  Crown,
 } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
@@ -26,8 +27,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { COLORS, SPACING } from '@/constants/design';
 import { useBackground } from '@/contexts';
-import { useAuthStore, useOnboardingStore, useMissionStore } from '@/stores';
+import { useAuthStore, useOnboardingStore, useMissionStore, useSubscriptionStore } from '@/stores';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
+import { PremiumSubscriptionModal } from '@/components/premium';
 
 const { width, height } = Dimensions.get('window');
 
@@ -53,6 +55,10 @@ export default function MoreScreen() {
   const resetAuth = useAuthStore((state) => state.reset);
   const coupleSyncCleanup = useCoupleSyncStore((state) => state.cleanup);
   const resetAllMissions = useCoupleSyncStore((state) => state.resetAllMissions);
+  const { isPremium, plan } = useSubscriptionStore();
+
+  // Premium modal state
+  const [showPremiumModal, setShowPremiumModal] = React.useState(false);
 
   const handleDevReset = () => {
     Alert.alert(
@@ -221,18 +227,56 @@ export default function MoreScreen() {
 
         {/* Menu Sections */}
         {menuSections.map((section, sectionIndex) => (
-          <View key={sectionIndex} style={styles.section}>
-            <Text style={styles.sectionTitle}>{section.title}</Text>
-            <View style={styles.menuCard}>
-              {section.items.map((item, itemIndex) => {
-                const isLast = itemIndex === section.items.length - 1;
-                return renderMenuItem(item, isLast, itemIndex);
-              })}
+          <React.Fragment key={sectionIndex}>
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>{section.title}</Text>
+              <View style={styles.menuCard}>
+                {section.items.map((item, itemIndex) => {
+                  const isLast = itemIndex === section.items.length - 1;
+                  return renderMenuItem(item, isLast, itemIndex);
+                })}
+              </View>
             </View>
-          </View>
+
+            {/* Premium Card - between Profile and Settings sections */}
+            {sectionIndex === 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>{t('settings.sections.premium')}</Text>
+                <Pressable
+                  style={[styles.premiumCard, isPremium && styles.premiumCardActive]}
+                  onPress={() => setShowPremiumModal(true)}
+                >
+                  <View style={styles.premiumCardLeft}>
+                    <View style={[styles.premiumIconWrapper, isPremium && styles.premiumIconWrapperActive]}>
+                      <Crown color={isPremium ? '#FFD700' : 'rgba(255, 255, 255, 0.8)'} size={22} />
+                    </View>
+                    <View style={styles.premiumInfo}>
+                      <Text style={[styles.premiumTitle, isPremium && styles.premiumTitleActive]}>
+                        {isPremium ? t('premium.status.active') : t('premium.title')}
+                      </Text>
+                      <Text style={styles.premiumDescription}>
+                        {isPremium
+                          ? plan === 'monthly'
+                            ? t('premium.status.monthlyPlan')
+                            : t('premium.status.annualPlan')
+                          : t('premium.subtitle')}
+                      </Text>
+                    </View>
+                  </View>
+                  <ChevronRight color={isPremium ? '#FFD700' : 'rgba(255, 255, 255, 0.4)'} size={20} />
+                </Pressable>
+              </View>
+            )}
+          </React.Fragment>
         ))}
 
       </ScrollView>
+
+      {/* Premium Subscription Modal */}
+      <PremiumSubscriptionModal
+        visible={showPremiumModal}
+        onClose={() => setShowPremiumModal(false)}
+      />
     </View>
   );
 }
@@ -319,5 +363,54 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     marginLeft: SPACING.md,
     fontWeight: '400',
+  },
+  // Premium Card Styles
+  premiumCard: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    padding: SPACING.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  premiumCardActive: {
+    backgroundColor: 'rgba(255, 215, 0, 0.15)',
+    borderColor: 'rgba(255, 215, 0, 0.4)',
+  },
+  premiumCardLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  premiumIconWrapper: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SPACING.md,
+  },
+  premiumIconWrapperActive: {
+    backgroundColor: 'rgba(255, 215, 0, 0.2)',
+  },
+  premiumInfo: {
+    flex: 1,
+  },
+  premiumTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.white,
+    marginBottom: 2,
+  },
+  premiumTitleActive: {
+    color: '#FFD700',
+  },
+  premiumDescription: {
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.6)',
   },
 });

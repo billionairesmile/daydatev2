@@ -3,7 +3,14 @@ export { useMissionStore } from './missionStore';
 export { useMemoryStore, SAMPLE_MEMORIES } from './memoryStore';
 export { useOnboardingStore, generatePairingCode } from './onboardingStore';
 export { useLanguageStore, getLanguageDisplayName } from './languageStore';
+export {
+  useSubscriptionStore,
+  usePremiumFeature,
+  SUBSCRIPTION_LIMITS,
+  PRODUCT_IDS,
+} from './subscriptionStore';
 export type { SupportedLanguage, CountryCode } from './languageStore';
+export type { SubscriptionPlan, HomeFrameOption } from './subscriptionStore';
 export type {
   OnboardingData,
   OnboardingStep,

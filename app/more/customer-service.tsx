@@ -25,19 +25,14 @@ import { useLanguageStore, type SupportedLanguage } from '@/stores/languageStore
 export default function CustomerServiceScreen() {
   const router = useRouter();
   const { t } = useTranslation();
-  const { language: appLanguage } = useLanguageStore();
+  const { language } = useLanguageStore();
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [selectedLanguage, setSelectedLanguage] = useState<SupportedLanguage>(appLanguage);
 
-  // Get FAQ items from hardcoded data based on selected language
-  const faqItems = FAQ_DATA[selectedLanguage] || FAQ_DATA.en;
+  // Get FAQ items from hardcoded data based on user's language setting
+  const faqItems = FAQ_DATA[language] || FAQ_DATA.en;
 
   const toggleExpand = (id: string) => {
     setExpandedId(expandedId === id ? null : id);
-  };
-
-  const handleLanguageToggle = (lang: SupportedLanguage) => {
-    setSelectedLanguage(lang);
   };
 
   const handleKakaoInquiry = () => {
@@ -55,57 +50,7 @@ export default function CustomerServiceScreen() {
           <ChevronLeft color={COLORS.black} size={24} />
         </Pressable>
         <Text style={styles.headerTitle}>{t('more.customerService.title')}</Text>
-        {/* Language Toggle */}
-        <View style={styles.languageToggle}>
-          <Pressable
-            style={[
-              styles.langButton,
-              selectedLanguage === 'ko' && styles.langButtonActive,
-            ]}
-            onPress={() => handleLanguageToggle('ko')}
-          >
-            <Text
-              style={[
-                styles.langButtonText,
-                selectedLanguage === 'ko' && styles.langButtonTextActive,
-              ]}
-            >
-              KR
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[
-              styles.langButton,
-              selectedLanguage === 'en' && styles.langButtonActive,
-            ]}
-            onPress={() => handleLanguageToggle('en')}
-          >
-            <Text
-              style={[
-                styles.langButtonText,
-                selectedLanguage === 'en' && styles.langButtonTextActive,
-              ]}
-            >
-              EN
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[
-              styles.langButton,
-              selectedLanguage === 'es' && styles.langButtonActive,
-            ]}
-            onPress={() => handleLanguageToggle('es')}
-          >
-            <Text
-              style={[
-                styles.langButtonText,
-                selectedLanguage === 'es' && styles.langButtonTextActive,
-              ]}
-            >
-              ES
-            </Text>
-          </Pressable>
-        </View>
+        <View style={styles.headerSpacer} />
       </View>
 
       <ScrollView
@@ -185,32 +130,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.black,
   },
-  languageToggle: {
-    flexDirection: 'row',
-    backgroundColor: '#f0f0f0',
-    borderRadius: 8,
-    padding: 2,
-  },
-  langButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  langButtonActive: {
-    backgroundColor: COLORS.white,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  langButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#999',
-  },
-  langButtonTextActive: {
-    color: COLORS.black,
+  headerSpacer: {
+    width: 40,
   },
   scrollView: {
     flex: 1,

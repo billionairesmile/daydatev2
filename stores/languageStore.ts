@@ -4,10 +4,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import i18n from '@/lib/i18n';
 
 // Supported languages
-export type SupportedLanguage = 'ko' | 'en' | 'es';
+export type SupportedLanguage = 'ko' | 'en' | 'es' | 'zh-TW';
 
 // Country codes for culture-specific content
-export type CountryCode = 'KR' | 'US' | 'GB' | 'AU' | 'CA' | 'DEFAULT';
+export type CountryCode = 'KR' | 'US' | 'GB' | 'AU' | 'CA' | 'TW' | 'HK' | 'DEFAULT';
 
 interface LanguageState {
   // User's selected language (for UI and missions)
@@ -29,9 +29,16 @@ const getDeviceLanguage = (): SupportedLanguage => {
     const Localization = require('expo-localization');
     const locales = Localization.getLocales();
     if (locales && locales.length > 0) {
-      const languageCode = locales[0].languageCode;
+      const locale = locales[0];
+      const languageCode = locale.languageCode;
+      const regionCode = locale.regionCode;
+
       if (languageCode === 'ko') return 'ko';
       if (languageCode === 'es') return 'es';
+      // Traditional Chinese for Taiwan, Hong Kong, Macau
+      if (languageCode === 'zh' && (regionCode === 'TW' || regionCode === 'HK' || regionCode === 'MO')) {
+        return 'zh-TW';
+      }
     }
   } catch (e) {
     console.log('[LanguageStore] Failed to get device language:', e);
@@ -80,6 +87,9 @@ export const getLanguageForCountry = (country: CountryCode): SupportedLanguage =
   switch (country) {
     case 'KR':
       return 'ko';
+    case 'TW':
+    case 'HK':
+      return 'zh-TW';
     case 'US':
     case 'GB':
     case 'AU':
@@ -98,6 +108,8 @@ export const getLanguageDisplayName = (language: SupportedLanguage): string => {
       return 'English';
     case 'es':
       return 'Español';
+    case 'zh-TW':
+      return '繁體中文';
     default:
       return 'English';
   }

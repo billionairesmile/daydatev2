@@ -26,7 +26,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as MediaLibrary from 'expo-media-library';
 import { Paths, File as ExpoFile } from 'expo-file-system';
-import { ChevronDown, MapPin, Clock, X, Plus, ImageIcon, RefreshCw, BookHeart, MoreHorizontal, Edit2, Trash2, Check, Download } from 'lucide-react-native';
+import { ChevronDown, MapPin, Clock, X, Plus, ImageIcon, RefreshCw, BookHeart, MoreHorizontal, Edit2, Trash2, Check, Download, Lock } from 'lucide-react-native';
 import ReanimatedModule, {
   useSharedValue,
   useAnimatedScrollHandler,
@@ -43,8 +43,10 @@ import { useMemoryStore, SAMPLE_MEMORIES } from '@/stores/memoryStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useOnboardingStore } from '@/stores/onboardingStore';
 import { useCoupleSyncStore, CoupleAlbum, AlbumPhoto } from '@/stores/coupleSyncStore';
+import { useSubscriptionStore } from '@/stores/subscriptionStore';
 import { useBackground } from '@/contexts';
 import { isDemoMode, db } from '@/lib/supabase';
+import { BannerAdView } from '@/components/ads';
 import type { CompletedMission } from '@/types';
 import { RansomText } from '@/components/ransom';
 
@@ -102,6 +104,9 @@ export default function MemoriesScreen() {
     addPhotoToAlbum: syncAddPhotoToAlbum,
     removePhotoFromAlbum: syncRemovePhotoFromAlbum,
   } = useCoupleSyncStore();
+
+  // Subscription store for read-only album checks and album limit
+  const { isAlbumReadOnly, canCreateAlbum } = useSubscriptionStore();
 
   const [selectedMonth, setSelectedMonth] = useState<MonthData | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<MemoryType | null>(null);
@@ -197,6 +202,17 @@ export default function MemoriesScreen() {
   const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
   const [showAlbumDetailModal, setShowAlbumDetailModal] = useState(false);
   const [showAlbumMenu, setShowAlbumMenu] = useState(false);
+
+  // Check if selected album is read-only (only for free users with >5 albums)
+  const selectedAlbumIndex = React.useMemo(() => {
+    if (!selectedAlbum) return -1;
+    return albums.findIndex(a => a.id === selectedAlbum.id);
+  }, [selectedAlbum, albums]);
+
+  const isSelectedAlbumReadOnly = React.useMemo(() => {
+    if (selectedAlbumIndex < 0) return false;
+    return isAlbumReadOnly(selectedAlbumIndex, albums.length);
+  }, [selectedAlbumIndex, albums.length, isAlbumReadOnly]);
 
   // Album photo selection states
   const [isSelectingAlbumPhotos, setIsSelectingAlbumPhotos] = useState(false);
@@ -764,6 +780,16 @@ export default function MemoriesScreen() {
 
   // Open album creation modal with animation
   const openAlbumModal = () => {
+    // Check if user can create more albums (free users limited to 5)
+    if (!canCreateAlbum(albums.length)) {
+      Alert.alert(
+        t('memories.album.limitReached'),
+        t('memories.album.limitReachedMessage'),
+        [{ text: t('common.confirm') }]
+      );
+      return;
+    }
+
     // Reset animation values
     albumModalScaleAnim.setValue(0.9);
     albumModalOpacityAnim.setValue(0);
@@ -1819,17 +1845,25 @@ export default function MemoriesScreen() {
                 >
                   <X color="#FFFFFF" size={24} />
                 </Pressable>
-                <Text
-                  style={[
-                    styles.albumDetailTitle,
-                    { fontSize: selectedAlbum?.name ? Math.max(12, Math.min(18, 20 - selectedAlbum.name.length * 0.5)) : 18 }
-                  ]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.6}
-                >
-                  {selectedAlbum?.name || t('memories.album.title')}
-                </Text>
+                <View style={styles.albumDetailTitleContainer}>
+                  <Text
+                    style={[
+                      styles.albumDetailTitle,
+                      { fontSize: selectedAlbum?.name ? Math.max(12, Math.min(18, 20 - selectedAlbum.name.length * 0.5)) : 18 }
+                    ]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.6}
+                  >
+                    {selectedAlbum?.name || t('memories.album.title')}
+                  </Text>
+                  {isSelectedAlbumReadOnly && (
+                    <View style={styles.readOnlyBadge}>
+                      <Lock color="#FF6B6B" size={12} />
+                      <Text style={styles.readOnlyBadgeText}>{t('memories.album.readOnly')}</Text>
+                    </View>
+                  )}
+                </View>
                 <Pressable
                   style={styles.albumDetailMenuButton}
                   onPress={() => setShowAlbumMenu(!showAlbumMenu)}
@@ -1840,36 +1874,43 @@ export default function MemoriesScreen() {
                 {/* Dropdown Menu */}
                 {showAlbumMenu && (
                   <View style={styles.albumMenuDropdown}>
-                    <Pressable
-                      style={styles.albumMenuItem}
-                      onPress={() => {
-                        setShowAlbumMenu(false);
-                        setShowMissionPhotosPicker(true);
-                      }}
-                    >
-                      <Plus color="#FFFFFF" size={18} />
-                      <Text style={styles.albumMenuItemText}>{t('memories.album.addPhoto')}</Text>
-                    </Pressable>
-                    <Pressable
-                      style={styles.albumMenuItem}
-                      onPress={() => {
-                        if (selectedAlbum) {
-                          // Initialize all edit states from existing album data
-                          setEditAlbumName(selectedAlbum.name);
-                          setEditFontStyle(selectedAlbum.fontStyle);
-                          setEditCoverPhoto(selectedAlbum.coverPhoto);
-                          setEditTextPosition(selectedAlbum.namePosition || { x: 30, y: 16 });
-                          setEditTextScale(selectedAlbum.textScale || 1);
-                          setEditRansomSeed(selectedAlbum.ransomSeed || Math.floor(Math.random() * 1000000));
-                          setEditAlbumStep('fontStyle');
-                          setShowCoverEditModal(true);
-                        }
-                        setShowAlbumMenu(false);
-                      }}
-                    >
-                      <Edit2 color="#FFFFFF" size={18} />
-                      <Text style={styles.albumMenuItemText}>{t('memories.album.editCover')}</Text>
-                    </Pressable>
+                    {/* Add Photo - Hidden for read-only albums */}
+                    {!isSelectedAlbumReadOnly && (
+                      <Pressable
+                        style={styles.albumMenuItem}
+                        onPress={() => {
+                          setShowAlbumMenu(false);
+                          setShowMissionPhotosPicker(true);
+                        }}
+                      >
+                        <Plus color="#FFFFFF" size={18} />
+                        <Text style={styles.albumMenuItemText}>{t('memories.album.addPhoto')}</Text>
+                      </Pressable>
+                    )}
+                    {/* Edit Cover - Hidden for read-only albums */}
+                    {!isSelectedAlbumReadOnly && (
+                      <Pressable
+                        style={styles.albumMenuItem}
+                        onPress={() => {
+                          if (selectedAlbum) {
+                            // Initialize all edit states from existing album data
+                            setEditAlbumName(selectedAlbum.name);
+                            setEditFontStyle(selectedAlbum.fontStyle);
+                            setEditCoverPhoto(selectedAlbum.coverPhoto);
+                            setEditTextPosition(selectedAlbum.namePosition || { x: 30, y: 16 });
+                            setEditTextScale(selectedAlbum.textScale || 1);
+                            setEditRansomSeed(selectedAlbum.ransomSeed || Math.floor(Math.random() * 1000000));
+                            setEditAlbumStep('fontStyle');
+                            setShowCoverEditModal(true);
+                          }
+                          setShowAlbumMenu(false);
+                        }}
+                      >
+                        <Edit2 color="#FFFFFF" size={18} />
+                        <Text style={styles.albumMenuItemText}>{t('memories.album.editCover')}</Text>
+                      </Pressable>
+                    )}
+                    {/* Delete Album - Always available */}
                     <Pressable
                       style={[styles.albumMenuItem, styles.albumMenuItemDanger]}
                       onPress={() => {
@@ -2720,6 +2761,9 @@ export default function MemoriesScreen() {
         </Animated.View>
       </Modal>
 
+      {/* Banner Ad - Fixed at bottom */}
+      <BannerAdView placement="memories" style={styles.bannerAd} />
+
     </View>
   );
 }
@@ -3299,6 +3343,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.white,
+  },
+  bannerAd: {
+    position: 'absolute',
+    bottom: 90,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
   },
   backgroundImage: {
     position: 'absolute',
@@ -5092,6 +5143,27 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     flex: 1,
     textAlign: 'center',
+  },
+  albumDetailTitleContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  readOnlyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 107, 107, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginTop: 4,
+    gap: 4,
+  },
+  readOnlyBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#FF6B6B',
+    letterSpacing: 0.3,
   },
   albumDetailMenuButton: {
     width: 40,

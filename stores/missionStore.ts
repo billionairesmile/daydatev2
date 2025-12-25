@@ -14,6 +14,7 @@ import {
 } from '@/stores/onboardingStore';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
 import { useAuthStore } from '@/stores/authStore';
+import { useSubscriptionStore } from '@/stores/subscriptionStore';
 import {
   checkCoupleLocationStatus,
   showLocationRequiredAlert,
@@ -89,7 +90,7 @@ interface MissionActions {
   getTodayCompletedMissionId: () => string | null;
   isTodayCompletedMission: (missionId: string) => boolean;
   // Mission generation actions
-  generateTodayMissions: (answers: MissionGenerationAnswers) => Promise<{ status: 'success' | 'locked' | 'exists' | 'location_required' | 'preferences_required'; message?: string }>;
+  generateTodayMissions: (answers: MissionGenerationAnswers) => Promise<{ status: 'success' | 'locked' | 'exists' | 'location_required' | 'preferences_required' | 'limit_reached'; message?: string }>;
   hasTodayMissions: () => boolean;
   getTodayMissions: () => Mission[];
   checkAndResetMissions: () => void;
@@ -165,7 +166,7 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
         }
       },
 
-      // Keep mission: 미션을 북마크에 추가 (최대 5개)
+      // Keep mission: 미션을 북마크에 추가 (구독 상태에 따라 제한)
       keepMission: (mission) => {
         const { keptMissions } = get();
 
@@ -173,8 +174,9 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
         const isAlreadyKept = keptMissions.some((m) => m.id === mission.id);
         if (isAlreadyKept) return false;
 
-        // 최대 5개 제한
-        if (keptMissions.length >= 5) {
+        // 구독 상태에 따른 북마크 제한 확인
+        const { canBookmarkMission } = useSubscriptionStore.getState();
+        if (!canBookmarkMission(keptMissions.length)) {
           return false;
         }
 
@@ -347,6 +349,20 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
             // Partner is generating
             return { status: 'locked' as const, message: '미션 생성 중입니다...' };
           }
+
+          // Check subscription limit for mission generation
+          const subscriptionStore = useSubscriptionStore.getState();
+          const canGenerate = await subscriptionStore.canGenerateMissions(syncStore.coupleId);
+          if (!canGenerate) {
+            // Release lock since we can't generate
+            await syncStore.releaseMissionLock();
+            Alert.alert(
+              '일일 미션 생성 한도 도달',
+              '오늘의 미션 생성 한도에 도달했습니다. 프리미엄으로 업그레이드하여 더 많은 미션을 생성하세요!',
+              [{ text: '확인' }]
+            );
+            return { status: 'limit_reached' as const, message: '일일 미션 생성 한도에 도달했습니다.' };
+          }
         }
 
         try {
@@ -410,6 +426,9 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
               partner?.id, // Partner ID for push notification
               user?.nickname // Current user's nickname for notification message
             );
+
+            // Increment generation count for subscription tracking
+            await useSubscriptionStore.getState().incrementGenerationCount(syncStore.coupleId);
           }
 
           return { status: 'success' as const };
@@ -440,6 +459,9 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
               partner?.id, // Partner ID for push notification
               user?.nickname // Current user's nickname for notification message
             );
+
+            // Increment generation count for subscription tracking
+            await useSubscriptionStore.getState().incrementGenerationCount(syncStore.coupleId);
           }
 
           return { status: 'success' as const };
@@ -450,14 +472,15 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
       hasTodayMissions: () => {
         const { generatedMissionData } = get();
         const syncStore = useCoupleSyncStore.getState();
+        const today = getTodayDateString();
 
         // Check local state first
-        if (generatedMissionData && generatedMissionData.generatedDate === getTodayDateString()) {
+        if (generatedMissionData && generatedMissionData.generatedDate === today) {
           return true;
         }
 
-        // Check synced state
-        if (syncStore.isInitialized && syncStore.sharedMissions.length > 0) {
+        // Check synced state - also verify the date matches today
+        if (syncStore.isInitialized && syncStore.sharedMissions.length > 0 && syncStore.sharedMissionsDate === today) {
           return true;
         }
 
@@ -475,8 +498,8 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
           return generatedMissionData.missions;
         }
 
-        // Check synced state
-        if (syncStore.isInitialized && syncStore.sharedMissions.length > 0) {
+        // Check synced state - also verify the date matches today
+        if (syncStore.isInitialized && syncStore.sharedMissions.length > 0 && syncStore.sharedMissionsDate === today) {
           return syncStore.sharedMissions;
         }
 

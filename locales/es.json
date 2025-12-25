@@ -2,6 +2,7 @@
   "common": {
     "confirm": "Confirmar",
     "cancel": "Cancelar",
+    "ok": "OK",
     "save": "Guardar",
     "delete": "Eliminar",
     "edit": "Editar",
@@ -289,7 +290,10 @@
       "addPhoto": "Añadir Foto",
       "editCover": "Editar Portada",
       "deleteAlbum": "Eliminar Álbum",
-      "deleteAlbumConfirm": "¿Estás seguro de eliminar este álbum?"
+      "deleteAlbumConfirm": "¿Estás seguro de eliminar este álbum?",
+      "readOnly": "Solo Lectura",
+      "limitReached": "Límite de Álbumes",
+      "limitReachedMessage": "El plan gratuito permite hasta 5 álbumes. Actualiza a Premium para álbumes ilimitados."
     },
     "photo": {
       "select": "Seleccionar",
@@ -445,6 +449,7 @@
     "sections": {
       "notifications": "Notificaciones",
       "marketing": "Marketing",
+      "premium": "Premium",
       "other": "Otros",
       "account": "Cuenta"
     },
@@ -704,6 +709,121 @@
     "dataRecovery": {
       "title": "Datos Recuperados 💕",
       "message": "Se encontraron tus datos de preferencias anteriores.\nOmitiendo entrada de preferencias."
+    }
+  },
+  "premium": {
+    "title": "Premium",
+    "subtitle": "Premium para citas más especiales",
+    "heroTitle": "DayDate Premium",
+    "heroSubtitle": "Disfruta de citas más especiales con tu pareja",
+    "heroTitleNew": "Empieza Premium Hoy",
+    "heroSubtitleNew": "Un pago, beneficios para dos",
+    "coupleBenefitHighlight": "¡Tu pareja también obtiene Premium!",
+    "annual": "Anual",
+    "monthly": "Mensual",
+    "perYear": "/año",
+    "perMonth": "/mes",
+    "monthlyPrice": "$3.99",
+    "annualPrice": "$34.99",
+    "annualMonthlyEquivalent": "$2.92/mes",
+    "originalAnnualPrice": "Original $47.88/año",
+    "coupleSharing": "Compartir con pareja",
+    "save27": "AHORRA 27%",
+    "subscribe": "Suscribirse Ahora",
+    "subscribeAnnualCTA": "Comenzar con Plan Anual",
+    "subscribeMonthlyCTA": "Comenzar con Plan Mensual",
+    "termsOfUse": "Términos de Uso",
+    "paymentNoticeTitle": "Información de Pago",
+    "paymentNotice1": "El pago se cargará a tu cuenta de App Store o Google Play tras la confirmación.",
+    "paymentNotice2": "La suscripción se renueva automáticamente a menos que se cancele al menos 24 horas antes del final del período actual.",
+    "paymentNotice3": "Puedes cancelar en cualquier momento en la configuración de suscripciones de tu dispositivo.",
+    "refundNoticeTitle": "Política de Reembolso",
+    "refundNotice1": "Los reembolsos se procesan según las políticas de App Store o Google Play.",
+    "refundNotice2": "Después de cancelar, puedes seguir usando los beneficios Premium hasta el final del período de facturación actual.",
+    "coupleNoticeTitle": "Beneficios de Pareja",
+    "coupleNotice": "Cuando te suscribes, tu pareja también obtiene los beneficios Premium.",
+    "restoreSuccess": "Restauración Exitosa",
+    "restoreSuccessMessage": "Tu compra ha sido restaurada exitosamente.",
+    "restoreFailed": "Restauración Fallida",
+    "restoreFailedMessage": "No se encontraron compras anteriores. Si crees que esto es un error, por favor contacta soporte.",
+    "benefitsTitle": "Beneficios Premium",
+    "comparisonTitle": "Comparar Planes",
+    "free": "Gratis",
+    "premiumLabel": "Premium",
+    "features": {
+      "skipAds": "Sin Anuncios",
+      "unlimitedMissions": "Misiones Diarias Ilimitadas",
+      "unlimitedBookmarks": "Marcadores Ilimitados",
+      "unlimitedAlbums": "Álbumes Ilimitados"
+    },
+    "status": {
+      "active": "Premium Activo",
+      "monthlyPlan": "Suscripción mensual activa",
+      "annualPlan": "Suscripción anual activa",
+      "expiresOn": "Válido hasta {{date}}"
+    },
+    "managementTitle": "Gestión Premium",
+    "currentPlan": "Plan Actual",
+    "monthlyPlan": "Mensual",
+    "annualPlan": "Anual",
+    "perMonthEquivalent": "/mes",
+    "savings": "¡Ahorra más de 2 meses gratis!",
+    "subscribeMonthly": "Suscribirse Mensual",
+    "subscribeAnnual": "Suscribirse Anual",
+    "restorePurchases": "Restaurar compra",
+    "manageSubscription": "Gestionar Suscripción",
+    "termsOfService": "Términos de Servicio",
+    "privacyPolicy": "Política de Privacidad",
+    "legalText": "La suscripción pertenece a la cuenta que paga, y tu pareja emparejada también disfruta de los beneficios premium. Puedes cancelar tu suscripción directamente en App Store o Google Play, y puedes seguir usándola hasta el final del período pagado. La suscripción no se cancela automáticamente al desemparejar o eliminar tu cuenta.",
+    "benefits": {
+      "missionComplete": "Completar Misión",
+      "missionCompleteFree": "1/día",
+      "missionCompletePremium": "Misiones Ilimitadas",
+      "missionCompletePremiumDesc": "Completa todas las misiones que quieras\ny crea más recuerdos juntos",
+      "missionGenerate": "Generar Misión",
+      "missionGenerateFree": "1x/día (3 misiones)",
+      "missionGeneratePremium": "2x Más Misiones",
+      "missionGeneratePremiumDesc": "Recibe 6 misiones diversas cada día\ny elige lo que quieres hacer hoy",
+      "noAds": "Anuncios",
+      "noAdsFree": "Con Anuncios",
+      "noAdsPremium": "Experiencia Sin Anuncios",
+      "noAdsPremiumDesc": "Concéntrate en tus momentos preciosos\nsin ninguna interrupción",
+      "homeFrame": "Marco de Inicio",
+      "homeFrameFree": "Solo Polaroid",
+      "homeFramePremium": "Polaroid + Calendario",
+      "missionKeep": "Guardar Misión",
+      "missionKeepFree": "Máx 5",
+      "missionKeepPremium": "Guardado Ilimitado",
+      "missionKeepPremiumDesc": "Guarda tus misiones favoritas\ny pruébalas cuando quieras",
+      "photoStoragePremium": "Almacenamiento Ilimitado",
+      "photoStoragePremiumDesc": "Guarda tus recuerdos preciosos\nsin preocuparte por el espacio",
+      "albumCreate": "Crear Álbum",
+      "albumCreateFree": "Máx 5",
+      "albumCreatePremium": "Álbumes Ilimitados",
+      "albumCreatePremiumDesc": "Organiza tus momentos especiales por tema\ny crea tus propios álbumes de recuerdos"
+    },
+    "button": {
+      "subscribe": "Suscribirse a Premium",
+      "manage": "Gestionar Premium"
+    },
+    "limits": {
+      "generationReached": "Has usado todas las generaciones de misión de hoy",
+      "completionReached": "Has usado todas las completaciones de misión de hoy",
+      "bookmarkReached": "El guardado de misiones está lleno (máx 5)",
+      "albumReached": "No puedes crear más álbumes (máx 5)",
+      "albumReadOnly": "Este álbum es de solo lectura",
+      "upgradeToPremium": "Actualiza a Premium para acceso ilimitado",
+      "upgradeForEdit": "Actualiza a Premium para editar todos los álbumes"
+    },
+    "limitReached": {
+      "title": "Límite Diario Alcanzado",
+      "completion": "¡Has alcanzado tu límite diario de completar misiones. Actualiza a Premium para completar más misiones!"
+    },
+    "deleteWarning": {
+      "title": "Aviso de Suscripción",
+      "message": "Tienes una suscripción activa. Eliminar tu cuenta no cancelará automáticamente tu suscripción. Por favor, cancela tu suscripción en App Store o Google Play primero.",
+      "manageSubscription": "Gestionar Suscripción",
+      "continueDelete": "Continuar Eliminando"
     }
   },
   "errors": {

@@ -39,6 +39,7 @@ import { useMissionStore } from '@/stores/missionStore';
 import { useMemoryStore } from '@/stores/memoryStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
+import { useSubscriptionStore } from '@/stores/subscriptionStore';
 import { db, isDemoMode } from '@/lib/supabase';
 import type { CompletedMission, Mission } from '@/types';
 
@@ -716,6 +717,19 @@ export default function MissionDetailScreen() {
       // Save to database first (if not in demo mode and couple exists)
       // This ensures we use the database-generated ID for album photo references
       if (!isDemoMode && couple?.id) {
+        // Check subscription limit for mission completion
+        const subscriptionStore = useSubscriptionStore.getState();
+        const canComplete = await subscriptionStore.canCompleteMission(couple.id);
+        if (!canComplete) {
+          Alert.alert(
+            t('premium.limitReached.title'),
+            t('premium.limitReached.completion'),
+            [{ text: t('common.ok') }]
+          );
+          memorySavedRef.current = false; // Reset so user can try again after upgrade
+          return;
+        }
+
         try {
           // Check if photo is already a remote URL (synced from partner)
           const isRemoteUrl = capturedPhoto.startsWith('http://') || capturedPhoto.startsWith('https://');
@@ -748,6 +762,9 @@ export default function MissionDetailScreen() {
           if (dbMemory && !dbError) {
             newMemory.id = dbMemory.id;
             newMemory.photoUrl = finalPhotoUrl;
+
+            // Increment completion count for subscription tracking
+            await subscriptionStore.incrementCompletionCount(couple.id);
           }
         } catch (error) {
           console.error('Error saving memory to DB:', error);
@@ -803,6 +820,15 @@ export default function MissionDetailScreen() {
           };
 
           if (!isDemoMode && couple?.id) {
+            // Check subscription limit for mission completion
+            const subscriptionStore = useSubscriptionStore.getState();
+            const canComplete = await subscriptionStore.canCompleteMission(couple.id);
+            if (!canComplete) {
+              console.log('[MissionComplete] Daily completion limit reached');
+              memorySavedRef.current = false;
+              return;
+            }
+
             try {
               const isRemoteUrl = capturedPhoto.startsWith('http://') || capturedPhoto.startsWith('https://');
               let finalPhotoUrl = capturedPhoto;
@@ -830,6 +856,9 @@ export default function MissionDetailScreen() {
               if (dbMemory && !dbError) {
                 newMemory.id = dbMemory.id;
                 newMemory.photoUrl = finalPhotoUrl;
+
+                // Increment completion count for subscription tracking
+                await subscriptionStore.incrementCompletionCount(couple.id);
               }
             } catch (error) {
               console.error('Error auto-saving memory to DB:', error);

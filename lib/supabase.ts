@@ -1186,7 +1186,7 @@ export const db = {
       return { data, error };
     },
 
-    async getActiveByLanguage(language: 'ko' | 'en' | 'es') {
+    async getActiveByLanguage(language: 'ko' | 'en' | 'es' | 'zh-TW') {
       const client = getSupabase();
       const { data, error } = await client
         .from('announcements')
@@ -1299,12 +1299,16 @@ export const db = {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
+      // Use .gt() (greater than) instead of .gte() to correctly exclude
+      // missions that expire at exactly midnight today
+      // e.g., mission created Dec 24 expires at Dec 25 00:00:00
+      // On Dec 25, this mission should NOT be returned
       const { data, error } = await client
         .from('couple_missions')
         .select('*')
         .eq('couple_id', coupleId)
         .eq('status', 'active')
-        .gte('expires_at', today.toISOString())
+        .gt('expires_at', today.toISOString())
         .order('generated_at', { ascending: false })
         .limit(1)
         .maybeSingle();

@@ -1,0 +1,141 @@
+import React, { useState, useRef } from 'react';
+import { View, StyleSheet, StyleProp, ViewStyle, Platform } from 'react-native';
+import Constants from 'expo-constants';
+
+import { useSubscriptionStore } from '@/stores/subscriptionStore';
+
+// Check if we're running in Expo Go (not a development build)
+const isExpoGo = Constants.appOwnership === 'expo';
+
+// Only import Google Mobile Ads when NOT in Expo Go
+let BannerAd: any = null;
+let BannerAdSize: any = null;
+let TestIds: any = null;
+let useForeground: any = null;
+
+if (!isExpoGo) {
+  try {
+    const ads = require('react-native-google-mobile-ads');
+    BannerAd = ads.BannerAd;
+    BannerAdSize = ads.BannerAdSize;
+    TestIds = ads.TestIds;
+    useForeground = ads.useForeground;
+  } catch (e) {
+    console.log('[Ads] Google Mobile Ads not available');
+  }
+}
+
+// Ad unit IDs - replace with actual IDs in production
+const getAdUnitIds = () => {
+  if (!TestIds) return { HOME_BANNER: '', CALENDAR_BANNER: '', MEMORIES_BANNER: '' };
+  return {
+    HOME_BANNER: Platform.select({
+      ios: TestIds.BANNER,
+      android: TestIds.BANNER,
+    }) || TestIds.BANNER,
+    CALENDAR_BANNER: Platform.select({
+      ios: TestIds.BANNER,
+      android: TestIds.BANNER,
+    }) || TestIds.BANNER,
+    MEMORIES_BANNER: Platform.select({
+      ios: TestIds.BANNER,
+      android: TestIds.BANNER,
+    }) || TestIds.BANNER,
+  };
+};
+
+export type BannerAdPlacement = 'home' | 'calendar' | 'memories';
+
+interface BannerAdViewProps {
+  placement: BannerAdPlacement;
+  style?: StyleProp<ViewStyle>;
+  size?: any; // BannerAdSize when available
+}
+
+export default function BannerAdView({
+  placement,
+  style,
+  size,
+}: BannerAdViewProps) {
+  const { shouldShowAds } = useSubscriptionStore();
+  const [adLoaded, setAdLoaded] = useState(false);
+  const [adError, setAdError] = useState(false);
+  const bannerRef = useRef<any>(null);
+
+  // Required for iOS to handle app state changes - reload ad when app returns to foreground
+  // Only use if useForeground is available (not in Expo Go)
+  if (useForeground) {
+    useForeground(() => {
+      Platform.OS === 'ios' && bannerRef.current?.load();
+    });
+  }
+
+  // Don't show ads in Expo Go (native module not available)
+  if (isExpoGo || !BannerAd) {
+    return null;
+  }
+
+  // Don't show ads for premium users
+  if (!shouldShowAds()) {
+    return null;
+  }
+
+  const AD_UNIT_IDS = getAdUnitIds();
+
+  // Get ad unit ID based on placement
+  const getAdUnitId = (): string => {
+    switch (placement) {
+      case 'home':
+        return AD_UNIT_IDS.HOME_BANNER;
+      case 'calendar':
+        return AD_UNIT_IDS.CALENDAR_BANNER;
+      case 'memories':
+        return AD_UNIT_IDS.MEMORIES_BANNER;
+      default:
+        return TestIds?.BANNER || '';
+    }
+  };
+
+  // If ad failed to load, return null (no empty space)
+  if (adError) {
+    return null;
+  }
+
+  // Get the banner size, default to ANCHORED_ADAPTIVE_BANNER if available
+  const bannerSize = size || (BannerAdSize?.ANCHORED_ADAPTIVE_BANNER);
+
+  return (
+    <View style={[styles.container, !adLoaded && styles.hidden, style]}>
+      <BannerAd
+        ref={bannerRef}
+        unitId={getAdUnitId()}
+        size={bannerSize}
+        requestOptions={{
+          requestNonPersonalizedAdsOnly: true,
+        }}
+        onAdLoaded={() => {
+          console.log(`[Ads] Banner loaded for ${placement}`);
+          setAdLoaded(true);
+          setAdError(false);
+        }}
+        onAdFailedToLoad={(error: any) => {
+          console.log(`[Ads] Banner failed to load for ${placement}:`, error);
+          setAdError(true);
+          setAdLoaded(false);
+        }}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  hidden: {
+    height: 0,
+    opacity: 0,
+  },
+});

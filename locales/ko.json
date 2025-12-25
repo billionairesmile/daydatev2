@@ -2,6 +2,7 @@
   "common": {
     "confirm": "확인",
     "cancel": "취소",
+    "ok": "확인",
     "save": "저장",
     "delete": "삭제",
     "edit": "수정",
@@ -289,7 +290,10 @@
       "addPhoto": "사진 추가",
       "editCover": "표지 편집",
       "deleteAlbum": "앨범 삭제",
-      "deleteAlbumConfirm": "이 앨범을 삭제하시겠습니까?"
+      "deleteAlbumConfirm": "이 앨범을 삭제하시겠습니까?",
+      "readOnly": "읽기 전용",
+      "limitReached": "앨범 생성 제한",
+      "limitReachedMessage": "무료 플랜에서는 앨범을 최대 5개까지 만들 수 있습니다. 프리미엄으로 업그레이드하면 무제한으로 앨범을 만들 수 있습니다."
     },
     "photo": {
       "select": "선택",
@@ -445,6 +449,7 @@
     "sections": {
       "notifications": "알림",
       "marketing": "마케팅",
+      "premium": "프리미엄",
       "other": "기타",
       "account": "계정"
     },
@@ -704,6 +709,121 @@
     "dataRecovery": {
       "title": "기존 데이터 복구 💕",
       "message": "이전에 입력하신 선호도 정보가 있어요.\n선호도 입력을 건너뛰고 완료합니다."
+    }
+  },
+  "premium": {
+    "title": "프리미엄",
+    "subtitle": "더 특별한 데이트를 위한 프리미엄",
+    "heroTitle": "DayDate 프리미엄",
+    "heroSubtitle": "연인과 더 특별한 데이트를 즐겨보세요",
+    "heroTitleNew": "지금, 프리미엄을 시작하세요",
+    "heroSubtitleNew": "결제는 한 번, 혜택은 둘이서",
+    "coupleBenefitHighlight": "파트너도 함께 프리미엄!",
+    "annual": "연간",
+    "monthly": "월간",
+    "perYear": "/년",
+    "perMonth": "/월",
+    "monthlyPrice": "4,900원",
+    "annualPrice": "42,000원",
+    "annualMonthlyEquivalent": "(3,500원/월)",
+    "originalAnnualPrice": "정가 58,800원/년",
+    "coupleSharing": "커플 공유 지원",
+    "save27": "27% 할인",
+    "subscribe": "구독하기",
+    "subscribeAnnualCTA": "연간 구독으로 시작하기",
+    "subscribeMonthlyCTA": "월간 구독으로 시작하기",
+    "termsOfUse": "이용약관",
+    "paymentNoticeTitle": "결제 안내",
+    "paymentNotice1": "결제 확인 시 App Store 또는 Google Play 계정으로 청구됩니다.",
+    "paymentNotice2": "구독은 현재 기간 종료 최소 24시간 전에 해지하지 않으면 자동으로 갱신됩니다.",
+    "paymentNotice3": "기기의 구독 설정에서 언제든지 해지할 수 있습니다.",
+    "refundNoticeTitle": "환불 안내",
+    "refundNotice1": "환불은 App Store 또는 Google Play 정책에 따라 처리됩니다.",
+    "refundNotice2": "구독 취소 후에도 결제 기간 종료 시까지 프리미엄 혜택을 이용하실 수 있습니다.",
+    "coupleNoticeTitle": "커플 혜택",
+    "coupleNotice": "구독하시면 페어링된 파트너도 프리미엄 혜택을 함께 이용할 수 있습니다.",
+    "restoreSuccess": "구매 복원 완료",
+    "restoreSuccessMessage": "구매가 성공적으로 복원되었습니다.",
+    "restoreFailed": "구매 복원 실패",
+    "restoreFailedMessage": "이전 구매 내역을 찾을 수 없습니다. 오류라고 생각되시면 고객센터로 문의해주세요.",
+    "benefitsTitle": "프리미엄 혜택",
+    "comparisonTitle": "혜택 비교",
+    "free": "무료",
+    "premiumLabel": "프리미엄",
+    "features": {
+      "skipAds": "광고 없이 이용",
+      "unlimitedMissions": "무제한 미션 생성",
+      "unlimitedBookmarks": "무제한 북마크",
+      "unlimitedAlbums": "무제한 앨범"
+    },
+    "status": {
+      "active": "프리미엄 이용 중",
+      "monthlyPlan": "월간 구독 이용 중",
+      "annualPlan": "연간 구독 이용 중",
+      "expiresOn": "{{date}}까지 이용 가능"
+    },
+    "managementTitle": "프리미엄 관리",
+    "currentPlan": "현재 구독 중",
+    "monthlyPlan": "월간 구독",
+    "annualPlan": "연간 구독",
+    "perMonthEquivalent": "/월",
+    "savings": "2개월 이상 무료!",
+    "subscribeMonthly": "월간 구독하기",
+    "subscribeAnnual": "연간 구독하기",
+    "restorePurchases": "구매 복원",
+    "manageSubscription": "구독 관리",
+    "termsOfService": "이용약관",
+    "privacyPolicy": "개인정보처리방침",
+    "legalText": "구독은 결제한 계정에 귀속되며, 페어링된 파트너도 프리미엄 혜택을 함께 이용할 수 있습니다. 구독 해지는 App Store 또는 Google Play에서 직접 가능하며, 해지 후에도 결제한 기간까지 이용 가능합니다. 페어링 해제 또는 계정 탈퇴 시에도 구독은 자동 취소되지 않습니다.",
+    "benefits": {
+      "missionComplete": "미션 완료",
+      "missionCompleteFree": "1개/일",
+      "missionCompletePremium": "무제한 미션 완료",
+      "missionCompletePremiumDesc": "하루에 원하는 만큼 미션을 완료하고\n더 많은 추억을 쌓아보세요",
+      "missionGenerate": "미션 생성",
+      "missionGenerateFree": "1회/일 (3개)",
+      "missionGeneratePremium": "2배 미션 생성",
+      "missionGeneratePremiumDesc": "매일 6개의 다양한 미션을 받아보고\n오늘 하고 싶은 미션을 선택하세요",
+      "noAds": "광고",
+      "noAdsFree": "광고 있음",
+      "noAdsPremium": "광고 없는 쾌적한 사용",
+      "noAdsPremiumDesc": "방해받지 않고 연인과의\n소중한 순간에 집중하세요",
+      "homeFrame": "홈 프레임",
+      "homeFrameFree": "폴라로이드만",
+      "homeFramePremium": "폴라로이드 + 캘린더",
+      "missionKeep": "미션 보관",
+      "missionKeepFree": "최대 5개",
+      "missionKeepPremium": "무제한 미션 보관",
+      "missionKeepPremiumDesc": "마음에 드는 미션을 제한 없이 저장하고\n원할 때 언제든 도전하세요",
+      "photoStoragePremium": "무제한 사진 보관",
+      "photoStoragePremiumDesc": "소중한 추억 사진을\n용량 걱정 없이 보관하세요",
+      "albumCreate": "앨범 생성",
+      "albumCreateFree": "최대 5개",
+      "albumCreatePremium": "무제한 앨범 생성",
+      "albumCreatePremiumDesc": "특별한 순간들을 테마별로 정리해서\n나만의 추억 앨범을 만들어보세요"
+    },
+    "button": {
+      "subscribe": "프리미엄 플랜 구독하기",
+      "manage": "프리미엄 플랜 관리"
+    },
+    "limits": {
+      "generationReached": "오늘의 미션 생성 횟수를 모두 사용했어요",
+      "completionReached": "오늘의 미션 완료 횟수를 모두 사용했어요",
+      "bookmarkReached": "미션 보관함이 가득 찼어요 (최대 5개)",
+      "albumReached": "앨범을 더 만들 수 없어요 (최대 5개)",
+      "albumReadOnly": "이 앨범은 읽기 전용이에요",
+      "upgradeToPremium": "프리미엄으로 업그레이드하면 제한 없이 이용할 수 있어요",
+      "upgradeForEdit": "프리미엄 플랜으로 업그레이드하면 모든 앨범을 편집할 수 있어요"
+    },
+    "limitReached": {
+      "title": "일일 한도 도달",
+      "completion": "오늘의 미션 완료 한도에 도달했습니다. 프리미엄으로 업그레이드하여 더 많은 미션을 완료하세요!"
+    },
+    "deleteWarning": {
+      "title": "구독 확인",
+      "message": "활성화된 구독이 있습니다. 계정을 삭제해도 구독은 자동으로 취소되지 않습니다. 먼저 App Store 또는 Google Play에서 구독을 취소해주세요.",
+      "manageSubscription": "구독 관리하기",
+      "continueDelete": "계속 삭제하기"
     }
   },
   "errors": {

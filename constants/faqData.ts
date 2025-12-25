@@ -8,7 +8,7 @@ export type FAQItem = {
   category: string;
 };
 
-export const FAQ_DATA: Record<'ko' | 'en' | 'es', FAQItem[]> = {
+export const FAQ_DATA: Record<'ko' | 'en' | 'es' | 'zh-TW', FAQItem[]> = {
   ko: [
     {
       id: 'ko-1',
@@ -210,6 +210,74 @@ export const FAQ_DATA: Record<'ko' | 'en' | 'es', FAQItem[]> = {
       id: 'es-11',
       question: '¿Qué pasa si elimino mi cuenta?',
       answer: 'Cuando eliminas tu cuenta, el emparejamiento con tu pareja termina inmediatamente y todos los datos se eliminan permanentemente sin posibilidad de recuperación.',
+      category: 'account',
+    },
+  ],
+  'zh-TW': [
+    {
+      id: 'zh-TW-1',
+      question: 'Daydate是什麼樣的App？',
+      answer: 'Daydate是一款專為情侶設計的App，每天提供新的約會任務。AI會分析你們的喜好、情況和天氣，推薦客製化的約會任務。完成的任務會成為兩人專屬的珍貴回憶，讓你們一起累積特別的時刻。',
+      category: 'general',
+    },
+    {
+      id: 'zh-TW-2',
+      question: '每天可以獲得幾個任務？',
+      answer: '免費方案每天可獲得1次（3個任務），Premium方案每天可獲得2次（6個任務）。所有任務在午夜重置。你也可以不定期發現Daydate提供的特別任務。',
+      category: 'mission',
+    },
+    {
+      id: 'zh-TW-3',
+      question: '如何完成任務？',
+      answer: '點擊任務卡片上的「開始」按鈕，拍攝認證照片，然後互相寫下給對方的話就能完成任務。認證照片會保存為兩人專屬的回憶，記得捕捉難忘的瞬間。免費方案每天可完成1個任務，Premium方案則不限次數。',
+      category: 'mission',
+    },
+    {
+      id: 'zh-TW-4',
+      question: '拍完一個任務的照片後，可以進行其他任務嗎？',
+      answer: '可以的。不過，先寫下「給對方的話」的任務會被指定為當天可完成的任務。',
+      category: 'mission',
+    },
+    {
+      id: 'zh-TW-5',
+      question: '完成任務後刪除照片，可以重新開始嗎？',
+      answer: '不行，任務一旦完成，無論是否刪除照片都無法重新開始。',
+      category: 'mission',
+    },
+    {
+      id: 'zh-TW-6',
+      question: '可以收藏的任務數量有限制嗎？',
+      answer: '免費方案最多可收藏5個任務。Premium方案則沒有收藏數量限制。',
+      category: 'mission',
+    },
+    {
+      id: 'zh-TW-7',
+      question: '在哪裡可以查看紀念日？',
+      answer: '點擊首頁上方的日期文字即可查看紀念日列表。',
+      category: 'anniversary',
+    },
+    {
+      id: 'zh-TW-8',
+      question: '如何編輯或刪除紀念日？',
+      answer: '系統自動生成的預設紀念日（100天、週年等）無法編輯或刪除。只有你手動新增的紀念日才能編輯或刪除。',
+      category: 'anniversary',
+    },
+    {
+      id: 'zh-TW-9',
+      question: '可以建立幾個相簿？',
+      answer: '免費方案最多可建立2個相簿。Premium方案則沒有相簿數量限制。',
+      category: 'album',
+    },
+    {
+      id: 'zh-TW-10',
+      question: '解除配對會怎樣？',
+      answer: '解除配對後，兩人都會被導向配對畫面。如果在30天內與原來的伴侶重新配對，所有資料都會恢復。如果與新伴侶配對，則會重新開始。但是，如果任何一方刪除帳戶，資料將無法恢復。',
+      category: 'account',
+    },
+    {
+      id: 'zh-TW-11',
+      question: '刪除帳戶會怎樣？',
+      answer: '刪除帳戶後，與伴侶的配對會立即解除，所有資料將永久刪除且無法恢復。',
       category: 'account',
     },
   ],

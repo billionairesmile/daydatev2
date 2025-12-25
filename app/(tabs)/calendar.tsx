@@ -39,6 +39,7 @@ import { useMemoryStore, SAMPLE_MEMORIES } from '@/stores/memoryStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useCoupleSyncStore, type SyncedTodo } from '@/stores/coupleSyncStore';
 import { isDemoMode } from '@/lib/supabase';
+import { BannerAdView } from '@/components/ads';
 
 const { width, height } = Dimensions.get('window');
 
@@ -505,41 +506,55 @@ export default function CalendarScreen() {
   };
 
   const getMissionForDate = (day: number) => {
-    // First check actual memories from store (includes newly completed missions)
-    const memoryForDate = memories.find((memory) => {
-      const completedDate = new Date(memory.completedAt);
-      return (
-        completedDate.getFullYear() === year &&
-        completedDate.getMonth() === month &&
-        completedDate.getDate() === day
-      );
-    });
+    // Get all memories for this date and sort by completedAt (earliest first)
+    // This ensures we show the first completed mission's photo, with fallback if deleted
+    const memoriesForDate = memories
+      .filter((memory) => {
+        const completedDate = new Date(memory.completedAt);
+        return (
+          completedDate.getFullYear() === year &&
+          completedDate.getMonth() === month &&
+          completedDate.getDate() === day
+        );
+      })
+      .sort((a, b) => new Date(a.completedAt).getTime() - new Date(b.completedAt).getTime());
 
-    if (memoryForDate) {
+    // Find the first memory with a valid photo URL
+    const memoryWithPhoto = memoriesForDate.find(
+      (memory) => memory.photoUrl && memory.photoUrl.trim() !== ''
+    );
+
+    if (memoryWithPhoto) {
       return {
-        imageUrl: memoryForDate.photoUrl,
-        title: memoryForDate.mission?.title || '미션 완료',
+        imageUrl: memoryWithPhoto.photoUrl,
+        title: memoryWithPhoto.mission?.title || '미션 완료',
       };
     }
 
-    // Then check SAMPLE_MEMORIES for development data
-    const sampleMemory = SAMPLE_MEMORIES.find((memory) => {
-      const completedDate = new Date(memory.completedAt);
-      return (
-        completedDate.getFullYear() === year &&
-        completedDate.getMonth() === month &&
-        completedDate.getDate() === day
-      );
-    });
+    // Then check SAMPLE_MEMORIES for development data (same logic)
+    const sampleMemoriesForDate = SAMPLE_MEMORIES
+      .filter((memory) => {
+        const completedDate = new Date(memory.completedAt);
+        return (
+          completedDate.getFullYear() === year &&
+          completedDate.getMonth() === month &&
+          completedDate.getDate() === day
+        );
+      })
+      .sort((a, b) => new Date(a.completedAt).getTime() - new Date(b.completedAt).getTime());
 
-    if (sampleMemory) {
+    const sampleMemoryWithPhoto = sampleMemoriesForDate.find(
+      (memory) => memory.photoUrl && memory.photoUrl.trim() !== ''
+    );
+
+    if (sampleMemoryWithPhoto) {
       return {
-        imageUrl: sampleMemory.photoUrl,
-        title: sampleMemory.mission?.title || '미션 완료',
+        imageUrl: sampleMemoryWithPhoto.photoUrl,
+        title: sampleMemoryWithPhoto.mission?.title || '미션 완료',
       };
     }
 
-    // No mission data found
+    // No mission data with valid photo found
     return undefined;
   };
 
@@ -1407,6 +1422,9 @@ export default function CalendarScreen() {
         </TouchableWithoutFeedback>
       </Modal>
 
+      {/* Banner Ad - Fixed at bottom */}
+      <BannerAdView placement="calendar" style={styles.bannerAd} />
+
     </View>
   );
 }
@@ -1415,6 +1433,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.black,
+  },
+  bannerAd: {
+    position: 'absolute',
+    bottom: 90,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
   },
   backgroundImage: {
     position: 'absolute',

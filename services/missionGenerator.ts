@@ -3,8 +3,9 @@ import type { Mission, MissionCategory } from '@/types';
 import type { OnboardingData, DateWorry } from '@/stores/onboardingStore';
 import type { MissionGenerationAnswers } from '@/stores/missionStore';
 import { getRandomImage } from '@/constants/missionImages';
-import { useLanguageStore } from '@/stores';
-import type { SupportedLanguage, CountryCode } from '@/stores';
+// Import directly from individual store files to avoid require cycle
+import { useLanguageStore, type SupportedLanguage, type CountryCode } from '@/stores/languageStore';
+import { useSubscriptionStore, SUBSCRIPTION_LIMITS } from '@/stores/subscriptionStore';
 
 // ============================================
 // Types
@@ -729,10 +730,11 @@ function getUserPrompt(
   contextString: string,
   fewShotExamples: string,
   language: SupportedLanguage,
-  deduplicationContext: string
+  deduplicationContext: string,
+  missionCount: number = 3
 ): string {
   if (language === 'ko') {
-    return `다음 상황의 커플을 위한 데이트 미션 3개를 생성해주세요.
+    return `다음 상황의 커플을 위한 데이트 미션 ${missionCount}개를 생성해주세요.
 
 ${contextString}
 ${deduplicationContext}
@@ -749,12 +751,12 @@ ${deduplicationContext}
 ${fewShotExamples}
 
 ---
-위 정보를 바탕으로 이 커플에게 딱 맞는 미션 3개를 JSON으로 생성해주세요.
+위 정보를 바탕으로 이 커플에게 딱 맞는 미션 ${missionCount}개를 JSON으로 생성해주세요.
 반드시 JSON 형식으로만 응답하세요.`;
   }
 
   // English prompt
-  return `Please generate 3 date missions for the following couple's situation.
+  return `Please generate ${missionCount} date missions for the following couple's situation.
 
 ${contextString}
 ${deduplicationContext}
@@ -771,7 +773,7 @@ Reference examples:
 ${fewShotExamples}
 
 ---
-Based on the above information, generate 3 perfectly matched missions for this couple in JSON format.
+Based on the above information, generate ${missionCount} perfectly matched missions for this couple in JSON format.
 Respond only in JSON format.`;
 }
 
@@ -811,12 +813,22 @@ export async function generateMissionsWithAI(input: MissionGenerationInput): Pro
   // Build deduplication context from mission history (token-efficient)
   const deduplicationContext = buildDeduplicationContext(input.missionHistory, language);
 
+  // Determine mission count based on subscription status
+  const subscriptionState = useSubscriptionStore.getState();
+  const isCouplePremium = subscriptionState.isPremium || subscriptionState.partnerIsPremium;
+  const missionCount = isCouplePremium
+    ? SUBSCRIPTION_LIMITS.premium.missionsPerGeneration
+    : SUBSCRIPTION_LIMITS.free.missionsPerGeneration;
+
   // Get language-specific prompts
   const systemPrompt = getSystemPrompt(weather.countryCode, language);
   const fewShotExamples = getFewShotExamples(language);
-  const userPrompt = getUserPrompt(contextString, fewShotExamples, language, deduplicationContext);
+  const userPrompt = getUserPrompt(contextString, fewShotExamples, language, deduplicationContext, missionCount);
 
   try {
+    // Increase max_tokens for premium users (6 missions need more tokens)
+    const maxTokens = missionCount > 3 ? 4500 : 2500;
+
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
@@ -824,7 +836,7 @@ export async function generateMissionsWithAI(input: MissionGenerationInput): Pro
         { role: 'user', content: userPrompt },
       ],
       temperature: 0.9,
-      max_tokens: 2500,
+      max_tokens: maxTokens,
       presence_penalty: 0.7,
       frequency_penalty: 0.4,
       response_format: { type: 'json_object' },
@@ -886,8 +898,15 @@ export async function generateMissionsWithAI(input: MissionGenerationInput): Pro
 export function generateMissionsFallback(todayMoods: string[]): Mission[] {
   const language = useLanguageStore.getState().language;
 
-  // Language-specific fallback missions
-  const fallbackMissions: Mission[] = language === 'ko'
+  // Determine mission count based on subscription status
+  const subscriptionState = useSubscriptionStore.getState();
+  const isCouplePremium = subscriptionState.isPremium || subscriptionState.partnerIsPremium;
+  const missionCount = isCouplePremium
+    ? SUBSCRIPTION_LIMITS.premium.missionsPerGeneration
+    : SUBSCRIPTION_LIMITS.free.missionsPerGeneration;
+
+  // Language-specific fallback missions (6 missions for premium)
+  const allFallbackMissions: Mission[] = language === 'ko'
     ? [
         {
           id: `fallback-${Date.now()}-1`,
@@ -916,6 +935,36 @@ export function generateMissionsFallback(todayMoods: string[]): Mission[] {
           category: 'cafe' as MissionCategory,
           tags: ['카페', '감성', '데이트'],
           imageUrl: getRandomImage('cafe'),
+          isPremium: false,
+          moodTags: todayMoods as any,
+        },
+        {
+          id: `fallback-${Date.now()}-4`,
+          title: '야경 드라이브',
+          description: '밤에 예쁜 야경 보며 드라이브하기',
+          category: 'outdoor' as MissionCategory,
+          tags: ['드라이브', '야경', '로맨틱'],
+          imageUrl: getRandomImage('outdoor'),
+          isPremium: false,
+          moodTags: todayMoods as any,
+        },
+        {
+          id: `fallback-${Date.now()}-5`,
+          title: '함께 요리하기',
+          description: '새로운 레시피로 함께 요리 만들어보기',
+          category: 'home' as MissionCategory,
+          tags: ['요리', '홈쿠킹', '협동'],
+          imageUrl: getRandomImage('home'),
+          isPremium: false,
+          moodTags: todayMoods as any,
+        },
+        {
+          id: `fallback-${Date.now()}-6`,
+          title: '영화관 데이트',
+          description: '최신 영화 보고 감상 나누기',
+          category: 'movie' as MissionCategory,
+          tags: ['영화', '데이트', '문화'],
+          imageUrl: getRandomImage('movie'),
           isPremium: false,
           moodTags: todayMoods as any,
         },
@@ -951,7 +1000,38 @@ export function generateMissionsFallback(todayMoods: string[]): Mission[] {
           isPremium: false,
           moodTags: todayMoods as any,
         },
+        {
+          id: `fallback-${Date.now()}-4`,
+          title: 'Night Drive Adventure',
+          description: 'Take a scenic night drive and enjoy the city lights',
+          category: 'outdoor' as MissionCategory,
+          tags: ['drive', 'nightview', 'romantic'],
+          imageUrl: getRandomImage('outdoor'),
+          isPremium: false,
+          moodTags: todayMoods as any,
+        },
+        {
+          id: `fallback-${Date.now()}-5`,
+          title: 'Cook Together',
+          description: 'Try a new recipe and cook a meal together',
+          category: 'home' as MissionCategory,
+          tags: ['cooking', 'homemade', 'teamwork'],
+          imageUrl: getRandomImage('home'),
+          isPremium: false,
+          moodTags: todayMoods as any,
+        },
+        {
+          id: `fallback-${Date.now()}-6`,
+          title: 'Movie Date Night',
+          description: 'Watch a new movie and share your thoughts',
+          category: 'movie' as MissionCategory,
+          tags: ['movie', 'date', 'culture'],
+          imageUrl: getRandomImage('movie'),
+          isPremium: false,
+          moodTags: todayMoods as any,
+        },
       ];
 
-  return fallbackMissions;
+  // Return the appropriate number of missions based on subscription
+  return allFallbackMissions.slice(0, missionCount);
 }

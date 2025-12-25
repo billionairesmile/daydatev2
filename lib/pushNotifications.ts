@@ -39,6 +39,52 @@ export interface PushNotificationResult {
 }
 
 /**
+ * Check current notification permission status
+ * Returns true if notifications are granted, false otherwise
+ */
+export async function getNotificationPermissionStatus(): Promise<boolean> {
+  if (!Notifications) {
+    return false;
+  }
+
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    return status === 'granted';
+  } catch (error) {
+    console.error('[Push] Error getting permission status:', error);
+    return false;
+  }
+}
+
+/**
+ * Sync marketing_agreed field with OS notification permission status
+ */
+export async function syncMarketingAgreedWithPermission(userId: string): Promise<boolean> {
+  if (isDemoMode || !userId) {
+    return false;
+  }
+
+  try {
+    const hasPermission = await getNotificationPermissionStatus();
+
+    const { error } = await db.profiles.update(userId, {
+      marketing_agreed: hasPermission,
+    });
+
+    if (error) {
+      console.error('[Push] Error syncing marketing_agreed:', error);
+      return false;
+    }
+
+    console.log('[Push] marketing_agreed synced with permission status:', hasPermission);
+    return true;
+  } catch (error) {
+    console.error('[Push] Error syncing marketing_agreed:', error);
+    return false;
+  }
+}
+
+/**
  * Register for push notifications and get the Expo push token
  */
 export async function registerForPushNotifications(): Promise<PushNotificationResult> {
@@ -213,6 +259,10 @@ const notificationMessages = {
       title: '¡La misión de hoy ha llegado!',
       body: (nickname: string) => `${nickname} ha creado la misión de hoy. ¡Échale un vistazo!`,
     },
+    'zh-TW': {
+      title: '今日任務來了！',
+      body: (nickname: string) => `${nickname}建立了今天的任務，快來看看吧！`,
+    },
   },
   missionReminder: {
     ko: {
@@ -230,6 +280,11 @@ const notificationMessages = {
       bodyWithPartner: (nickname: string) => `${nickname} dejó un mensaje. ¡Escribe el tuyo también!`,
       bodyWithoutPartner: '¡Escríbanse un mensaje para completar la misión!',
     },
+    'zh-TW': {
+      title: '任務完成只差一步！',
+      bodyWithPartner: (nickname: string) => `${nickname}留了訊息給你，也寫下你的訊息吧！`,
+      bodyWithoutPartner: '互相寫下給對方的話就能完成任務！',
+    },
   },
   scheduledReminder: {
     ko: {
@@ -244,10 +299,14 @@ const notificationMessages = {
       title: '¡Completa la misión de hoy!',
       body: 'Tienes una misión sin completar. Crea recuerdos especiales con tu pareja 💕',
     },
+    'zh-TW': {
+      title: '來完成今天的任務吧！',
+      body: '還有未完成的任務喔，和另一半一起創造特別的回憶吧 💕',
+    },
   },
 } as const;
 
-type SupportedLanguage = 'ko' | 'en' | 'es';
+type SupportedLanguage = 'ko' | 'en' | 'es' | 'zh-TW';
 
 /**
  * Send push notification via Supabase Edge Function

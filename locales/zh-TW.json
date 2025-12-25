@@ -1,0 +1,838 @@
+{
+  "common": {
+    "confirm": "確認",
+    "cancel": "取消",
+    "ok": "確定",
+    "save": "儲存",
+    "delete": "刪除",
+    "edit": "編輯",
+    "done": "完成",
+    "add": "新增",
+    "reset": "重置",
+    "close": "關閉",
+    "next": "下一步",
+    "back": "返回",
+    "yes": "是",
+    "no": "否",
+    "loading": "載入中...",
+    "error": "錯誤",
+    "success": "成功",
+    "today": "今天",
+    "partner": "伴侶",
+    "me": "我",
+    "days": "天",
+    "daysCount": "天"
+  },
+  "tabs": {
+    "home": "首頁",
+    "mission": "任務",
+    "calendar": "日曆",
+    "memories": "回憶",
+    "more": "更多"
+  },
+  "home": {
+    "anniversary": {
+      "title": "紀念日",
+      "add": "新增紀念日",
+      "edit": "編輯紀念日",
+      "delete": "刪除紀念日",
+      "deleteConfirm": "確定要刪除「{{name}}」紀念日嗎？",
+      "name": "紀念日",
+      "namePlaceholder": "請輸入紀念日名稱",
+      "date": "日期",
+      "weddingAnniversary": "結婚紀念日",
+      "datingAnniversary": "交往",
+      "birthday": "生日",
+      "lunar": "(農曆)",
+      "christmas": "聖誕節",
+      "valentinesDay": "情人節",
+      "whiteDay": "白色情人節",
+      "selectDate": "紀念日"
+    },
+    "background": {
+      "title": "更換背景圖片",
+      "description": "選擇的圖片將套用於所有頁面背景",
+      "selectFromGallery": "從相簿選擇",
+      "resetToDefault": "恢復預設圖片",
+      "uploadFailed": "上傳失敗",
+      "uploadFailedMessage": "圖片上傳失敗，請重試。",
+      "uploadError": "上傳圖片時發生錯誤。"
+    },
+    "tutorial": {
+      "title": "試著更換背景圖片吧",
+      "description": "點擊這個按鈕\n可以用情侶照片裝飾背景"
+    }
+  },
+  "mission": {
+    "title": "今日任務",
+    "subtitle": "今天要一起創造什麼樣的時刻呢？",
+    "generate": "獲取今日任務",
+    "generating": "生成中...",
+    "generatingMessage": "正在生成任務",
+    "pleaseWait": "請稍候",
+    "start": "開始",
+    "completed": "已完成",
+    "kept": "已收藏",
+    "keep": "收藏",
+    "anotherInProgress": "其他任務進行中",
+    "questions": {
+      "canMeetToday": "今天可以見面嗎？",
+      "yesMeet": "可以見面",
+      "noMeet": "無法見面",
+      "availableTime": "今天有多少時間可以一起度過？",
+      "todayMood": "今天想要什麼樣的氛圍？（可多選）"
+    },
+    "timeOptions": {
+      "30min": "30分鐘",
+      "1hour": "1小時",
+      "2hour": "2小時以上",
+      "allday": "一整天"
+    },
+    "moodOptions": {
+      "fun": "想開心笑",
+      "deep_talk": "需要深談",
+      "active": "活力・動態",
+      "healing": "休息・療癒",
+      "culture": "文藝・感性",
+      "adventure": "新挑戰",
+      "romantic": "浪漫"
+    },
+    "alerts": {
+      "locationRequired": "需要位置權限",
+      "locationRequiredMessage": "生成任務需要位置權限。\n請允許位置權限。",
+      "allowPermission": "允許權限",
+      "locationDenied": "位置權限被拒絕",
+      "locationDeniedMessage": "位置權限被拒絕。請在設定中允許位置權限。",
+      "goToSettings": "前往設定",
+      "cannotKeep": "無法收藏",
+      "alreadyCompletedKeep": "已完成的任務無法收藏。",
+      "keepMission": "收藏任務",
+      "keepMissionConfirm": "要將「{{title}}」任務加入收藏嗎？",
+      "keepLimit": "收藏限制",
+      "keepLimitMessage": "最多只能收藏5個任務。\n請刪除已收藏的任務後再試。",
+      "cannotStart": "無法開始任務",
+      "anotherInProgressMessage": "已有其他任務進行中。\n請先完成進行中的任務！",
+      "dailyLimitMessage": "今天可完成的任務已全部完成。\n明天再來挑戰吧！"
+    }
+  },
+  "missionDetail": {
+    "headerTitle": "任務詳情",
+    "notFound": {
+      "title": "找不到任務",
+      "description": "此任務已無法使用。"
+    },
+    "camera": {
+      "title": "拍照",
+      "confirmTitle": "確認照片",
+      "permissionRequired": "需要相機權限",
+      "permissionMessage": "拍照需要相機權限。",
+      "photoError": "拍照失敗，請重試。",
+      "usePhoto": "使用這張",
+      "retake": "重新拍攝"
+    },
+    "location": {
+      "noInfo": "無位置資訊"
+    },
+    "steps": {
+      "photo": {
+        "title": "拍照記錄",
+        "description": "用照片記錄兩人的特別時刻。",
+        "hint": "將此刻的心動和幸福\n拍成照片留作回憶。"
+      },
+      "message": {
+        "title": "寫下給對方的話",
+        "description": "寫下此刻想對對方說的心意。真誠的訊息能創造更特別的回憶。",
+        "written": "已完成",
+        "notWritten": "未完成"
+      },
+      "complete": "完成"
+    },
+    "status": {
+      "anotherInProgress": "其他任務進行中",
+      "waitingPartner": "等待對方中...",
+      "waitingPhoto": "等待照片中...",
+      "writeMessage": "寫下給對方的話",
+      "takePhoto": "拍照"
+    },
+    "modal": {
+      "title": "給對方的話",
+      "placeholder": "寫下想對對方說的話"
+    },
+    "defaultPartnerMessage": "有你在身邊真幸福 💕",
+    "completed": "已完成",
+    "completeButton": "完成任務！🎉",
+    "writeMessage": "撰寫訊息",
+    "messagePlaceholder": "一起記錄今天的任務吧",
+    "submitMission": "完成任務",
+    "partnerMessage": "對方的訊息",
+    "myMessage": "我的訊息",
+    "waitingPartner": "正在等待對方的訊息",
+    "viewMemory": "查看回憶"
+  },
+  "bookmark": {
+    "title": "收藏夾",
+    "empty": "沒有收藏的任務",
+    "emptyHint": "試著收藏喜歡的任務吧",
+    "deleteMission": "刪除任務",
+    "deleteConfirm": "確定要刪除「{{title}}」任務嗎？"
+  },
+  "calendar": {
+    "title": "日曆",
+    "subtitle": "記錄我們的時光",
+    "dayNames": [
+      "日",
+      "一",
+      "二",
+      "三",
+      "四",
+      "五",
+      "六"
+    ],
+    "settings": {
+      "title": "日曆功能設定",
+      "description": "選擇要顯示的功能"
+    },
+    "todo": {
+      "title": "待辦事項",
+      "empty": "沒有待辦事項",
+      "emptyHint": "點擊按鈕新增",
+      "addPlaceholder": "例如：預訂電影票",
+      "addTitle": "請輸入待辦事項",
+      "add": "新增待辦事項"
+    },
+    "period": {
+      "title": "生理期資訊",
+      "calendar": "生理期日曆",
+      "calendarDesc": "追蹤和預測生理週期",
+      "inputTitle": "請輸入生理期資訊",
+      "settingsTitle": "生理期設定",
+      "startDate": "生理期開始日",
+      "lastStartDate": "上次生理期開始日",
+      "averageCycle": "平均週期",
+      "cycleLength": "週期長度",
+      "periodLength": "生理期天數",
+      "cycleHint": "一般生理週期為21~35天",
+      "nextDate": "下次預計日",
+      "lastDate": "上次開始日",
+      "daysUnit": "天",
+      "legend": {
+        "period": "生理期",
+        "fertile": "易孕期",
+        "ovulation": "預計排卵日"
+      },
+      "selectDate": "選擇日期"
+    },
+    "holidays": {
+      "newYear": "元旦",
+      "lunarNewYear": "春節",
+      "lunarNewYearHoliday": "春節假期",
+      "independenceDay": "和平紀念日",
+      "childrenDay": "兒童節",
+      "buddhasBirthday": "佛誕節",
+      "memorialDay": "清明節",
+      "liberationDay": "國慶日",
+      "foundationDay": "建國紀念日",
+      "chuseok": "中秋節",
+      "chuseokHoliday": "中秋假期",
+      "hangulDay": "雙十節",
+      "christmas": "聖誕節"
+    }
+  },
+  "memories": {
+    "title": "回憶",
+    "subtitle": "我們一起度過的時刻",
+    "empty": "沒有已完成的任務",
+    "emptyHint": "完成任務並寫下給對方的話吧",
+    "viewAll": "查看全部",
+    "togetherMoment": "一起的時刻",
+    "itemCount": "{{count}}個項目",
+    "monthNames": [
+      "1月",
+      "2月",
+      "3月",
+      "4月",
+      "5月",
+      "6月",
+      "7月",
+      "8月",
+      "9月",
+      "10月",
+      "11月",
+      "12月"
+    ],
+    "yearFormat": "{{year}}年",
+    "yearMonthFormat": "{{year}}年{{month}}",
+    "filter": {
+      "all": "全部",
+      "thisMonth": "本月",
+      "thisYear": "今年"
+    },
+    "album": {
+      "title": "相簿",
+      "subtitle": "將難忘時刻製作成相簿吧",
+      "name": "相簿名稱",
+      "coverPhoto": "封面照片",
+      "fontStyle": "字體風格",
+      "fontStyleDesc": "選擇相簿標題使用的字體風格",
+      "basicFont": "基本字體",
+      "basicFontDesc": "簡潔風格",
+      "ransomStyle": "剪報風格",
+      "basicFontHint": "套用簡潔字體",
+      "ransomFontHint": "每個字母都有特別的風格",
+      "namePlaceholder": "輸入相簿名稱...",
+      "ransomPlaceholder": "僅限英文輸入 (A-Z, 0-9)",
+      "selectPhoto": "選擇照片",
+      "dragHint": "拖曳文字調整位置",
+      "coverEditHint": "選擇照片後拖曳文字調整位置",
+      "color": "顏色",
+      "size": "大小",
+      "textSize": "文字大小",
+      "addPhoto": "新增照片",
+      "editCover": "編輯封面",
+      "deleteAlbum": "刪除相簿",
+      "deleteAlbumConfirm": "確定要刪除這個相簿嗎？",
+      "readOnly": "唯讀",
+      "limitReached": "相簿數量已達上限",
+      "limitReachedMessage": "免費方案最多可建立5個相簿。升級至Premium即可無限建立相簿。"
+    },
+    "photo": {
+      "select": "選擇",
+      "delete": "刪除",
+      "deleteTitle": "刪除照片",
+      "deleteConfirm": "確定要刪除{{count}}張照片嗎？",
+      "deleteSingleConfirm": "確定要刪除這張照片嗎？",
+      "save": "儲存照片",
+      "tapToFlip": "點擊查看背面",
+      "tapToView": "點擊查看照片"
+    },
+    "permission": {
+      "required": "需要權限",
+      "photoAccess": "需要存取相簿的權限。",
+      "saveAccess": "儲存照片需要存取相簿的權限。",
+      "saveSuccess": "儲存成功",
+      "saveSuccessMessage": "照片已儲存至相簿。",
+      "saveFailed": "儲存失敗",
+      "saveFailedMessage": "儲存照片時發生錯誤。"
+    }
+  },
+  "more": {
+    "title": "更多",
+    "sections": {
+      "profile": "個人資料",
+      "settings": "設定",
+      "support": "支援",
+      "developer": "開發者"
+    },
+    "menu": {
+      "myProfile": "我的資料",
+      "coupleProfile": "情侶資料",
+      "settings": "設定",
+      "announcements": "公告",
+      "customerService": "客服中心",
+      "onboardingReset": "重置引導",
+      "missionReset": "重置任務",
+      "fullReset": "完全重置",
+      "logout": "登出"
+    },
+    "announcements": {
+      "title": "公告",
+      "empty": "沒有公告"
+    },
+    "help": {
+      "title": "幫助",
+      "inquiry": "聯絡我們",
+      "faq": "常見問題"
+    },
+    "customerService": {
+      "title": "客服中心",
+      "faqTitle": "常見問題",
+      "inquiryTitle": "問題還沒解決嗎？",
+      "inquiryDescription": "透過客服聯繫我們\n我們會盡快回覆您。",
+      "kakaoButton": "1:1 諮詢"
+    },
+    "others": {
+      "title": "其他",
+      "termsOfService": "服務條款",
+      "privacyPolicy": "隱私權政策"
+    },
+    "alerts": {
+      "devReset": "開發者重置",
+      "devResetMessage": "確定要初始化引導狀態並重新開始嗎？",
+      "missionReset": "重置任務",
+      "missionResetMessage": "確定要重置今日任務和完成狀態嗎？",
+      "missionResetComplete": "重置完成",
+      "missionResetCompleteMessage": "任務已重置。請前往任務頁面生成新任務。",
+      "fullReset": "⚠️ 完全重置",
+      "fullResetMessage": "將初始化所有資料。\n\n• 引導資料\n• 配對資訊\n• 情侶同步資料\n• 任務資料\n• 所有本地儲存\n\n確定要初始化嗎？",
+      "fullResetComplete": "初始化完成",
+      "fullResetCompleteMessage": "所有資料已初始化。正在重新啟動應用程式。",
+      "logout": "登出",
+      "logoutMessage": "確定要登出嗎？"
+    }
+  },
+  "profile": {
+    "myProfile": "我的資料",
+    "coupleProfile": "情侶資料",
+    "nickname": "暱稱",
+    "birthDate": "生日",
+    "mbti": "MBTI",
+    "anniversaryDate": "紀念日",
+    "relationshipType": "關係類型",
+    "dating": "交往中",
+    "married": "已婚",
+    "inviteCode": "邀請碼",
+    "copyCode": "複製代碼",
+    "codeCopied": "代碼已複製",
+    "disconnect": "解除連結",
+    "disconnectConfirm": "確定要解除連結嗎？",
+    "disconnectWarning": "解除連結後所有情侶資料將被刪除。",
+    "notSet": "未設定",
+    "dateFormat": "{{year}}年{{month}}月{{day}}日",
+    "solar": "國曆",
+    "lunar": "農曆",
+    "preferences": "偏好設定",
+    "preferredActivities": "偏好活動",
+    "dateConcerns": "約會煩惱",
+    "constraints": "限制條件",
+    "activitiesCount": "{{count}}項活動",
+    "noPreferences": "尚未設定偏好",
+    "editNickname": {
+      "title": "更改暱稱",
+      "description": "這是對方看到的名字",
+      "placeholder": "輸入暱稱"
+    },
+    "editBirthday": {
+      "title": "修改生日",
+      "description": "請輸入正確的生日",
+      "selectDate": "請選擇日期"
+    },
+    "editPreferences": {
+      "title": "偏好設定",
+      "editTitle": "修改偏好設定",
+      "button": "修改"
+    },
+    "couple": {
+      "title": "情侶資料",
+      "anniversary": "紀念日",
+      "accountInfo": "帳戶資訊",
+      "myAccountInfo": "{{nickname}}的帳戶資訊",
+      "myAccount": "我的帳戶",
+      "partnerAccountInfo": "{{nickname}}的帳戶資訊",
+      "partnerAccount": "伴侶的帳戶",
+      "datingLabel": "交往日",
+      "marriedLabel": "結婚紀念日",
+      "datingType": "情侶",
+      "marriedType": "夫妻",
+      "editAnniversary": {
+        "title": "更改紀念日",
+        "description": "修改特別的日子",
+        "relationshipLabel": "關係類型",
+        "selectDate": "請選擇日期",
+        "datingStart": "交往開始日",
+        "marriedAnniversary": "結婚紀念日"
+      },
+      "accountDetail": {
+        "me": "我",
+        "partner": "伴侶",
+        "nickname": "暱稱",
+        "email": "電子郵件",
+        "joinDate": "加入日期",
+        "noInfo": "無資訊",
+        "defaultPartnerEmail": "已連結的伴侶"
+      }
+    },
+    "me": "我",
+    "partner": "伴侶"
+  },
+  "settings": {
+    "title": "設定",
+    "sections": {
+      "notifications": "通知",
+      "marketing": "行銷",
+      "premium": "高級會員",
+      "other": "其他",
+      "account": "帳戶"
+    },
+    "notifications": {
+      "push": "推播通知",
+      "pushDesc": "接收所有通知",
+      "mission": "任務通知",
+      "missionDesc": "生成新任務時通知",
+      "message": "訊息未填寫通知",
+      "messageDesc": "未填寫給對方的話時通知"
+    },
+    "marketing": {
+      "news": "接收最新消息",
+      "newsDesc": "活動及更新消息",
+      "info": "接收行銷資訊",
+      "infoDesc": "促銷及優惠資訊"
+    },
+    "other": {
+      "language": "語言",
+      "selectLanguage": "選擇語言",
+      "termsOfService": "服務條款",
+      "locationTerms": "位置資訊服務條款",
+      "privacyPolicy": "隱私權政策",
+      "version": "版本 {{version}}",
+      "latestVersion": "最新版本"
+    },
+    "account": {
+      "logout": "登出",
+      "logoutTitle": "登出",
+      "logoutMessage": "確定要登出嗎？",
+      "deleteAccount": "刪除帳戶",
+      "unpair": "解除配對"
+    },
+    "unpair": {
+      "title": "解除配對",
+      "confirmAlertTitle": "解除配對",
+      "confirmAlertMessage": "確定要解除配對嗎？",
+      "confirmTitle": "確認解除配對",
+      "warningTitle": "確定要解除配對嗎？",
+      "warningText": "解除配對後與伴侶的連結將中斷，\n部分資料將無法存取。",
+      "checkTitle": "解除連結前請確認",
+      "daysTogether": "在一起的時間",
+      "daysUnit": "天",
+      "completedMissions": "一起完成的任務",
+      "missionsUnit": "個",
+      "recoveryPeriod": "可恢復期間",
+      "recoveryHint": "最多可在30天內恢復",
+      "warningsTitle": "注意事項",
+      "warning1": "將向對方發送解除配對通知",
+      "warning2": "任務記錄將保存在個人帳戶中",
+      "warning3": "30天內可與同一伴侶重新連結",
+      "confirmPrompt": "請在下方輸入「解除配對」以繼續",
+      "confirmText": "解除配對",
+      "button": "解除配對",
+      "finalConfirmTitle": "最終確認",
+      "finalConfirmMessage": "確定要解除配對嗎？\n此操作無法撤銷。",
+      "success": "已解除配對",
+      "successMessage": "配對已解除。\n30天內與同一伴侶重新連結可恢復原有資料。",
+      "error": "解除配對時發生錯誤。",
+      "notificationTitle": "配對已解除",
+      "notificationBody": "{{nickname}}解除了配對。30天內重新連結可恢復資料。",
+      "partnerDisconnectedTitle": "配對已解除",
+      "partnerDisconnectedMessage": "對方解除了配對。\n您可以與新伴侶連結，或在30天內與同一伴侶重新連結。",
+      "partnerDeletedAccountTitle": "對方已刪除帳戶",
+      "partnerDeletedAccountMessage": "對方已刪除帳戶，配對已解除。\n無法重新連結，原有回憶和資料無法恢復。"
+    },
+    "deleteAccount": {
+      "title": "刪除帳戶",
+      "confirmAlertTitle": "刪除帳戶",
+      "confirmAlertMessage": "確定要刪除帳戶嗎？",
+      "warningText": "刪除帳戶後所有資料將被",
+      "permanentDelete": "永久刪除",
+      "warningEnd": "。",
+      "dataList": "將刪除的資料：個人資料、情侶連結資訊、已完成任務記錄、相簿和照片、所有設定",
+      "confirmPrompt": "請在下方輸入「刪除帳戶」以繼續",
+      "confirmText": "刪除帳戶",
+      "button": "刪除帳戶",
+      "finalConfirmTitle": "最終確認",
+      "finalConfirmMessage": "確定要刪除帳戶嗎？\n所有資料將被永久刪除。",
+      "deleting": "刪除中...",
+      "success": "帳戶已刪除",
+      "successMessage": "所有資料已刪除。\n感謝您的使用。",
+      "error": "刪除帳戶時發生錯誤。",
+      "partnerNotificationTitle": "帳戶刪除通知",
+      "partnerNotificationBody": "{{nickname}}已刪除帳戶。"
+    },
+    "language": "語言",
+    "theme": "主題",
+    "darkMode": "深色模式",
+    "version": "版本",
+    "termsOfService": "服務條款",
+    "privacyPolicy": "隱私權政策",
+    "licenses": "開源授權"
+  },
+  "onboarding": {
+    "welcome": "歡迎",
+    "welcomeTitle": "歡迎來到\nDaydate",
+    "welcomeSubtitle": "一起記錄和分享\n兩人的特別時刻吧",
+    "start": "開始",
+    "skip": "跳過",
+    "complete": "完成",
+    "next": "下一步",
+    "previous": "上一步",
+    "continue": "繼續",
+    "confirm": "確認",
+    "defaultUser": "使用者",
+    "login": {
+      "google": "使用 Google 登入",
+      "kakao": "使用 Kakao 登入",
+      "or": "或",
+      "success": "登入成功",
+      "successMessage": "已使用 {{provider}} 帳戶登入。",
+      "failed": "登入失敗",
+      "failedMessage": "登入時發生錯誤，請重試。",
+      "failedProvider": "{{provider}} 登入失敗，請重試。",
+      "demoMode": "示範模式",
+      "demoModeMessage": "社群登入在示範模式下無法使用。\n\n請設定環境變數以連接 Supabase。",
+      "welcomeBack": "歡迎回來！",
+      "alreadyConnected": "已與對方連結。從基本資訊輸入繼續。",
+      "termsDisclaimer": {
+        "prefix": "登入即表示您已滿16歲，並同意",
+        "privacy": "隱私權政策",
+        "terms": "服務條款",
+        "location": "位置資訊服務條款",
+        "comma": "、",
+        "suffix": "。"
+      }
+    },
+    "testMode": {
+      "title": "測試模式",
+      "message": "測試模式下資料只儲存在本地，不會與伺服器同步。\n\n僅供開發測試使用。",
+      "confirm": "以測試模式開始",
+      "button": "以測試模式開始",
+      "divider": "開發者專用",
+      "hint": "資料只儲存在本地"
+    },
+    "basicInfo": {
+      "title": "請輸入\n基本資訊",
+      "nickname": "暱稱",
+      "nicknamePlaceholder": "輸入暱稱",
+      "gender": "性別",
+      "male": "男",
+      "female": "女",
+      "birthDate": "生日",
+      "birthDatePlaceholder": "選擇生日",
+      "solar": "國曆",
+      "lunar": "農曆"
+    },
+    "terms": {
+      "title": "同意服務條款",
+      "subtitle": "使用服務前請同意條款",
+      "agreeAll": "全部同意",
+      "ageRequired": "[必填] 已滿14歲",
+      "ageRequiredDesc": "使用服務需年滿14歲。未滿14歲的使用者將受到服務限制。",
+      "serviceTerms": "[必填] 同意服務條款",
+      "serviceTermsTitle": "服務條款",
+      "locationTerms": "[必填] 同意位置服務條款",
+      "locationTermsTitle": "位置服務條款",
+      "privacyTerms": "[必填] 同意個人資料收集及使用",
+      "privacyTermsTitle": "個人資料收集及使用",
+      "marketingTerms": "[選填] 同意接收廣告通知"
+    },
+    "location": {
+      "permissionRequired": "需要位置權限",
+      "permissionMessage": "使用位置服務需要位置權限。請在設定中允許位置權限。",
+      "goToSettings": "前往設定"
+    },
+    "nickname": {
+      "title": "請輸入暱稱",
+      "placeholder": "暱稱",
+      "hint": "這是對方看到的名字"
+    },
+    "birthDate": {
+      "title": "請輸入生日",
+      "solar": "國曆",
+      "lunar": "農曆"
+    },
+    "mbti": {
+      "title": "請選擇\n您的MBTI",
+      "skip": "不清楚"
+    },
+    "relationship": {
+      "title": "請選擇關係類型",
+      "dating": "情侶",
+      "married": "夫妻"
+    },
+    "coupleInfo": {
+      "title": "請輸入\n情侶資訊",
+      "relationship": "關係",
+      "datingLabel": "交往日",
+      "marriedLabel": "結婚紀念日",
+      "selectDate": "選擇{{label}}"
+    },
+    "anniversary": {
+      "title": "請輸入紀念日",
+      "datingStart": "交往開始日",
+      "weddingDate": "結婚紀念日"
+    },
+    "pairing": {
+      "title": "與伴侶\n連結",
+      "subtitle": "使用配對碼與伴侶分享資料",
+      "generateCode": "生成代碼",
+      "enterCode": "輸入代碼",
+      "myCode": "分享給伴侶的代碼",
+      "enterCodePlaceholder": "請輸入伴侶生成的代碼",
+      "connect": "連結",
+      "connecting": "連結中...",
+      "waitingConnection": "等待連結",
+      "shareCode": "分享代碼",
+      "waitingPartner": "伴侶輸入此代碼後\n將自動連結",
+      "connected": "已與伴侶連結！\n請繼續下一步",
+      "invalidCode": "無效的代碼，請確認代碼。",
+      "alreadyPaired": "此代碼已被使用。",
+      "partnerNotReady": "伴侶尚未準備好，請稍後重試。",
+      "connectionError": "連結時發生錯誤，請重試。",
+      "coupleRestoreError": "恢復情侶資料時發生錯誤。",
+      "coupleConnectionError": "情侶連結時發生錯誤。",
+      "copied": "已複製",
+      "reconnected": "很高興再次見到你！💕",
+      "reconnectedMessage": "30天內重新連結，已恢復原有資料。"
+    },
+    "preferences": {
+      "title": "請選擇\n偏好的活動",
+      "subtitle": "可以選擇多個",
+      "indoor": "室內活動",
+      "outdoor": "戶外活動",
+      "active": "活力型",
+      "relaxing": "休閒型",
+      "food": "美食探索",
+      "cafe": "咖啡廳",
+      "culture": "文藝生活",
+      "travel": "旅行"
+    },
+    "concerns": {
+      "title": "約會時\n有什麼煩惱？",
+      "subtitle": "可以選擇多個",
+      "noIdeas": "沒有約會點子",
+      "sameRoutine": "每次都是同樣的約會",
+      "budget": "預算有壓力",
+      "time": "時間不夠",
+      "distance": "距離太遠"
+    },
+    "constraints": {
+      "title": "生成任務時\n需要注意什麼？",
+      "subtitle": "請選擇所有適用項目"
+    },
+    "preferencesIntro": {
+      "title": "告訴我們您的偏好\n以獲得客製化任務",
+      "subtitle": "我們會分析兩人的偏好\n推薦適合的約會任務",
+      "hint": "大約需要1分鐘，\n隨時可以在「更多 > 我的資料」中修改",
+      "startAnalysis": "開始偏好分析"
+    },
+    "completeStep": {
+      "title": "{{nickname}}，歡迎！",
+      "subtitle": "所有設定已完成\n一起創造特別的時刻吧！"
+    },
+    "dataRecovery": {
+      "title": "恢復原有資料 💕",
+      "message": "發現之前輸入的偏好資訊。\n跳過偏好輸入並完成設定。"
+    }
+  },
+  "premium": {
+    "title": "Premium",
+    "subtitle": "為更特別的約會而設的Premium",
+    "heroTitle": "DayDate Premium",
+    "heroSubtitle": "與伴侶享受更特別的約會",
+    "heroTitleNew": "立即開始 Premium",
+    "heroSubtitleNew": "一次付款，兩人享受",
+    "coupleBenefitHighlight": "伴侶也享Premium!",
+    "annual": "年繳",
+    "monthly": "月繳",
+    "perYear": "/年",
+    "perMonth": "/月",
+    "monthlyPrice": "$3.99",
+    "annualPrice": "$34.99",
+    "annualMonthlyEquivalent": "$2.92/月",
+    "originalAnnualPrice": "原價 $47.88/年",
+    "coupleSharing": "支援情侶共享",
+    "save27": "省27%",
+    "subscribe": "訂閱",
+    "subscribeAnnualCTA": "開始年度訂閱",
+    "subscribeMonthlyCTA": "開始月度訂閱",
+    "termsOfUse": "使用條款",
+    "paymentNoticeTitle": "付款資訊",
+    "paymentNotice1": "確認付款後將從 App Store 或 Google Play 帳戶收取費用。",
+    "paymentNotice2": "如果在當前期間結束前至少24小時未取消，訂閱將自動續訂。",
+    "paymentNotice3": "您可以隨時在裝置的訂閱設定中取消。",
+    "refundNoticeTitle": "退款政策",
+    "refundNotice1": "退款將按照 App Store 或 Google Play 政策處理。",
+    "refundNotice2": "取消後，您可以繼續使用 Premium 優惠直到當前計費期結束。",
+    "coupleNoticeTitle": "情侶優惠",
+    "coupleNotice": "訂閱後，已配對的伴侶也可以一起享受 Premium 優惠。",
+    "restoreSuccess": "恢復成功",
+    "restoreSuccessMessage": "已成功恢復您之前的購買。",
+    "restoreFailed": "恢復失敗",
+    "restoreFailedMessage": "找不到之前的購買記錄。如果問題持續，請聯繫客服。",
+    "benefitsTitle": "Premium 優惠",
+    "comparisonTitle": "方案比較",
+    "free": "免費",
+    "premiumLabel": "Premium",
+    "features": {
+      "skipAds": "無廣告體驗",
+      "unlimitedMissions": "無限每日任務",
+      "unlimitedBookmarks": "無限書籤",
+      "unlimitedAlbums": "無限相簿"
+    },
+    "status": {
+      "active": "Premium使用中",
+      "monthlyPlan": "月訂閱使用中",
+      "annualPlan": "年訂閱使用中",
+      "expiresOn": "可使用至{{date}}"
+    },
+    "managementTitle": "Premium管理",
+    "currentPlan": "目前訂閱中",
+    "monthlyPlan": "月訂閱",
+    "annualPlan": "年訂閱",
+    "perMonth": "/月",
+    "perYear": "/年",
+    "perMonthEquivalent": "/月",
+    "savings": "省2個月以上！",
+    "subscribeMonthly": "月訂閱",
+    "subscribeAnnual": "年訂閱",
+    "restorePurchases": "恢復購買",
+    "manageSubscription": "管理訂閱",
+    "termsOfService": "服務條款",
+    "privacyPolicy": "隱私權政策",
+    "legalText": "訂閱歸屬於付款帳戶，配對的伴侶也可以一起享受Premium優惠。可以直接在App Store或Google Play取消訂閱，取消後仍可使用至付款期間結束。解除配對或刪除帳戶時，訂閱不會自動取消。",
+    "benefits": {
+      "missionComplete": "任務完成",
+      "missionCompleteFree": "1個/天",
+      "missionCompletePremium": "無限任務完成",
+      "missionCompletePremiumDesc": "想完成多少任務就完成多少\n一起創造更多美好回憶",
+      "missionGenerate": "任務生成",
+      "missionGenerateFree": "1次/天 (3個)",
+      "missionGeneratePremium": "2倍任務生成",
+      "missionGeneratePremiumDesc": "每天獲得6個多樣化任務\n選擇今天想做的事",
+      "noAds": "廣告",
+      "noAdsFree": "有廣告",
+      "noAdsPremium": "無廣告舒適體驗",
+      "noAdsPremiumDesc": "專注於與伴侶的\n珍貴時刻，不受打擾",
+      "homeFrame": "首頁框架",
+      "homeFrameFree": "僅Polaroid",
+      "homeFramePremium": "Polaroid + 日曆",
+      "missionKeep": "任務收藏",
+      "missionKeepFree": "最多5個",
+      "missionKeepPremium": "無限任務收藏",
+      "missionKeepPremiumDesc": "無限收藏喜歡的任務\n隨時都能挑戰",
+      "photoStoragePremium": "無限照片儲存",
+      "photoStoragePremiumDesc": "珍貴的回憶照片\n不用擔心空間問題",
+      "albumCreate": "相簿創建",
+      "albumCreateFree": "最多5個",
+      "albumCreatePremium": "無限相簿創建",
+      "albumCreatePremiumDesc": "按主題整理特別時刻\n打造專屬回憶相簿"
+    },
+    "button": {
+      "subscribe": "訂閱Premium方案",
+      "manage": "管理Premium方案"
+    },
+    "limits": {
+      "generationReached": "今天的任務生成次數已用完",
+      "completionReached": "今天的任務完成次數已用完",
+      "bookmarkReached": "任務收藏已滿（最多5個）",
+      "albumReached": "無法創建更多相簿（最多5個）",
+      "albumReadOnly": "此相簿為唯讀",
+      "upgradeToPremium": "升級到Premium可無限制使用",
+      "upgradeForEdit": "升級到Premium方案可編輯所有相簿"
+    },
+    "limitReached": {
+      "title": "已達每日限制",
+      "completion": "您已達到今日任務完成上限。升級到Premium可完成更多任務！"
+    },
+    "deleteWarning": {
+      "title": "訂閱確認",
+      "message": "您有有效的訂閱。刪除帳戶不會自動取消訂閱。請先在App Store或Google Play取消訂閱。",
+      "manageSubscription": "管理訂閱",
+      "continueDelete": "繼續刪除"
+    }
+  },
+  "errors": {
+    "networkError": "發生網路錯誤",
+    "tryAgain": "請重試",
+    "somethingWrong": "發生問題",
+    "sessionExpired": "工作階段已過期",
+    "unauthorized": "沒有權限"
+  }
+}

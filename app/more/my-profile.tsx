@@ -140,10 +140,10 @@ export default function MyProfileScreen() {
       // Save to database
       if (!isDemoMode && user?.id) {
         try {
+          // birthDateCalendarType is stored as a separate column, not in preferences
           const preferences = {
             mbti: data.mbti,
             gender: data.gender,
-            birthDateCalendarType: tempCalendarType,
             activityTypes: data.activityTypes,
             dateWorries: data.dateWorries,
             constraints: data.constraints,
@@ -152,6 +152,7 @@ export default function MyProfileScreen() {
 
           await db.profiles.update(user.id, {
             birth_date: formatDateToLocal(tempBirthday),
+            birth_date_calendar_type: tempCalendarType,
             preferences,
           });
         } catch (error) {
@@ -173,10 +174,10 @@ export default function MyProfileScreen() {
     // Save to database
     if (!isDemoMode && user?.id) {
       try {
+        // birthDateCalendarType is stored as a separate column, not in preferences
         const preferences = {
           mbti: tempMbti,
           gender: data.gender,
-          birthDateCalendarType: data.birthDateCalendarType,
           activityTypes: tempActivityTypes,
           dateWorries: tempDateWorries,
           constraints: tempConstraints,

@@ -21,7 +21,10 @@
         "NSPhotoLibraryUsageDescription": "Daydate needs photo library access to save and share your memories.",
         "NSLocationWhenInUseUsageDescription": "Daydate needs your location to create personalized date missions based on nearby places and activities.",
         "ITSAppUsesNonExemptEncryption": false,
-        "CFBundleLocalizations": ["en", "ko"],
+        "CFBundleLocalizations": [
+          "en",
+          "ko"
+        ],
         "CFBundleDevelopmentRegion": "en"
       }
     },
@@ -78,7 +81,8 @@
         }
       ],
       "expo-asset",
-      "expo-web-browser"
+      "expo-web-browser",
+      "react-native-google-mobile-ads"
     ],
     "experiments": {
       "typedRoutes": true

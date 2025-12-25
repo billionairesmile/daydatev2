@@ -16,6 +16,7 @@ import {
   Animated,
   Keyboard,
   Platform,
+  Linking,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import {
@@ -44,7 +45,7 @@ import { useTranslation } from 'react-i18next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { COLORS, SPACING, RADIUS } from '@/constants/design';
-import { useOnboardingStore, useAuthStore, useMemoryStore, useLanguageStore, getLanguageDisplayName } from '@/stores';
+import { useOnboardingStore, useAuthStore, useMemoryStore, useLanguageStore, getLanguageDisplayName, useSubscriptionStore } from '@/stores';
 import type { SupportedLanguage } from '@/stores';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
 import { db, isDemoMode } from '@/lib/supabase';
@@ -60,6 +61,7 @@ export default function SettingsScreen() {
   const { signOut, couple, user, setIsOnboardingComplete } = useAuthStore();
   const { memories } = useMemoryStore();
   const { language, setLanguage } = useLanguageStore();
+  const { isPremium } = useSubscriptionStore();
 
   // Notification settings
   const [pushEnabled, setPushEnabled] = useState(true);
@@ -182,6 +184,7 @@ export default function SettingsScreen() {
     { code: 'ko', name: 'Korean', nativeName: '한국어' },
     { code: 'en', name: 'English', nativeName: 'English' },
     { code: 'es', name: 'Spanish', nativeName: 'Español' },
+    { code: 'zh-TW', name: 'Traditional Chinese', nativeName: '繁體中文' },
   ];
 
   const handleLanguageSelect = (langCode: SupportedLanguage) => {
@@ -218,7 +221,42 @@ export default function SettingsScreen() {
     );
   };
 
+  const handleSubscriptionManagement = () => {
+    // Open App Store or Google Play subscription management
+    const url = Platform.select({
+      ios: 'https://apps.apple.com/account/subscriptions',
+      android: 'https://play.google.com/store/account/subscriptions',
+    });
+    if (url) {
+      Linking.openURL(url);
+    }
+  };
+
   const handleAccountDeletion = () => {
+    // If user has active subscription, show warning first
+    if (isPremium) {
+      Alert.alert(
+        t('premium.deleteWarning.title'),
+        t('premium.deleteWarning.message'),
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          {
+            text: t('premium.deleteWarning.manageSubscription'),
+            onPress: handleSubscriptionManagement,
+          },
+          {
+            text: t('premium.deleteWarning.continueDelete'),
+            style: 'destructive',
+            onPress: () => showDeleteConfirmation(),
+          },
+        ]
+      );
+    } else {
+      showDeleteConfirmation();
+    }
+  };
+
+  const showDeleteConfirmation = () => {
     // Show confirmation alert before opening the text-input modal
     Alert.alert(
       t('settings.deleteAccount.confirmAlertTitle'),

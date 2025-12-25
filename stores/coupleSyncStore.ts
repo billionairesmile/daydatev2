@@ -15,6 +15,7 @@ import {
   cancelMissionReminderNotification,
 } from '@/lib/pushNotifications';
 import { useLanguageStore } from './languageStore';
+import { useSubscriptionStore } from './subscriptionStore';
 
 // Types
 export interface SyncedTodo {
@@ -316,8 +317,10 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     // 1. Mission subscription
     missionChannel = db.coupleMissions.subscribeToMissions(coupleId, (payload) => {
       const missions = payload.missions as Mission[];
+      const today = formatDateToLocal(new Date());
       set({
         sharedMissions: missions,
+        sharedMissionsDate: today, // Set the date when receiving missions via real-time
         lastMissionUpdate: new Date(),
         missionGenerationStatus: 'completed',
         generatingUserId: payload.generated_by,
@@ -911,9 +914,14 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     const { sharedMissionsDate, sharedMissions, allMissionProgress } = get();
     const today = formatDateToLocal(new Date());
 
-    // Reset shared missions if date changed
-    if (sharedMissions.length > 0 && sharedMissionsDate && sharedMissionsDate !== today) {
-      console.log('[CoupleSyncStore] Date changed, resetting shared missions. Old date:', sharedMissionsDate, 'Today:', today);
+    // Reset shared missions if:
+    // 1. Date changed (sharedMissionsDate exists but doesn't match today), OR
+    // 2. We have missions but no date set (shouldn't happen, but handle gracefully)
+    const shouldReset = sharedMissions.length > 0 &&
+      (!sharedMissionsDate || sharedMissionsDate !== today);
+
+    if (shouldReset) {
+      console.log('[CoupleSyncStore] Resetting shared missions. Old date:', sharedMissionsDate, 'Today:', today);
       set({
         sharedMissions: [],
         sharedMissionsDate: null,
@@ -1637,6 +1645,13 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
   ) => {
     const { coupleId, userId, coupleAlbums } = get();
 
+    // Check subscription limit for album creation
+    const { canCreateAlbum } = useSubscriptionStore.getState();
+    if (!canCreateAlbum(coupleAlbums.length)) {
+      console.log('[Albums] Album creation limit reached');
+      return null;
+    }
+
     const finalRansomSeed = ransomSeed ?? Math.floor(Math.random() * 1000000);
 
     if (!coupleId || !userId || isInTestMode()) {
@@ -1679,6 +1694,16 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
 
   updateAlbum: async (albumId: string, updates: Partial<CoupleAlbum>) => {
     const { coupleAlbums } = get();
+
+    // Check subscription limit for album editing
+    const albumIndex = coupleAlbums.findIndex((a) => a.id === albumId);
+    if (albumIndex !== -1) {
+      const { canEditAlbum } = useSubscriptionStore.getState();
+      if (!canEditAlbum(albumIndex, coupleAlbums.length)) {
+        console.log('[Albums] Album edit not allowed for this index');
+        return;
+      }
+    }
 
     if (isInTestMode()) {
       // Demo mode: update locally

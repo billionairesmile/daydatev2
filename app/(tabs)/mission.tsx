@@ -97,6 +97,7 @@ export default function MissionScreen() {
   const {
     missionGenerationStatus,
     sharedMissions,
+    sharedMissionsDate,
     sharedBookmarks,
     isInitialized: isSyncInitialized,
     addBookmark,
@@ -142,12 +143,12 @@ export default function MissionScreen() {
   const todayMissions = React.useMemo(() => {
     return getTodayMissions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [generatedMissionData, sharedMissions, getTodayMissions]);
+  }, [generatedMissionData, sharedMissions, sharedMissionsDate, getTodayMissions]);
 
   const hasGeneratedMissions = React.useMemo(() => {
     return hasTodayMissions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [generatedMissionData, sharedMissions, isSyncInitialized, hasTodayMissions]);
+  }, [generatedMissionData, sharedMissions, sharedMissionsDate, isSyncInitialized, hasTodayMissions]);
 
   // Combine AI-generated missions with featured missions (only show featured after daily missions are generated)
   const allMissions = React.useMemo(() => {

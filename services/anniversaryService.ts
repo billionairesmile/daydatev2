@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { db, supabase, isInTestMode } from '@/lib/supabase';
-import { formatDateToLocal } from '@/lib/dateUtils';
+import { formatDateToLocal, parseDateFromLocal } from '@/lib/dateUtils';
 
 // Storage keys
 const STORAGE_KEYS = {
@@ -53,7 +53,7 @@ function dbToApp(dbAnniversary: DBAnniversary): Anniversary {
   return {
     id: dbAnniversary.id,
     label: dbAnniversary.title,
-    targetDate: new Date(dbAnniversary.date),
+    targetDate: parseDateFromLocal(dbAnniversary.date),
     icon: dbAnniversary.icon || '🎉',
     bgColor: dbAnniversary.bg_color || 'rgba(168, 85, 247, 0.25)',
     gradientColors,

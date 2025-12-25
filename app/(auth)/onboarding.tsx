@@ -63,7 +63,7 @@ import {
   checkTestPairingStatus,
   generateDeterministicId,
 } from '@/lib/testPairing';
-import { formatDateToLocal } from '@/lib/dateUtils';
+import { formatDateToLocal, parseDateFromLocal } from '@/lib/dateUtils';
 
 const { width, height } = Dimensions.get('window');
 
@@ -340,10 +340,8 @@ export default function OnboardingScreen() {
         const { error: profileError } = await db.profiles.update(currentUser.id, {
           nickname: data.nickname,
           birth_date: data.birthDate ? formatDateToLocal(data.birthDate) : null,
-          preferences: {
-            ...currentPreferences,
-            birthDateCalendarType: data.birthDateCalendarType,
-          },
+          birth_date_calendar_type: data.birthDateCalendarType,
+          preferences: currentPreferences,
         });
 
         if (profileError) {
@@ -402,9 +400,11 @@ export default function OnboardingScreen() {
           console.log('[Onboarding] Existing user check:', { isExistingUser, existingProfile });
 
           // Create user object - prioritize DB data over OAuth metadata for existing users
-          // Extract birthDateCalendarType from preferences (stored in DB as preferences.birthDateCalendarType)
+          // Extract birthDateCalendarType from column (fallback to preferences for backward compatibility)
           const dbPreferences = existingProfile?.preferences as Record<string, unknown> | undefined;
-          const birthDateCalendarType = (dbPreferences?.birthDateCalendarType as 'solar' | 'lunar') || 'solar';
+          const birthDateCalendarType = (existingProfile?.birth_date_calendar_type as 'solar' | 'lunar')
+            || (dbPreferences?.birthDateCalendarType as 'solar' | 'lunar')
+            || 'solar';
 
           const userObject = {
             id: session.user.id,
@@ -430,22 +430,34 @@ export default function OnboardingScreen() {
             updateData({ nickname: oauthName });
           }
 
-          // For new users: create profile. For existing users: only update auth_provider (don't overwrite other fields)
+          // For new users: create profile with consent fields. For existing users: update consent if not already set
+          // Login implies agreement to terms (as stated on login screen)
+          const consentFields = {
+            age_verified: true,
+            terms_agreed: true,
+            location_terms_agreed: true,
+            privacy_agreed: true,
+            consent_given_at: new Date().toISOString(),
+          };
+
           if (isExistingUser) {
-            // Only update auth_provider for existing users (don't overwrite nickname, preferences, etc.)
+            // Update auth_provider and consent fields (only if not already agreed)
+            const needsConsentUpdate = !existingProfile?.terms_agreed || !existingProfile?.privacy_agreed;
             const { error: profileError } = await db.profiles.update(session.user.id, {
               auth_provider: provider,
+              ...(needsConsentUpdate ? consentFields : {}),
             });
             if (profileError) {
               console.error('[Onboarding] Profile update error:', profileError);
             }
           } else {
-            // Create new profile for new users
+            // Create new profile with consent fields (login = agreement as per login screen disclaimer)
             const { error: profileError } = await db.profiles.upsert({
               id: session.user.id,
               nickname: userObject.nickname,
               email: userObject.email || undefined,
               auth_provider: provider,
+              ...consentFields,
             });
             if (profileError) {
               console.error('[Onboarding] Profile upsert error:', profileError);
@@ -513,7 +525,7 @@ export default function OnboardingScreen() {
               updateData({
                 nickname: existingProfile?.nickname || '',
                 birthDate: existingProfile?.birth_date ? parseDateAsLocal(existingProfile.birth_date) : undefined,
-                birthDateCalendarType: (prefs?.birthDateCalendarType as CalendarType) || 'solar',
+                birthDateCalendarType: (existingProfile?.birth_date_calendar_type as CalendarType) || (prefs?.birthDateCalendarType as CalendarType) || 'solar',
                 mbti: (prefs?.mbti as string) || '',
                 gender: (prefs?.gender as Gender) || null,
                 activityTypes: (prefs?.activityTypes as ActivityType[]) || [],
@@ -596,11 +608,10 @@ export default function OnboardingScreen() {
     if (!isInTestMode()) {
       try {
         if (currentUser?.id) {
-          // Prepare preferences object for DB storage
+          // Prepare preferences object for DB storage (birthDateCalendarType is now a separate column)
           const preferences = {
             mbti: data.mbti,
             gender: data.gender,
-            birthDateCalendarType: data.birthDateCalendarType,
             activityTypes: data.activityTypes,
             dateWorries: data.dateWorries,
             constraints: data.constraints,
@@ -608,26 +619,15 @@ export default function OnboardingScreen() {
           };
 
           // Build update object with core fields
+          // Note: Consent fields are set on login (login = agreement as per login screen disclaimer)
           const profileUpdate: Record<string, unknown> = {
             nickname: data.nickname,
             birth_date: data.birthDate ? formatDateToLocal(data.birthDate) : null,
+            birth_date_calendar_type: data.birthDateCalendarType,
             preferences,
             couple_id: currentCouple?.id || null,
             is_onboarding_complete: true,
           };
-
-          // Only save consent fields if user actually went through terms step (not skipped)
-          // If user skipped terms (existing user), all consent fields are false (default)
-          // We don't want to overwrite their existing true values with false
-          const userCompletedTermsStep = data.ageVerified || data.termsAgreed || data.privacyAgreed;
-          if (userCompletedTermsStep) {
-            profileUpdate.age_verified = data.ageVerified ?? false;
-            profileUpdate.terms_agreed = data.termsAgreed ?? false;
-            profileUpdate.location_terms_agreed = data.locationTermsAgreed ?? false;
-            profileUpdate.privacy_agreed = data.privacyAgreed ?? false;
-            profileUpdate.marketing_agreed = data.marketingAgreed ?? false;
-            profileUpdate.consent_given_at = new Date().toISOString();
-          }
 
           // Update profile with birth date, preferences, completion status, and consent fields (if applicable)
           const { error: profileError } = await db.profiles.update(currentUser.id, profileUpdate);
@@ -1872,8 +1872,8 @@ function PairingStep({
                   id: existingCouple.id,
                   user1Id: existingCouple.user1_id,
                   user2Id: existingCouple.user2_id || undefined,
-                  anniversaryDate: existingCouple.dating_start_date ? new Date(existingCouple.dating_start_date) : undefined,
-                  datingStartDate: existingCouple.dating_start_date ? new Date(existingCouple.dating_start_date) : undefined,
+                  anniversaryDate: existingCouple.dating_start_date ? parseDateFromLocal(existingCouple.dating_start_date) : undefined,
+                  datingStartDate: existingCouple.dating_start_date ? parseDateFromLocal(existingCouple.dating_start_date) : undefined,
                   anniversaryType: t('onboarding.anniversary.datingStart'),
                   status: existingCouple.user2_id ? 'active' : 'pending',
                   createdAt: existingCouple.created_at ? new Date(existingCouple.created_at) : new Date(),
@@ -1894,8 +1894,8 @@ function PairingStep({
                 id: existingCouple.id,
                 user1Id: existingCouple.user1_id,
                 user2Id: undefined,
-                anniversaryDate: existingCouple.dating_start_date ? new Date(existingCouple.dating_start_date) : undefined,
-                datingStartDate: existingCouple.dating_start_date ? new Date(existingCouple.dating_start_date) : undefined,
+                anniversaryDate: existingCouple.dating_start_date ? parseDateFromLocal(existingCouple.dating_start_date) : undefined,
+                datingStartDate: existingCouple.dating_start_date ? parseDateFromLocal(existingCouple.dating_start_date) : undefined,
                 anniversaryType: t('onboarding.anniversary.datingStart'),
                 status: 'pending',
                 createdAt: existingCouple.created_at ? new Date(existingCouple.created_at) : new Date(),
@@ -1932,8 +1932,8 @@ function PairingStep({
                 id: doubleCheckCouple.id,
                 user1Id: doubleCheckCouple.user1_id,
                 user2Id: doubleCheckCouple.user2_id || undefined,
-                anniversaryDate: doubleCheckCouple.dating_start_date ? new Date(doubleCheckCouple.dating_start_date) : undefined,
-                datingStartDate: doubleCheckCouple.dating_start_date ? new Date(doubleCheckCouple.dating_start_date) : undefined,
+                anniversaryDate: doubleCheckCouple.dating_start_date ? parseDateFromLocal(doubleCheckCouple.dating_start_date) : undefined,
+                datingStartDate: doubleCheckCouple.dating_start_date ? parseDateFromLocal(doubleCheckCouple.dating_start_date) : undefined,
                 anniversaryType: t('onboarding.anniversary.datingStart'),
                 status: doubleCheckCouple.user2_id ? 'active' : 'pending',
                 createdAt: doubleCheckCouple.created_at ? new Date(doubleCheckCouple.created_at) : new Date(),
@@ -2610,7 +2610,7 @@ function PairingStep({
                 updateData({
                   nickname: joinerProfile.nickname || '',
                   birthDate: joinerProfile.birth_date ? parseDateAsLocal(joinerProfile.birth_date) : undefined,
-                  birthDateCalendarType: (joinerPrefs?.birthDateCalendarType as CalendarType) || 'solar',
+                  birthDateCalendarType: (joinerProfile.birth_date_calendar_type as CalendarType) || (joinerPrefs?.birthDateCalendarType as CalendarType) || 'solar',
                   mbti: (joinerPrefs?.mbti as string) || '',
                   gender: (joinerPrefs?.gender as Gender) || null,
                   activityTypes: (joinerPrefs?.activityTypes as ActivityType[]) || [],
@@ -2804,7 +2804,7 @@ function PairingStep({
           updateData({
             nickname: joinerProfile.nickname || '',
             birthDate: joinerProfile.birth_date ? parseDateAsLocal(joinerProfile.birth_date) : undefined,
-            birthDateCalendarType: (joinerPrefs?.birthDateCalendarType as CalendarType) || 'solar',
+            birthDateCalendarType: (joinerProfile.birth_date_calendar_type as CalendarType) || (joinerPrefs?.birthDateCalendarType as CalendarType) || 'solar',
             mbti: (joinerPrefs?.mbti as string) || '',
             gender: (joinerPrefs?.gender as Gender) || null,
             activityTypes: (joinerPrefs?.activityTypes as ActivityType[]) || [],
@@ -2898,7 +2898,7 @@ function PairingStep({
             updateData({
               nickname: profile.nickname || '',
               birthDate: profile.birth_date ? parseDateAsLocal(profile.birth_date) : undefined,
-              birthDateCalendarType: (creatorPrefs?.birthDateCalendarType as CalendarType) || 'solar',
+              birthDateCalendarType: (profile.birth_date_calendar_type as CalendarType) || (creatorPrefs?.birthDateCalendarType as CalendarType) || 'solar',
               mbti: (creatorPrefs?.mbti as string) || '',
               gender: (creatorPrefs?.gender as Gender) || null,
               activityTypes: (creatorPrefs?.activityTypes as ActivityType[]) || [],
