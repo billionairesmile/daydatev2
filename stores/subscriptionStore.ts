@@ -120,6 +120,7 @@ interface SubscriptionActions {
   incrementGenerationCount: (coupleId: string) => Promise<boolean>;
   incrementCompletionCount: (coupleId: string) => Promise<boolean>;
   loadDailyUsage: (coupleId: string) => Promise<void>;
+  resetDailyUsage: (coupleId: string) => Promise<void>;
 
   // Partner premium sync
   setPartnerIsPremium: (isPremium: boolean) => void;
@@ -661,6 +662,34 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
           });
         } catch (error) {
           console.error('[Subscription] Load daily usage error:', error);
+        }
+      },
+
+      resetDailyUsage: async (coupleId: string) => {
+        try {
+          if (!supabase) return;
+
+          const today = getTodayString();
+
+          // Delete today's usage record from database
+          await supabase
+            .from('daily_usage')
+            .delete()
+            .eq('couple_id', coupleId)
+            .eq('usage_date', today);
+
+          // Reset local state
+          set({
+            dailyUsage: {
+              generationCount: 0,
+              completionCount: 0,
+              usageDate: today,
+            },
+          });
+
+          console.log('[Subscription] Daily usage reset successfully');
+        } catch (error) {
+          console.error('[Subscription] Reset daily usage error:', error);
         }
       },
 

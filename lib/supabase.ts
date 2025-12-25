@@ -1840,7 +1840,7 @@ export const db = {
         .select('*')
         .eq('couple_id', coupleId)
         .eq('date', today)
-        .order('created_at', { ascending: true });
+        .order('started_at', { ascending: true });
       return { data: data || [], error };
     },
 
@@ -1893,7 +1893,7 @@ export const db = {
         .select('*')
         .eq('couple_id', coupleId)
         .eq('date', today)
-        .order('created_at', { ascending: true })
+        .order('started_at', { ascending: true })
         .limit(1)
         .maybeSingle();
       return { data, error: lockedError || error };

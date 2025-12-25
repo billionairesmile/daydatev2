@@ -55,7 +55,8 @@ export default function MoreScreen() {
   const resetAuth = useAuthStore((state) => state.reset);
   const coupleSyncCleanup = useCoupleSyncStore((state) => state.cleanup);
   const resetAllMissions = useCoupleSyncStore((state) => state.resetAllMissions);
-  const { isPremium, plan } = useSubscriptionStore();
+  const { isPremium, plan, resetDailyUsage } = useSubscriptionStore();
+  const couple = useAuthStore((state) => state.couple);
 
   // Premium modal state
   const [showPremiumModal, setShowPremiumModal] = React.useState(false);
@@ -95,6 +96,10 @@ export default function MoreScreen() {
             resetAllTodayMissions();
             // Reset synced missions (coupleSyncStore + database)
             await resetAllMissions();
+            // Reset daily usage (generation count) so missions can be generated again
+            if (couple?.id) {
+              await resetDailyUsage(couple.id);
+            }
             Alert.alert(
               t('more.alerts.missionResetComplete'),
               t('more.alerts.missionResetCompleteMessage'),

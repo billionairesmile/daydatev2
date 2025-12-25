@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Dimensions,
   Pressable,
   Animated,
   Image,
@@ -12,6 +11,7 @@ import {
   Modal,
   ActivityIndicator,
   Linking,
+  useWindowDimensions,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Image as ExpoImage } from 'expo-image';
@@ -32,12 +32,9 @@ import { CircularLoadingAnimation } from '@/components/CircularLoadingAnimation'
 import type { Mission, FeaturedMission } from '@/types';
 import { db, isDemoMode } from '@/lib/supabase';
 
-const { width, height } = Dimensions.get('window');
-
-const CARD_WIDTH = width * 0.75;
+// Fixed card dimensions (width is calculated dynamically in component)
 const CARD_HEIGHT = 468;
 const CARD_MARGIN = 10;
-const SNAP_INTERVAL = CARD_WIDTH + CARD_MARGIN * 2;
 
 // Easing gradient for smooth blur transition
 const { colors: blurGradientColors, locations: blurGradientLocations } = easeGradient({
@@ -55,6 +52,11 @@ export default function MissionScreen() {
   const { backgroundImage } = useBackground();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showBookmarkedMissions, setShowBookmarkedMissions] = useState(false);
+
+  // Get screen dimensions dynamically
+  const { width: screenWidth } = useWindowDimensions();
+  const CARD_WIDTH = screenWidth * 0.75;
+  const SNAP_INTERVAL = CARD_WIDTH + CARD_MARGIN * 2;
 
   // Handle returning from mission detail to bookmark page
   useEffect(() => {
@@ -514,6 +516,7 @@ export default function MissionScreen() {
           style={[
             styles.card,
             {
+              width: CARD_WIDTH,
               transform: [{ scale }],
             },
           ]}
@@ -533,7 +536,7 @@ export default function MissionScreen() {
         </Animated.View>
       );
     },
-    [scrollX, handleMissionPress, handleKeepMission, checkIsKept, canStartMission, isTodayCompletedMission, lockedMissionId, isScrollInitialized, isAnotherMissionInProgress, handleMissionImageLoad]
+    [scrollX, handleMissionPress, handleKeepMission, checkIsKept, canStartMission, isTodayCompletedMission, lockedMissionId, isScrollInitialized, isAnotherMissionInProgress, handleMissionImageLoad, SNAP_INTERVAL, CARD_WIDTH]
   );
 
   return (
@@ -597,7 +600,10 @@ export default function MissionScreen() {
               snapToInterval={SNAP_INTERVAL}
               decelerationRate="fast"
               disableIntervalMomentum={true}
-              contentContainerStyle={styles.carouselContent}
+              contentContainerStyle={{
+                paddingHorizontal: (screenWidth - CARD_WIDTH) / 2 - CARD_MARGIN,
+                alignItems: 'center',
+              }}
               onScroll={Animated.event(
                 [{ nativeEvent: { contentOffset: { x: scrollX } } }],
                 { useNativeDriver: true }
@@ -1062,10 +1068,6 @@ const styles = StyleSheet.create({
   carouselWrapper: {
     height: CARD_HEIGHT + 40,
   },
-  carouselContent: {
-    paddingHorizontal: (width - CARD_WIDTH) / 2 - CARD_MARGIN,
-    alignItems: 'center',
-  },
   cardStack: {
     width: '100%',
     maxWidth: 324,
@@ -1073,7 +1075,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   card: {
-    width: CARD_WIDTH,
+    // width is set dynamically inline using CARD_WIDTH = screenWidth * 0.75
     height: CARD_HEIGHT,
     marginHorizontal: CARD_MARGIN,
     borderRadius: 45,

@@ -777,14 +777,31 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       return missions;
     }
 
-    // No missions found for today - clear any stale persisted missions
+    // No missions found for today from database
+    // Only clear local state if we're confident the missions are truly gone:
+    // 1. Query succeeded (no error)
+    // 2. No data returned
+    // 3. Local missions are from a different date (not today) - this means they're stale
+    // If local missions are from today, DON'T clear them - they might just not be synced yet
+    // or there could be a temporary query issue
     if (!error && !data) {
-      set({
-        sharedMissions: [],
-        sharedMissionsDate: null,
-        missionGenerationStatus: 'idle',
-        generatingUserId: null,
-      });
+      const { sharedMissions: localMissions, sharedMissionsDate: localDate } = get();
+      const isLocalMissionsFromToday = localDate === today;
+
+      if (!isLocalMissionsFromToday) {
+        // Local missions are stale (from different day), safe to clear
+        console.log('[CoupleSyncStore] No missions from DB and local missions are stale, clearing');
+        set({
+          sharedMissions: [],
+          sharedMissionsDate: null,
+          missionGenerationStatus: 'idle',
+          generatingUserId: null,
+        });
+      } else if (localMissions.length > 0) {
+        // Local missions exist for today but DB returned null - don't clear!
+        // This could be a transient issue or sync delay
+        console.log('[CoupleSyncStore] DB returned null but local missions exist for today, keeping local state');
+      }
     }
 
     // Also check lock status
@@ -914,11 +931,12 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     const { sharedMissionsDate, sharedMissions, allMissionProgress } = get();
     const today = formatDateToLocal(new Date());
 
-    // Reset shared missions if:
-    // 1. Date changed (sharedMissionsDate exists but doesn't match today), OR
-    // 2. We have missions but no date set (shouldn't happen, but handle gracefully)
+    // Only reset if we have missions AND the date is explicitly set to a different day
+    // IMPORTANT: If sharedMissionsDate is null but missions exist, we should NOT reset
+    // This protects against hydration timing issues or partial state restoration
     const shouldReset = sharedMissions.length > 0 &&
-      (!sharedMissionsDate || sharedMissionsDate !== today);
+      sharedMissionsDate !== null &&
+      sharedMissionsDate !== today;
 
     if (shouldReset) {
       console.log('[CoupleSyncStore] Resetting shared missions. Old date:', sharedMissionsDate, 'Today:', today);
@@ -928,6 +946,13 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
         missionGenerationStatus: 'idle',
         generatingUserId: null,
       });
+    }
+
+    // If missions exist but date is null (shouldn't happen normally), set the date to today
+    // This helps recover from partial state issues
+    if (sharedMissions.length > 0 && sharedMissionsDate === null) {
+      console.log('[CoupleSyncStore] Missions exist but date is null, setting date to today');
+      set({ sharedMissionsDate: today });
     }
 
     // Also reset mission progress if date changed

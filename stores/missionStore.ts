@@ -356,11 +356,8 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
           if (!canGenerate) {
             // Release lock since we can't generate
             await syncStore.releaseMissionLock();
-            Alert.alert(
-              '일일 미션 생성 한도 도달',
-              '오늘의 미션 생성 한도에 도달했습니다. 프리미엄으로 업그레이드하여 더 많은 미션을 생성하세요!',
-              [{ text: '확인' }]
-            );
+            // Don't show alert - just silently return limit_reached status
+            // The UI should handle showing appropriate feedback
             return { status: 'limit_reached' as const, message: '일일 미션 생성 한도에 도달했습니다.' };
           }
         }
@@ -479,9 +476,19 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
           return true;
         }
 
-        // Check synced state - also verify the date matches today
+        // Check synced state - verify the date matches today
         if (syncStore.isInitialized && syncStore.sharedMissions.length > 0 && syncStore.sharedMissionsDate === today) {
           return true;
+        }
+
+        // Defensive: if missions exist but date is null, check mission progress for today
+        // This handles edge cases where sharedMissionsDate wasn't properly set
+        if (syncStore.isInitialized && syncStore.sharedMissions.length > 0 && syncStore.sharedMissionsDate === null) {
+          const hasTodayProgress = syncStore.allMissionProgress.some(p => p.date === today);
+          if (hasTodayProgress) {
+            // Missions exist and we have today's progress - treat as today's missions
+            return true;
+          }
         }
 
         return false;
@@ -498,9 +505,19 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
           return generatedMissionData.missions;
         }
 
-        // Check synced state - also verify the date matches today
+        // Check synced state - verify the date matches today
         if (syncStore.isInitialized && syncStore.sharedMissions.length > 0 && syncStore.sharedMissionsDate === today) {
           return syncStore.sharedMissions;
+        }
+
+        // Defensive: if missions exist but date is null, check mission progress for today
+        // This handles edge cases where sharedMissionsDate wasn't properly set
+        if (syncStore.isInitialized && syncStore.sharedMissions.length > 0 && syncStore.sharedMissionsDate === null) {
+          const hasTodayProgress = syncStore.allMissionProgress.some(p => p.date === today);
+          if (hasTodayProgress) {
+            // Missions exist and we have today's progress - return them
+            return syncStore.sharedMissions;
+          }
         }
 
         return [];

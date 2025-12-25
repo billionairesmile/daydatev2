@@ -668,7 +668,6 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1520390138845-fd2d229dd553${IMAGE_PARAMS}`, // 촬영
     `${UNSPLASH_BASE}/photo-1494232410401-ad00d5433cfa${IMAGE_PARAMS}`, // 스냅사진
     `${UNSPLASH_BASE}/photo-1500051638674-ff996a0ec29e${IMAGE_PARAMS}`, // 커플 셀피
-    `${UNSPLASH_BASE}/photo-1517694712202-14dd9538aa97${IMAGE_PARAMS}`, // 포토부스
     `${UNSPLASH_BASE}/photo-1581591524425-c7e0978865fc${IMAGE_PARAMS}`, // 사진 촬영
     `${UNSPLASH_BASE}/photo-1517633220927-9b84d4098b40${IMAGE_PARAMS}`, // 스마트폰 사진
     `${UNSPLASH_BASE}/photo-1484154218962-a197022b5858${IMAGE_PARAMS}`, // 인테리어 사진

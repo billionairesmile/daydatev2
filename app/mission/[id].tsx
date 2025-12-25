@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Dimensions,
   Pressable,
   ScrollView,
   Modal,
@@ -14,6 +13,7 @@ import {
   Image as RNImage,
   GestureResponderEvent,
   ActivityIndicator,
+  useWindowDimensions,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { BlurView } from 'expo-blur';
@@ -43,9 +43,9 @@ import { useSubscriptionStore } from '@/stores/subscriptionStore';
 import { db, isDemoMode } from '@/lib/supabase';
 import type { CompletedMission, Mission } from '@/types';
 
-const { width, height } = Dimensions.get('window');
-
 export default function MissionDetailScreen() {
+  // Get screen dimensions dynamically
+  const { width, height } = useWindowDimensions();
   const router = useRouter();
   const { id, source } = useLocalSearchParams<{ id: string; source?: string }>();
   const { t, i18n } = useTranslation();
@@ -84,6 +84,9 @@ export default function MissionDetailScreen() {
   const [photoAspectRatio, setPhotoAspectRatio] = useState<number>(3 / 4); // Always portrait 3:4
   // Track if captured photo is landscape (for cover mode display)
   const [isLandscapePhoto, setIsLandscapePhoto] = useState(false);
+
+  // State for enlarged photo modal
+  const [showEnlargedPhoto, setShowEnlargedPhoto] = useState(false);
 
   // Location state for photo
   const [currentLocation, setCurrentLocation] = useState<string | null>(null);
@@ -356,7 +359,6 @@ export default function MissionDetailScreen() {
       try {
         const photo = await cameraRef.current.takePictureAsync({
           quality: 1.0, // Maximum quality at capture
-          skipProcessing: true,
         });
 
         if (photo) {
@@ -382,87 +384,33 @@ export default function MissionDetailScreen() {
                 currentHeight = originalWidth;
               }
 
-              // Step 2: Calculate crop to match what was visible in preview
-              // The preview uses "cover" mode, so we need to crop to the visible region
-              const screenAspect = width / height;
-              const imageAspect = currentWidth / currentHeight;
-
-              let visibleWidth = currentWidth;
-              let visibleHeight = currentHeight;
-              let offsetX = 0;
-              let offsetY = 0;
-
-              if (imageAspect > screenAspect) {
-                // Image is wider than screen - sides were cropped in preview
-                visibleWidth = Math.round(currentHeight * screenAspect);
-                offsetX = Math.round((currentWidth - visibleWidth) / 2);
-              } else {
-                // Image is taller than screen - top/bottom were cropped in preview
-                visibleHeight = Math.round(currentWidth / screenAspect);
-                offsetY = Math.round((currentHeight - visibleHeight) / 2);
-              }
-
-              // Step 3: Now crop to 3:4 within the visible region
-              // Frame guide is 85% of screen width, centered
-              const frameRatio = 0.85;
-              const targetAspect = 3 / 4;
-
-              // Calculate frame position within visible region
-              const frameWidthInImage = Math.round(visibleWidth * frameRatio);
-              const frameHeightInImage = Math.round(frameWidthInImage / targetAspect);
-
-              // Center the frame within the visible region
-              const frameOffsetX = Math.round((visibleWidth - frameWidthInImage) / 2);
-              // Account for the -40 pixel vertical offset of the frame guide
-              const verticalOffsetRatio = 40 / height;
-              const frameOffsetY = Math.round((visibleHeight - frameHeightInImage) / 2 - visibleHeight * verticalOffsetRatio);
-
-              // Final crop coordinates (relative to full image)
-              const cropX = Math.max(0, offsetX + frameOffsetX);
-              const cropY = Math.max(0, offsetY + frameOffsetY);
-              const cropWidth = Math.min(frameWidthInImage, currentWidth - cropX);
-              const cropHeight = Math.min(frameHeightInImage, currentHeight - cropY);
-
-              manipulations.push({
-                crop: {
-                  originX: cropX,
-                  originY: cropY,
-                  width: cropWidth,
-                  height: cropHeight,
-                },
-              });
-
-              // Step 4: Flip horizontally for selfie (front camera)
+              // Step 2: Flip horizontally for selfie (front camera)
               if (facing === 'front') {
                 manipulations.push({ flip: ImageManipulator.FlipType.Horizontal });
               }
 
-              // Step 5: Ensure minimum resolution for quality
-              // If the cropped image width is less than 1500px, resize to 1500x2000 (3:4)
-              const minWidth = 1500;
-              if (cropWidth < minWidth) {
-                manipulations.push({
-                  resize: { width: minWidth, height: Math.round(minWidth / targetAspect) },
-                });
+              // NO CROPPING HERE - Keep full photo for preview
+              // Cropping will be done in handleConfirmPhoto
+
+              // Apply only rotation and flip (if any)
+              let resultUri = photo.uri;
+              if (manipulations.length > 0) {
+                const result = await ImageManipulator.manipulateAsync(
+                  photo.uri,
+                  manipulations,
+                  { format: ImageManipulator.SaveFormat.JPEG, compress: 0.95 } // Higher quality for preview
+                );
+                resultUri = result.uri;
+                console.log('[Camera] Full photo after rotation/flip:', currentWidth, 'x', currentHeight);
+              } else {
+                console.log('[Camera] Full photo (no manipulation):', originalWidth, 'x', originalHeight);
               }
 
-              // Apply all manipulations with lossless PNG format for maximum quality
-              // PNG is lossless, providing better quality than JPEG (larger file size)
-              const result = await ImageManipulator.manipulateAsync(
-                photo.uri,
-                manipulations,
-                { format: ImageManipulator.SaveFormat.PNG }
-              );
-
-              // Log final image dimensions for quality debugging
-              console.log('[Camera] Original:', originalWidth, 'x', originalHeight);
-              console.log('[Camera] Crop area:', cropWidth, 'x', cropHeight);
-              console.log('[Camera] Final dimensions:', result.width, 'x', result.height);
-
-              // Set the cropped image - always 3:4 portrait
-              setPhotoAspectRatio(3 / 4);
-              setIsLandscapePhoto(false);
-              setPreviewPhoto(result.uri);
+              // Set the full image for preview - calculate actual aspect ratio
+              const actualAspect = currentWidth / currentHeight;
+              setPhotoAspectRatio(actualAspect);
+              setIsLandscapePhoto(actualAspect >= 1);
+              setPreviewPhoto(resultUri);
               setShowPreview(true);
             } catch (manipError) {
               console.error('Image manipulation error:', manipError);
@@ -558,62 +506,124 @@ export default function MissionDetailScreen() {
 
   const handleConfirmPhoto = async () => {
     if (previewPhoto) {
-      setCapturedPhoto(previewPhoto);
-      setPhotoTaken(true);
-      setShowCamera(false);
-      setShowPreview(false);
-      setPreviewPhoto(null);
+      // Apply 3:4 crop to the full photo before saving
+      // This ensures the best quality by cropping at the end
+      try {
+        // Get the actual image dimensions
+        const imageDimensions = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+          RNImage.getSize(
+            previewPhoto,
+            (imgWidth, imgHeight) => resolve({ width: imgWidth, height: imgHeight }),
+            reject
+          );
+        });
 
-      // Get current location when photo is confirmed
-      const locationName = await getCurrentLocationName();
-      setCurrentLocation(locationName);
+        const { width: imgWidth, height: imgHeight } = imageDimensions;
+        const currentAspect = imgWidth / imgHeight;
+        const targetAspect = 3 / 4;
 
-      // Save to in-progress mission data for persistence
-      saveInProgressMission({
-        missionId: mission.id,
-        capturedPhoto: previewPhoto,
-      });
+        let croppedPhotoUri = previewPhoto;
 
-      // Start synced mission progress if sync is initialized
-      if (isSyncInitialized && couple?.id) {
-        try {
-          // Upload photo to storage first
-          const uploadedPhotoUrl = await db.storage.uploadPhoto(couple.id, previewPhoto);
+        // Only crop if aspect ratio differs from target
+        if (Math.abs(currentAspect - targetAspect) > 0.01) {
+          let cropWidth: number;
+          let cropHeight: number;
+          let cropX: number;
+          let cropY: number;
 
-          if (uploadedPhotoUrl) {
-            // Update capturedPhoto state to the remote URL to prevent duplicate uploads
-            // when handleCompleteAndClose or auto-save runs later
-            setCapturedPhoto(uploadedPhotoUrl);
+          if (currentAspect > targetAspect) {
+            // Photo is wider than 3:4 - crop sides (center crop)
+            cropHeight = imgHeight;
+            cropWidth = Math.round(cropHeight * targetAspect);
+            cropX = Math.round((imgWidth - cropWidth) / 2);
+            cropY = 0;
+          } else {
+            // Photo is taller than 3:4 - crop top/bottom (center crop)
+            cropWidth = imgWidth;
+            cropHeight = Math.round(cropWidth / targetAspect);
+            cropX = 0;
+            cropY = Math.round((imgHeight - cropHeight) / 2);
+          }
 
-            // Also update in-progress data with the remote URL
-            saveInProgressMission({
-              missionId: mission.id,
-              capturedPhoto: uploadedPhotoUrl,
-            });
+          console.log('[Camera] Applying 3:4 crop:', { cropX, cropY, cropWidth, cropHeight });
 
-            if (!thisMissionProgress) {
-              // No progress for this mission - start new mission progress
-              const progress = await startMissionProgress(mission.id, mission);
-              if (progress) {
-                // Upload photo to the progress
-                await uploadMissionPhoto(uploadedPhotoUrl, progress.id);
-                // Update location
+          const croppedResult = await ImageManipulator.manipulateAsync(
+            previewPhoto,
+            [{ crop: { originX: cropX, originY: cropY, width: cropWidth, height: cropHeight } }],
+            { format: ImageManipulator.SaveFormat.JPEG, compress: 0.92 }
+          );
+          croppedPhotoUri = croppedResult.uri;
+          console.log('[Camera] Cropped photo saved:', croppedPhotoUri);
+        }
+
+        // Now set the cropped photo as the captured photo
+        setCapturedPhoto(croppedPhotoUri);
+        setPhotoTaken(true);
+        setPhotoAspectRatio(3 / 4); // Now it's 3:4
+        setIsLandscapePhoto(false); // 3:4 is always portrait
+        setShowCamera(false);
+        setShowPreview(false);
+        setPreviewPhoto(null);
+
+        // Get current location when photo is confirmed
+        const locationName = await getCurrentLocationName();
+        setCurrentLocation(locationName);
+
+        // Save to in-progress mission data for persistence
+        saveInProgressMission({
+          missionId: mission.id,
+          capturedPhoto: croppedPhotoUri,
+        });
+
+        // Start synced mission progress if sync is initialized
+        if (isSyncInitialized && couple?.id) {
+          try {
+            // Upload photo to storage first
+            const uploadedPhotoUrl = await db.storage.uploadPhoto(couple.id, croppedPhotoUri);
+
+            if (uploadedPhotoUrl) {
+              // Update capturedPhoto state to the remote URL to prevent duplicate uploads
+              // when handleCompleteAndClose or auto-save runs later
+              setCapturedPhoto(uploadedPhotoUrl);
+
+              // Also update in-progress data with the remote URL
+              saveInProgressMission({
+                missionId: mission.id,
+                capturedPhoto: uploadedPhotoUrl,
+              });
+
+              if (!thisMissionProgress) {
+                // No progress for this mission - start new mission progress
+                const progress = await startMissionProgress(mission.id, mission);
+                if (progress) {
+                  // Upload photo to the progress
+                  await uploadMissionPhoto(uploadedPhotoUrl, progress.id);
+                  // Update location
+                  if (locationName && locationName !== t('missionDetail.location.noInfo')) {
+                    await updateMissionLocation(locationName, progress.id);
+                  }
+                }
+              } else {
+                // Same mission already started (maybe by partner), just upload photo
+                await uploadMissionPhoto(uploadedPhotoUrl, thisMissionProgress.id);
                 if (locationName && locationName !== t('missionDetail.location.noInfo')) {
-                  await updateMissionLocation(locationName, progress.id);
+                  await updateMissionLocation(locationName, thisMissionProgress.id);
                 }
               }
-            } else {
-              // Same mission already started (maybe by partner), just upload photo
-              await uploadMissionPhoto(uploadedPhotoUrl, thisMissionProgress.id);
-              if (locationName && locationName !== t('missionDetail.location.noInfo')) {
-                await updateMissionLocation(locationName, thisMissionProgress.id);
-              }
             }
+          } catch (error) {
+            console.error('Error syncing photo:', error);
+            // Local save already done, continue even if sync fails
           }
-        } catch (error) {
-          console.error('Error syncing photo:', error);
-          // Local save already done, continue even if sync fails
         }
+      } catch (error) {
+        console.error('Error processing photo:', error);
+        // Fallback: use the original preview photo if cropping fails
+        setCapturedPhoto(previewPhoto);
+        setPhotoTaken(true);
+        setShowCamera(false);
+        setShowPreview(false);
+        setPreviewPhoto(null);
       }
     }
   };
@@ -934,6 +944,25 @@ export default function MissionDetailScreen() {
 
       const previewTop = (height - previewHeight) / 2 - 40;
 
+      // Calculate 3:4 crop guide dimensions within the preview
+      // The crop will be applied to the center of the image
+      const targetAspect = 3 / 4;
+      let cropGuideWidth: number;
+      let cropGuideHeight: number;
+
+      if (photoAspectRatio > targetAspect) {
+        // Photo is wider than 3:4 - crop sides
+        cropGuideHeight = previewHeight;
+        cropGuideWidth = cropGuideHeight * targetAspect;
+      } else {
+        // Photo is taller than 3:4 - crop top/bottom
+        cropGuideWidth = previewWidth;
+        cropGuideHeight = cropGuideWidth / targetAspect;
+      }
+
+      const cropGuideLeft = (previewWidth - cropGuideWidth) / 2;
+      const cropGuideTop = (previewHeight - cropGuideHeight) / 2;
+
       return (
         <View style={styles.cameraContainer}>
           {/* Dark Background */}
@@ -951,13 +980,15 @@ export default function MissionDetailScreen() {
             <View style={styles.headerSpacer} />
           </View>
 
-          {/* Photo Preview - adapts to photo aspect ratio */}
+          {/* Photo Preview - shows full photo with crop guide overlay */}
           <View style={[styles.previewFrameContainer, {
             position: 'absolute',
             top: previewTop,
             left: (width - previewWidth) / 2,
             width: previewWidth,
-            height: previewHeight
+            height: previewHeight,
+            borderWidth: 0, // Remove border since we have crop guide
+            backgroundColor: 'transparent',
           }]}>
             <ExpoImage
               source={{ uri: previewPhoto }}
@@ -966,6 +997,55 @@ export default function MissionDetailScreen() {
               cachePolicy="memory-disk"
               transition={100}
             />
+
+            {/* Crop Guide Overlay - shows which part will be kept */}
+            {(photoAspectRatio !== targetAspect) && (
+              <View style={StyleSheet.absoluteFill} pointerEvents="none">
+                {/* Top dark area (will be cropped) */}
+                {cropGuideTop > 0 && (
+                  <View style={[styles.cropGuideOverlay, {
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: cropGuideTop,
+                  }]} />
+                )}
+                {/* Bottom dark area (will be cropped) */}
+                {cropGuideTop > 0 && (
+                  <View style={[styles.cropGuideOverlay, {
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    height: cropGuideTop,
+                  }]} />
+                )}
+                {/* Left dark area (will be cropped) */}
+                {cropGuideLeft > 0 && (
+                  <View style={[styles.cropGuideOverlay, {
+                    top: cropGuideTop,
+                    left: 0,
+                    width: cropGuideLeft,
+                    height: cropGuideHeight,
+                  }]} />
+                )}
+                {/* Right dark area (will be cropped) */}
+                {cropGuideLeft > 0 && (
+                  <View style={[styles.cropGuideOverlay, {
+                    top: cropGuideTop,
+                    right: 0,
+                    width: cropGuideLeft,
+                    height: cropGuideHeight,
+                  }]} />
+                )}
+                {/* Crop area border */}
+                <View style={[styles.cropGuideBorder, {
+                  top: cropGuideTop,
+                  left: cropGuideLeft,
+                  width: cropGuideWidth,
+                  height: cropGuideHeight,
+                }]} />
+              </View>
+            )}
           </View>
 
           {/* Confirm Button */}
@@ -976,12 +1056,7 @@ export default function MissionDetailScreen() {
       );
     }
 
-    // Show camera viewfinder with 3:4 frame guide
-    // Calculate 3:4 frame dimensions (width 3, height 4)
-    const frameWidth = width * 0.85;
-    const frameHeight = frameWidth * (4 / 3);
-    const frameTop = (height - frameHeight) / 2 - 40; // Offset for header/buttons
-
+    // Show camera viewfinder - full screen like normal camera
     return (
       <View style={styles.cameraContainer}>
         <View
@@ -997,26 +1072,8 @@ export default function MissionDetailScreen() {
             mode="picture"
             zoom={zoom}
             enableTorch={flashEnabled && facing === 'back'}
+            autofocus="on"
           />
-        </View>
-
-        {/* 3:4 Frame Guide Overlay */}
-        <View style={styles.frameGuideOverlay} pointerEvents="none">
-          {/* Top dark area */}
-          <View style={[styles.frameGuideDark, { top: 0, left: 0, right: 0, height: frameTop }]} />
-          {/* Bottom dark area */}
-          <View style={[styles.frameGuideDark, { top: frameTop + frameHeight, left: 0, right: 0, bottom: 0 }]} />
-          {/* Left dark area */}
-          <View style={[styles.frameGuideDark, { top: frameTop, left: 0, width: (width - frameWidth) / 2, height: frameHeight }]} />
-          {/* Right dark area */}
-          <View style={[styles.frameGuideDark, { top: frameTop, right: 0, width: (width - frameWidth) / 2, height: frameHeight }]} />
-          {/* Frame border */}
-          <View style={[styles.frameGuideBorder, {
-            top: frameTop,
-            left: (width - frameWidth) / 2,
-            width: frameWidth,
-            height: frameHeight
-          }]} />
         </View>
 
         {/* Camera Header */}
@@ -1032,25 +1089,17 @@ export default function MissionDetailScreen() {
             <X color={COLORS.white} size={24} />
           </Pressable>
           <Text style={styles.cameraTitle}>{t('missionDetail.camera.title')}</Text>
-          <View style={styles.cameraHeaderRight}>
-            <Pressable
-              onPress={() => setFlashEnabled(!flashEnabled)}
-              style={[styles.cameraBackButton, facing === 'front' && styles.cameraButtonDisabled]}
-              disabled={facing === 'front'}
-            >
-              {flashEnabled ? (
-                <Zap color={facing === 'front' ? '#666' : '#FFD700'} size={24} />
-              ) : (
-                <ZapOff color={facing === 'front' ? '#666' : COLORS.white} size={24} />
-              )}
-            </Pressable>
-            <Pressable
-              onPress={toggleCameraFacing}
-              style={styles.cameraBackButton}
-            >
-              <SwitchCamera color={COLORS.white} size={24} />
-            </Pressable>
-          </View>
+          <Pressable
+            onPress={() => setFlashEnabled(!flashEnabled)}
+            style={[styles.cameraBackButton, facing === 'front' && styles.cameraButtonDisabled]}
+            disabled={facing === 'front'}
+          >
+            {flashEnabled ? (
+              <Zap color={facing === 'front' ? '#666' : '#FFD700'} size={24} />
+            ) : (
+              <ZapOff color={facing === 'front' ? '#666' : COLORS.white} size={24} />
+            )}
+          </Pressable>
         </View>
 
         {/* Zoom Level Indicator - 1.0x to 4.0x */}
@@ -1064,8 +1113,9 @@ export default function MissionDetailScreen() {
           </View>
         )}
 
-        {/* Capture Button */}
+        {/* Capture Button and Camera Switch */}
         <View style={styles.captureButtonContainer}>
+          <View style={styles.captureButtonSpacer} />
           <Pressable
             onPress={handleCapture}
             style={[styles.captureButton, isCapturing && styles.captureButtonDisabled]}
@@ -1073,6 +1123,14 @@ export default function MissionDetailScreen() {
           >
             <View style={styles.captureButtonInner} />
           </Pressable>
+          <View style={styles.cameraSwitchContainer}>
+            <Pressable
+              onPress={toggleCameraFacing}
+              style={styles.cameraSwitchButton}
+            >
+              <SwitchCamera color={COLORS.white} size={28} />
+            </Pressable>
+          </View>
         </View>
       </View>
     );
@@ -1170,15 +1228,18 @@ export default function MissionDetailScreen() {
                   </Text>
                   {capturedPhoto && (
                     <View style={styles.photoPreviewContainer}>
-                      <ExpoImage
-                        source={{ uri: capturedPhoto }}
-                        style={[styles.photoPreview, { aspectRatio: photoAspectRatio }]}
-                        contentFit="contain"
-                        cachePolicy="memory-disk"
-                        transition={100}
-                      />
-                      {/* Only show retake button to the photo taker, not the partner */}
-                      {!isComplete && isPhotoTaker && (
+                      {/* Tap photo to enlarge */}
+                      <Pressable onPress={() => setShowEnlargedPhoto(true)}>
+                        <ExpoImage
+                          source={{ uri: capturedPhoto }}
+                          style={[styles.photoPreview, { aspectRatio: photoAspectRatio }]}
+                          contentFit="contain"
+                          cachePolicy="memory-disk"
+                          transition={100}
+                        />
+                      </Pressable>
+                      {/* Show retake button for both users until mission is complete */}
+                      {!isComplete && (
                         <Pressable
                           onPress={handleRetakeFromDetail}
                           style={styles.detailRetakeButton}
@@ -1333,13 +1394,14 @@ export default function MissionDetailScreen() {
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? -100 : 0}
           style={styles.modalOverlay}
         >
           <Pressable
             style={styles.modalBackdrop}
             onPress={() => setShowMessageModal(false)}
           />
-          <View style={styles.modalContainer}>
+          <View style={[styles.modalContainer, { width: width - 48 }]}>
             <BlurView intensity={60} tint="dark" style={styles.modalBlur}>
               <View style={styles.modalContent}>
                 {/* Modal Header */}
@@ -1381,6 +1443,36 @@ export default function MissionDetailScreen() {
             </BlurView>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Enlarged Photo Modal */}
+      <Modal
+        visible={showEnlargedPhoto}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowEnlargedPhoto(false)}
+      >
+        <Pressable
+          style={styles.enlargedPhotoOverlay}
+          onPress={() => setShowEnlargedPhoto(false)}
+        >
+          <View style={styles.enlargedPhotoContainer}>
+            {capturedPhoto && (
+              <ExpoImage
+                source={{ uri: capturedPhoto }}
+                style={styles.enlargedPhoto}
+                contentFit="contain"
+                cachePolicy="memory-disk"
+              />
+            )}
+          </View>
+          <Pressable
+            style={styles.enlargedPhotoCloseButton}
+            onPress={() => setShowEnlargedPhoto(false)}
+          >
+            <X color={COLORS.white} size={28} />
+          </Pressable>
+        </Pressable>
       </Modal>
     </View>
   );
@@ -1747,7 +1839,25 @@ const styles = StyleSheet.create({
     bottom: 40,
     left: 0,
     right: 0,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 40,
+  },
+  captureButtonSpacer: {
+    flex: 1,
+  },
+  cameraSwitchContainer: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  cameraSwitchButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   zoomIndicatorContainer: {
     position: 'absolute',
@@ -2094,7 +2204,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
   modalContainer: {
-    width: width - 48,
+    // width is set dynamically inline using (width - 48)
     maxWidth: 340,
     borderRadius: 20,
     overflow: 'hidden',
@@ -2179,5 +2289,44 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.6)',
     borderRadius: 16,
+  },
+  // Crop guide overlay styles for preview
+  cropGuideOverlay: {
+    position: 'absolute',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  cropGuideBorder: {
+    position: 'absolute',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.8)',
+    borderRadius: 12,
+  },
+  // Enlarged photo modal styles
+  enlargedPhotoOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  enlargedPhotoContainer: {
+    width: '100%',
+    height: '80%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  enlargedPhoto: {
+    width: '100%',
+    height: '100%',
+  },
+  enlargedPhotoCloseButton: {
+    position: 'absolute',
+    top: 60,
+    right: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

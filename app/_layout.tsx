@@ -135,7 +135,7 @@ function RootLayoutNav() {
   const segments = useSegments();
   const { t } = useTranslation();
   const { isAuthenticated, isOnboardingComplete, setIsOnboardingComplete, couple, user, setCouple, setPartner, partner } = useAuthStore();
-  const { initializeSync, cleanup: cleanupSync, processPendingOperations } = useCoupleSyncStore();
+  const { initializeSync, cleanup: cleanupSync, processPendingOperations, loadMissionProgress, loadSharedMissions } = useCoupleSyncStore();
   const { setStep: setOnboardingStep, updateData: updateOnboardingData } = useOnboardingStore();
   const [isNavigationReady, setIsNavigationReady] = useState(false);
   const appState = useRef(AppState.currentState);
@@ -377,13 +377,16 @@ function RootLayoutNav() {
     updateUserLocation();
   }, [updateUserLocation]);
 
-  // Refresh partner data and location when app comes to foreground
+  // Refresh partner data, location, and mission progress when app comes to foreground
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
       if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
-        // App has come to the foreground, refresh partner data and location
+        // App has come to the foreground, refresh partner data, location, and mission progress
         fetchCoupleAndPartnerData();
         updateUserLocation();
+        // Refresh mission data to sync any changes from partner
+        loadMissionProgress();
+        loadSharedMissions();
       }
       appState.current = nextAppState;
     });
@@ -391,7 +394,7 @@ function RootLayoutNav() {
     return () => {
       subscription.remove();
     };
-  }, [fetchCoupleAndPartnerData, updateUserLocation]);
+  }, [fetchCoupleAndPartnerData, updateUserLocation, loadMissionProgress, loadSharedMissions]);
 
   // Also refresh if partner data is incomplete (partner might have completed onboarding)
   useEffect(() => {
