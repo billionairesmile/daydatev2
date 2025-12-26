@@ -930,36 +930,36 @@ export default function HomeScreen() {
       mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [3, 4],
-      quality: 1.0,
+      quality: 0.8, // Reduced from 1.0 for faster upload (still good quality)
     });
 
     if (!result.canceled && result.assets[0]) {
       const localUri = result.assets[0].uri;
 
-      // Close modal first for instant feedback
+      // Close modal and show local image IMMEDIATELY (no await)
       setShowImagePickerModal(false);
+      setBackgroundImage({ uri: localUri }, true); // Fire-and-forget for instant display
 
-      // Show local image immediately - skip prefetch for local files (file://)
-      // Local files don't need prefetch and it can cause delays
-      await setBackgroundImage({ uri: localUri }, true);
-
-      // Upload to Supabase Storage if coupleId exists
+      // Upload to Supabase Storage in background (non-blocking)
       if (coupleId) {
         setIsUploadingBackground(true);
-        try {
-          const uploadedUrl = await db.storage.uploadBackground(coupleId, localUri);
-          if (uploadedUrl) {
-            // Update with the remote URL for syncing (prefetch this one)
-            await setBackgroundImage({ uri: uploadedUrl }, false);
-          } else {
-            Alert.alert(t('home.background.uploadFailed'), t('home.background.uploadFailedMessage'));
-          }
-        } catch (error) {
-          console.error('Background upload error:', error);
-          Alert.alert(t('home.background.uploadFailed'), t('home.background.uploadError'));
-        } finally {
-          setIsUploadingBackground(false);
-        }
+        // Don't await - let upload happen in background
+        db.storage.uploadBackground(coupleId, localUri)
+          .then((uploadedUrl) => {
+            if (uploadedUrl) {
+              // Update with remote URL for syncing (silent update)
+              setBackgroundImage({ uri: uploadedUrl }, false);
+            } else {
+              Alert.alert(t('home.background.uploadFailed'), t('home.background.uploadFailedMessage'));
+            }
+          })
+          .catch((error) => {
+            console.error('Background upload error:', error);
+            Alert.alert(t('home.background.uploadFailed'), t('home.background.uploadError'));
+          })
+          .finally(() => {
+            setIsUploadingBackground(false);
+          });
       }
     }
   };

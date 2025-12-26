@@ -4,6 +4,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { File as ExpoFile } from 'expo-file-system';
 import { decode } from 'base64-arraybuffer';
 import { formatDateToLocal } from './dateUtils';
+import * as ImageManipulator from 'expo-image-manipulator';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -2390,8 +2391,16 @@ export const db = {
       try {
         const client = getSupabase();
 
-        // Read file as base64 using new expo-file-system API
-        const file = new ExpoFile(uri);
+        // Resize image for faster upload (max 1080x1440 for 3:4 aspect ratio)
+        // This dramatically reduces file size while maintaining good quality
+        const manipulatedImage = await ImageManipulator.manipulateAsync(
+          uri,
+          [{ resize: { width: 1080 } }], // Resize to 1080px width, height auto-calculated
+          { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+        );
+
+        // Read resized file as base64
+        const file = new ExpoFile(manipulatedImage.uri);
         const base64 = await file.base64();
 
         const fileName = `backgrounds/${coupleId}/${Date.now()}.jpg`;
