@@ -46,7 +46,7 @@ import { useTranslation } from 'react-i18next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { COLORS, SPACING, RADIUS } from '@/constants/design';
-import { useOnboardingStore, useAuthStore, useMemoryStore, useLanguageStore, getLanguageDisplayName, useSubscriptionStore, useTimezoneStore, getTimezoneDisplayName, COMMON_TIMEZONES } from '@/stores';
+import { useOnboardingStore, useAuthStore, useMemoryStore, useLanguageStore, getLanguageDisplayName, useSubscriptionStore, useTimezoneStore, getTimezoneDisplayName, getDeviceTimezoneLabel, COMMON_TIMEZONES } from '@/stores';
 import type { SupportedLanguage, TimezoneId } from '@/stores';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
 import { db, isDemoMode } from '@/lib/supabase';
@@ -693,13 +693,13 @@ export default function SettingsScreen() {
             <Text style={styles.timezoneHint}>{t('settings.other.timezoneHint')}</Text>
 
             <ScrollView style={styles.timezoneScrollView} showsVerticalScrollIndicator={false}>
-              {/* Auto (Device) Option */}
+              {/* Auto (Device) Option - Shows actual detected city */}
               <Pressable
                 style={styles.languageOption}
                 onPress={() => handleTimezoneSelect('auto')}
               >
                 <View style={styles.languageOptionLeft}>
-                  <Text style={styles.languageOptionName}>{t('settings.other.timezoneAuto')}</Text>
+                  <Text style={styles.languageOptionName}>{getDeviceTimezoneLabel()}</Text>
                   <Text style={styles.languageOptionSubname}>{t('settings.other.timezoneAutoDesc')}</Text>
                 </View>
                 {timezone === 'auto' && (

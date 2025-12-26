@@ -154,18 +154,37 @@ export const useTimezoneStore = create<TimezoneState>()(
   )
 );
 
-// Helper: Get timezone display name
+// Helper: Get the resolved timezone label (city name with abbreviation)
+// For 'auto', returns the device timezone's city label
+// For manual selection, returns the selected timezone's city label
 export const getTimezoneDisplayName = (timezone: TimezoneId): string => {
   if (timezone === 'auto') {
     const deviceTz = getDeviceTimezone();
     const found = COMMON_TIMEZONES.find(tz => tz.id === deviceTz);
     if (found) {
-      return `Auto (${found.label})`;
+      return found.label; // e.g., "Seoul (KST)"
     }
-    return `Auto (${deviceTz})`;
+    // For unknown timezones, try to get a readable name
+    return deviceTz.split('/').pop()?.replace(/_/g, ' ') || deviceTz;
   }
   const found = COMMON_TIMEZONES.find(tz => tz.id === timezone);
   return found?.label || timezone;
+};
+
+// Helper: Get the device timezone label (for display in settings)
+export const getDeviceTimezoneLabel = (): string => {
+  const deviceTz = getDeviceTimezone();
+  const found = COMMON_TIMEZONES.find(tz => tz.id === deviceTz);
+  if (found) {
+    return found.label; // e.g., "Seoul (KST)"
+  }
+  // For unknown timezones, try to get a readable name
+  return deviceTz.split('/').pop()?.replace(/_/g, ' ') || deviceTz;
+};
+
+// Helper: Get the IANA timezone ID (e.g., 'Asia/Seoul')
+export const getDeviceTimezoneId = (): string => {
+  return getDeviceTimezone();
 };
 
 // Helper: Format date in specified timezone

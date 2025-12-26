@@ -1267,8 +1267,12 @@ export default function MemoriesScreen() {
               </View>
             )}
           </View>
+
         </ScrollView>
       )}
+
+      {/* Banner Ad - Fixed at bottom above nav bar */}
+      <BannerAdView placement="memories" style={styles.bannerAd} />
 
       {/* Month Album Modal */}
       <Modal
@@ -2761,9 +2765,6 @@ export default function MemoriesScreen() {
         </Animated.View>
       </Modal>
 
-      {/* Banner Ad - Fixed at bottom */}
-      <BannerAdView placement="memories" style={styles.bannerAd} />
-
     </View>
   );
 }
@@ -3435,7 +3436,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   mainContentContainer: {
-    paddingBottom: 120,
+    paddingBottom: 170,
   },
   yearSection: {
     marginTop: SPACING.md,

@@ -1,17 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  Image,
-  Pressable,
-  Dimensions,
   Platform,
 } from 'react-native';
-import { BlurView } from 'expo-blur';
 import Constants from 'expo-constants';
 
-import { COLORS, SPACING, RADIUS, SHADOWS } from '@/constants/design';
+import { COLORS, SPACING } from '@/constants/design';
 import { useSubscriptionStore } from '@/stores/subscriptionStore';
 
 // Check if we're running in Expo Go (not a development build)
@@ -41,9 +37,9 @@ if (!isExpoGo) {
   }
 }
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CARD_WIDTH = SCREEN_WIDTH - SPACING.lg * 2;
-const CARD_HEIGHT = CARD_WIDTH * 1.2; // Match mission card aspect ratio
+// Fixed card dimensions matching mission card
+const CARD_HEIGHT = 468;
+const CARD_MARGIN = 10;
 
 // Ad unit ID - replace with actual ID in production
 const getNativeAdUnitId = () => {
@@ -57,11 +53,13 @@ const getNativeAdUnitId = () => {
 interface NativeAdMissionCardProps {
   onAdLoaded?: () => void;
   onAdFailed?: () => void;
+  cardWidth: number;
 }
 
 export default function NativeAdMissionCard({
   onAdLoaded,
   onAdFailed,
+  cardWidth,
 }: NativeAdMissionCardProps) {
   const { shouldShowAds } = useSubscriptionStore();
   const [nativeAd, setNativeAd] = useState<any>(null);
@@ -69,7 +67,6 @@ export default function NativeAdMissionCard({
   const [adError, setAdError] = useState(false);
 
   // Required for iOS to handle app state changes
-  // Only use if useForeground is available (not in Expo Go)
   if (useForeground) {
     useForeground(() => {
       // Native ads handle foreground state internally
@@ -89,7 +86,6 @@ export default function NativeAdMissionCard({
 
     const NATIVE_AD_UNIT_ID = getNativeAdUnitId();
 
-    // createForAdRequest returns a promise that resolves with the loaded ad
     NativeAd.createForAdRequest(NATIVE_AD_UNIT_ID, {
       requestNonPersonalizedAdsOnly: true,
     })
@@ -130,131 +126,102 @@ export default function NativeAdMissionCard({
   return (
     <NativeAdView
       nativeAd={nativeAd}
-      style={styles.container}
+      style={[styles.nativeAdContainer, { width: cardWidth }]}
     >
-      <View style={styles.card}>
-        {/* Ad Media/Image - mimics mission card image area */}
-        <View style={styles.imageContainer}>
-          <NativeMediaView style={styles.mediaView} />
-          {/* Ad Badge */}
-          <View style={styles.adBadge}>
-            <Text style={styles.adBadgeText}>AD</Text>
-          </View>
-        </View>
+      {/* AD Badge at top left */}
+      <View style={styles.adBadge}>
+        <Text style={styles.adBadgeText}>AD</Text>
+      </View>
 
-        {/* Content Area - mimics mission card content */}
-        <BlurView intensity={25} tint="dark" style={styles.contentContainer}>
-          {/* Headline */}
-          <NativeAsset assetType={NativeAssetType.HEADLINE}>
-            <Text style={styles.headline} numberOfLines={2} />
-          </NativeAsset>
+      {/* Media with contain mode - centered */}
+      <View style={styles.mediaContainer}>
+        <NativeMediaView
+          style={styles.mediaView}
+          resizeMode="contain"
+        />
+      </View>
 
-          {/* Body/Description */}
-          <NativeAsset assetType={NativeAssetType.BODY}>
-            <Text style={styles.body} numberOfLines={2} />
-          </NativeAsset>
+      {/* Content section - centered */}
+      <View style={styles.contentSection}>
+        {/* Headline */}
+        <NativeAsset assetType={NativeAssetType.HEADLINE}>
+          <Text style={styles.headlineText} numberOfLines={2} />
+        </NativeAsset>
 
-          {/* Call to Action Button */}
-          <NativeAsset assetType={NativeAssetType.CALL_TO_ACTION}>
-            <View style={styles.ctaButton}>
-              <Text style={styles.ctaText} />
-            </View>
-          </NativeAsset>
+        {/* Body */}
+        <NativeAsset assetType={NativeAssetType.BODY}>
+          <Text style={styles.bodyText} numberOfLines={3} />
+        </NativeAsset>
 
-          {/* Advertiser/Icon Row */}
-          <View style={styles.advertiserRow}>
-            <NativeAsset assetType={NativeAssetType.ICON}>
-              <Image style={styles.icon} />
-            </NativeAsset>
-            <NativeAsset assetType={NativeAssetType.ADVERTISER}>
-              <Text style={styles.advertiser} numberOfLines={1} />
-            </NativeAsset>
-          </View>
-        </BlurView>
+        {/* Advertiser */}
+        <NativeAsset assetType={NativeAssetType.ADVERTISER}>
+          <Text style={styles.advertiserText} numberOfLines={1} />
+        </NativeAsset>
       </View>
     </NativeAdView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    width: CARD_WIDTH,
-    marginHorizontal: SPACING.lg,
-    marginBottom: SPACING.lg,
-  },
-  card: {
-    width: '100%',
+  nativeAdContainer: {
     height: CARD_HEIGHT,
-    borderRadius: RADIUS.md,
+    marginHorizontal: CARD_MARGIN,
+    borderRadius: 45,
     overflow: 'hidden',
-    backgroundColor: COLORS.glass.black40,
-    ...SHADOWS.md,
-  },
-  imageContainer: {
-    flex: 1,
-    position: 'relative',
-  },
-  mediaView: {
-    width: '100%',
-    height: '100%',
+    backgroundColor: '#1a1a2e',
+    padding: 24,
+    alignItems: 'center',
   },
   adBadge: {
-    position: 'absolute',
-    top: SPACING.sm,
-    right: SPACING.sm,
+    alignSelf: 'flex-start',
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: 4,
+    marginBottom: 12,
   },
   adBadgeText: {
     fontSize: 10,
     fontWeight: '700',
     color: '#666',
   },
-  contentContainer: {
-    padding: SPACING.lg,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.glass.white10,
-  },
-  headline: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: COLORS.white,
-    marginBottom: SPACING.xs,
-  },
-  body: {
-    fontSize: 14,
-    color: COLORS.text.secondary,
-    lineHeight: 20,
-    marginBottom: SPACING.md,
-  },
-  ctaButton: {
-    backgroundColor: COLORS.accent,
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.lg,
-    borderRadius: RADIUS.sm,
-    alignItems: 'center',
-    marginBottom: SPACING.sm,
-  },
-  ctaText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.white,
-  },
-  advertiserRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-  },
-  icon: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-  },
-  advertiser: {
-    fontSize: 12,
-    color: COLORS.text.tertiary,
+  mediaContainer: {
     flex: 1,
+    width: '100%',
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#2a2a3e',
+    marginBottom: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mediaView: {
+    width: '100%',
+    height: '100%',
+  },
+  contentSection: {
+    width: '100%',
+    paddingBottom: 4,
+  },
+  headlineText: {
+    fontSize: 16,
+    color: COLORS.white,
+    fontWeight: '700',
+    marginBottom: 4,
+    lineHeight: 22,
+    textAlign: 'left',
+  },
+  bodyText: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
+    lineHeight: 16,
+    marginBottom: 6,
+    textAlign: 'left',
+  },
+  advertiserText: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontWeight: '500',
+    textAlign: 'left',
   },
 });

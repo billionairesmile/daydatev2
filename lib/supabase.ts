@@ -426,6 +426,7 @@ export const db = {
       anniversary_type?: string;
       dating_start_date?: string; // ISO date string - when they started dating
       wedding_date?: string; // ISO date string - wedding anniversary (if married)
+      timezone?: string; // IANA timezone string from creator's device (e.g., 'Asia/Seoul')
     }) {
       const client = getSupabase();
       const { data, error } = await client

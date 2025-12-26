@@ -104,6 +104,8 @@
       "locationDenied": "Location Denied",
       "locationDeniedMessage": "Location permission was denied. Please enable it in settings.",
       "goToSettings": "Go to Settings",
+      "partnerLocationRequired": "Partner Location Required",
+      "partnerLocationRequiredMessage": "Your partner also needs to enable location permission to generate missions.\nPlease ask your partner to allow location access.",
       "cannotKeep": "Cannot Save",
       "alreadyCompletedKeep": "Completed missions cannot be saved.",
       "keepMission": "Save Mission",

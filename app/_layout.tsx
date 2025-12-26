@@ -362,6 +362,10 @@ function RootLayoutNav() {
               preferences: partnerPreferences,
               birthDate: partnerData.birth_date ? parseDateAsLocal(partnerData.birth_date) : undefined,
               birthDateCalendarType: birthDateCalendarType || 'solar',
+              locationLatitude: partnerData.location_latitude,
+              locationLongitude: partnerData.location_longitude,
+              locationCity: partnerData.location_city,
+              locationDistrict: partnerData.location_district,
               createdAt: partnerData.created_at ? new Date(partnerData.created_at) : new Date(),
             });
           }

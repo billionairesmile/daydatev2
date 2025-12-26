@@ -32,6 +32,7 @@ import {
 import * as Clipboard from 'expo-clipboard';
 import * as Linking from 'expo-linking';
 import * as Location from 'expo-location';
+import * as Localization from 'expo-localization';
 import Constants from 'expo-constants';
 import { WebView } from 'react-native-webview';
 import { useRouter } from 'expo-router';
@@ -40,6 +41,7 @@ import { signInWithGoogle, signInWithKakao, onAuthStateChange, signOut } from '@
 
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '@/constants/design';
 import { useAuthStore } from '@/stores';
+import { useTimezoneStore } from '@/stores/timezoneStore';
 import {
   useOnboardingStore,
   generatePairingCode,
@@ -1942,8 +1944,22 @@ function PairingStep({
               return;
             }
 
+            // Get device timezone for the couple (creator's timezone)
+            let deviceTimezone = 'Asia/Seoul'; // fallback
+            try {
+              const calendars = Localization.getCalendars();
+              if (calendars && calendars.length > 0 && calendars[0].timeZone) {
+                deviceTimezone = calendars[0].timeZone;
+              } else {
+                deviceTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+              }
+            } catch (e) {
+              console.log('[PairingStep] Failed to get device timezone, using fallback');
+            }
+
             const { data: newCouple, error: coupleError } = await db.couples.create({
               user1_id: creatorUserId,
+              timezone: deviceTimezone,
             });
 
             if (coupleError) {
@@ -1976,7 +1992,11 @@ function PairingStep({
                 anniversaryType: t('onboarding.anniversary.datingStart'),
                 status: 'pending',
                 createdAt: new Date(),
+                timezone: deviceTimezone,
               });
+
+              // Sync timezone to timezoneStore so it's immediately effective
+              useTimezoneStore.getState().syncFromCouple(deviceTimezone);
 
               // Cleanup any previous orphaned pending couples for this creator
               // (e.g., from failed pairing attempts)

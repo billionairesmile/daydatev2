@@ -1129,7 +1129,11 @@ export default function CalendarScreen() {
             )}
           </View>
         )}
+
       </ScrollView>
+
+      {/* Banner Ad - Fixed at bottom above nav bar */}
+      <BannerAdView placement="calendar" style={styles.bannerAd} />
 
       {/* Settings Modal */}
       <Modal
@@ -1446,9 +1450,6 @@ export default function CalendarScreen() {
         </TouchableWithoutFeedback>
       </Modal>
 
-      {/* Banner Ad - Fixed at bottom */}
-      <BannerAdView placement="calendar" style={styles.bannerAd} />
-
     </View>
   );
 }
@@ -1492,7 +1493,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: SPACING.lg,
-    paddingBottom: 120,
+    paddingBottom: 170,
   },
   header: {
     flexDirection: 'row',

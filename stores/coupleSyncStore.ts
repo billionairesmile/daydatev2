@@ -761,64 +761,98 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
   },
 
   loadSharedMissions: async () => {
-    const { coupleId } = get();
+    const { coupleId, isLoadingMissions, sharedMissions: existingMissions, sharedMissionsDate: existingDate } = get();
     if (!coupleId || isInTestMode()) return null;
 
+    // Guard against concurrent calls - if already loading, return existing missions
+    // This prevents race conditions when app comes to foreground multiple times quickly
+    if (isLoadingMissions) {
+      console.log('[CoupleSyncStore] loadSharedMissions already in progress, skipping');
+      return existingMissions.length > 0 ? existingMissions : null;
+    }
+
     set({ isLoadingMissions: true });
-    const { data, error } = await db.coupleMissions.getToday(coupleId);
-    set({ isLoadingMissions: false });
 
     const today = getTodayInTimezone();
 
-    if (!error && data) {
-      const missions = data.missions as Mission[];
-      set({
-        sharedMissions: missions,
-        sharedMissionsDate: today,
-        lastMissionUpdate: new Date(data.generated_at),
-        missionGenerationStatus: 'completed',
-        generatingUserId: data.generated_by,
-      });
-      return missions;
-    }
+    try {
+      const { data, error } = await db.coupleMissions.getToday(coupleId);
 
-    // No missions found for today from database
-    // Only clear local state if we're confident the missions are truly gone:
-    // 1. Query succeeded (no error)
-    // 2. No data returned
-    // 3. Local missions are from a different date (not today) - this means they're stale
-    // If local missions are from today, DON'T clear them - they might just not be synced yet
-    // or there could be a temporary query issue
-    if (!error && !data) {
-      const { sharedMissions: localMissions, sharedMissionsDate: localDate } = get();
-      const isLocalMissionsFromToday = localDate === today;
-
-      if (!isLocalMissionsFromToday) {
-        // Local missions are stale (from different day), safe to clear
-        console.log('[CoupleSyncStore] No missions from DB and local missions are stale, clearing');
+      if (!error && data) {
+        const missions = data.missions as Mission[];
         set({
-          sharedMissions: [],
-          sharedMissionsDate: null,
-          missionGenerationStatus: 'idle',
-          generatingUserId: null,
+          sharedMissions: missions,
+          sharedMissionsDate: today,
+          lastMissionUpdate: new Date(data.generated_at),
+          missionGenerationStatus: 'completed',
+          generatingUserId: data.generated_by,
+          isLoadingMissions: false,
         });
-      } else if (localMissions.length > 0) {
-        // Local missions exist for today but DB returned null - don't clear!
-        // This could be a transient issue or sync delay
-        console.log('[CoupleSyncStore] DB returned null but local missions exist for today, keeping local state');
+        return missions;
       }
-    }
 
-    // Also check lock status
-    const { data: lockData } = await db.missionLock.getStatus(coupleId);
-    if (lockData && lockData.status === 'generating') {
-      set({
-        missionGenerationStatus: 'generating',
-        generatingUserId: lockData.locked_by,
-      });
-    }
+      // No missions found for today from database
+      // DEFENSIVE: Only clear local state if we're ABSOLUTELY confident the missions are truly gone
+      // Priority: Preserve user experience over strict DB consistency
+      if (!error && !data) {
+        // Re-fetch current state to avoid stale closure issues
+        const currentState = get();
+        const localMissions = currentState.sharedMissions;
+        const localDate = currentState.sharedMissionsDate;
+        const isLocalMissionsFromToday = localDate === today;
 
-    return null;
+        if (localMissions.length > 0) {
+          // ALWAYS preserve local missions if they exist
+          // This prevents the "disappearing cards" bug on older devices with memory pressure
+          console.log('[CoupleSyncStore] DB returned null but local missions exist, preserving local state');
+
+          // If date doesn't match but missions exist, update the date to today
+          // This handles edge cases from timezone changes or partial rehydration
+          if (!isLocalMissionsFromToday) {
+            console.log('[CoupleSyncStore] Updating stale date to today while preserving missions');
+            set({ sharedMissionsDate: today });
+          }
+        } else if (!isLocalMissionsFromToday && localDate !== null) {
+          // Only clear if: no local missions AND date is from a different day
+          console.log('[CoupleSyncStore] No local missions and date is stale, clearing state');
+          set({
+            sharedMissions: [],
+            sharedMissionsDate: null,
+            missionGenerationStatus: 'idle',
+            generatingUserId: null,
+          });
+        }
+        // If localMissions is empty and localDate is null, do nothing - state is already clean
+      }
+
+      // Check lock status, but be defensive about stale locks
+      const { data: lockData } = await db.missionLock.getStatus(coupleId);
+      if (lockData && lockData.status === 'generating') {
+        // Only respect the lock if it's recent (within last 5 minutes)
+        // This prevents stale "generating" locks from hiding the generate button
+        const lockTime = lockData.locked_at ? new Date(lockData.locked_at) : null;
+        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+
+        if (lockTime && lockTime > fiveMinutesAgo) {
+          set({
+            missionGenerationStatus: 'generating',
+            generatingUserId: lockData.locked_by,
+          });
+        } else {
+          // Stale lock detected - release it
+          console.log('[CoupleSyncStore] Stale generating lock detected, releasing');
+          await db.missionLock.release(coupleId, 'idle');
+          set({
+            missionGenerationStatus: 'idle',
+            generatingUserId: null,
+          });
+        }
+      }
+
+      return null;
+    } finally {
+      set({ isLoadingMissions: false });
+    }
   },
 
   setSharedMissions: (missions: Mission[]) => {
@@ -2085,6 +2119,9 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       // Mission state (with date tracking for proper reset)
       sharedMissions: state.sharedMissions,
       sharedMissionsDate: state.sharedMissionsDate,
+      // Mission generation status - persist to prevent state loss on memory pressure
+      // Only persist 'completed' status (not 'idle' or 'generating') to avoid stale states
+      missionGenerationStatus: state.sharedMissions.length > 0 ? 'completed' : state.missionGenerationStatus,
       // Mission progress state
       allMissionProgress: state.allMissionProgress,
       lockedMissionId: state.lockedMissionId,

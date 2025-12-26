@@ -26,11 +26,17 @@ import * as Location from 'expo-location';
 import { COLORS, SPACING, RADIUS } from '@/constants/design';
 import { useMissionStore, MOOD_OPTIONS, TIME_OPTIONS, type TodayMood, type AvailableTime, type MissionGenerationAnswers } from '@/stores/missionStore';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
+import { useAuthStore } from '@/stores/authStore';
+import { useSubscriptionStore } from '@/stores/subscriptionStore';
 import { useBackground } from '@/contexts';
 import { BookmarkedMissionsPage } from '@/components/BookmarkedMissionsPage';
 import { CircularLoadingAnimation } from '@/components/CircularLoadingAnimation';
+import NativeAdMissionCard from '@/components/ads/NativeAdMissionCard';
 import type { Mission, FeaturedMission } from '@/types';
 import { db, isDemoMode } from '@/lib/supabase';
+
+// Type for carousel items (Mission or Ad placeholder)
+type CarouselItem = Mission | { type: 'ad'; id: string };
 
 // Fixed card dimensions (width is calculated dynamically in component)
 const CARD_HEIGHT = 468;
@@ -80,7 +86,7 @@ export default function MissionScreen() {
   const [isWaitingForImages, setIsWaitingForImages] = useState(false);
   const isWaitingForImagesRef = useRef(false);
   const scrollX = useRef(new Animated.Value(0)).current;
-  const scrollViewRef = useRef<Animated.FlatList<Mission>>(null);
+  const scrollViewRef = useRef<Animated.FlatList<CarouselItem>>(null);
 
   const {
     keptMissions,
@@ -108,6 +114,21 @@ export default function MissionScreen() {
     allMissionProgress,
     coupleId,
   } = useCoupleSyncStore();
+
+  // Get partner info from auth store
+  const { partner } = useAuthStore();
+
+  // Subscription store for ads
+  const { shouldShowAds } = useSubscriptionStore();
+
+  // Random ad position (1, 2, or 3 = positions 2, 3, or 4 in the carousel)
+  const [adPosition] = useState(() => Math.floor(Math.random() * 3) + 1);
+
+  // Check if partner has location enabled (has location data in DB)
+  const checkPartnerHasLocation = useCallback((): boolean => {
+    if (!partner) return false;
+    return !!(partner.locationLatitude && partner.locationLongitude);
+  }, [partner]);
 
   // Use synced bookmark check if initialized, otherwise local
   const checkIsKept = useCallback((missionId: string) => {
@@ -153,13 +174,34 @@ export default function MissionScreen() {
   }, [generatedMissionData, sharedMissions, sharedMissionsDate, isSyncInitialized, hasTodayMissions]);
 
   // Combine AI-generated missions with featured missions (only show featured after daily missions are generated)
-  const allMissions = React.useMemo(() => {
+  // Also insert native ad at random position (2nd, 3rd, or 4th) if user should see ads
+  const allMissions = React.useMemo((): CarouselItem[] => {
+    let missions: CarouselItem[] = [];
+
     // Only include featured missions if today's missions have been generated
     if (hasGeneratedMissions && todayMissions.length > 0) {
-      return [...todayMissions, ...featuredMissions];
+      missions = [...todayMissions, ...featuredMissions];
+    } else {
+      missions = [...todayMissions];
     }
-    return todayMissions;
-  }, [todayMissions, featuredMissions, hasGeneratedMissions]);
+
+    // Insert ad at random position (1, 2, or 3 = index 1, 2, or 3) if:
+    // - Missions have been generated (hasGeneratedMissions is true)
+    // - User should see ads (not premium)
+    // - There are at least 3 missions (so we have positions 2, 3, 4)
+    if (hasGeneratedMissions && shouldShowAds() && missions.length >= 3) {
+      const adPlaceholder: CarouselItem = { type: 'ad', id: 'native-ad' };
+      // Insert at position 1, 2, or 3 (which is 2nd, 3rd, or 4th item)
+      const insertIndex = Math.min(adPosition, missions.length);
+      missions = [
+        ...missions.slice(0, insertIndex),
+        adPlaceholder,
+        ...missions.slice(insertIndex),
+      ];
+    }
+
+    return missions;
+  }, [todayMissions, featuredMissions, hasGeneratedMissions, shouldShowAds, adPosition]);
 
   // Force FlatList to render properly when missions change from empty to populated
   // This handles cases where the list mounts before React has finished updating
@@ -327,7 +369,7 @@ export default function MissionScreen() {
   };
 
   const handleGenerateButtonPress = async () => {
-    // Check if location permission is granted
+    // Check if location permission is granted for current user
     const hasPermission = await checkLocationPermission();
 
     if (!hasPermission) {
@@ -341,6 +383,15 @@ export default function MissionScreen() {
             onPress: async () => {
               const granted = await requestLocationPermission();
               if (granted) {
+                // After granting permission, also check partner location
+                if (!checkPartnerHasLocation()) {
+                  Alert.alert(
+                    t('mission.alerts.partnerLocationRequired'),
+                    t('mission.alerts.partnerLocationRequiredMessage'),
+                    [{ text: t('common.confirm') }]
+                  );
+                  return;
+                }
                 setShowGenerationModal(true);
               } else {
                 Alert.alert(
@@ -359,7 +410,17 @@ export default function MissionScreen() {
       return;
     }
 
-    // Permission granted, open modal
+    // Check if partner has location enabled
+    if (!checkPartnerHasLocation()) {
+      Alert.alert(
+        t('mission.alerts.partnerLocationRequired'),
+        t('mission.alerts.partnerLocationRequiredMessage'),
+        [{ text: t('common.confirm') }]
+      );
+      return;
+    }
+
+    // Both users have location enabled, open modal
     setShowGenerationModal(true);
   };
 
@@ -490,8 +551,13 @@ export default function MissionScreen() {
     viewAreaCoveragePercentThreshold: 50,
   }).current;
 
+  // Helper function to check if item is an ad
+  const isAdItem = (item: CarouselItem): item is { type: 'ad'; id: string } => {
+    return 'type' in item && item.type === 'ad';
+  };
+
   const renderCard = useCallback(
-    ({ item, index }: { item: Mission; index: number }) => {
+    ({ item, index }: { item: CarouselItem; index: number }) => {
       const inputRange = [
         (index - 1) * SNAP_INTERVAL,
         index * SNAP_INTERVAL,
@@ -511,6 +577,24 @@ export default function MissionScreen() {
       // Don't use opacity animation - it causes cards to be invisible until scroll event
       // The scale animation provides enough visual feedback for carousel effect
 
+      // Render native ad if item is ad placeholder
+      if (isAdItem(item)) {
+        return (
+          <Animated.View
+            style={[
+              styles.card,
+              {
+                width: CARD_WIDTH,
+                transform: [{ scale }],
+              },
+            ]}
+          >
+            <NativeAdMissionCard cardWidth={CARD_WIDTH} />
+          </Animated.View>
+        );
+      }
+
+      // Render mission card
       return (
         <Animated.View
           style={[

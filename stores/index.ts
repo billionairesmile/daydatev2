@@ -6,6 +6,7 @@ export { useLanguageStore, getLanguageDisplayName } from './languageStore';
 export {
   useTimezoneStore,
   getTimezoneDisplayName,
+  getDeviceTimezoneLabel,
   getTodayInTimezone,
   COMMON_TIMEZONES,
 } from './timezoneStore';

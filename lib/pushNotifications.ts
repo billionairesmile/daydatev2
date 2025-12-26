@@ -14,14 +14,16 @@ if (!isExpoGo) {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     Notifications = require('expo-notifications');
     // Configure notification behavior
+    // When app is in foreground, don't show alert/banner - only update badge
+    // This prevents notifications from popping up when user is already using the app
     if (Notifications) {
       Notifications.setNotificationHandler({
         handleNotification: async () => ({
-          shouldShowAlert: true,
-          shouldPlaySound: true,
-          shouldSetBadge: true,
-          shouldShowBanner: true,
-          shouldShowList: true,
+          shouldShowAlert: false, // Don't show alert when app is in foreground
+          shouldPlaySound: false, // Don't play sound when app is in foreground
+          shouldSetBadge: true,   // Still update badge count
+          shouldShowBanner: false, // Don't show banner when app is in foreground
+          shouldShowList: true,    // Still add to notification list
         }),
       });
     }

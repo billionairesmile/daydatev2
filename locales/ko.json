@@ -104,6 +104,8 @@
       "locationDenied": "위치 권한 거부됨",
       "locationDeniedMessage": "위치 권한이 거부되었어요. 설정에서 위치 권한을 허용해주세요.",
       "goToSettings": "설정으로 이동",
+      "partnerLocationRequired": "파트너 위치 정보 필요",
+      "partnerLocationRequiredMessage": "미션을 생성하려면 파트너도 위치 정보를 허용해야 해요.\n파트너에게 위치 권한을 허용해달라고 요청해주세요.",
       "cannotKeep": "보관 불가",
       "alreadyCompletedKeep": "이미 완료한 미션은 보관할 수 없어요.",
       "keepMission": "미션 보관",
