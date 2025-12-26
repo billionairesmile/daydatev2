@@ -13,7 +13,7 @@ import 'react-native-reanimated';
 import '@/lib/i18n';
 import { useTranslation } from 'react-i18next';
 
-import { useAuthStore, useOnboardingStore } from '@/stores';
+import { useAuthStore, useOnboardingStore, useTimezoneStore } from '@/stores';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
 import { BackgroundProvider, useBackground } from '@/contexts';
 import { preloadCharacterAssets } from '@/utils';
@@ -22,6 +22,20 @@ import { updateUserLocationInDB, checkLocationPermission } from '@/lib/locationU
 import { initializeNetworkMonitoring, subscribeToNetwork } from '@/lib/useNetwork';
 import { offlineQueue } from '@/lib/offlineQueue';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+
+// Type for couple data from DB (includes timezone column)
+interface CoupleDbRow {
+  id: string;
+  user1_id: string;
+  user2_id?: string;
+  dating_start_date?: string;
+  wedding_date?: string;
+  timezone?: string;
+  status?: 'pending' | 'active' | 'disconnected';
+  disconnected_at?: string;
+  disconnected_by?: string;
+  disconnect_reason?: 'unpaired' | 'account_deleted';
+}
 
 // Parse date string as local date (not UTC) to avoid timezone issues
 // "1990-01-03" should be January 3rd in local timezone, not UTC
@@ -137,6 +151,7 @@ function RootLayoutNav() {
   const { isAuthenticated, isOnboardingComplete, setIsOnboardingComplete, couple, user, setCouple, setPartner, partner } = useAuthStore();
   const { initializeSync, cleanup: cleanupSync, processPendingOperations, loadMissionProgress, loadSharedMissions } = useCoupleSyncStore();
   const { setStep: setOnboardingStep, updateData: updateOnboardingData } = useOnboardingStore();
+  const { syncFromCouple } = useTimezoneStore();
   const [isNavigationReady, setIsNavigationReady] = useState(false);
   const appState = useRef(AppState.currentState);
   const lastFetchTime = useRef<number>(0);
@@ -188,7 +203,8 @@ function RootLayoutNav() {
     try {
       // Fetch latest couple data from DB
       console.log('[Layout] Fetching couple data for id:', couple.id);
-      const { data: coupleData, error: coupleError } = await db.couples.get(couple.id);
+      const { data, error: coupleError } = await db.couples.get(couple.id);
+      const coupleData = data as CoupleDbRow | null;
       console.log('[Layout] Couple data fetched:', { coupleData, coupleError });
 
       if (coupleError) {
@@ -317,8 +333,12 @@ function RootLayoutNav() {
           datingStartDate: coupleData.dating_start_date ? parseDateAsLocal(coupleData.dating_start_date) : undefined,
           weddingDate: coupleData.wedding_date ? parseDateAsLocal(coupleData.wedding_date) : undefined,
           relationshipType,
+          timezone: coupleData.timezone || 'auto',
           status: coupleData.status || 'active',
         });
+
+        // Sync timezone from couple record
+        syncFromCouple(coupleData.timezone);
 
         // Determine partner's user_id
         const partnerId = coupleData.user1_id === user.id
@@ -350,7 +370,7 @@ function RootLayoutNav() {
     } catch (error) {
       console.error('Error fetching couple/partner data:', error);
     }
-  }, [isOnboardingComplete, couple, user?.id, setCouple, setPartner, cleanupSync, setIsOnboardingComplete, setOnboardingStep, updateOnboardingData, t, router]);
+  }, [isOnboardingComplete, couple, user?.id, setCouple, setPartner, cleanupSync, setIsOnboardingComplete, setOnboardingStep, updateOnboardingData, syncFromCouple, t, router]);
 
   // Update user location in DB (silently, no alerts)
   const updateUserLocation = useCallback(async () => {
@@ -541,17 +561,7 @@ function RootLayoutNav() {
         async (payload) => {
           console.log('[Layout] Couple realtime update received:', payload);
           // Couple data was updated, refresh the data
-          const coupleData = payload.new as {
-            id: string;
-            user1_id: string;
-            user2_id?: string;
-            dating_start_date?: string;
-            wedding_date?: string;
-            status?: string;
-            disconnected_at?: string;
-            disconnected_by?: string;
-            disconnect_reason?: 'unpaired' | 'account_deleted';
-          };
+          const coupleData = payload.new as CoupleDbRow;
 
           if (coupleData) {
             // Check if couple was disconnected by partner
@@ -633,6 +643,7 @@ function RootLayoutNav() {
                 user2Id: coupleData.user2_id,
                 datingStartDate: coupleData.dating_start_date,
                 weddingDate: coupleData.wedding_date,
+                timezone: coupleData.timezone,
                 status: coupleData.status,
               });
 
@@ -645,8 +656,12 @@ function RootLayoutNav() {
                 datingStartDate: coupleData.dating_start_date ? parseDateAsLocal(coupleData.dating_start_date) : undefined,
                 weddingDate: coupleData.wedding_date ? parseDateAsLocal(coupleData.wedding_date) : undefined,
                 relationshipType,
+                timezone: coupleData.timezone || 'auto',
                 status: (coupleData.status as 'pending' | 'active') || 'active',
               });
+
+              // Sync timezone when partner updates it
+              useTimezoneStore.getState().syncFromCouple(coupleData.timezone);
             }
           }
         }

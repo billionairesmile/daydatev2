@@ -56,6 +56,13 @@
     "plugins": [
       "expo-router",
       [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "Allow Daydate to access your camera to capture memories.",
+          "enableMicrophonePermission": false
+        }
+      ],
+      [
         "expo-camera",
         {
           "cameraPermission": "Allow Daydate to access your camera to capture memories."
@@ -81,8 +88,7 @@
         }
       ],
       "expo-asset",
-      "expo-web-browser",
-      "react-native-google-mobile-ads"
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true

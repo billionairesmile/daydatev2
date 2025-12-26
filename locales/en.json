@@ -128,7 +128,9 @@
       "permissionMessage": "Camera permission is required to take photos.",
       "photoError": "Failed to take photo. Please try again.",
       "usePhoto": "Use Photo",
-      "retake": "Retake"
+      "retake": "Retake",
+      "pinchToZoom": "Pinch to zoom",
+      "error": "Unable to start camera"
     },
     "location": {
       "noInfo": "Location not available"
@@ -470,6 +472,13 @@
     "other": {
       "language": "Language",
       "selectLanguage": "Select Language",
+      "timezone": "Timezone",
+      "selectTimezone": "Select Timezone",
+      "timezoneAuto": "Auto (Device Setting)",
+      "timezoneAutoDesc": "Follows your device's timezone setting",
+      "timezoneManual": "Manual Selection",
+      "timezoneManualDesc": "Manual timezone for long-distance couples",
+      "timezoneHint": "Applied to mission reset and D-day calculations",
       "termsOfService": "Terms of Service",
       "locationTerms": "Location Terms",
       "privacyPolicy": "Privacy Policy",

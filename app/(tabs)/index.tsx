@@ -35,7 +35,7 @@ Asset.fromModule(DEFAULT_BACKGROUND_IMAGE).downloadAsync();
 
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '@/constants/design';
 import { useBackground } from '@/contexts';
-import { useOnboardingStore, useAuthStore } from '@/stores';
+import { useOnboardingStore, useAuthStore, useTimezoneStore } from '@/stores';
 import { BannerAdView } from '@/components/ads';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
 import { db } from '@/lib/supabase';
@@ -320,6 +320,7 @@ export default function HomeScreen() {
   const { backgroundImage, setBackgroundImage, resetToDefault } = useBackground();
   const { data: onboardingData } = useOnboardingStore();
   const { user, partner, couple, setPartner, setCouple } = useAuthStore();
+  const { getEffectiveTimezone } = useTimezoneStore();
   const { coupleId } = useCoupleSyncStore();
 
   // Determine nicknames - always show "나 ❤️ 파트너" from current user's perspective
@@ -657,7 +658,30 @@ export default function HomeScreen() {
   const anniversaryDate = couple?.datingStartDate
     ? new Date(couple.datingStartDate)
     : null;
-  const today = new Date();
+
+  // Get today's date in the selected timezone
+  const getTodayInSelectedTimezone = useMemo(() => {
+    const timezone = getEffectiveTimezone();
+    const now = new Date();
+    try {
+      const options: Intl.DateTimeFormatOptions = {
+        timeZone: timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      };
+      const parts = new Intl.DateTimeFormat('en-CA', options).formatToParts(now);
+      const year = parseInt(parts.find(p => p.type === 'year')?.value || '0');
+      const month = parseInt(parts.find(p => p.type === 'month')?.value || '1') - 1;
+      const day = parseInt(parts.find(p => p.type === 'day')?.value || '1');
+      return new Date(year, month, day);
+    } catch (e) {
+      // Fallback to local date
+      return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    }
+  }, [getEffectiveTimezone]);
+
+  const today = getTodayInSelectedTimezone;
   const diffDays = anniversaryDate
     ? Math.floor((today.getTime() - anniversaryDate.getTime()) / (1000 * 60 * 60 * 24)) + 1 // +1 to count from day 1
     : null;

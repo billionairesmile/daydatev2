@@ -128,7 +128,9 @@
       "permissionMessage": "사진을 촬영하려면 카메라 권한이 필요합니다.",
       "photoError": "사진 촬영에 실패했습니다. 다시 시도해주세요.",
       "usePhoto": "사용하기",
-      "retake": "다시 찍기"
+      "retake": "다시 찍기",
+      "pinchToZoom": "핀치하여 확대/축소",
+      "error": "카메라를 시작할 수 없습니다"
     },
     "location": {
       "noInfo": "위치 정보 없음"
@@ -470,6 +472,13 @@
     "other": {
       "language": "언어",
       "selectLanguage": "언어 선택",
+      "timezone": "시간대",
+      "selectTimezone": "시간대 선택",
+      "timezoneAuto": "자동 (기기 설정)",
+      "timezoneAutoDesc": "기기의 시간대 설정을 따릅니다",
+      "timezoneManual": "수동 선택",
+      "timezoneManualDesc": "장거리 커플을 위한 수동 시간대 설정",
+      "timezoneHint": "미션 초기화 및 D-day 계산에 적용됩니다",
       "termsOfService": "서비스 이용약관",
       "locationTerms": "위치정보 이용약관",
       "privacyPolicy": "개인정보 처리방침",

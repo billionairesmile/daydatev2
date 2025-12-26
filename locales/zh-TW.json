@@ -128,7 +128,8 @@
       "permissionMessage": "拍照需要相機權限。",
       "photoError": "拍照失敗，請重試。",
       "usePhoto": "使用這張",
-      "retake": "重新拍攝"
+      "retake": "重新拍攝",
+      "pinchToZoom": "雙指縮放"
     },
     "location": {
       "noInfo": "無位置資訊"
@@ -470,6 +471,13 @@
     "other": {
       "language": "語言",
       "selectLanguage": "選擇語言",
+      "timezone": "時區",
+      "selectTimezone": "選擇時區",
+      "timezoneAuto": "自動（裝置設定）",
+      "timezoneAutoDesc": "依照裝置的時區設定",
+      "timezoneManual": "手動選擇",
+      "timezoneManualDesc": "遠距離情侶的手動時區設定",
+      "timezoneHint": "適用於任務重置和紀念日計算",
       "termsOfService": "服務條款",
       "locationTerms": "位置資訊服務條款",
       "privacyPolicy": "隱私權政策",

@@ -234,6 +234,8 @@ export type NotificationType =
   | 'mission_generated'
   | 'mission_reminder'
   | 'partner_message_waiting'
+  | 'partner_message_written'
+  | 'hourly_reminder'
   | 'couple_unpaired';
 
 export interface SendNotificationParams {
@@ -302,6 +304,42 @@ const notificationMessages = {
     'zh-TW': {
       title: '來完成今天的任務吧！',
       body: '還有未完成的任務喔，和另一半一起創造特別的回憶吧 💕',
+    },
+  },
+  partnerMessageWritten: {
+    ko: {
+      title: '💌 서로에게 한마디가 도착했어요!',
+      body: (nickname: string) => `${nickname}님이 메시지를 남겼어요. 지금 확인해보세요!`,
+    },
+    en: {
+      title: '💌 A message from your partner!',
+      body: (nickname: string) => `${nickname} left you a message. Check it out now!`,
+    },
+    es: {
+      title: '💌 ¡Tienes un mensaje de tu pareja!',
+      body: (nickname: string) => `${nickname} te dejó un mensaje. ¡Míralo ahora!`,
+    },
+    'zh-TW': {
+      title: '💌 收到另一半的話了！',
+      body: (nickname: string) => `${nickname}留了訊息給你，快去看看吧！`,
+    },
+  },
+  hourlyReminder: {
+    ko: {
+      title: '⏰ 아직 미션이 기다리고 있어요!',
+      body: '서로에게 한마디를 남겨 오늘의 미션을 완료해보세요 💕',
+    },
+    en: {
+      title: "⏰ Your mission is waiting!",
+      body: "Leave a message for each other to complete today's mission 💕",
+    },
+    es: {
+      title: '⏰ ¡Tu misión te está esperando!',
+      body: 'Déjense un mensaje para completar la misión de hoy 💕',
+    },
+    'zh-TW': {
+      title: '⏰ 任務還在等你喔！',
+      body: '互相留下訊息來完成今天的任務吧 💕',
     },
   },
 } as const;
@@ -397,6 +435,24 @@ export async function notifyPartnerUnpaired(
     title,
     body,
     data: { screen: 'onboarding' },
+  });
+}
+
+/**
+ * Send notification when partner writes their message (한마디)
+ */
+export async function notifyPartnerMessageWritten(
+  partnerId: string,
+  writerNickname: string,
+  language: SupportedLanguage = 'ko'
+): Promise<boolean> {
+  const messages = notificationMessages.partnerMessageWritten[language];
+  return sendPushNotification({
+    targetUserId: partnerId,
+    type: 'partner_message_written',
+    title: messages.title,
+    body: messages.body(writerNickname),
+    data: { screen: 'mission' },
   });
 }
 
@@ -525,6 +581,98 @@ export async function cancelMissionReminderNotification(): Promise<void> {
     console.log('[Push] Cancelled scheduled mission reminder');
   } catch (error) {
     // Ignore errors - notification might not exist
+  }
+}
+
+// Hourly reminder notification identifiers
+const HOURLY_REMINDER_PREFIX = 'hourly-reminder-';
+const MAX_HOURLY_REMINDERS = 12; // Limit to 12 hours of reminders
+
+/**
+ * Schedule hourly reminder notifications after photo upload
+ * Schedules notifications for the next several hours until midnight
+ */
+export async function scheduleHourlyReminders(
+  language: SupportedLanguage = 'ko'
+): Promise<string[]> {
+  if (!Notifications) {
+    console.log('[Push] Notifications not available - skipping hourly reminders');
+    return [];
+  }
+
+  if (isDemoMode) {
+    console.log('[Push] Demo mode - skipping hourly reminders');
+    return [];
+  }
+
+  try {
+    // Cancel any existing hourly reminders first
+    await cancelHourlyReminders();
+
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    const scheduledIds: string[] = [];
+
+    const messages = notificationMessages.hourlyReminder[language];
+
+    // Schedule reminders for the next several hours
+    // Start from the next hour, end before midnight (23:00)
+    for (let i = 1; i <= MAX_HOURLY_REMINDERS; i++) {
+      const reminderHour = currentHour + i;
+
+      // Don't schedule past 23:00 (11 PM) - let people sleep!
+      if (reminderHour >= 23) break;
+
+      // Calculate trigger time
+      const triggerDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), reminderHour, 0, 0);
+
+      const identifier = `${HOURLY_REMINDER_PREFIX}${i}`;
+
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: messages.title,
+          body: messages.body,
+          data: { screen: 'mission', type: 'hourly_reminder' },
+          sound: 'default',
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: triggerDate,
+        },
+        identifier,
+      });
+
+      scheduledIds.push(identifier);
+      console.log('[Push] Hourly reminder scheduled for', triggerDate.toLocaleTimeString());
+    }
+
+    console.log('[Push] Scheduled', scheduledIds.length, 'hourly reminders');
+    return scheduledIds;
+  } catch (error) {
+    console.error('[Push] Error scheduling hourly reminders:', error);
+    return [];
+  }
+}
+
+/**
+ * Cancel all hourly reminder notifications
+ */
+export async function cancelHourlyReminders(): Promise<void> {
+  if (!Notifications) return;
+
+  try {
+    for (let i = 1; i <= MAX_HOURLY_REMINDERS; i++) {
+      const identifier = `${HOURLY_REMINDER_PREFIX}${i}`;
+      try {
+        await Notifications.cancelScheduledNotificationAsync(identifier);
+      } catch {
+        // Ignore errors - notification might not exist
+      }
+    }
+    console.log('[Push] Cancelled hourly reminders');
+  } catch (error) {
+    console.error('[Push] Error cancelling hourly reminders:', error);
   }
 }
 

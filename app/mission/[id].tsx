@@ -14,10 +14,11 @@ import {
   GestureResponderEvent,
   ActivityIndicator,
   useWindowDimensions,
+  Animated,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { BlurView } from 'expo-blur';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import { Camera as VisionCamera, useCameraDevice, useCameraFormat, useCameraPermission, CameraRuntimeError } from 'react-native-vision-camera';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as Location from 'expo-location';
 import {
@@ -65,6 +66,7 @@ export default function MissionDetailScreen() {
   const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
   const [showCamera, setShowCamera] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const showPreviewRef = useRef(false); // Track showPreview for async callbacks
   const [showMessageModal, setShowMessageModal] = useState(false);
   const [messageText, setMessageText] = useState('');
   const [user1Message, setUser1Message] = useState<string | null>(null);
@@ -72,28 +74,58 @@ export default function MissionDetailScreen() {
   const [facing, setFacing] = useState<'front' | 'back'>('back');
   const [flashEnabled, setFlashEnabled] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
 
   // Track if current user is the photo taker (user1 in mission progress)
   const [isPhotoTaker, setIsPhotoTaker] = useState(true);
 
-  // Zoom state for pinch-to-zoom (0 = 1x default, 1 = max zoom ~4x)
-  const [zoom, setZoom] = useState(0);
-  const lastPinchDistance = useRef<number | null>(null);
-
-  // Photo aspect ratio state - always 3:4 portrait frame
-  const [photoAspectRatio, setPhotoAspectRatio] = useState<number>(3 / 4); // Always portrait 3:4
-  // Track if captured photo is landscape (for cover mode display)
-  const [isLandscapePhoto, setIsLandscapePhoto] = useState(false);
 
   // State for enlarged photo modal
   const [showEnlargedPhoto, setShowEnlargedPhoto] = useState(false);
+
+  // Enlarged photo pinch-to-zoom state - using Animated for smooth performance
+  const enlargedScaleAnim = useRef(new Animated.Value(1)).current;
+  const enlargedTranslateXAnim = useRef(new Animated.Value(0)).current;
+  const enlargedTranslateYAnim = useRef(new Animated.Value(0)).current;
+  const enlargedScaleRef = useRef(1);
+  const enlargedTranslateXRef = useRef(0);
+  const enlargedTranslateYRef = useRef(0);
+  const lastEnlargedPinchDistance = useRef<number | null>(null);
+  const lastEnlargedPanPosition = useRef<{ x: number; y: number } | null>(null);
+  const initialPinchScale = useRef<number>(1);
+  const [enlargedScaleDisplay, setEnlargedScaleDisplay] = useState(1); // For UI indicator only
+
+  // Camera tap-to-focus state
+  const [focusPoint, setFocusPoint] = useState<{ x: number; y: number } | null>(null);
+  const focusAnimValue = useRef(new Animated.Value(0)).current;
+  const focusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Enlarged photo pinch-to-zoom focal point tracking
+  const pinchFocalPointRef = useRef<{ x: number; y: number } | null>(null);
+
+  // Velocity tracking for smooth pan momentum
+  const panVelocityRef = useRef<{ vx: number; vy: number }>({ vx: 0, vy: 0 });
+  const lastPanTimeRef = useRef<number>(0);
 
   // Location state for photo
   const [currentLocation, setCurrentLocation] = useState<string | null>(null);
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
 
-  const [permission, requestPermission] = useCameraPermissions();
-  const cameraRef = useRef<CameraView>(null);
+  // Vision Camera permission and device
+  const { hasPermission, requestPermission } = useCameraPermission();
+  const device = useCameraDevice(facing === 'front' ? 'front' : 'back');
+  const cameraRef = useRef<VisionCamera>(null);
+
+  // Select best camera format for maximum photo quality
+  const format = useCameraFormat(device, [
+    { photoResolution: 'max' },
+    { photoHdr: true },
+  ]);
+
+  // Handle camera runtime errors
+  const handleCameraError = useCallback((error: CameraRuntimeError) => {
+    console.error('[VisionCamera] Camera error:', error.code, error.message);
+  }, []);
 
   // Get mission from store (AI-generated or featured missions)
   const { getTodayMissions, completeTodayMission, hasTodayCompletedMission, isTodayCompletedMission, keptMissions, saveInProgressMission, getInProgressMission, clearInProgressMission } = useMissionStore();
@@ -311,37 +343,233 @@ export default function MissionDetailScreen() {
     }
   }, [mission.id, isTodayCompletedMission, memories, getInProgressMission]);
 
-  // Pinch-to-zoom gesture handler
-  const handlePinchMove = (evt: GestureResponderEvent) => {
+  // Calculate max pan boundaries based on scale and image dimensions
+  // Image is displayed with contentFit="contain", so it fills width on portrait screens
+  const getMaxPan = useCallback((scale: number) => {
+    // For a portrait photo (4:3) on portrait screen:
+    // Image fills width, so maxPanX = width * (scale - 1) / 2
+    // Image height is proportional, maxPanY needs to account for aspect ratio
+    const imageAspectRatio = 4 / 3; // Typical phone camera aspect ratio
+
+    let displayedWidth = width;
+    let displayedHeight = width / imageAspectRatio;
+
+    // If image would be taller than screen, it's constrained by height instead
+    if (displayedHeight > height) {
+      displayedHeight = height;
+      displayedWidth = height * imageAspectRatio;
+    }
+
+    // Max pan is half the overflow (scaled size - screen size) / 2
+    // But we also need to divide by scale since translation is applied before scale
+    const maxPanX = Math.max(0, (displayedWidth * scale - width) / 2 / scale);
+    const maxPanY = Math.max(0, (displayedHeight * scale - height) / 2 / scale);
+
+    return { maxPanX, maxPanY };
+  }, [width, height]);
+
+  // Enlarged photo gesture handlers (pinch-to-zoom and pan) - using Animated for smooth performance
+  const handleEnlargedGesture = (evt: GestureResponderEvent) => {
     const touches = evt.nativeEvent.touches;
+
     if (touches.length === 2) {
+      // Pinch to zoom - zoom at pinch focal point
       const touch1 = touches[0];
       const touch2 = touches[1];
 
+      // Calculate pinch center (focal point)
+      const focalX = (touch1.pageX + touch2.pageX) / 2;
+      const focalY = (touch1.pageY + touch2.pageY) / 2;
+
+      // Calculate pinch distance
       const dx = touch1.pageX - touch2.pageX;
       const dy = touch1.pageY - touch2.pageY;
       const distance = Math.sqrt(dx * dx + dy * dy);
 
-      if (lastPinchDistance.current !== null) {
-        const diff = distance - lastPinchDistance.current;
-        // Adjust zoom based on pinch distance change
-        setZoom((prevZoom) => {
-          const newZoom = prevZoom + diff * 0.003; // Sensitivity factor
-          return Math.max(0, Math.min(1, newZoom));
-        });
+      if (lastEnlargedPinchDistance.current === null) {
+        // First pinch - save initial state
+        lastEnlargedPinchDistance.current = distance;
+        initialPinchScale.current = enlargedScaleRef.current;
+        pinchFocalPointRef.current = { x: focalX, y: focalY };
+      } else {
+        const oldScale = enlargedScaleRef.current;
+        // Smoother scale calculation with reduced sensitivity
+        const scaleMultiplier = distance / lastEnlargedPinchDistance.current;
+        const newScale = Math.max(1, Math.min(4, initialPinchScale.current * scaleMultiplier));
+
+        // Update pinch distance for continuous scaling
+        lastEnlargedPinchDistance.current = distance;
+        initialPinchScale.current = newScale;
+
+        // Zoom around focal point: adjust translation so focal point stays in place
+        const centerX = width / 2;
+        const centerY = height / 2;
+
+        // Calculate how much to adjust translation to keep focal point fixed
+        const scaleRatio = newScale / oldScale;
+        const focalOffsetX = (pinchFocalPointRef.current!.x - centerX) / oldScale;
+        const focalOffsetY = (pinchFocalPointRef.current!.y - centerY) / oldScale;
+
+        // New translation keeps the focal point in the same screen position
+        let newTranslateX = enlargedTranslateXRef.current * scaleRatio + focalOffsetX * (1 - scaleRatio);
+        let newTranslateY = enlargedTranslateYRef.current * scaleRatio + focalOffsetY * (1 - scaleRatio);
+
+        // Get proper boundaries
+        const { maxPanX, maxPanY } = getMaxPan(newScale);
+
+        enlargedScaleRef.current = newScale;
+        enlargedScaleAnim.setValue(newScale);
+        setEnlargedScaleDisplay(Math.round(newScale * 10) / 10);
+
+        // Reset translation if scale goes back to 1
+        if (newScale <= 1.01) {
+          enlargedTranslateXRef.current = 0;
+          enlargedTranslateYRef.current = 0;
+          enlargedTranslateXAnim.setValue(0);
+          enlargedTranslateYAnim.setValue(0);
+        } else {
+          // Clamp to boundaries
+          enlargedTranslateXRef.current = Math.max(-maxPanX, Math.min(maxPanX, newTranslateX));
+          enlargedTranslateYRef.current = Math.max(-maxPanY, Math.min(maxPanY, newTranslateY));
+          enlargedTranslateXAnim.setValue(enlargedTranslateXRef.current);
+          enlargedTranslateYAnim.setValue(enlargedTranslateYRef.current);
+        }
       }
-      lastPinchDistance.current = distance;
+    } else if (touches.length === 1 && enlargedScaleRef.current > 1) {
+      // Pan when zoomed in
+      const touch = touches[0];
+      const now = Date.now();
+
+      if (lastEnlargedPanPosition.current === null) {
+        lastEnlargedPanPosition.current = { x: touch.pageX, y: touch.pageY };
+        lastPanTimeRef.current = now;
+        panVelocityRef.current = { vx: 0, vy: 0 };
+      } else {
+        const dx = (touch.pageX - lastEnlargedPanPosition.current.x) / enlargedScaleRef.current;
+        const dy = (touch.pageY - lastEnlargedPanPosition.current.y) / enlargedScaleRef.current;
+        const dt = Math.max(now - lastPanTimeRef.current, 1);
+
+        // Calculate velocity
+        panVelocityRef.current = {
+          vx: dx / dt * 16,
+          vy: dy / dt * 16,
+        };
+
+        // Get proper boundaries
+        const { maxPanX, maxPanY } = getMaxPan(enlargedScaleRef.current);
+        const newX = Math.max(-maxPanX, Math.min(maxPanX, enlargedTranslateXRef.current + dx));
+        const newY = Math.max(-maxPanY, Math.min(maxPanY, enlargedTranslateYRef.current + dy));
+
+        enlargedTranslateXRef.current = newX;
+        enlargedTranslateYRef.current = newY;
+        enlargedTranslateXAnim.setValue(newX);
+        enlargedTranslateYAnim.setValue(newY);
+
+        lastEnlargedPanPosition.current = { x: touch.pageX, y: touch.pageY };
+        lastPanTimeRef.current = now;
+      }
     }
   };
 
-  const handlePinchEnd = () => {
-    lastPinchDistance.current = null;
+  const handleEnlargedGestureEnd = () => {
+    // Get current boundaries
+    const { maxPanX, maxPanY } = getMaxPan(enlargedScaleRef.current);
+
+    // Clamp to boundaries with spring animation
+    const clampedX = Math.max(-maxPanX, Math.min(maxPanX, enlargedTranslateXRef.current));
+    const clampedY = Math.max(-maxPanY, Math.min(maxPanY, enlargedTranslateYRef.current));
+
+    // If out of bounds, spring back
+    if (Math.abs(clampedX - enlargedTranslateXRef.current) > 0.1 ||
+        Math.abs(clampedY - enlargedTranslateYRef.current) > 0.1) {
+      enlargedTranslateXRef.current = clampedX;
+      enlargedTranslateYRef.current = clampedY;
+      Animated.parallel([
+        Animated.spring(enlargedTranslateXAnim, {
+          toValue: clampedX,
+          useNativeDriver: true,
+          tension: 200,
+          friction: 20,
+        }),
+        Animated.spring(enlargedTranslateYAnim, {
+          toValue: clampedY,
+          useNativeDriver: true,
+          tension: 200,
+          friction: 20,
+        }),
+      ]).start();
+    }
+
+    // Reset tracking state
+    lastEnlargedPinchDistance.current = null;
+    lastEnlargedPanPosition.current = null;
+    pinchFocalPointRef.current = null;
+    initialPinchScale.current = enlargedScaleRef.current;
+    panVelocityRef.current = { vx: 0, vy: 0 };
   };
 
+  const resetEnlargedZoom = () => {
+    enlargedScaleRef.current = 1;
+    enlargedTranslateXRef.current = 0;
+    enlargedTranslateYRef.current = 0;
+    enlargedScaleAnim.setValue(1);
+    enlargedTranslateXAnim.setValue(0);
+    enlargedTranslateYAnim.setValue(0);
+    setEnlargedScaleDisplay(1);
+  };
+
+  // Handle tap on camera for focus
+  const handleCameraTap = useCallback((x: number, y: number) => {
+    console.log('[Camera] Tap at:', { x, y });
+
+    // Check if device supports focus
+    if (!device?.supportsFocus) {
+      console.log('[Camera] Device does not support focus');
+      return;
+    }
+
+    // Cancel any existing timeout
+    if (focusTimeoutRef.current) {
+      clearTimeout(focusTimeoutRef.current);
+      focusTimeoutRef.current = null;
+    }
+
+    // Update focus point for UI indicator
+    setFocusPoint({ x, y });
+
+    // Animate focus indicator with improved animation - bounce in effect
+    focusAnimValue.setValue(0);
+    Animated.spring(focusAnimValue, {
+      toValue: 1,
+      tension: 180,
+      friction: 7,
+      useNativeDriver: true,
+    }).start();
+
+    // Focus the camera - use pixel coordinates directly (not normalized)
+    if (cameraRef.current) {
+      cameraRef.current.focus({ x, y })
+        .then(() => console.log('[Camera] Focus set at pixel:', x.toFixed(0), y.toFixed(0)))
+        .catch((error: unknown) => console.log('[Camera] Focus error:', error));
+    }
+
+    // Auto-hide with fade out after 1.5 seconds
+    focusTimeoutRef.current = setTimeout(() => {
+      Animated.timing(focusAnimValue, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start(() => {
+        setFocusPoint(null);
+      });
+    }, 1500);
+  }, [device, focusAnimValue]);
+
+
   const handleTakePhoto = async () => {
-    if (!permission?.granted) {
-      const result = await requestPermission();
-      if (!result.granted) {
+    if (!hasPermission) {
+      const granted = await requestPermission();
+      if (!granted) {
         Alert.alert(
           t('missionDetail.camera.permissionRequired'),
           t('missionDetail.camera.permissionMessage'),
@@ -357,13 +585,30 @@ export default function MissionDetailScreen() {
     if (cameraRef.current && !isCapturing) {
       setIsCapturing(true);
       try {
-        const photo = await cameraRef.current.takePictureAsync({
-          quality: 1.0, // Maximum quality at capture
+        // Vision Camera uses takePhoto with quality settings
+        const photo = await cameraRef.current.takePhoto({
+          flash: flashEnabled ? 'on' : 'off',
+          enableShutterSound: true,
         });
 
         if (photo) {
-          // Get original image dimensions
-          RNImage.getSize(photo.uri, async (originalWidth: number, originalHeight: number) => {
+          // Vision Camera returns path without file:// prefix
+          const photoUri = `file://${photo.path}`;
+
+          // Show preview with loading indicator while processing
+          setPreviewPhoto(null); // Don't show raw photo
+          setIsProcessingPhoto(true);
+          setShowPreview(true);
+          showPreviewRef.current = true; // Track for async callback
+          setIsCapturing(false);
+
+          // Get original image dimensions and process
+          RNImage.getSize(photoUri, async (originalWidth: number, originalHeight: number) => {
+            // Check if user already went back (cancelled preview) using ref
+            if (!showPreviewRef.current) {
+              setIsProcessingPhoto(false);
+              return;
+            }
             try {
               const isLandscapeImage = originalWidth > originalHeight;
               const manipulations: ImageManipulator.Action[] = [];
@@ -384,54 +629,125 @@ export default function MissionDetailScreen() {
                 currentHeight = originalWidth;
               }
 
-              // Step 2: Flip horizontally for selfie (front camera)
-              if (facing === 'front') {
-                manipulations.push({ flip: ImageManipulator.FlipType.Horizontal });
-              }
+              // Front camera photos are kept mirrored (like the viewfinder)
+              // No horizontal flip - this keeps the "selfie" appearance users expect
 
-              // NO CROPPING HERE - Keep full photo for preview
-              // Cropping will be done in handleConfirmPhoto
-
-              // Apply only rotation and flip (if any)
-              let resultUri = photo.uri;
+              // Apply rotation first
+              let processedUri = photoUri;
               if (manipulations.length > 0) {
                 const result = await ImageManipulator.manipulateAsync(
-                  photo.uri,
+                  photoUri,
                   manipulations,
-                  { format: ImageManipulator.SaveFormat.JPEG, compress: 0.95 } // Higher quality for preview
+                  { format: ImageManipulator.SaveFormat.JPEG, compress: 1 }
                 );
-                resultUri = result.uri;
-                console.log('[Camera] Full photo after rotation/flip:', currentWidth, 'x', currentHeight);
-              } else {
-                console.log('[Camera] Full photo (no manipulation):', originalWidth, 'x', originalHeight);
+                processedUri = result.uri;
+                console.log('[Camera] Photo after rotation:', currentWidth, 'x', currentHeight);
               }
 
-              // Set the full image for preview - calculate actual aspect ratio
-              const actualAspect = currentWidth / currentHeight;
-              setPhotoAspectRatio(actualAspect);
-              setIsLandscapePhoto(actualAspect >= 1);
-              setPreviewPhoto(resultUri);
-              setShowPreview(true);
+              // Step 2: First crop to VIEWFINDER aspect (screen aspect)
+              // The viewfinder fills the screen, so it shows a cropped view of the sensor
+              // We need to match that crop so preview shows exactly what user saw
+              const photoAspect = currentWidth / currentHeight;
+              const screenAspect = width / height; // What user saw in viewfinder
+
+              if (photoAspect > screenAspect) {
+                // Photo is wider than viewfinder - crop sides to match viewfinder
+                const viewfinderCropHeight = currentHeight;
+                const viewfinderCropWidth = Math.round(currentHeight * screenAspect);
+                const viewfinderCropX = Math.round((currentWidth - viewfinderCropWidth) / 2);
+                const viewfinderCropY = 0;
+
+                console.log('[Camera] Step 1 - Cropping to viewfinder:', {
+                  viewfinderCropX, viewfinderCropY, viewfinderCropWidth, viewfinderCropHeight,
+                  photoAspect: photoAspect.toFixed(3), screenAspect: screenAspect.toFixed(3)
+                });
+
+                const viewfinderResult = await ImageManipulator.manipulateAsync(
+                  processedUri,
+                  [{ crop: { originX: viewfinderCropX, originY: viewfinderCropY, width: viewfinderCropWidth, height: viewfinderCropHeight } }],
+                  { format: ImageManipulator.SaveFormat.JPEG, compress: 1 }
+                );
+                processedUri = viewfinderResult.uri;
+                currentWidth = viewfinderCropWidth;
+                currentHeight = viewfinderCropHeight;
+              }
+
+              // Step 3: Crop to 3:4 photocard aspect ratio (final saved format)
+              const currentAspect = currentWidth / currentHeight;
+              const targetAspect = 3 / 4;
+
+              if (Math.abs(currentAspect - targetAspect) > 0.01) {
+                let cropWidth: number;
+                let cropHeight: number;
+                let cropX: number;
+                let cropY: number;
+
+                if (currentAspect > targetAspect) {
+                  // Photo is wider than 3:4 - crop sides
+                  cropHeight = currentHeight;
+                  cropWidth = Math.round(cropHeight * targetAspect);
+                  cropX = Math.round((currentWidth - cropWidth) / 2);
+                  cropY = 0;
+                } else {
+                  // Photo is taller than 3:4 - crop top/bottom
+                  cropWidth = currentWidth;
+                  cropHeight = Math.round(cropWidth / targetAspect);
+                  cropX = 0;
+                  cropY = Math.round((currentHeight - cropHeight) / 2);
+                }
+
+                console.log('[Camera] Step 2 - Cropping to 3:4:', { cropX, cropY, cropWidth, cropHeight });
+
+                const croppedResult = await ImageManipulator.manipulateAsync(
+                  processedUri,
+                  [{ crop: { originX: cropX, originY: cropY, width: cropWidth, height: cropHeight } }],
+                  { format: ImageManipulator.SaveFormat.JPEG, compress: 1 }
+                );
+                processedUri = croppedResult.uri;
+                currentWidth = cropWidth;
+                currentHeight = cropHeight;
+              }
+
+              // Step 4: Resize if too large and apply final compression for optimal quality/size balance
+              // Target: max 1500px width (1500x2000 for 3:4) with 0.85 compression = ~1-1.5MB
+              const maxWidth = 1500;
+              const finalManipulations: ImageManipulator.Action[] = [];
+
+              if (currentWidth > maxWidth) {
+                const scaledHeight = Math.round(currentHeight * (maxWidth / currentWidth));
+                finalManipulations.push({ resize: { width: maxWidth, height: scaledHeight } });
+                console.log('[Camera] Step 3 - Resizing:', currentWidth, 'x', currentHeight, '→', maxWidth, 'x', scaledHeight);
+              }
+
+              // Apply final resize (if needed) and compression
+              const finalResult = await ImageManipulator.manipulateAsync(
+                processedUri,
+                finalManipulations,
+                { format: ImageManipulator.SaveFormat.JPEG, compress: 0.85 }
+              );
+              processedUri = finalResult.uri;
+              console.log('[Camera] Final photo ready with 85% quality compression');
+
+              // Set the processed photo and stop loading
+              setPreviewPhoto(processedUri);
+              setIsProcessingPhoto(false);
             } catch (manipError) {
               console.error('Image manipulation error:', manipError);
-              setPhotoAspectRatio(3 / 4);
-              setIsLandscapePhoto(false);
-              setPreviewPhoto(photo.uri);
-              setShowPreview(true);
+              // Fallback to original photo on error
+              setPreviewPhoto(photoUri);
+              setIsProcessingPhoto(false);
             }
           }, (error: Error) => {
             console.error('Failed to get original image size:', error);
-            setPhotoAspectRatio(3 / 4);
-            setIsLandscapePhoto(false);
-            setPreviewPhoto(photo.uri);
-            setShowPreview(true);
+            // Fallback to original photo on error
+            setPreviewPhoto(photoUri);
+            setIsProcessingPhoto(false);
           });
         }
       } catch (error) {
         console.error('Failed to take picture:', error);
         Alert.alert(t('common.error'), t('missionDetail.camera.photoError'));
-      } finally {
-        setIsCapturing(false);
+        setIsCapturing(false); // Only reset on capture failure (not in finally, as success already resets)
       }
     }
   };
@@ -506,63 +822,14 @@ export default function MissionDetailScreen() {
 
   const handleConfirmPhoto = async () => {
     if (previewPhoto) {
-      // Apply 3:4 crop to the full photo before saving
-      // This ensures the best quality by cropping at the end
+      // Photo is already cropped to 3:4 in handleCapture, so just use it directly
       try {
-        // Get the actual image dimensions
-        const imageDimensions = await new Promise<{ width: number; height: number }>((resolve, reject) => {
-          RNImage.getSize(
-            previewPhoto,
-            (imgWidth, imgHeight) => resolve({ width: imgWidth, height: imgHeight }),
-            reject
-          );
-        });
-
-        const { width: imgWidth, height: imgHeight } = imageDimensions;
-        const currentAspect = imgWidth / imgHeight;
-        const targetAspect = 3 / 4;
-
-        let croppedPhotoUri = previewPhoto;
-
-        // Only crop if aspect ratio differs from target
-        if (Math.abs(currentAspect - targetAspect) > 0.01) {
-          let cropWidth: number;
-          let cropHeight: number;
-          let cropX: number;
-          let cropY: number;
-
-          if (currentAspect > targetAspect) {
-            // Photo is wider than 3:4 - crop sides (center crop)
-            cropHeight = imgHeight;
-            cropWidth = Math.round(cropHeight * targetAspect);
-            cropX = Math.round((imgWidth - cropWidth) / 2);
-            cropY = 0;
-          } else {
-            // Photo is taller than 3:4 - crop top/bottom (center crop)
-            cropWidth = imgWidth;
-            cropHeight = Math.round(cropWidth / targetAspect);
-            cropX = 0;
-            cropY = Math.round((imgHeight - cropHeight) / 2);
-          }
-
-          console.log('[Camera] Applying 3:4 crop:', { cropX, cropY, cropWidth, cropHeight });
-
-          const croppedResult = await ImageManipulator.manipulateAsync(
-            previewPhoto,
-            [{ crop: { originX: cropX, originY: cropY, width: cropWidth, height: cropHeight } }],
-            { format: ImageManipulator.SaveFormat.JPEG, compress: 0.92 }
-          );
-          croppedPhotoUri = croppedResult.uri;
-          console.log('[Camera] Cropped photo saved:', croppedPhotoUri);
-        }
-
-        // Now set the cropped photo as the captured photo
-        setCapturedPhoto(croppedPhotoUri);
+        // Set the preview photo as the captured photo (already 3:4)
+        setCapturedPhoto(previewPhoto);
         setPhotoTaken(true);
-        setPhotoAspectRatio(3 / 4); // Now it's 3:4
-        setIsLandscapePhoto(false); // 3:4 is always portrait
         setShowCamera(false);
         setShowPreview(false);
+        showPreviewRef.current = false;
         setPreviewPhoto(null);
 
         // Get current location when photo is confirmed
@@ -572,14 +839,14 @@ export default function MissionDetailScreen() {
         // Save to in-progress mission data for persistence
         saveInProgressMission({
           missionId: mission.id,
-          capturedPhoto: croppedPhotoUri,
+          capturedPhoto: previewPhoto,
         });
 
         // Start synced mission progress if sync is initialized
         if (isSyncInitialized && couple?.id) {
           try {
             // Upload photo to storage first
-            const uploadedPhotoUrl = await db.storage.uploadPhoto(couple.id, croppedPhotoUri);
+            const uploadedPhotoUrl = await db.storage.uploadPhoto(couple.id, previewPhoto);
 
             if (uploadedPhotoUrl) {
               // Update capturedPhoto state to the remote URL to prevent duplicate uploads
@@ -623,6 +890,7 @@ export default function MissionDetailScreen() {
         setPhotoTaken(true);
         setShowCamera(false);
         setShowPreview(false);
+        showPreviewRef.current = false;
         setPreviewPhoto(null);
       }
     }
@@ -631,6 +899,9 @@ export default function MissionDetailScreen() {
   const handleRetakePhoto = () => {
     setPreviewPhoto(null);
     setShowPreview(false);
+    showPreviewRef.current = false; // Reset ref for async callbacks
+    setIsCapturing(false);
+    setIsProcessingPhoto(false);
   };
 
   const handleRetakeFromDetail = async () => {
@@ -911,57 +1182,10 @@ export default function MissionDetailScreen() {
 
   // Camera UI
   if (showCamera) {
-    // Show preview after capturing
-    if (showPreview && previewPhoto) {
-      // Calculate preview dimensions based on current photo aspect ratio
-      // Max dimensions for preview area
-      const maxPreviewWidth = width * 0.85;
-      const maxPreviewHeight = maxPreviewWidth * (4 / 3);
-
-      // Calculate actual preview size based on photo aspect ratio
-      let previewWidth: number;
-      let previewHeight: number;
-
-      if (photoAspectRatio >= 1) {
-        // Landscape or square - fit to width
-        previewWidth = maxPreviewWidth;
-        previewHeight = previewWidth / photoAspectRatio;
-        // If height exceeds max, scale down
-        if (previewHeight > maxPreviewHeight) {
-          previewHeight = maxPreviewHeight;
-          previewWidth = previewHeight * photoAspectRatio;
-        }
-      } else {
-        // Portrait - fit to height first, then check width
-        previewHeight = maxPreviewHeight;
-        previewWidth = previewHeight * photoAspectRatio;
-        // If width exceeds max, scale down
-        if (previewWidth > maxPreviewWidth) {
-          previewWidth = maxPreviewWidth;
-          previewHeight = previewWidth / photoAspectRatio;
-        }
-      }
-
-      const previewTop = (height - previewHeight) / 2 - 40;
-
-      // Calculate 3:4 crop guide dimensions within the preview
-      // The crop will be applied to the center of the image
-      const targetAspect = 3 / 4;
-      let cropGuideWidth: number;
-      let cropGuideHeight: number;
-
-      if (photoAspectRatio > targetAspect) {
-        // Photo is wider than 3:4 - crop sides
-        cropGuideHeight = previewHeight;
-        cropGuideWidth = cropGuideHeight * targetAspect;
-      } else {
-        // Photo is taller than 3:4 - crop top/bottom
-        cropGuideWidth = previewWidth;
-        cropGuideHeight = cropGuideWidth / targetAspect;
-      }
-
-      const cropGuideLeft = (previewWidth - cropGuideWidth) / 2;
-      const cropGuideTop = (previewHeight - cropGuideHeight) / 2;
+    // Show preview after capturing - display as photocard (same as memories page)
+    if (showPreview) {
+      // Photocard width: 90% of screen (same as memories FlipCard)
+      const photocardWidth = width * 0.9;
 
       return (
         <View style={styles.cameraContainer}>
@@ -980,78 +1204,33 @@ export default function MissionDetailScreen() {
             <View style={styles.headerSpacer} />
           </View>
 
-          {/* Photo Preview - shows full photo with crop guide overlay */}
-          <View style={[styles.previewFrameContainer, {
-            position: 'absolute',
-            top: previewTop,
-            left: (width - previewWidth) / 2,
-            width: previewWidth,
-            height: previewHeight,
-            borderWidth: 0, // Remove border since we have crop guide
-            backgroundColor: 'transparent',
-          }]}>
-            <ExpoImage
-              source={{ uri: previewPhoto }}
-              style={styles.previewFrameImage}
-              contentFit="contain"
-              cachePolicy="memory-disk"
-              transition={100}
-            />
-
-            {/* Crop Guide Overlay - shows which part will be kept */}
-            {(photoAspectRatio !== targetAspect) && (
-              <View style={StyleSheet.absoluteFill} pointerEvents="none">
-                {/* Top dark area (will be cropped) */}
-                {cropGuideTop > 0 && (
-                  <View style={[styles.cropGuideOverlay, {
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    height: cropGuideTop,
-                  }]} />
-                )}
-                {/* Bottom dark area (will be cropped) */}
-                {cropGuideTop > 0 && (
-                  <View style={[styles.cropGuideOverlay, {
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    height: cropGuideTop,
-                  }]} />
-                )}
-                {/* Left dark area (will be cropped) */}
-                {cropGuideLeft > 0 && (
-                  <View style={[styles.cropGuideOverlay, {
-                    top: cropGuideTop,
-                    left: 0,
-                    width: cropGuideLeft,
-                    height: cropGuideHeight,
-                  }]} />
-                )}
-                {/* Right dark area (will be cropped) */}
-                {cropGuideLeft > 0 && (
-                  <View style={[styles.cropGuideOverlay, {
-                    top: cropGuideTop,
-                    right: 0,
-                    width: cropGuideLeft,
-                    height: cropGuideHeight,
-                  }]} />
-                )}
-                {/* Crop area border */}
-                <View style={[styles.cropGuideBorder, {
-                  top: cropGuideTop,
-                  left: cropGuideLeft,
-                  width: cropGuideWidth,
-                  height: cropGuideHeight,
-                }]} />
-              </View>
-            )}
+          {/* Photocard Preview - same size as memories page FlipCard */}
+          <View style={styles.photocardPreviewContainer}>
+            <View style={[styles.photocardPreview, { width: photocardWidth }]}>
+              {isProcessingPhoto ? (
+                // Show loading indicator while processing
+                <View style={styles.previewLoadingContainer}>
+                  <ActivityIndicator size="large" color={COLORS.white} />
+                  <Text style={styles.previewLoadingText}>{t('common.loading')}</Text>
+                </View>
+              ) : previewPhoto ? (
+                <ExpoImage
+                  source={{ uri: previewPhoto }}
+                  style={styles.photocardPreviewImage}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                  transition={100}
+                />
+              ) : null}
+            </View>
           </View>
 
-          {/* Confirm Button */}
-          <Pressable onPress={handleConfirmPhoto} style={styles.floatingConfirmButton}>
-            <Text style={styles.confirmButtonText}>{t('missionDetail.camera.usePhoto')}</Text>
-          </Pressable>
+          {/* Confirm Button - only show when photo is ready */}
+          {!isProcessingPhoto && previewPhoto && (
+            <Pressable onPress={handleConfirmPhoto} style={styles.floatingConfirmButton}>
+              <Text style={styles.confirmButtonText}>{t('missionDetail.camera.usePhoto')}</Text>
+            </Pressable>
+          )}
         </View>
       );
     }
@@ -1061,19 +1240,66 @@ export default function MissionDetailScreen() {
       <View style={styles.cameraContainer}>
         <View
           style={styles.cameraViewfinder}
-          onTouchMove={handlePinchMove}
-          onTouchEnd={handlePinchEnd}
-          onTouchCancel={handlePinchEnd}
+          onTouchEnd={(evt) => {
+            // Handle single-finger taps for focus (pinch zoom is handled by VisionCamera)
+            if (evt.nativeEvent.touches.length === 0 && evt.nativeEvent.changedTouches.length === 1) {
+              const touch = evt.nativeEvent.changedTouches[0];
+              handleCameraTap(touch.locationX, touch.locationY);
+            }
+          }}
         >
-          <CameraView
-            ref={cameraRef}
-            style={StyleSheet.absoluteFill}
-            facing={facing}
-            mode="picture"
-            zoom={zoom}
-            enableTorch={flashEnabled && facing === 'back'}
-            autofocus="on"
-          />
+          {device ? (
+            <VisionCamera
+              ref={cameraRef}
+              style={StyleSheet.absoluteFill}
+              device={device}
+              isActive={showCamera}
+              photo={true}
+              format={format}
+              photoHdr={format?.supportsPhotoHdr}
+              photoQualityBalance="quality"
+              zoom={device?.neutralZoom ?? 1}
+              enableZoomGesture={true}
+              torch={flashEnabled && facing === 'back' ? 'on' : 'off'}
+              videoStabilizationMode="cinematic-extended"
+              lowLightBoost={device?.supportsLowLightBoost}
+              onError={handleCameraError}
+            />
+          ) : (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={COLORS.white} />
+              <Text style={styles.loadingText}>{t('common.loading')}</Text>
+            </View>
+          )}
+
+          {/* Focus Indicator - pointerEvents none so taps pass through */}
+          {focusPoint && (
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.focusIndicator,
+                {
+                  left: focusPoint.x - 45,
+                  top: focusPoint.y - 45,
+                  transform: [
+                    {
+                      scale: focusAnimValue.interpolate({
+                        inputRange: [0, 0.5, 1],
+                        outputRange: [1.4, 0.9, 1],
+                      }),
+                    },
+                  ],
+                  opacity: focusAnimValue.interpolate({
+                    inputRange: [0, 0.3, 1],
+                    outputRange: [0, 1, 1],
+                  }),
+                },
+              ]}
+            >
+              <View style={styles.focusIndicatorInner} />
+            </Animated.View>
+          )}
+
         </View>
 
         {/* Camera Header */}
@@ -1082,6 +1308,7 @@ export default function MissionDetailScreen() {
             onPress={() => {
               setShowCamera(false);
               setShowPreview(false);
+              showPreviewRef.current = false;
               setPreviewPhoto(null);
             }}
             style={styles.cameraBackButton}
@@ -1101,17 +1328,6 @@ export default function MissionDetailScreen() {
             )}
           </Pressable>
         </View>
-
-        {/* Zoom Level Indicator - 1.0x to 4.0x */}
-        {zoom > 0.01 && (
-          <View style={styles.zoomIndicatorContainer}>
-            <View style={styles.zoomIndicator}>
-              <Text style={styles.zoomIndicatorText}>
-                {(1.0 + zoom * 3.0).toFixed(1)}x
-              </Text>
-            </View>
-          </View>
-        )}
 
         {/* Capture Button and Camera Switch */}
         <View style={styles.captureButtonContainer}>
@@ -1232,8 +1448,8 @@ export default function MissionDetailScreen() {
                       <Pressable onPress={() => setShowEnlargedPhoto(true)}>
                         <ExpoImage
                           source={{ uri: capturedPhoto }}
-                          style={[styles.photoPreview, { aspectRatio: photoAspectRatio }]}
-                          contentFit="contain"
+                          style={styles.photoPreview}
+                          contentFit="cover"
                           cachePolicy="memory-disk"
                           transition={100}
                         />
@@ -1445,34 +1661,61 @@ export default function MissionDetailScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Enlarged Photo Modal */}
+      {/* Enlarged Photo Modal with pinch-to-zoom */}
       <Modal
         visible={showEnlargedPhoto}
         transparent
         animationType="fade"
-        onRequestClose={() => setShowEnlargedPhoto(false)}
+        onRequestClose={() => {
+          resetEnlargedZoom();
+          setShowEnlargedPhoto(false);
+        }}
       >
-        <Pressable
+        <View
           style={styles.enlargedPhotoOverlay}
-          onPress={() => setShowEnlargedPhoto(false)}
+          onTouchMove={handleEnlargedGesture}
+          onTouchEnd={handleEnlargedGestureEnd}
+          onTouchCancel={handleEnlargedGestureEnd}
         >
           <View style={styles.enlargedPhotoContainer}>
             {capturedPhoto && (
-              <ExpoImage
-                source={{ uri: capturedPhoto }}
-                style={styles.enlargedPhoto}
-                contentFit="contain"
-                cachePolicy="memory-disk"
-              />
+              <Animated.View
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  transform: [
+                    { scale: enlargedScaleAnim },
+                    { translateX: enlargedTranslateXAnim },
+                    { translateY: enlargedTranslateYAnim },
+                  ],
+                }}
+              >
+                <ExpoImage
+                  source={{ uri: capturedPhoto }}
+                  style={styles.enlargedPhoto}
+                  contentFit="contain"
+                  cachePolicy="memory-disk"
+                />
+              </Animated.View>
             )}
           </View>
+          {/* Close button */}
           <Pressable
             style={styles.enlargedPhotoCloseButton}
-            onPress={() => setShowEnlargedPhoto(false)}
+            onPress={() => {
+              resetEnlargedZoom();
+              setShowEnlargedPhoto(false);
+            }}
           >
             <X color={COLORS.white} size={28} />
           </Pressable>
-        </Pressable>
+          {/* Zoom indicator - only show when zoomed */}
+          {enlargedScaleDisplay > 1 && (
+            <View style={styles.zoomLevelIndicator}>
+              <Text style={styles.zoomLevelText}>{enlargedScaleDisplay.toFixed(1)}x</Text>
+            </View>
+          )}
+        </View>
       </Modal>
     </View>
   );
@@ -1841,14 +2084,14 @@ const styles = StyleSheet.create({
     right: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 40,
+    justifyContent: 'space-between',
+    paddingHorizontal: 60,
   },
   captureButtonSpacer: {
-    flex: 1,
+    width: 50, // Match camera switch button width for balance
   },
   cameraSwitchContainer: {
-    flex: 1,
+    width: 50, // Fixed width to prevent layout shift
     alignItems: 'center',
   },
   cameraSwitchButton: {
@@ -2301,6 +2544,41 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.8)',
     borderRadius: 12,
   },
+  // Photocard preview styles (matches memories FlipCard)
+  photocardPreviewContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 80, // Space for header
+    paddingBottom: 100, // Space for button
+  },
+  photocardPreview: {
+    aspectRatio: 3 / 4,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#000',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  photocardPreviewImage: {
+    width: '100%',
+    height: '100%',
+  },
+  previewLoadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.black,
+  },
+  previewLoadingText: {
+    color: COLORS.white,
+    fontSize: 14,
+    marginTop: 12,
+    opacity: 0.7,
+  },
   // Enlarged photo modal styles
   enlargedPhotoOverlay: {
     flex: 1,
@@ -2328,5 +2606,62 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  zoomLevelIndicator: {
+    position: 'absolute',
+    bottom: 100,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  zoomLevelText: {
+    color: COLORS.white,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  // Focus indicator styles (tap to focus)
+  focusIndicator: {
+    position: 'absolute',
+    width: 90,
+    height: 90,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  focusIndicatorInner: {
+    width: 90,
+    height: 90,
+    borderWidth: 2,
+    borderColor: '#FFD700',
+    borderRadius: 6,
+    backgroundColor: 'transparent',
+  },
+  // Camera error styles
+  cameraErrorText: {
+    color: COLORS.white,
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  cameraErrorDetail: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 20,
+    paddingHorizontal: 40,
+  },
+  cameraErrorButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 100,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  cameraErrorButtonText: {
+    color: COLORS.white,
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

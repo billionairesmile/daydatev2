@@ -38,6 +38,7 @@ import {
   Gift,
   Target,
   MessageSquare,
+  Clock,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -45,8 +46,8 @@ import { useTranslation } from 'react-i18next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { COLORS, SPACING, RADIUS } from '@/constants/design';
-import { useOnboardingStore, useAuthStore, useMemoryStore, useLanguageStore, getLanguageDisplayName, useSubscriptionStore } from '@/stores';
-import type { SupportedLanguage } from '@/stores';
+import { useOnboardingStore, useAuthStore, useMemoryStore, useLanguageStore, getLanguageDisplayName, useSubscriptionStore, useTimezoneStore, getTimezoneDisplayName, COMMON_TIMEZONES } from '@/stores';
+import type { SupportedLanguage, TimezoneId } from '@/stores';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
 import { db, isDemoMode } from '@/lib/supabase';
 import { signOut as supabaseSignOut } from '@/lib/socialAuth';
@@ -61,6 +62,7 @@ export default function SettingsScreen() {
   const { signOut, couple, user, setIsOnboardingComplete } = useAuthStore();
   const { memories } = useMemoryStore();
   const { language, setLanguage } = useLanguageStore();
+  const { timezone, updateTimezoneInDb, getEffectiveTimezone } = useTimezoneStore();
   const { isPremium } = useSubscriptionStore();
 
   // Notification settings
@@ -78,6 +80,9 @@ export default function SettingsScreen() {
 
   // Language selection modal
   const [showLanguageModal, setShowLanguageModal] = useState(false);
+
+  // Timezone selection modal
+  const [showTimezoneModal, setShowTimezoneModal] = useState(false);
 
   // Policy modal
   const [policyModalVisible, setPolicyModalVisible] = useState(false);
@@ -190,6 +195,14 @@ export default function SettingsScreen() {
   const handleLanguageSelect = (langCode: SupportedLanguage) => {
     setLanguage(langCode);
     setShowLanguageModal(false);
+  };
+
+  const handleTimezoneSelect = async (tzId: TimezoneId) => {
+    setShowTimezoneModal(false);
+    if (couple?.id) {
+      // Save to DB for couple-level sync
+      await updateTimezoneInDb(couple.id, tzId);
+    }
   };
 
   const openPolicyModal = (url: string, title: string) => {
@@ -534,6 +547,21 @@ export default function SettingsScreen() {
 
           <View style={styles.settingDivider} />
 
+          <Pressable style={styles.menuItem} onPress={() => setShowTimezoneModal(true)}>
+            <View style={styles.settingItemLeft}>
+              <View style={styles.iconWrapper}>
+                <Clock color={COLORS.black} size={20} />
+              </View>
+              <Text style={styles.settingItemLabel}>{t('settings.other.timezone')}</Text>
+            </View>
+            <View style={styles.languageValue}>
+              <Text style={styles.languageValueText}>{getTimezoneDisplayName(timezone)}</Text>
+              <ChevronRight color="#999" size={20} />
+            </View>
+          </Pressable>
+
+          <View style={styles.settingDivider} />
+
           <View style={styles.versionItem}>
             <View style={styles.settingItemLeft}>
               <View style={styles.iconWrapper}>
@@ -645,6 +673,60 @@ export default function SettingsScreen() {
                 )}
               </Pressable>
             ))}
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Timezone Selection Modal */}
+      <Modal
+        visible={showTimezoneModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowTimezoneModal(false)}
+      >
+        <Pressable
+          style={styles.languageModalOverlay}
+          onPress={() => setShowTimezoneModal(false)}
+        >
+          <View style={styles.timezoneModalContent}>
+            <Text style={styles.languageModalTitle}>{t('settings.other.selectTimezone')}</Text>
+            <Text style={styles.timezoneHint}>{t('settings.other.timezoneHint')}</Text>
+
+            <ScrollView style={styles.timezoneScrollView} showsVerticalScrollIndicator={false}>
+              {/* Auto (Device) Option */}
+              <Pressable
+                style={styles.languageOption}
+                onPress={() => handleTimezoneSelect('auto')}
+              >
+                <View style={styles.languageOptionLeft}>
+                  <Text style={styles.languageOptionName}>{t('settings.other.timezoneAuto')}</Text>
+                  <Text style={styles.languageOptionSubname}>{t('settings.other.timezoneAutoDesc')}</Text>
+                </View>
+                {timezone === 'auto' && (
+                  <Check color="#4caf50" size={20} />
+                )}
+              </Pressable>
+
+              {/* Manual Timezones */}
+              <Text style={styles.timezoneManualHeader}>{t('settings.other.timezoneManual')}</Text>
+              {COMMON_TIMEZONES.map((tz) => (
+                <Pressable
+                  key={tz.id}
+                  style={styles.languageOption}
+                  onPress={() => handleTimezoneSelect(tz.id)}
+                >
+                  <View style={styles.languageOptionLeft}>
+                    <Text style={styles.languageOptionName}>{tz.label}</Text>
+                    <Text style={styles.languageOptionSubname}>
+                      UTC{tz.offset >= 0 ? '+' : ''}{tz.offset}
+                    </Text>
+                  </View>
+                  {timezone === tz.id && (
+                    <Check color="#4caf50" size={20} />
+                  )}
+                </Pressable>
+              ))}
+            </ScrollView>
           </View>
         </Pressable>
       </Modal>
@@ -1026,6 +1108,33 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#999',
     marginTop: 2,
+  },
+  // Timezone Selection Styles
+  timezoneModalContent: {
+    width: '100%',
+    maxWidth: 360,
+    maxHeight: '80%',
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.md,
+    padding: SPACING.lg,
+  },
+  timezoneScrollView: {
+    flexGrow: 0,
+  },
+  timezoneHint: {
+    fontSize: 13,
+    color: '#999',
+    textAlign: 'center',
+    marginBottom: SPACING.md,
+  },
+  timezoneManualHeader: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#999',
+    marginTop: SPACING.md,
+    marginBottom: SPACING.sm,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   // Policy Modal Styles
   policyModalContainer: {

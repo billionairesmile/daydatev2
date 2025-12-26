@@ -38,6 +38,7 @@ import { useBackground } from '@/contexts';
 import { useMemoryStore, SAMPLE_MEMORIES } from '@/stores/memoryStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useCoupleSyncStore, type SyncedTodo } from '@/stores/coupleSyncStore';
+import { useTimezoneStore } from '@/stores/timezoneStore';
 import { isDemoMode } from '@/lib/supabase';
 import { BannerAdView } from '@/components/ads';
 
@@ -306,6 +307,7 @@ export default function CalendarScreen() {
   const { backgroundImage } = useBackground();
   const { memories, loadFromDB } = useMemoryStore();
   const { couple } = useAuthStore();
+  const { getEffectiveTimezone } = useTimezoneStore();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<number | null>(null);
   const [localTodos, setLocalTodos] = useState<LocalTodo[]>([]); // Fallback for non-synced mode
@@ -573,8 +575,30 @@ export default function CalendarScreen() {
     return isWeekend(day) || !!getHolidayForDate(day);
   };
 
+  // Get today's date in the selected timezone
+  const getTodayInTimezone = (): Date => {
+    const timezone = getEffectiveTimezone();
+    const now = new Date();
+    try {
+      const options: Intl.DateTimeFormatOptions = {
+        timeZone: timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      };
+      const parts = new Intl.DateTimeFormat('en-CA', options).formatToParts(now);
+      const y = parseInt(parts.find(p => p.type === 'year')?.value || '0');
+      const m = parseInt(parts.find(p => p.type === 'month')?.value || '1') - 1;
+      const d = parseInt(parts.find(p => p.type === 'day')?.value || '1');
+      return new Date(y, m, d);
+    } catch (e) {
+      // Fallback to local date
+      return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    }
+  };
+
   const isToday = (day: number) => {
-    const today = new Date();
+    const today = getTodayInTimezone();
     return (
       today.getFullYear() === year &&
       today.getMonth() === month &&
@@ -596,7 +620,7 @@ export default function CalendarScreen() {
   const getCycleOffsetRange = (): { start: number; end: number } => {
     if (!lastPeriodDate || !cycleLength) return { start: 0, end: 0 };
 
-    const today = new Date();
+    const today = getTodayInTimezone();
     // 3 months from current month (end of that month)
     const threeMonthsAhead = new Date(today.getFullYear(), today.getMonth() + 4, 0);
 
@@ -672,7 +696,7 @@ export default function CalendarScreen() {
   const calculatePeriodInfo = () => {
     if (!lastPeriodDate || !cycleLength) return null;
 
-    const today = new Date();
+    const today = getTodayInTimezone();
     const nextPeriodDate = new Date(lastPeriodDate);
     nextPeriodDate.setDate(nextPeriodDate.getDate() + cycleLength);
 
@@ -695,7 +719,7 @@ export default function CalendarScreen() {
   };
 
   const getCurrentDateTodos = () => {
-    const today = new Date();
+    const today = getTodayInTimezone();
     if (selectedDate) {
       // Use selected date with current displayed month/year
       const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(selectedDate).padStart(2, '0')}`;
@@ -709,7 +733,7 @@ export default function CalendarScreen() {
 
   const handleAddTodo = async () => {
     if (todoText.trim()) {
-      const today = new Date();
+      const today = getTodayInTimezone();
       let dateKey: string;
 
       if (selectedDate) {

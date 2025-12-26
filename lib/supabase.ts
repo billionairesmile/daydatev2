@@ -457,6 +457,48 @@ export const db = {
       return { data, error };
     },
 
+    // Update timezone for a couple
+    async updateTimezone(coupleId: string, timezone: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('couples')
+        .update({ timezone })
+        .eq('id', coupleId)
+        .select()
+        .single();
+      return { data, error };
+    },
+
+    // Subscribe to couple updates (for timezone sync, etc.)
+    subscribeToCoupleUpdates(
+      coupleId: string,
+      callback: (payload: { timezone: string | null }) => void
+    ) {
+      const client = getSupabase();
+      const channel = client
+        .channel(`couple_updates:${coupleId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'couples',
+            filter: `id=eq.${coupleId}`,
+          },
+          (payload) => {
+            const record = payload.new as { timezone: string | null };
+            callback({ timezone: record.timezone });
+          }
+        )
+        .subscribe();
+      return channel;
+    },
+
+    unsubscribeFromCoupleUpdates(channel: ReturnType<SupabaseClient['channel']>) {
+      const client = getSupabase();
+      client.removeChannel(channel);
+    },
+
     // Soft delete - disconnect couple (30-day recovery period)
     // reason: 'unpaired' (manual disconnect) or 'account_deleted' (user deleted account)
     async disconnect(coupleId: string, userId: string, reason: 'unpaired' | 'account_deleted' = 'unpaired') {

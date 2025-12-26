@@ -41,6 +41,7 @@ export interface Couple {
   datingStartDate?: Date; // For 100-day anniversary calculation
   weddingDate?: Date; // For wedding anniversary (if married)
   relationshipType?: 'dating' | 'married'; // Relationship type for anniversary display
+  timezone?: string; // Shared timezone for the couple ('auto' or IANA timezone string)
   status: CoupleStatus;
   disconnectedAt?: Date; // For 30-day recovery period
   disconnectedBy?: string; // user_id who initiated disconnect

@@ -128,7 +128,8 @@
       "permissionMessage": "Se necesita permiso de cámara para tomar fotos.",
       "photoError": "Error al tomar la foto. Inténtalo de nuevo.",
       "usePhoto": "Usar Foto",
-      "retake": "Repetir"
+      "retake": "Repetir",
+      "pinchToZoom": "Pellizcar para zoom"
     },
     "location": {
       "noInfo": "Ubicación no disponible"
@@ -470,6 +471,13 @@
     "other": {
       "language": "Idioma",
       "selectLanguage": "Seleccionar Idioma",
+      "timezone": "Zona horaria",
+      "selectTimezone": "Seleccionar zona horaria",
+      "timezoneAuto": "Auto (Configuración del dispositivo)",
+      "timezoneAutoDesc": "Sigue la zona horaria de tu dispositivo",
+      "timezoneManual": "Selección manual",
+      "timezoneManualDesc": "Zona horaria manual para parejas a distancia",
+      "timezoneHint": "Se aplica al reinicio de misiones y cálculos de D-day",
       "termsOfService": "Términos de Servicio",
       "locationTerms": "Términos de Ubicación",
       "privacyPolicy": "Política de Privacidad",

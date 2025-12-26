@@ -6,16 +6,21 @@ import type { Mission } from '@/types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { useMemoryStore, dbToCompletedMission } from './memoryStore';
 import { formatDateToLocal } from '@/lib/dateUtils';
+import { getTodayInTimezone } from './timezoneStore';
 import { offlineQueue, OfflineOperationType } from '@/lib/offlineQueue';
 import { getIsOnline } from '@/lib/useNetwork';
 import {
   notifyPartnerMissionGenerated,
   notifyMissionReminder,
+  notifyPartnerMessageWritten,
   scheduleMissionReminderNotification,
   cancelMissionReminderNotification,
+  scheduleHourlyReminders,
+  cancelHourlyReminders,
 } from '@/lib/pushNotifications';
 import { useLanguageStore } from './languageStore';
 import { useSubscriptionStore } from './subscriptionStore';
+import { useAuthStore } from './authStore';
 
 // Types
 export interface SyncedTodo {
@@ -317,7 +322,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     // 1. Mission subscription
     missionChannel = db.coupleMissions.subscribeToMissions(coupleId, (payload) => {
       const missions = payload.missions as Mission[];
-      const today = formatDateToLocal(new Date());
+      const today = getTodayInTimezone();
       set({
         sharedMissions: missions,
         sharedMissionsDate: today, // Set the date when receiving missions via real-time
@@ -410,7 +415,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     // 7. Mission progress subscription (handles multiple missions per day)
     progressChannel = db.missionProgress.subscribeToProgress(coupleId, (payload) => {
       const progress = payload.progress as MissionProgress;
-      const today = formatDateToLocal(new Date());
+      const today = getTodayInTimezone();
 
       // Only process progress for today
       if (progress.date !== today) return;
@@ -715,7 +720,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
 
   saveSharedMissions: async (missions: Mission[], answers: unknown, partnerId?: string, userNickname?: string) => {
     const { coupleId, userId } = get();
-    const today = formatDateToLocal(new Date());
+    const today = getTodayInTimezone();
 
     if (!coupleId || !userId || isInTestMode()) {
       set({ sharedMissions: missions, sharedMissionsDate: today, lastMissionUpdate: new Date() });
@@ -763,7 +768,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     const { data, error } = await db.coupleMissions.getToday(coupleId);
     set({ isLoadingMissions: false });
 
-    const today = formatDateToLocal(new Date());
+    const today = getTodayInTimezone();
 
     if (!error && data) {
       const missions = data.missions as Mission[];
@@ -843,7 +848,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     }
 
     // Check if mission date is still today (don't send reminders for past missions after midnight)
-    const today = formatDateToLocal(new Date());
+    const today = getTodayInTimezone();
     if (activeMissionProgress.date !== today) {
       console.log('[CoupleSyncStore] Mission date is not today - skipping reminder (mission date:', activeMissionProgress.date, ', today:', today, ')');
       return;
@@ -929,7 +934,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
   // Check and reset shared missions if date changed (called from missionStore.checkAndResetMissions)
   checkAndResetSharedMissions: () => {
     const { sharedMissionsDate, sharedMissions, allMissionProgress } = get();
-    const today = formatDateToLocal(new Date());
+    const today = getTodayInTimezone();
 
     // Only reset if we have missions AND the date is explicitly set to a different day
     // IMPORTANT: If sharedMissionsDate is null but missions exist, we should NOT reset
@@ -1381,7 +1386,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
         completed_at: null,
         status: 'photo_pending',
         location: null,
-        date: formatDateToLocal(new Date()),
+        date: getTodayInTimezone(),
         is_message_locked: false,
       };
 
@@ -1434,6 +1439,12 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     }
 
     await db.missionProgress.uploadPhoto(targetProgress.id, photoUrl);
+
+    // Schedule hourly reminder notifications after photo is uploaded
+    const language = useLanguageStore.getState().language;
+    scheduleHourlyReminders(language).catch((err) => {
+      console.error('[CoupleSyncStore] Failed to schedule hourly reminders:', err);
+    });
   },
 
   submitMissionMessage: async (message: string, progressId?: string) => {
@@ -1450,30 +1461,40 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       return;
     }
 
+    // Get user info for notifications
+    const language = useLanguageStore.getState().language;
+    const currentUserNickname = useAuthStore.getState().user?.nickname || '';
+    const isUser1 = targetProgress.user1_id === userId;
+    const partnerId = isUser1 ? targetProgress.user2_id : targetProgress.user1_id;
+
+    // Check if both will have messages after this submission
+    const hasUser1Message = isUser1 ? true : !!targetProgress.user1_message;
+    const hasUser2Message = isUser1 ? !!targetProgress.user2_message : true;
+    const willBeCompleted = hasUser1Message && hasUser2Message;
+
     if (isInTestMode()) {
       // Demo mode: update locally
-      const isUser1 = targetProgress.user1_id === userId;
       const now = new Date().toISOString();
 
       const updates: Partial<MissionProgress> = isUser1
         ? { user1_message: message, user1_message_at: now }
         : { user2_id: userId, user2_message: message, user2_message_at: now };
 
-      const hasUser1Message = isUser1 ? true : !!targetProgress.user1_message;
-      const hasUser2Message = isUser1 ? !!targetProgress.user2_message : true;
-
       // Set is_message_locked if this is the first message and no mission is locked yet
       if (!lockedMissionId) {
         updates.is_message_locked = true;
       }
 
-      if (hasUser1Message && hasUser2Message) {
+      if (willBeCompleted) {
         updates.status = 'completed';
         updates.completed_at = now;
 
-        // Cancel scheduled reminder since mission is completed
-        cancelMissionReminderNotification().catch((err) => {
-          console.error('[CoupleSyncStore] Failed to cancel reminder notification:', err);
+        // Cancel all scheduled reminders since mission is completed
+        Promise.all([
+          cancelMissionReminderNotification(),
+          cancelHourlyReminders(),
+        ]).catch((err) => {
+          console.error('[CoupleSyncStore] Failed to cancel reminder notifications:', err);
         });
       } else {
         updates.status = 'waiting_partner';
@@ -1495,8 +1516,23 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       return;
     }
 
-    const isUser1 = targetProgress.user1_id === userId;
     await db.missionProgress.submitMessage(targetProgress.id, userId, message, isUser1);
+
+    // Handle notifications after message submission
+    if (willBeCompleted) {
+      // Mission is completed - cancel all reminders
+      Promise.all([
+        cancelMissionReminderNotification(),
+        cancelHourlyReminders(),
+      ]).catch((err) => {
+        console.error('[CoupleSyncStore] Failed to cancel reminder notifications:', err);
+      });
+    } else if (partnerId) {
+      // Mission not complete yet - notify partner that message was written
+      notifyPartnerMessageWritten(partnerId, currentUserNickname, language).catch((err) => {
+        console.error('[CoupleSyncStore] Failed to send partner message notification:', err);
+      });
+    }
   },
 
   updateMissionLocation: async (location: string, progressId?: string) => {
