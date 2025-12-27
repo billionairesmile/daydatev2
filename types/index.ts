@@ -170,6 +170,9 @@ export interface FeaturedMission {
   isActive: boolean;
   priority: number;
   targetAudience: string;
+  // Additional promotional content (affiliate links, 1-2 sentences)
+  additionalContent?: string;
+  additionalContentEn?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }

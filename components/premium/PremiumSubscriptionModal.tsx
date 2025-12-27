@@ -11,7 +11,6 @@ import {
   StatusBar,
   Alert,
   SafeAreaView,
-  Image,
 } from 'react-native';
 import {
   Crown,
@@ -22,6 +21,7 @@ import {
   X,
   Image as ImageIcon,
 } from 'lucide-react-native';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
 
@@ -148,7 +148,8 @@ export default function PremiumSubscriptionModal({
             <Image
               source={require('@/assets/images/daydate-logo.png')}
               style={styles.headerLogo}
-              resizeMode="contain"
+              contentFit="contain"
+              cachePolicy="memory-disk"
             />
             <Pressable onPress={onClose} style={styles.closeButton}>
               <X color={COLORS.black} size={24} />

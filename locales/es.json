@@ -8,6 +8,7 @@
     "edit": "Editar",
     "done": "Listo",
     "add": "Añadir",
+    "adding": "Añadiendo...",
     "reset": "Restablecer",
     "close": "Cerrar",
     "next": "Siguiente",
@@ -199,7 +200,14 @@
       "emptyHint": "Toca para añadir una tarea",
       "addPlaceholder": "Ej: Reservar entradas de cine",
       "addTitle": "Escribe tu tarea",
-      "add": "Añadir Tarea"
+      "add": "Añadir Tarea",
+      "editTitle": "Editar Tarea",
+      "edit": "Editar",
+      "delete": "Borrar",
+      "deleteConfirmTitle": "Eliminar Tarea",
+      "deleteConfirmMessage": "¿Estás seguro de que quieres eliminar esta tarea?",
+      "deleteConfirmCancel": "Cancelar",
+      "deleteConfirmOk": "Eliminar"
     },
     "period": {
       "title": "Info del Período",

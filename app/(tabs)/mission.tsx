@@ -5,7 +5,6 @@ import {
   StyleSheet,
   Pressable,
   Animated,
-  Image,
   Platform,
   Alert,
   Modal,
@@ -469,7 +468,7 @@ export default function MissionScreen() {
 
       try {
         const imagePromises = imagesToLoad.map(mission =>
-          Image.prefetch(`${mission.imageUrl}?w=800&h=1000&fit=crop`)
+          ExpoImage.prefetch(`${mission.imageUrl}?w=800&h=1000&fit=crop`)
         );
 
         // Wait for all images to prefetch (with timeout fallback)
@@ -589,7 +588,7 @@ export default function MissionScreen() {
               },
             ]}
           >
-            <View style={styles.cardInner}>
+            <View style={styles.cardInnerAd}>
               <NativeAdMissionCard />
             </View>
           </Animated.View>
@@ -982,10 +981,11 @@ function MissionCardContent({ mission, onStartPress, onKeepPress, isKept, canSta
   return (
     <View style={styles.cardContentWrapper}>
       {/* Background Image */}
-      <Image
+      <ExpoImage
         source={{ uri: `${mission.imageUrl}?w=800&h=1000&fit=crop` }}
         style={styles.cardImage}
-        resizeMode="cover"
+        contentFit="cover"
+        cachePolicy="memory-disk"
         onLoad={onImageLoad}
       />
 
@@ -1171,6 +1171,12 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 45,
     overflow: 'hidden',
+  },
+  cardInnerAd: {
+    flex: 1,
+    borderRadius: 45,
+    // NO overflow: hidden for ad cards - causes "asset boundaries" error
+    backgroundColor: '#000000',
   },
   cardPressable: {
     flex: 1,

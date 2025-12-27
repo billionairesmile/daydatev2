@@ -133,6 +133,9 @@ export interface FeaturedMission {
   is_active: boolean;
   priority: number;
   target_audience: string;
+  // Additional promotional content (affiliate links, 1-2 sentences)
+  additional_content?: string;
+  additional_content_en?: string;
   created_at?: string;
   updated_at?: string;
 }

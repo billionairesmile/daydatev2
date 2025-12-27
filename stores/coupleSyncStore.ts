@@ -13,6 +13,7 @@ import {
   notifyPartnerMissionGenerated,
   notifyMissionReminder,
   notifyPartnerMessageWritten,
+  notifyPartnerPhotoUploaded,
   scheduleMissionReminderNotification,
   cancelMissionReminderNotification,
   scheduleHourlyReminders,
@@ -193,6 +194,7 @@ interface CoupleSyncActions {
   // Todo sync
   addTodo: (date: string, text: string) => Promise<SyncedTodo | null>;
   toggleTodo: (todoId: string, completed: boolean) => Promise<void>;
+  updateTodo: (todoId: string, text: string) => Promise<void>;
   deleteTodo: (todoId: string) => Promise<void>;
   loadTodos: () => Promise<void>;
   getTodosByDate: (date: string) => SyncedTodo[];
@@ -1055,8 +1057,9 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       console.warn('[Bookmark] DB fetch failed, using local state:', fetchError);
     }
 
-    // Check if already bookmarked (max 5)
-    if (bookmarkList.length >= 5) {
+    // Check if bookmark limit reached (premium: unlimited, free: max 5)
+    const { canBookmarkMission } = useSubscriptionStore.getState();
+    if (!canBookmarkMission(bookmarkList.length)) {
       console.log('[Bookmark] Limit reached:', bookmarkList.length);
       return false;
     }
@@ -1152,8 +1155,9 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     const { coupleId, userId, sharedTodos } = get();
 
     // Create local todo first (optimistic update)
+    // Use timestamp + random string to ensure unique ID even with rapid clicks
     const newTodo: SyncedTodo = {
-      id: `local-${Date.now()}`,
+      id: `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       couple_id: coupleId || 'demo',
       date,
       text,
@@ -1274,6 +1278,36 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     } catch (error) {
       console.log('[CoupleSyncStore] Network error - queueing delete for later sync');
       await offlineQueue.add('DELETE_TODO', { todoId, coupleId, userId });
+    }
+  },
+
+  updateTodo: async (todoId: string, text: string) => {
+    const { sharedTodos, coupleId, userId } = get();
+
+    // Optimistic update - update local state immediately
+    set({
+      sharedTodos: sharedTodos.map((t) =>
+        t.id === todoId ? { ...t, text } : t
+      ),
+    });
+
+    if (isInTestMode()) {
+      return;
+    }
+
+    // Check if online
+    const isOnline = getIsOnline();
+    if (!isOnline) {
+      console.log('[CoupleSyncStore] Offline - queueing update for later sync');
+      await offlineQueue.add('UPDATE_TODO', { todoId, text, coupleId, userId });
+      return;
+    }
+
+    try {
+      await db.coupleTodos.updateText(todoId, text);
+    } catch (error) {
+      console.log('[CoupleSyncStore] Network error - queueing update for later sync');
+      await offlineQueue.add('UPDATE_TODO', { todoId, text, coupleId, userId });
     }
   },
 
@@ -1444,7 +1478,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
   },
 
   uploadMissionPhoto: async (photoUrl: string, progressId?: string) => {
-    const { activeMissionProgress, allMissionProgress } = get();
+    const { activeMissionProgress, allMissionProgress, lockedMissionId } = get();
     const targetId = progressId || activeMissionProgress?.id;
     const targetProgress = progressId
       ? allMissionProgress.find(p => p.id === progressId)
@@ -1474,11 +1508,48 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
 
     await db.missionProgress.uploadPhoto(targetProgress.id, photoUrl);
 
-    // Schedule hourly reminder notifications after photo is uploaded
-    const language = useLanguageStore.getState().language;
-    scheduleHourlyReminders(language).catch((err) => {
-      console.error('[CoupleSyncStore] Failed to schedule hourly reminders:', err);
-    });
+    // Only schedule hourly reminders and notify partner if:
+    // 1. No mission is locked yet, OR
+    // 2. This mission is the locked mission
+    // Don't schedule reminders for non-locked missions when another mission is locked
+    const shouldScheduleReminders = !lockedMissionId || lockedMissionId === targetProgress.mission_id;
+
+    if (shouldScheduleReminders) {
+      const language = useLanguageStore.getState().language;
+      const { userId } = get();
+      const currentUserNickname = useAuthStore.getState().user?.nickname || '';
+
+      // Get partner info for notifications
+      if (userId && targetProgress) {
+        const isUser1 = targetProgress.user1_id === userId;
+        const partnerId = isUser1 ? targetProgress.user2_id : targetProgress.user1_id;
+
+        if (partnerId) {
+          // Fetch partner nickname for hourly reminders
+          db.profiles.get(partnerId).then(({ data: partnerProfile }) => {
+            const partnerNickname = partnerProfile?.nickname || '';
+
+            // Schedule local hourly reminders for current user with partner's nickname
+            scheduleHourlyReminders(partnerNickname, language).catch((err) => {
+              console.error('[CoupleSyncStore] Failed to schedule hourly reminders:', err);
+            });
+          }).catch((err) => {
+            console.error('[CoupleSyncStore] Failed to get partner profile:', err);
+            // Fallback: schedule without nickname
+            scheduleHourlyReminders('', language).catch((err2) => {
+              console.error('[CoupleSyncStore] Failed to schedule hourly reminders:', err2);
+            });
+          });
+
+          // Send push notification to partner
+          notifyPartnerPhotoUploaded(partnerId, currentUserNickname, language).catch((err) => {
+            console.error('[CoupleSyncStore] Failed to notify partner of photo upload:', err);
+          });
+        }
+      }
+    } else {
+      console.log('[CoupleSyncStore] Skipping hourly reminders - another mission is locked');
+    }
   },
 
   submitMissionMessage: async (message: string, progressId?: string) => {
@@ -1597,7 +1668,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
   },
 
   loadMissionProgress: async () => {
-    const { coupleId } = get();
+    const { coupleId, userId } = get();
     if (!coupleId || isInTestMode()) return;
 
     set({ isLoadingProgress: true });
@@ -1617,6 +1688,45 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
         activeMissionProgress: active,
         lockedMissionId: lockedId,
       });
+
+      // Schedule hourly reminders if there's a relevant mission with photo but no message from current user
+      // Only for the locked mission (or first mission if none locked)
+      const relevantProgress = lockedProgress || allProgress[0];
+      if (relevantProgress && userId) {
+        const hasPhoto = !!relevantProgress.photo_url;
+        const isUser1 = relevantProgress.user1_id === userId;
+        const currentUserHasMessage = isUser1
+          ? !!relevantProgress.user1_message
+          : !!relevantProgress.user2_message;
+        const isCompleted = relevantProgress.status === 'completed';
+
+        // Schedule reminders if: has photo, not completed, current user hasn't written message
+        if (hasPhoto && !isCompleted && !currentUserHasMessage) {
+          const language = useLanguageStore.getState().language;
+          const partnerId = isUser1 ? relevantProgress.user2_id : relevantProgress.user1_id;
+
+          // Fetch partner nickname for hourly reminders
+          if (partnerId) {
+            db.profiles.get(partnerId).then(({ data: partnerProfile }) => {
+              const partnerNickname = partnerProfile?.nickname || '';
+              scheduleHourlyReminders(partnerNickname, language).catch((err) => {
+                console.error('[CoupleSyncStore] Failed to schedule hourly reminders on load:', err);
+              });
+            }).catch((err) => {
+              console.error('[CoupleSyncStore] Failed to get partner profile on load:', err);
+              // Fallback: schedule without nickname
+              scheduleHourlyReminders('', language).catch((err2) => {
+                console.error('[CoupleSyncStore] Failed to schedule hourly reminders on load:', err2);
+              });
+            });
+          }
+        } else if (isCompleted) {
+          // Cancel reminders if mission is already completed
+          cancelHourlyReminders().catch((err) => {
+            console.error('[CoupleSyncStore] Failed to cancel hourly reminders on load:', err);
+          });
+        }
+      }
     }
   },
 

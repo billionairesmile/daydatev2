@@ -8,7 +8,7 @@ export type FAQItem = {
   category: string;
 };
 
-export const FAQ_DATA: Record<'ko' | 'en' | 'es' | 'zh-TW', FAQItem[]> = {
+export const FAQ_DATA: Record<'ko' | 'en' | 'es' | 'zh-TW' | 'ja', FAQItem[]> = {
   ko: [
     {
       id: 'ko-1',
@@ -66,12 +66,18 @@ export const FAQ_DATA: Record<'ko' | 'en' | 'es' | 'zh-TW', FAQItem[]> = {
     },
     {
       id: 'ko-10',
+      question: '장거리 커플이라 시간대가 달라요. 시간대를 맞출 수 있나요?',
+      answer: '네, 가능해요. 더보기 > 설정 > 시간대에서 원하는 시간대를 선택하시면 됩니다. 설정한 시간대를 기준으로 매일 정오에 새로운 미션이 도착하고, 기념일 디데이도 해당 시간대에 맞춰 표시돼요.',
+      category: 'general',
+    },
+    {
+      id: 'ko-11',
       question: '페어링을 해제하면 어떻게 되나요?',
       answer: '페어링이 해제되면 두 분 모두 페어링 화면으로 이동하게 됩니다. 기존 파트너와 30일 이내에 다시 페어링하시면 모든 데이터가 복구됩니다. 새로운 파트너와 페어링하시면 처음부터 다시 시작됩니다. 단, 두 분 중 한 분이라도 계정을 탈퇴하시면 데이터 복구가 불가능합니다.',
       category: 'account',
     },
     {
-      id: 'ko-11',
+      id: 'ko-12',
       question: '계정을 탈퇴하면 어떻게 되나요?',
       answer: '계정 탈퇴 시 파트너와의 페어링이 즉시 해제되며, 모든 데이터가 영구 삭제되어 복구가 불가능합니다.',
       category: 'account',
@@ -134,12 +140,18 @@ export const FAQ_DATA: Record<'ko' | 'en' | 'es' | 'zh-TW', FAQItem[]> = {
     },
     {
       id: 'en-10',
+      question: "We're in a long-distance relationship with different time zones. Can we sync our time zones?",
+      answer: 'Yes, you can. Go to More > Settings > Time Zone and select your preferred time zone. New missions will arrive at noon based on your selected time zone, and anniversary D-days will also be displayed according to that time zone.',
+      category: 'general',
+    },
+    {
+      id: 'en-11',
       question: 'What happens if I unpair?',
       answer: 'When unpairing occurs, both of you will be redirected to the pairing screen. If you re-pair with your previous partner within 30 days, all data will be restored. If you pair with a new partner, you will start fresh. However, if either of you deletes your account, data recovery will not be possible.',
       category: 'account',
     },
     {
-      id: 'en-11',
+      id: 'en-12',
       question: 'What happens if I delete my account?',
       answer: 'When you delete your account, the pairing with your partner is immediately terminated, and all data is permanently deleted and cannot be recovered.',
       category: 'account',
@@ -202,12 +214,18 @@ export const FAQ_DATA: Record<'ko' | 'en' | 'es' | 'zh-TW', FAQItem[]> = {
     },
     {
       id: 'es-10',
+      question: 'Estamos en una relación a distancia con diferentes zonas horarias. ¿Podemos sincronizar nuestras zonas horarias?',
+      answer: 'Sí, es posible. Ve a Más > Configuración > Zona horaria y selecciona tu zona horaria preferida. Las nuevas misiones llegarán al mediodía según tu zona horaria seleccionada, y los D-days de aniversario también se mostrarán según esa zona horaria.',
+      category: 'general',
+    },
+    {
+      id: 'es-11',
       question: '¿Qué pasa si desemparejo?',
       answer: 'Cuando se desempareja, ambos serán redirigidos a la pantalla de emparejamiento. Si vuelven a emparejarse con su pareja anterior en 30 días, todos los datos serán restaurados. Si se emparejan con una nueva pareja, comenzarán desde cero. Sin embargo, si alguno de los dos elimina su cuenta, la recuperación de datos no será posible.',
       category: 'account',
     },
     {
-      id: 'es-11',
+      id: 'es-12',
       question: '¿Qué pasa si elimino mi cuenta?',
       answer: 'Cuando eliminas tu cuenta, el emparejamiento con tu pareja termina inmediatamente y todos los datos se eliminan permanentemente sin posibilidad de recuperación.',
       category: 'account',
@@ -270,14 +288,94 @@ export const FAQ_DATA: Record<'ko' | 'en' | 'es' | 'zh-TW', FAQItem[]> = {
     },
     {
       id: 'zh-TW-10',
+      question: '我們是遠距離情侶，時區不同。可以同步時區嗎？',
+      answer: '可以的。前往更多 > 設定 > 時區，選擇你想要的時區即可。新任務會在你選擇的時區的中午到達，紀念日倒數也會按照該時區顯示。',
+      category: 'general',
+    },
+    {
+      id: 'zh-TW-11',
       question: '解除配對會怎樣？',
       answer: '解除配對後，兩人都會被導向配對畫面。如果在30天內與原來的伴侶重新配對，所有資料都會恢復。如果與新伴侶配對，則會重新開始。但是，如果任何一方刪除帳戶，資料將無法恢復。',
       category: 'account',
     },
     {
-      id: 'zh-TW-11',
+      id: 'zh-TW-12',
       question: '刪除帳戶會怎樣？',
       answer: '刪除帳戶後，與伴侶的配對會立即解除，所有資料將永久刪除且無法恢復。',
+      category: 'account',
+    },
+  ],
+  ja: [
+    {
+      id: 'ja-1',
+      question: 'Daydateはどんなアプリですか？',
+      answer: 'Daydateは毎日新しいデートミッションを提供するカップル専用アプリです。AIがお二人の好み、状況、天気を分析して、ぴったりのデートミッションをおすすめします。完了したミッションは二人だけの大切な思い出として残り、Daydateと一緒に特別な瞬間を積み重ねていくことができます。',
+      category: 'general',
+    },
+    {
+      id: 'ja-2',
+      question: 'ミッションは1日に何個もらえますか？',
+      answer: 'Freeプランは1日1回（3個）、Premiumプランは1日2回（6個）までミッションカードを受け取れます。すべてのミッションは0時にリセットされます。また、Daydateが直接提供する特別ミッションも随時お届けします。',
+      category: 'mission',
+    },
+    {
+      id: 'ja-3',
+      question: 'ミッションはどうやって完了しますか？',
+      answer: 'ミッションカードの「はじめる」ボタンをタップして、認証写真を撮影し、お互いへのひとことを書くとミッションが完了します。認証写真は二人だけの思い出として保存されるので、記憶に残る瞬間を撮ってくださいね。Freeプランは1日1個、Premiumプランは無制限でミッションを完了できます。',
+      category: 'mission',
+    },
+    {
+      id: 'ja-4',
+      question: 'ミッションの写真を撮った後、別のミッションを進めてもいいですか？',
+      answer: 'はい、大丈夫です。ただし、「お互いへのひとこと」を先に書いたミッションがその日に完了できるミッションとして指定されます。',
+      category: 'mission',
+    },
+    {
+      id: 'ja-5',
+      question: 'ミッション完了後に写真を削除したら、やり直せますか？',
+      answer: 'いいえ、一度完了したミッションは写真を削除してもやり直すことはできません。',
+      category: 'mission',
+    },
+    {
+      id: 'ja-6',
+      question: 'ミッションの保存（Keep）数に制限はありますか？',
+      answer: 'Freeプランは最大5個までミッションを保存できます。Premiumプランは個数制限なくミッションを保存できます。',
+      category: 'mission',
+    },
+    {
+      id: 'ja-7',
+      question: '記念日はどこで確認できますか？',
+      answer: 'ホーム画面上部の日付テキストをタップすると、記念日リストを確認できます。',
+      category: 'anniversary',
+    },
+    {
+      id: 'ja-8',
+      question: '記念日の編集・削除はどうすればいいですか？',
+      answer: '自動生成されるデフォルトの記念日（100日、1周年など）は編集・削除できません。自分で追加した記念日のみ編集・削除が可能です。',
+      category: 'anniversary',
+    },
+    {
+      id: 'ja-9',
+      question: 'アルバムはいくつまで作れますか？',
+      answer: 'Freeプランは最大2個までアルバムを作成できます。Premiumプランは個数制限なくアルバムを作成できます。',
+      category: 'album',
+    },
+    {
+      id: 'ja-10',
+      question: '遠距離カップルでタイムゾーンが違います。タイムゾーンを合わせられますか？',
+      answer: 'はい、できます。もっと見る > 設定 > タイムゾーンでお好みのタイムゾーンを選択してください。設定したタイムゾーンを基準に毎日正午に新しいミッションが届き、記念日のDデイもそのタイムゾーンに合わせて表示されます。',
+      category: 'general',
+    },
+    {
+      id: 'ja-11',
+      question: 'ペアリングを解除するとどうなりますか？',
+      answer: 'ペアリングが解除されると、お二人ともペアリング画面に移動します。元のパートナーと30日以内に再度ペアリングすると、すべてのデータが復元されます。新しいパートナーとペアリングすると、最初からやり直しになります。ただし、どちらかがアカウントを削除すると、データの復元はできなくなります。',
+      category: 'account',
+    },
+    {
+      id: 'ja-12',
+      question: 'アカウントを削除するとどうなりますか？',
+      answer: 'アカウント削除時、パートナーとのペアリングは即時解除され、すべてのデータが完全に削除されて復元できなくなります。',
       category: 'account',
     },
   ],

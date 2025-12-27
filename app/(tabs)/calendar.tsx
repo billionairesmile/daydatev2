@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
   Platform,
+  Alert,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -24,6 +25,7 @@ import {
   Circle,
   Check,
   Trash2,
+  Edit2,
   Droplet,
   Calendar as CalendarIcon,
   Clock,
@@ -33,6 +35,7 @@ import {
 } from 'lucide-react-native';
 
 import { useTranslation } from 'react-i18next';
+import { useFocusEffect } from 'expo-router';
 import { COLORS, SPACING, RADIUS } from '@/constants/design';
 import { useBackground } from '@/contexts';
 import { useMemoryStore, SAMPLE_MEMORIES } from '@/stores/memoryStore';
@@ -99,11 +102,21 @@ type Todo = LocalTodo | SyncedTodo;
 function SwipeableTodoItem({
   todo,
   onToggle,
+  onEdit,
   onDelete,
+  onSwipeStart,
+  onSwipeEnd,
+  editLabel,
+  deleteLabel,
 }: {
   todo: Todo;
   onToggle: () => void;
+  onEdit: () => void;
   onDelete: () => void;
+  onSwipeStart?: () => void;
+  onSwipeEnd?: () => void;
+  editLabel: string;
+  deleteLabel: string;
 }) {
   const translateX = useRef(new Animated.Value(0)).current;
   const itemOpacity = useRef(new Animated.Value(1)).current;
@@ -112,16 +125,16 @@ function SwipeableTodoItem({
   const isSwipedRef = useRef(false);
   const gestureStartedRef = useRef(false);
 
-  // Interpolate delete button opacity based on swipe distance
-  const deleteButtonOpacity = translateX.interpolate({
-    inputRange: [-64, -20, 0],
+  // Interpolate action buttons opacity based on swipe distance (120px for two buttons)
+  const actionButtonsOpacity = translateX.interpolate({
+    inputRange: [-120, -40, 0],
     outputRange: [1, 0.5, 0],
     extrapolate: 'clamp',
   });
 
-  // Interpolate delete button scale for nice effect
-  const deleteButtonScale = translateX.interpolate({
-    inputRange: [-64, -32, 0],
+  // Interpolate action buttons scale for nice effect
+  const actionButtonsScale = translateX.interpolate({
+    inputRange: [-120, -60, 0],
     outputRange: [1, 0.8, 0.6],
     extrapolate: 'clamp',
   });
@@ -147,6 +160,8 @@ function SwipeableTodoItem({
       },
       onPanResponderGrant: () => {
         gestureStartedRef.current = true;
+        // Disable parent scroll when swipe starts
+        onSwipeStart?.();
         // Extract current value for smooth continuation
         translateX.extractOffset();
       },
@@ -157,10 +172,10 @@ function SwipeableTodoItem({
         // Calculate new position
         let newValue = gesture.dx;
 
-        // Limit the swipe range
-        if (newValue < -64) {
+        // Limit the swipe range (120px for two buttons)
+        if (newValue < -120) {
           // Add resistance beyond threshold
-          newValue = -64 + (newValue + 64) * 0.2;
+          newValue = -120 + (newValue + 120) * 0.2;
         } else if (newValue > 0) {
           // Allow slight overswipe when closing
           newValue = newValue * 0.3;
@@ -170,19 +185,21 @@ function SwipeableTodoItem({
       },
       onPanResponderRelease: (_, gesture) => {
         gestureStartedRef.current = false;
+        // Re-enable parent scroll when swipe ends
+        onSwipeEnd?.();
         translateX.flattenOffset();
 
         // Get current animated value
         const currentValue = (translateX as any)._value || 0;
         const velocity = gesture.vx;
 
-        // Use velocity and position to determine final state
-        const shouldOpen = currentValue < -24 || velocity < -0.3;
-        const shouldClose = currentValue > -40 || velocity > 0.3;
+        // Use velocity and position to determine final state (adjusted for 120px)
+        const shouldOpen = currentValue < -50 || velocity < -0.3;
+        const shouldClose = currentValue > -70 || velocity > 0.3;
 
         if (shouldOpen && !shouldClose) {
           Animated.spring(translateX, {
-            toValue: -64,
+            toValue: -120,
             useNativeDriver: true,
             tension: 180,
             friction: 12,
@@ -200,6 +217,8 @@ function SwipeableTodoItem({
       },
       onPanResponderTerminate: () => {
         gestureStartedRef.current = false;
+        // Re-enable parent scroll when swipe is terminated
+        onSwipeEnd?.();
         translateX.flattenOffset();
         // Reset to closed state on terminate
         Animated.spring(translateX, {
@@ -236,6 +255,18 @@ function SwipeableTodoItem({
     });
   };
 
+  const handleEdit = () => {
+    // Trigger edit immediately, then close the swipe in background
+    onEdit();
+    isSwipedRef.current = false;
+    Animated.spring(translateX, {
+      toValue: 0,
+      useNativeDriver: true,
+      tension: 180,
+      friction: 12,
+    }).start();
+  };
+
   return (
     <Animated.View
       style={[
@@ -254,18 +285,23 @@ function SwipeableTodoItem({
         }
       ]}
     >
-      {/* Delete Button - Hidden until swiped with animated opacity */}
+      {/* Action Buttons - Hidden until swiped with animated opacity */}
       <Animated.View
         style={[
-          styles.deleteButtonContainer,
+          styles.todoActionsContainer,
           {
-            opacity: deleteButtonOpacity,
-            transform: [{ scale: deleteButtonScale }],
+            opacity: actionButtonsOpacity,
+            transform: [{ scale: actionButtonsScale }],
           }
         ]}
       >
-        <Pressable style={styles.deleteButton} onPress={handleDelete}>
+        <Pressable style={styles.todoEditButton} onPress={handleEdit}>
+          <Edit2 color={COLORS.black} size={18} strokeWidth={2} />
+          <Text style={styles.todoEditButtonText}>{editLabel}</Text>
+        </Pressable>
+        <Pressable style={styles.todoDeleteButton} onPress={handleDelete}>
           <Trash2 color={COLORS.white} size={18} strokeWidth={2} />
+          <Text style={styles.todoDeleteButtonText}>{deleteLabel}</Text>
         </Pressable>
       </Animated.View>
 
@@ -311,8 +347,14 @@ export default function CalendarScreen() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<number | null>(null);
   const [localTodos, setLocalTodos] = useState<LocalTodo[]>([]); // Fallback for non-synced mode
+  const [scrollEnabled, setScrollEnabled] = useState(true); // For disabling scroll during swipe
+  const [swipeResetKey, setSwipeResetKey] = useState(0); // For resetting swipe state on screen focus
   const [isAddTodoOpen, setIsAddTodoOpen] = useState(false);
   const [todoText, setTodoText] = useState('');
+  const [isAddingTodo, setIsAddingTodo] = useState(false);
+  const [isEditTodoOpen, setIsEditTodoOpen] = useState(false);
+  const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
+  const [editTodoText, setEditTodoText] = useState('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [tempMenstrualEnabled, setTempMenstrualEnabled] = useState(false);
   const [isPeriodSettingsOpen, setIsPeriodSettingsOpen] = useState(false);
@@ -328,6 +370,7 @@ export default function CalendarScreen() {
     isInitialized: isSyncInitialized,
     addTodo,
     toggleTodo,
+    updateTodo,
     deleteTodo: deleteSyncedTodo,
     updateMenstrualSettings,
   } = useCoupleSyncStore();
@@ -344,6 +387,7 @@ export default function CalendarScreen() {
   // Modal animations
   const settingsOpacity = useRef(new Animated.Value(0)).current;
   const todoOpacity = useRef(new Animated.Value(0)).current;
+  const editTodoOpacity = useRef(new Animated.Value(0)).current;
   const periodOpacity = useRef(new Animated.Value(0)).current;
 
   const openSettingsModal = () => {
@@ -390,6 +434,31 @@ export default function CalendarScreen() {
     }).start(() => {
       setIsAddTodoOpen(false);
       setTodoText('');
+    });
+  };
+
+  const openEditTodoModal = (todo: Todo) => {
+    setEditingTodo(todo);
+    setEditTodoText(todo.text);
+    editTodoOpacity.setValue(0);
+    setIsEditTodoOpen(true);
+    Animated.timing(editTodoOpacity, {
+      toValue: 1,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const closeEditTodoModal = () => {
+    Keyboard.dismiss();
+    Animated.timing(editTodoOpacity, {
+      toValue: 0,
+      duration: 150,
+      useNativeDriver: true,
+    }).start(() => {
+      setIsEditTodoOpen(false);
+      setEditingTodo(null);
+      setEditTodoText('');
     });
   };
 
@@ -461,6 +530,16 @@ export default function CalendarScreen() {
       loadFromDB(couple.id);
     }
   }, [couple?.id, loadFromDB]);
+
+  // Reset swipe state when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      // Increment key to force SwipeableTodoItem components to reset
+      setSwipeResetKey((prev) => prev + 1);
+      // Also ensure scroll is enabled
+      setScrollEnabled(true);
+    }, [])
+  );
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -763,7 +842,14 @@ export default function CalendarScreen() {
   };
 
   const handleAddTodo = async () => {
-    if (todoText.trim()) {
+    // Prevent duplicate submissions from rapid clicks
+    if (!todoText.trim() || isAddingTodo) {
+      return;
+    }
+
+    setIsAddingTodo(true);
+
+    try {
       const today = getTodayInTimezone();
       let dateKey: string;
 
@@ -781,7 +867,7 @@ export default function CalendarScreen() {
       } else {
         // Fallback to local
         const newTodo: LocalTodo = {
-          id: Date.now().toString(),
+          id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           date: dateKey,
           text: todoText.trim(),
           completed: false,
@@ -791,6 +877,8 @@ export default function CalendarScreen() {
 
       setTodoText('');
       closeTodoModal();
+    } finally {
+      setIsAddingTodo(false);
     }
   };
 
@@ -808,14 +896,50 @@ export default function CalendarScreen() {
     }
   };
 
-  const handleDeleteTodo = async (todo: Todo) => {
-    if (isSyncInitialized && 'couple_id' in todo) {
+  const handleDeleteTodo = (todo: Todo) => {
+    Alert.alert(
+      t('calendar.todo.deleteConfirmTitle'),
+      t('calendar.todo.deleteConfirmMessage'),
+      [
+        {
+          text: t('calendar.todo.deleteConfirmCancel'),
+          style: 'cancel',
+        },
+        {
+          text: t('calendar.todo.deleteConfirmOk'),
+          style: 'destructive',
+          onPress: async () => {
+            if (isSyncInitialized && 'couple_id' in todo) {
+              // Synced todo
+              await deleteSyncedTodo(todo.id);
+            } else {
+              // Local todo
+              setLocalTodos(localTodos.filter((t) => t.id !== todo.id));
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleUpdateTodo = async () => {
+    if (!editingTodo || !editTodoText.trim()) {
+      return;
+    }
+
+    if (isSyncInitialized && 'couple_id' in editingTodo) {
       // Synced todo
-      await deleteSyncedTodo(todo.id);
+      await updateTodo(editingTodo.id, editTodoText.trim());
     } else {
       // Local todo
-      setLocalTodos(localTodos.filter((t) => t.id !== todo.id));
+      setLocalTodos(
+        localTodos.map((t) =>
+          t.id === editingTodo.id ? { ...t, text: editTodoText.trim() } : t
+        )
+      );
     }
+
+    closeEditTodoModal();
   };
 
   // Date Picker helpers
@@ -879,6 +1003,7 @@ export default function CalendarScreen() {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        scrollEnabled={scrollEnabled}
       >
         {/* Calendar Header - Month/Year with Navigation */}
         <View style={styles.monthYearContainer}>
@@ -944,8 +1069,6 @@ export default function CalendarScreen() {
                     style={[
                       styles.dayCellInner,
                       styles.missionCell,
-                      isTodayDay && styles.todayBorder,
-                      isSelectedDay && !isTodayDay && styles.selectedBorder,
                     ]}
                   >
                     <ExpoImage
@@ -965,6 +1088,15 @@ export default function CalendarScreen() {
                         {day}
                       </Text>
                     </View>
+                    {/* Selection/Today indicator overlay - doesn't affect image size */}
+                    {(isTodayDay || isSelectedDay) && (
+                      <View
+                        style={[
+                          styles.missionSelectionOverlay,
+                          isTodayDay ? styles.missionTodayIndicator : styles.missionSelectedIndicator,
+                        ]}
+                      />
+                    )}
                   </Pressable>
                 ) : isTodayDay ? (
                   <Pressable
@@ -1051,10 +1183,15 @@ export default function CalendarScreen() {
             ) : (
               getCurrentDateTodos().map((todo) => (
                 <SwipeableTodoItem
-                  key={todo.id}
+                  key={`${todo.id}-${swipeResetKey}`}
                   todo={todo}
                   onToggle={() => handleToggleTodo(todo)}
+                  onEdit={() => openEditTodoModal(todo)}
                   onDelete={() => handleDeleteTodo(todo)}
+                  onSwipeStart={() => setScrollEnabled(false)}
+                  onSwipeEnd={() => setScrollEnabled(true)}
+                  editLabel={t('calendar.todo.edit')}
+                  deleteLabel={t('calendar.todo.delete')}
                 />
               ))
             )}
@@ -1275,8 +1412,66 @@ export default function CalendarScreen() {
                 </View>
 
                 <View style={styles.modalFooter}>
-                  <Pressable style={styles.modalAddButtonFull} onPress={handleAddTodo}>
-                    <Text style={styles.modalAddButtonText}>{t('common.add')}</Text>
+                  <Pressable
+                    style={[styles.modalAddButtonFull, isAddingTodo && styles.modalAddButtonDisabled]}
+                    onPress={handleAddTodo}
+                    disabled={isAddingTodo}
+                  >
+                    <Text style={styles.modalAddButtonText}>
+                      {isAddingTodo ? t('common.adding') : t('common.add')}
+                    </Text>
+                  </Pressable>
+                </View>
+              </Animated.View>
+            </BlurView>
+          </Animated.View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* Edit Todo Modal */}
+      <Modal
+        visible={isEditTodoOpen}
+        transparent
+        animationType="none"
+        onRequestClose={closeEditTodoModal}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <Animated.View style={[styles.modalOverlay, { opacity: editTodoOpacity }]}>
+            <BlurView intensity={60} tint="dark" style={styles.blurOverlay}>
+              <Animated.View style={[styles.modalContent, { transform: [{ translateY: keyboardOffset }] }]}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>{t('calendar.todo.editTitle')}</Text>
+                  <Pressable
+                    onPress={closeEditTodoModal}
+                    style={styles.modalCloseButton}
+                  >
+                    <X color="rgba(255,255,255,0.8)" size={20} strokeWidth={2} />
+                  </Pressable>
+                </View>
+                <View style={styles.modalHeaderDivider} />
+
+                <View style={styles.modalBody}>
+                  <View style={styles.todoInputContainer}>
+                    <TextInput
+                      style={styles.todoInput}
+                      placeholder={t('calendar.todo.addPlaceholder')}
+                      placeholderTextColor="rgba(255,255,255,0.5)"
+                      value={editTodoText}
+                      onChangeText={setEditTodoText}
+                      maxLength={50}
+                      multiline
+                      numberOfLines={3}
+                    />
+                    <Text style={styles.todoInputCount}>{editTodoText.length}/50</Text>
+                  </View>
+                </View>
+
+                <View style={styles.modalFooter}>
+                  <Pressable
+                    style={styles.modalAddButtonFull}
+                    onPress={handleUpdateTodo}
+                  >
+                    <Text style={styles.modalAddButtonText}>{t('common.save')}</Text>
                   </Pressable>
                 </View>
               </Animated.View>
@@ -1638,6 +1833,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Selection overlay for mission cells - positioned on top without affecting image size
+  missionSelectionOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: RADIUS.full,
+    borderWidth: 2,
+  },
+  missionTodayIndicator: {
+    borderColor: COLORS.primary,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+  },
+  missionSelectedIndicator: {
+    borderColor: '#E8DCC4',
+    shadowColor: '#E8DCC4',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+  },
   missionDayText: {
     fontSize: 14,
     fontWeight: '600',
@@ -1787,27 +2002,56 @@ const styles = StyleSheet.create({
     position: 'relative',
     marginBottom: 4,
   },
-  deleteButtonContainer: {
+  todoActionsContainer: {
     position: 'absolute',
     right: 4,
     top: 0,
     bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'flex-end',
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 8,
+    paddingRight: 4,
     zIndex: 0,
   },
-  // Destructive button - matches todo item height
-  deleteButton: {
-    width: 56,
-    height: '100%',
-    borderRadius: 28,
-    backgroundColor: COLORS.destructive,
+  // Edit button - matches anniversary card style
+  todoEditButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: COLORS.white,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: COLORS.destructive,
-    shadowOffset: { width: 0, height: 4 },
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  // Delete button - matches anniversary card style
+  todoDeleteButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowRadius: 4,
+  },
+  // Button text labels
+  todoEditButtonText: {
+    fontSize: 10,
+    color: COLORS.black,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  todoDeleteButtonText: {
+    fontSize: 10,
+    color: COLORS.white,
+    fontWeight: '600',
+    marginTop: 2,
   },
   // Todo item card - maximum rounded
   todoItem: {
@@ -2057,6 +2301,9 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  modalAddButtonDisabled: {
+    opacity: 0.6,
   },
   modalAddButtonText: {
     fontSize: 15,

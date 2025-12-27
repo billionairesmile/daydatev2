@@ -36,8 +36,6 @@ import {
   MapPin,
   LogOut,
   Gift,
-  Target,
-  MessageSquare,
   Clock,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
@@ -67,8 +65,6 @@ export default function SettingsScreen() {
 
   // Notification settings
   const [pushEnabled, setPushEnabled] = useState(true);
-  const [missionAlert, setMissionAlert] = useState(true);
-  const [partnerActivity, setPartnerActivity] = useState(true);
   const [newsEnabled, setNewsEnabled] = useState(false);
   const [marketingEnabled, setMarketingEnabled] = useState(false);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
@@ -105,8 +101,6 @@ export default function SettingsScreen() {
         const { data: profile } = await db.profiles.get(user.id);
         if (profile) {
           setPushEnabled(profile.push_enabled ?? true);
-          setMissionAlert(profile.mission_alert_enabled ?? true);
-          setPartnerActivity(profile.message_alert_enabled ?? true);
           setNewsEnabled(profile.news_agreed ?? false);
           setMarketingEnabled(profile.marketing_agreed ?? false);
         }
@@ -125,20 +119,6 @@ export default function SettingsScreen() {
     setPushEnabled(value);
     if (user?.id && !isDemoMode) {
       await db.profiles.update(user.id, { push_enabled: value });
-    }
-  };
-
-  const handleMissionAlertChange = async (value: boolean) => {
-    setMissionAlert(value);
-    if (user?.id && !isDemoMode) {
-      await db.profiles.update(user.id, { mission_alert_enabled: value });
-    }
-  };
-
-  const handlePartnerActivityChange = async (value: boolean) => {
-    setPartnerActivity(value);
-    if (user?.id && !isDemoMode) {
-      await db.profiles.update(user.id, { message_alert_enabled: value });
     }
   };
 
@@ -188,6 +168,7 @@ export default function SettingsScreen() {
   const AVAILABLE_LANGUAGES: { code: SupportedLanguage; name: string; nativeName: string }[] = [
     { code: 'ko', name: 'Korean', nativeName: '한국어' },
     { code: 'en', name: 'English', nativeName: 'English' },
+    { code: 'ja', name: 'Japanese', nativeName: '日本語' },
     { code: 'es', name: 'Spanish', nativeName: 'Español' },
     { code: 'zh-TW', name: 'Traditional Chinese', nativeName: '繁體中文' },
   ];
@@ -441,48 +422,6 @@ export default function SettingsScreen() {
               onValueChange={handlePushEnabledChange}
               trackColor={{ false: '#e0e0e0', true: '#4caf50' }}
               thumbColor={COLORS.white}
-            />
-          </View>
-
-          <View style={styles.settingDivider} />
-
-          <View style={styles.settingItem}>
-            <View style={styles.settingItemLeft}>
-              <View style={styles.iconWrapper}>
-                <Target color={COLORS.black} size={20} />
-              </View>
-              <View style={styles.settingItemContent}>
-                <Text style={styles.settingItemLabel}>{t('settings.notifications.mission')}</Text>
-                <Text style={styles.settingItemDescription}>{t('settings.notifications.missionDesc')}</Text>
-              </View>
-            </View>
-            <Switch
-              value={missionAlert}
-              onValueChange={handleMissionAlertChange}
-              trackColor={{ false: '#e0e0e0', true: '#4caf50' }}
-              thumbColor={COLORS.white}
-              disabled={!pushEnabled}
-            />
-          </View>
-
-          <View style={styles.settingDivider} />
-
-          <View style={styles.settingItem}>
-            <View style={styles.settingItemLeft}>
-              <View style={styles.iconWrapper}>
-                <MessageSquare color={COLORS.black} size={20} />
-              </View>
-              <View style={styles.settingItemContent}>
-                <Text style={styles.settingItemLabel}>{t('settings.notifications.message')}</Text>
-                <Text style={styles.settingItemDescription}>{t('settings.notifications.messageDesc')}</Text>
-              </View>
-            </View>
-            <Switch
-              value={partnerActivity}
-              onValueChange={handlePartnerActivityChange}
-              trackColor={{ false: '#e0e0e0', true: '#4caf50' }}
-              thumbColor={COLORS.white}
-              disabled={!pushEnabled}
             />
           </View>
         </View>

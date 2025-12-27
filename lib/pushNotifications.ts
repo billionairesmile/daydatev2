@@ -170,7 +170,13 @@ export async function savePushToken(userId: string, token: string): Promise<bool
     });
 
     if (error) {
-      console.error('[Push] Error saving push token:', error);
+      // Log detailed error info for debugging
+      console.error('[Push] Error saving push token:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+      });
       return false;
     }
 
@@ -197,7 +203,13 @@ export async function removePushToken(userId: string): Promise<boolean> {
     });
 
     if (error) {
-      console.error('[Push] Error removing push token:', error);
+      // Log detailed error info for debugging
+      console.error('[Push] Error removing push token:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+      });
       return false;
     }
 
@@ -238,6 +250,7 @@ export type NotificationType =
   | 'partner_message_waiting'
   | 'partner_message_written'
   | 'hourly_reminder'
+  | 'photo_uploaded'
   | 'couple_unpaired';
 
 export interface SendNotificationParams {
@@ -267,6 +280,10 @@ const notificationMessages = {
       title: '今日任務來了！',
       body: (nickname: string) => `${nickname}建立了今天的任務，快來看看吧！`,
     },
+    ja: {
+      title: '今日のミッションが届きました！',
+      body: (nickname: string) => `${nickname}さんが今日のミッションを作成しました。確認してみてね！`,
+    },
   },
   missionReminder: {
     ko: {
@@ -289,6 +306,11 @@ const notificationMessages = {
       bodyWithPartner: (nickname: string) => `${nickname}留了訊息給你，也寫下你的訊息吧！`,
       bodyWithoutPartner: '互相寫下給對方的話就能完成任務！',
     },
+    ja: {
+      title: 'ミッション完了まであと少し！',
+      bodyWithPartner: (nickname: string) => `${nickname}さんがメッセージを残しました。あなたのメッセージも書いてね！`,
+      bodyWithoutPartner: 'お互いにひとことを書いてミッションを完了しよう！',
+    },
   },
   scheduledReminder: {
     ko: {
@@ -306,6 +328,10 @@ const notificationMessages = {
     'zh-TW': {
       title: '來完成今天的任務吧！',
       body: '還有未完成的任務喔，和另一半一起創造特別的回憶吧 💕',
+    },
+    ja: {
+      title: '今日のミッションを完了しよう！',
+      body: 'まだ完了していないミッションがあるよ。恋人と一緒に特別な思い出を作ろう 💕',
     },
   },
   partnerMessageWritten: {
@@ -325,28 +351,58 @@ const notificationMessages = {
       title: '💌 收到另一半的話了！',
       body: (nickname: string) => `${nickname}留了訊息給你，快去看看吧！`,
     },
+    ja: {
+      title: '💌 お互いへのひとことが届きました！',
+      body: (nickname: string) => `${nickname}さんがメッセージを残しました。今すぐ確認してね！`,
+    },
   },
   hourlyReminder: {
     ko: {
       title: '⏰ 아직 미션이 기다리고 있어요!',
-      body: '서로에게 한마디를 남겨 오늘의 미션을 완료해보세요 💕',
+      body: (nickname: string) => `${nickname}님에게 한마디를 작성해주세요 😘`,
     },
     en: {
       title: "⏰ Your mission is waiting!",
-      body: "Leave a message for each other to complete today's mission 💕",
+      body: (nickname: string) => `Write a message for ${nickname} 😘`,
     },
     es: {
       title: '⏰ ¡Tu misión te está esperando!',
-      body: 'Déjense un mensaje para completar la misión de hoy 💕',
+      body: (nickname: string) => `Escribe un mensaje para ${nickname} 😘`,
     },
     'zh-TW': {
       title: '⏰ 任務還在等你喔！',
-      body: '互相留下訊息來完成今天的任務吧 💕',
+      body: (nickname: string) => `寫一段話給${nickname}吧 😘`,
+    },
+    ja: {
+      title: '⏰ まだミッションが待ってるよ！',
+      body: (nickname: string) => `${nickname}さんにひとことを書いてね 😘`,
+    },
+  },
+  photoUploaded: {
+    ko: {
+      title: '📸 미션 사진이 업로드됐어요!',
+      body: (nickname: string) => `${nickname}님이 사진을 올렸어요. 서로에게 한마디를 남겨주세요!`,
+    },
+    en: {
+      title: '📸 Mission photo uploaded!',
+      body: (nickname: string) => `${nickname} uploaded a photo. Leave a message for each other!`,
+    },
+    es: {
+      title: '📸 ¡Foto de la misión subida!',
+      body: (nickname: string) => `${nickname} subió una foto. ¡Déjense un mensaje!`,
+    },
+    'zh-TW': {
+      title: '📸 任務照片已上傳！',
+      body: (nickname: string) => `${nickname}上傳了照片，互相留下訊息吧！`,
+    },
+    ja: {
+      title: '📸 ミッション写真がアップロードされました！',
+      body: (nickname: string) => `${nickname}さんが写真をアップしました。お互いにひとことを残してね！`,
     },
   },
 } as const;
 
-type SupportedLanguage = 'ko' | 'en' | 'es' | 'zh-TW';
+type SupportedLanguage = 'ko' | 'en' | 'es' | 'zh-TW' | 'ja';
 
 /**
  * Send push notification via Supabase Edge Function
@@ -418,6 +474,24 @@ export async function notifyMissionReminder(
     type: 'mission_reminder',
     title: messages.title,
     body,
+    data: { screen: 'mission' },
+  });
+}
+
+/**
+ * Send photo uploaded notification to partner
+ */
+export async function notifyPartnerPhotoUploaded(
+  partnerId: string,
+  uploaderNickname: string,
+  language: SupportedLanguage = 'ko'
+): Promise<boolean> {
+  const messages = notificationMessages.photoUploaded[language];
+  return sendPushNotification({
+    targetUserId: partnerId,
+    type: 'photo_uploaded',
+    title: messages.title,
+    body: messages.body(uploaderNickname),
     data: { screen: 'mission' },
   });
 }
@@ -593,8 +667,11 @@ const MAX_HOURLY_REMINDERS = 12; // Limit to 12 hours of reminders
 /**
  * Schedule hourly reminder notifications after photo upload
  * Schedules notifications for the next several hours until midnight
+ * @param partnerNickname - Partner's nickname to include in the notification message
+ * @param language - Language for the notification
  */
 export async function scheduleHourlyReminders(
+  partnerNickname: string,
   language: SupportedLanguage = 'ko'
 ): Promise<string[]> {
   if (!Notifications) {
@@ -613,7 +690,6 @@ export async function scheduleHourlyReminders(
 
     const now = new Date();
     const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
     const scheduledIds: string[] = [];
 
     const messages = notificationMessages.hourlyReminder[language];
@@ -634,7 +710,7 @@ export async function scheduleHourlyReminders(
       await Notifications.scheduleNotificationAsync({
         content: {
           title: messages.title,
-          body: messages.body,
+          body: messages.body(partnerNickname),
           data: { screen: 'mission', type: 'hourly_reminder' },
           sound: 'default',
         },

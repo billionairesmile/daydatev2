@@ -22,6 +22,7 @@ interface CleanupResult {
 interface CleanupResponse {
   success: boolean;
   deleted_count: number;
+  expired_missions_deleted: number;
   results: CleanupResult[];
   errors: string[];
 }
@@ -58,6 +59,37 @@ Deno.serve(async (req: Request) => {
 
     console.log(`[Cleanup] Starting cleanup job. Trigger: ${trigger}, Dry run: ${dryRun}`);
 
+    // Step 0: Delete expired missions older than 7 days
+    let expiredMissionsDeleted = 0;
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    if (!dryRun) {
+      const { data: deletedMissions, error: missionDeleteError } = await supabase
+        .from("couple_missions")
+        .delete()
+        .eq("status", "expired")
+        .lt("expires_at", sevenDaysAgo.toISOString())
+        .select("id");
+
+      if (missionDeleteError) {
+        console.error("[Cleanup] Error deleting expired missions:", missionDeleteError);
+      } else {
+        expiredMissionsDeleted = deletedMissions?.length || 0;
+        console.log(`[Cleanup] Deleted ${expiredMissionsDeleted} expired missions (older than 7 days)`);
+      }
+    } else {
+      // Dry run: just count
+      const { count } = await supabase
+        .from("couple_missions")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "expired")
+        .lt("expires_at", sevenDaysAgo.toISOString());
+
+      expiredMissionsDeleted = count || 0;
+      console.log(`[Cleanup] Would delete ${expiredMissionsDeleted} expired missions (dry run)`);
+    }
+
     // Step 1: Find all couples disconnected more than 30 days ago
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -79,6 +111,7 @@ Deno.serve(async (req: Request) => {
         JSON.stringify({
           success: true,
           deleted_count: 0,
+          expired_missions_deleted: expiredMissionsDeleted,
           results: [],
           errors: [],
           message: "No couples found for cleanup",
@@ -205,11 +238,12 @@ Deno.serve(async (req: Request) => {
     const response: CleanupResponse = {
       success: globalErrors.length === 0,
       deleted_count: dryRun ? 0 : results.length,
+      expired_missions_deleted: expiredMissionsDeleted,
       results,
       errors: globalErrors,
     };
 
-    console.log(`[Cleanup] Completed. Deleted ${response.deleted_count} couples`);
+    console.log(`[Cleanup] Completed. Deleted ${response.deleted_count} couples, ${expiredMissionsDeleted} expired missions`);
 
     return new Response(JSON.stringify(response), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -221,6 +255,7 @@ Deno.serve(async (req: Request) => {
       JSON.stringify({
         success: false,
         deleted_count: 0,
+        expired_missions_deleted: 0,
         results: [],
         errors: [String(error)],
       } as CleanupResponse),

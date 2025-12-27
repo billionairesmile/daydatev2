@@ -1,8 +1,9 @@
 // Ransom note style character assets mapping
 // Each character has multiple variations for visual variety
 
-import { ImageSourcePropType, Image } from 'react-native';
+import { ImageSourcePropType } from 'react-native';
 import { Asset } from 'expo-asset';
+import { Image as ExpoImage } from 'expo-image';
 
 type CharacterVariants = ImageSourcePropType[];
 
@@ -283,15 +284,25 @@ export async function preloadCharacterAssets(): Promise<void> {
     try {
       const allAssets = getAllCharacterAssets();
 
-      // Use Asset.loadAsync for bundled assets
-      const assetPromises = allAssets.map(asset => {
+      // First, download assets using expo-asset (for bundled assets)
+      const downloadPromises = allAssets.map(asset => {
         if (typeof asset === 'number') {
           return Asset.fromModule(asset).downloadAsync();
+        }
+        return Promise.resolve(null);
+      });
+
+      const downloadedAssets = await Promise.all(downloadPromises);
+
+      // Then prefetch with expo-image for in-memory caching
+      const prefetchPromises = downloadedAssets.map((asset) => {
+        if (asset && asset.localUri) {
+          return ExpoImage.prefetch(asset.localUri).catch(() => {});
         }
         return Promise.resolve();
       });
 
-      await Promise.all(assetPromises);
+      await Promise.all(prefetchPromises);
       isPreloaded = true;
     } catch (error) {
       console.warn('Failed to preload character assets:', error);

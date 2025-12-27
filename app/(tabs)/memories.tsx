@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useTransition } from 'react';
 import {
   View,
   Text,
@@ -48,7 +48,31 @@ import { useBackground } from '@/contexts';
 import { isDemoMode, db } from '@/lib/supabase';
 import { BannerAdView } from '@/components/ads';
 import type { CompletedMission } from '@/types';
-import { RansomText } from '@/components/ransom';
+import { RansomText, CharacterPreloader } from '@/components/ransom';
+
+// Memoized Ransom Preview Component - prevents re-render on every keystroke
+const RansomPreview = React.memo(function RansomPreview({
+  text,
+  seed,
+  wrapText,
+}: {
+  text: string;
+  seed: number;
+  wrapText: (text: string, maxChars: number) => string;
+}) {
+  if (text.length === 0) return null;
+
+  return (
+    <RansomText
+      text={wrapText(text, 8)}
+      seed={seed}
+      characterSize={36}
+      spacing={-4}
+      enableRotation={true}
+      enableYOffset={true}
+    />
+  );
+});
 
 // Font style type
 type FontStyleType = 'basic' | 'ransom' | null;
@@ -189,6 +213,8 @@ export default function MemoriesScreen() {
   // Album creation states
   const [showAlbumModal, setShowAlbumModal] = useState(false);
   const [albumName, setAlbumName] = useState('');
+  const [previewText, setPreviewText] = useState(''); // Separate state for ransom preview (updated via transition)
+  const [isPending, startTransition] = useTransition(); // For non-blocking preview updates
   const [albumCoverPhoto, setAlbumCoverPhoto] = useState<string | null>(null);
   const [albumStep, setAlbumStep] = useState<'fontStyle' | 'name' | 'cover'>('fontStyle'); // Start with font selection
   const [namePosition, setNamePosition] = useState({ x: 30, y: 16 }); // Default position (past 24px book spine)
@@ -197,6 +223,7 @@ export default function MemoriesScreen() {
   const [textColor, setTextColor] = useState<'white' | 'black'>('white'); // Text color for basic font
   const [ransomSeed, setRansomSeed] = useState<number>(() => Math.floor(Math.random() * 1000000)); // Seed for ransom text
   const [isCreatingAlbum, setIsCreatingAlbum] = useState(false); // Prevent duplicate album creation
+
 
   // Album detail modal states
   const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
@@ -231,6 +258,7 @@ export default function MemoriesScreen() {
   const [editCoverPhoto, setEditCoverPhoto] = useState<string | null>(null);
   const [editTextPosition, setEditTextPosition] = useState({ x: 30, y: 16 });
   const [editTextScale, setEditTextScale] = useState(1);
+
 
   // Refs to keep state values fresh in PanResponder callbacks
   const albumNameRef = useRef(albumName);
@@ -286,8 +314,8 @@ export default function MemoriesScreen() {
   };
 
   // Helper function to wrap text for RansomText preview (prevents overflow)
-  // 띄어쓰기 제거하고 8글자마다 줄바꿈
-  const wrapLongWordsForRansom = (text: string, maxChars: number = 8): string => {
+  // 띄어쓰기 제거하고 8글자마다 줄바꿈 - memoized for RansomPreview
+  const wrapLongWordsForRansom = useCallback((text: string, maxChars: number = 8): string => {
     // 띄어쓰기 제거
     const textWithoutSpaces = text.replace(/\s/g, '');
 
@@ -300,7 +328,7 @@ export default function MemoriesScreen() {
       chunks.push(textWithoutSpaces.slice(i, i + maxChars));
     }
     return chunks.join(' ');
-  };
+  }, []);
 
   // PanResponder for dragging text position (constrained within photo bounds)
   const panResponder = useRef(
@@ -569,7 +597,12 @@ export default function MemoriesScreen() {
     const filteredText = fontStyle === 'ransom'
       ? text.replace(/[^a-zA-Z0-9\s]/g, '')
       : text;
+    // Update input value immediately (high priority)
     setAlbumName(filteredText);
+    // Update preview text as a low-priority transition (keeps input responsive)
+    startTransition(() => {
+      setPreviewText(filteredText);
+    });
   };
 
   // Regenerate ransom style with new seed
@@ -747,6 +780,7 @@ export default function MemoriesScreen() {
       ]).start(() => {
         setShowAlbumModal(false);
         setAlbumName('');
+        setPreviewText('');
         setAlbumCoverPhoto(null);
         setAlbumStep('fontStyle'); // Reset to font selection
         setNamePosition({ x: 30, y: 16 }); // Reset position (past 24px book spine)
@@ -798,6 +832,7 @@ export default function MemoriesScreen() {
     setShowAlbumModal(true);
     setAlbumStep('fontStyle'); // Start with font selection
     setAlbumName('');
+    setPreviewText('');
     setAlbumCoverPhoto(null);
     setNamePosition({ x: 30, y: 16 }); // Reset position (past 24px book spine)
     panPosition.setValue({ x: 30, y: 16 }); // Reset animated position
@@ -838,6 +873,7 @@ export default function MemoriesScreen() {
       setShowAlbumModal(false);
       // Reset state after animation completes
       setAlbumName('');
+      setPreviewText('');
       setAlbumCoverPhoto(null);
       setAlbumStep('fontStyle');
       setNamePosition({ x: 30, y: 16 });
@@ -1414,6 +1450,8 @@ export default function MemoriesScreen() {
       >
         <Animated.View style={[styles.albumModalFadeWrapper, { opacity: albumModalOpacityAnim }]}>
           <BlurView intensity={80} tint="dark" style={styles.albumModalContainer}>
+            {/* Preload all character images when modal opens */}
+            <CharacterPreloader />
             <TouchableWithoutFeedback onPress={closeAlbumModal}>
               <View style={styles.albumModalBackdrop} />
             </TouchableWithoutFeedback>
@@ -1477,6 +1515,7 @@ export default function MemoriesScreen() {
                             // Clear text if it contains Korean characters (not supported in ransom style)
                             if (/[가-힣ㄱ-ㅎㅏ-ㅣ]/.test(albumName)) {
                               setAlbumName('');
+                              setPreviewText('');
                             }
                           }}
                         >
@@ -1515,23 +1554,26 @@ export default function MemoriesScreen() {
 
                       {/* Text Preview - Basic or Ransom Style */}
                       <View style={styles.ransomPreviewContainer}>
-                        {albumName.length > 0 ? (
-                          fontStyle === 'basic' ? (
-                            // Basic Jua Font Style - Clean text without paper backgrounds
+                        {fontStyle === 'basic' ? (
+                          // Basic Jua Font Style - Clean text without paper backgrounds
+                          albumName.length > 0 ? (
                             <Text style={styles.basicFontPreview}>{albumName}</Text>
                           ) : (
-                            // Ransom Style - Image-based character rendering
-                            <RansomText
-                              text={wrapLongWordsForRansom(albumName, 8)}
-                              seed={ransomSeed}
-                              characterSize={36}
-                              spacing={-4}
-                              enableRotation={true}
-                              enableYOffset={true}
-                            />
+                            <Text style={[styles.ransomPlaceholder, { fontFamily: 'Jua' }]}>{t('memories.album.name')}</Text>
                           )
                         ) : (
-                          <Text style={[styles.ransomPlaceholder, fontStyle === 'basic' && { fontFamily: 'Jua' }]}>{t('memories.album.name')}</Text>
+                          // Ransom Style - Use memoized component with deferred previewText
+                          previewText.length > 0 ? (
+                            <View style={isPending ? { opacity: 0.7 } : undefined}>
+                              <RansomPreview
+                                text={previewText}
+                                seed={ransomSeed}
+                                wrapText={wrapLongWordsForRansom}
+                              />
+                            </View>
+                          ) : (
+                            <Text style={styles.ransomPlaceholder}>{t('memories.album.name')}</Text>
+                          )
                         )}
                         {/* Refresh Button for Ransom Style */}
                         {fontStyle === 'ransom' && albumName.length > 0 && (
@@ -1639,15 +1681,17 @@ export default function MemoriesScreen() {
                                   }
                                 ]}>{albumName}</Text>
                               ) : (
-                                // Ransom Style - Image-based
-                                <RansomText
-                                  text={albumName}
-                                  seed={ransomSeed}
-                                  characterSize={18 * textScale}
-                                  spacing={-4}
-                                  enableRotation={true}
-                                  enableYOffset={true}
-                                />
+                                // Ransom Style - Image-based (assets preloaded)
+                                albumName.length > 0 && (
+                                  <RansomText
+                                    text={albumName}
+                                    seed={ransomSeed}
+                                    characterSize={18 * textScale}
+                                    spacing={-4}
+                                    enableRotation={true}
+                                    enableYOffset={true}
+                                  />
+                                )
                               )}
                             </Animated.View>
                           )}
@@ -2521,14 +2565,17 @@ export default function MemoriesScreen() {
                             editFontStyle === 'basic' ? (
                               <Text style={styles.basicFontPreview}>{editAlbumName}</Text>
                             ) : (
-                              <RansomText
-                                text={editAlbumName}
-                                seed={editRansomSeed}
-                                characterSize={36}
-                                spacing={-4}
-                                enableRotation={true}
-                                enableYOffset={true}
-                              />
+                              // Ransom Style - assets preloaded
+                              editAlbumName.length > 0 ? (
+                                <RansomText
+                                  text={editAlbumName}
+                                  seed={editRansomSeed}
+                                  characterSize={36}
+                                  spacing={-4}
+                                  enableRotation={true}
+                                  enableYOffset={true}
+                                />
+                              ) : null
                             )
                           ) : (
                             <Text style={[styles.ransomPlaceholder, editFontStyle === 'basic' && { fontFamily: 'Jua' }]}>{t('memories.album.name')}</Text>
@@ -2638,14 +2685,17 @@ export default function MemoriesScreen() {
                                     }
                                   ]}>{editAlbumName}</Text>
                                 ) : (
-                                  <RansomText
-                                    text={editAlbumName}
-                                    seed={editRansomSeed}
-                                    characterSize={18 * editTextScale}
-                                    spacing={-4}
-                                    enableRotation={true}
-                                    enableYOffset={true}
-                                  />
+                                  // Ransom Style - assets preloaded
+                                  editAlbumName.length > 0 && (
+                                    <RansomText
+                                      text={editAlbumName}
+                                      seed={editRansomSeed}
+                                      characterSize={18 * editTextScale}
+                                      spacing={-4}
+                                      enableRotation={true}
+                                      enableYOffset={true}
+                                    />
+                                  )
                                 )}
                               </Animated.View>
                             )}

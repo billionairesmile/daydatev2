@@ -52,11 +52,11 @@ export const SUBSCRIPTION_LIMITS = {
     homeFrameOptions: ['polaroid'] as const,
   },
   premium: {
-    maxGenerationsPerDay: 1,
+    maxGenerationsPerDay: Infinity,
     maxCompletionsPerDay: Infinity,
     maxBookmarks: Infinity,
     maxAlbums: Infinity,
-    missionsPerGeneration: 6,
+    missionsPerGeneration: 5,
     showAds: false,
     homeFrameOptions: ['polaroid', 'calendar'] as const,
   },
@@ -78,6 +78,7 @@ interface SubscriptionState {
   expiryDate: Date | null;
   isLoading: boolean;
   isInitialized: boolean;
+  isRevenueCatConfigured: boolean; // Whether RevenueCat SDK is actually configured
   error: string | null;
 
   // RevenueCat data
@@ -128,6 +129,7 @@ interface SubscriptionActions {
 
   // Sync with database
   syncWithDatabase: () => Promise<void>;
+  loadFromDatabase: () => Promise<void>;
 
   // State management
   setHasHydrated: (hasHydrated: boolean) => void;
@@ -140,6 +142,7 @@ const initialState: SubscriptionState = {
   expiryDate: null,
   isLoading: false,
   isInitialized: false,
+  isRevenueCatConfigured: false,
   error: null,
   offerings: null,
   customerInfo: null,
@@ -171,16 +174,20 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
 
           // Skip RevenueCat in Expo Go
           if (isExpoGo || !Purchases) {
-            console.log('[Subscription] RevenueCat not available (Expo Go or native module missing), using free plan');
+            console.log('[Subscription] RevenueCat not available (Expo Go or native module missing), checking database');
             set({ isLoading: false, isInitialized: true });
+            // Check database for admin-granted premium
+            await get().loadFromDatabase();
             return;
           }
 
           const apiKey = Platform.OS === 'ios' ? REVENUECAT_API_KEY_IOS : REVENUECAT_API_KEY_ANDROID;
 
           if (!apiKey) {
-            console.log('[Subscription] RevenueCat API key not configured, using free plan');
+            console.log('[Subscription] RevenueCat API key not configured, checking database');
             set({ isLoading: false, isInitialized: true });
+            // Check database for admin-granted premium
+            await get().loadFromDatabase();
             return;
           }
 
@@ -219,10 +226,14 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
             offerings,
             isLoading: false,
             isInitialized: true,
+            isRevenueCatConfigured: true,
           });
 
           // Sync with database
           await get().syncWithDatabase();
+
+          // Check database for admin-granted premium (fallback)
+          await get().loadFromDatabase();
 
           // Set up customer info listener
           Purchases.addCustomerInfoUpdateListener((info: CustomerInfo) => {
@@ -260,6 +271,8 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
             isLoading: false,
             isInitialized: true,
           });
+          // Check database for admin-granted premium as fallback
+          await get().loadFromDatabase();
         }
       },
 
@@ -267,6 +280,11 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
         try {
           // Skip in Expo Go
           if (isExpoGo || !Purchases) {
+            return;
+          }
+
+          // Skip if RevenueCat is not configured yet
+          if (!get().isRevenueCatConfigured) {
             return;
           }
 
@@ -302,6 +320,12 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
             return;
           }
 
+          // Skip if RevenueCat is not configured yet
+          if (!get().isRevenueCatConfigured) {
+            console.log('[Subscription] loadOfferings skipped (RevenueCat not configured)');
+            return;
+          }
+
           const offerings = await Purchases.getOfferings();
           set({ offerings });
         } catch (error) {
@@ -314,6 +338,12 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
           // Skip in Expo Go
           if (isExpoGo || !Purchases) {
             console.log('[Subscription] Purchase skipped (Expo Go or native module missing)');
+            return false;
+          }
+
+          // Skip if RevenueCat is not configured yet
+          if (!get().isRevenueCatConfigured) {
+            console.log('[Subscription] Purchase skipped (RevenueCat not configured)');
             return false;
           }
 
@@ -363,6 +393,12 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
             return false;
           }
 
+          // Skip if RevenueCat is not configured yet
+          if (!get().isRevenueCatConfigured) {
+            console.log('[Subscription] Purchase skipped (RevenueCat not configured)');
+            return false;
+          }
+
           set({ isLoading: true, error: null });
 
           const offerings = get().offerings || (await Purchases.getOfferings());
@@ -406,6 +442,12 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
           // Skip in Expo Go
           if (isExpoGo || !Purchases) {
             console.log('[Subscription] Restore skipped (Expo Go or native module missing)');
+            return false;
+          }
+
+          // Skip if RevenueCat is not configured yet
+          if (!get().isRevenueCatConfigured) {
+            console.log('[Subscription] Restore skipped (RevenueCat not configured)');
             return false;
           }
 
@@ -741,6 +783,49 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
           }
         } catch (error) {
           console.error('[Subscription] Sync error:', error);
+        }
+      },
+
+      // Load premium status from database (for admin-granted premium or testing)
+      loadFromDatabase: async () => {
+        try {
+          if (!supabase) return;
+
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) return;
+
+          const { data: profile, error } = await supabase
+            .from('profiles')
+            .select('subscription_plan, subscription_expires_at')
+            .eq('id', user.id)
+            .single();
+
+          if (error || !profile) {
+            console.log('[Subscription] No profile found for premium check');
+            return;
+          }
+
+          // Check if user has valid premium in database
+          const dbPlan = profile.subscription_plan as SubscriptionPlan;
+          const dbExpiryDate = profile.subscription_expires_at
+            ? new Date(profile.subscription_expires_at)
+            : null;
+
+          // If database says premium and not expired, grant premium
+          if (dbPlan !== 'free' && dbExpiryDate && dbExpiryDate > new Date()) {
+            const state = get();
+            // Only apply if RevenueCat didn't already grant premium
+            if (!state.isPremium) {
+              console.log('[Subscription] Granting premium from database:', dbPlan);
+              set({
+                isPremium: true,
+                plan: dbPlan,
+                expiryDate: dbExpiryDate,
+              });
+            }
+          }
+        } catch (error) {
+          console.error('[Subscription] Load from database error:', error);
         }
       },
 

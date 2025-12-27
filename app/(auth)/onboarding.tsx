@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  ImageBackground,
   Dimensions,
   Pressable,
   TouchableOpacity,
@@ -14,9 +13,9 @@ import {
   Platform,
   Modal,
   Alert,
-  Image,
   ActivityIndicator,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import {
@@ -736,11 +735,12 @@ export default function OnboardingScreen() {
       {/* Background - White for welcome step, image for others */}
       {effectiveStep !== 'welcome' && (
         <>
-          <ImageBackground
+          <Image
             source={backgroundImage}
             style={styles.backgroundImage}
-            resizeMode="cover"
+            contentFit="cover"
             blurRadius={40}
+            cachePolicy="memory-disk"
           />
           <View style={styles.overlay} />
         </>
@@ -973,7 +973,8 @@ function WelcomeStep({ onSocialLogin }: { onSocialLogin: (provider: 'google' | '
         <Image
           source={require('@/assets/images/daydate-logo.png')}
           style={styles.welcomeLogo}
-          resizeMode="contain"
+          contentFit="contain"
+          cachePolicy="memory-disk"
         />
       </View>
 
@@ -992,6 +993,8 @@ function WelcomeStep({ onSocialLogin }: { onSocialLogin: (provider: 'google' | '
               <Image
                 source={{ uri: 'https://developers.google.com/identity/images/g-logo.png' }}
                 style={styles.socialIcon}
+                contentFit="contain"
+                cachePolicy="memory-disk"
               />
               <Text style={styles.googleButtonText}>{t('onboarding.login.google')}</Text>
             </>
@@ -1012,6 +1015,8 @@ function WelcomeStep({ onSocialLogin }: { onSocialLogin: (provider: 'google' | '
               <Image
                 source={{ uri: 'https://developers.kakao.com/assets/img/about/logos/kakaolink/kakaolink_btn_medium.png' }}
                 style={styles.kakaoIcon}
+                contentFit="contain"
+                cachePolicy="memory-disk"
               />
               <Text style={styles.kakaoButtonText}>{t('onboarding.login.kakao')}</Text>
             </>

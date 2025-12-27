@@ -7,7 +7,6 @@ import {
   addNotificationResponseListener,
   addNotificationReceivedListener,
   removeNotificationSubscription,
-  syncMarketingAgreedWithPermission,
 } from '@/lib/pushNotifications';
 import { isDemoMode } from '@/lib/supabase';
 
@@ -42,10 +41,6 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
           console.log('[usePushNotifications] Registration complete');
         }
       }
-
-      // Sync marketing_agreed with notification permission status (regardless of registration success)
-      // This updates DB to reflect whether user has granted notification permissions
-      await syncMarketingAgreedWithPermission(user.id);
     } catch (error) {
       console.error('[usePushNotifications] Registration error:', error);
     }

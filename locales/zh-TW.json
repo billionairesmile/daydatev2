@@ -8,6 +8,7 @@
     "edit": "編輯",
     "done": "完成",
     "add": "新增",
+    "adding": "新增中...",
     "reset": "重置",
     "close": "關閉",
     "next": "下一步",
@@ -199,7 +200,14 @@
       "emptyHint": "點擊按鈕新增",
       "addPlaceholder": "例如：預訂電影票",
       "addTitle": "請輸入待辦事項",
-      "add": "新增待辦事項"
+      "add": "新增待辦事項",
+      "editTitle": "編輯待辦事項",
+      "edit": "編輯",
+      "delete": "刪除",
+      "deleteConfirmTitle": "刪除待辦事項",
+      "deleteConfirmMessage": "確定要刪除這個待辦事項嗎？",
+      "deleteConfirmCancel": "取消",
+      "deleteConfirmOk": "刪除"
     },
     "period": {
       "title": "生理期資訊",

@@ -8,6 +8,7 @@
     "edit": "수정",
     "done": "완료",
     "add": "추가",
+    "adding": "추가 중...",
     "reset": "리셋",
     "close": "닫기",
     "next": "다음",
@@ -202,7 +203,14 @@
       "emptyHint": "버튼을 눌러 추가해보세요",
       "addPlaceholder": "예: 영화 예매하기",
       "addTitle": "할 일을 입력하세요",
-      "add": "할 일 추가"
+      "editTitle": "할 일 수정",
+      "add": "할 일 추가",
+      "edit": "수정",
+      "delete": "삭제",
+      "deleteConfirmTitle": "할 일 삭제",
+      "deleteConfirmMessage": "이 할 일을 삭제할까요?",
+      "deleteConfirmCancel": "취소",
+      "deleteConfirmOk": "삭제"
     },
     "period": {
       "title": "월경 정보",

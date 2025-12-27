@@ -124,7 +124,13 @@ export const updateUserLocationInDB = async (userId: string): Promise<boolean> =
     });
 
     if (error) {
-      console.error('[Location] Error updating user location in DB:', error);
+      // Log detailed error info for debugging
+      console.error('[Location] Error updating user location in DB:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+      });
       return false;
     }
 

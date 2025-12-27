@@ -19,6 +19,7 @@ import {
   checkCoupleLocationStatus,
   showLocationRequiredAlert,
   updateUserLocationInDB,
+  getCurrentLocation,
   type UserLocation,
 } from '@/lib/locationUtils';
 
@@ -398,12 +399,21 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
             }
           }
 
+          // Get current user's location for region-based mission generation
+          const currentLocation = await getCurrentLocation();
+          console.log('[MissionStore] Current location:', currentLocation ?
+            `${currentLocation.latitude.toFixed(4)}, ${currentLocation.longitude.toFixed(4)}` : 'Not available');
+
           // Try to generate missions with AI
           const aiMissions = await generateMissionsWithAI({
             userAPreferences: onboardingData,
             userBPreferences: partnerPreferences as OnboardingData | undefined,
             todayAnswers: answers,
             missionHistory, // Pass history for deduplication
+            location: currentLocation ? {
+              latitude: currentLocation.latitude,
+              longitude: currentLocation.longitude,
+            } : undefined,
           });
 
           // Save to local state

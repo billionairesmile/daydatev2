@@ -1230,7 +1230,7 @@ export const db = {
       return { data, error };
     },
 
-    async getActiveByLanguage(language: 'ko' | 'en' | 'es' | 'zh-TW') {
+    async getActiveByLanguage(language: 'ko' | 'en' | 'es' | 'zh-TW' | 'ja') {
       const client = getSupabase();
       const { data, error } = await client
         .from('announcements')
@@ -1685,6 +1685,17 @@ export const db = {
       return { error };
     },
 
+    async updateText(todoId: string, text: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('couple_todos')
+        .update({ text })
+        .eq('id', todoId)
+        .select()
+        .single();
+      return { data, error };
+    },
+
     subscribeToTodos(
       coupleId: string,
       callback: (payload: { eventType: string; todo: unknown }) => void
@@ -2084,15 +2095,59 @@ export const db = {
     },
 
     // Delete all non-locked missions for today (cleanup after locked mission completes)
+    // Also deletes associated photos from storage to prevent orphaned files
     async deleteNonLockedMissions(coupleId: string) {
       const client = getSupabase();
       const today = formatDateToLocal(new Date());
+
+      // First, get all non-locked missions to retrieve their photo URLs
+      const { data: nonLockedMissions, error: fetchError } = await client
+        .from('mission_progress')
+        .select('id, photo_url')
+        .eq('couple_id', coupleId)
+        .eq('date', today)
+        .eq('is_message_locked', false);
+
+      if (fetchError) {
+        console.error('[MissionProgress] Error fetching non-locked missions:', fetchError);
+        return { error: fetchError };
+      }
+
+      // Delete photos from storage if they exist
+      if (nonLockedMissions && nonLockedMissions.length > 0) {
+        const photoUrls = nonLockedMissions
+          .map(m => m.photo_url)
+          .filter((url): url is string => !!url);
+
+        if (photoUrls.length > 0) {
+          // Extract storage paths from URLs and delete
+          const storagePaths = photoUrls
+            .map(url => extractStoragePathFromUrl(url))
+            .filter((path): path is string => !!path);
+
+          if (storagePaths.length > 0) {
+            const { error: storageError } = await client.storage
+              .from('memories')
+              .remove(storagePaths);
+
+            if (storageError) {
+              console.warn('[MissionProgress] Error deleting photos from storage:', storageError);
+              // Continue with DB deletion even if storage deletion fails
+            } else {
+              console.log('[MissionProgress] Deleted', storagePaths.length, 'orphaned photos from storage');
+            }
+          }
+        }
+      }
+
+      // Delete the mission progress records
       const { error } = await client
         .from('mission_progress')
         .delete()
         .eq('couple_id', coupleId)
         .eq('date', today)
         .eq('is_message_locked', false);
+
       return { error };
     },
 
@@ -2356,20 +2411,24 @@ export const db = {
       try {
         const client = getSupabase();
 
-        // Read file as base64 using expo-file-system API (React Native compatible)
-        const file = new ExpoFile(uri);
+        // Compress and resize image before upload to reduce storage and egress costs
+        // Max 1080px width, JPEG format with 0.7 quality (good balance of quality/size)
+        const manipulatedImage = await ImageManipulator.manipulateAsync(
+          uri,
+          [{ resize: { width: 1080 } }],
+          { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+        );
+
+        // Read compressed file as base64
+        const file = new ExpoFile(manipulatedImage.uri);
         const base64 = await file.base64();
 
-        // Detect file format from URI or default to PNG for better quality
-        const isPng = uri.toLowerCase().includes('.png') || !uri.toLowerCase().includes('.jpg');
-        const extension = isPng ? 'png' : 'jpg';
-        const contentType = isPng ? 'image/png' : 'image/jpeg';
-        const fileName = `${coupleId}/${Date.now()}.${extension}`;
+        const fileName = `${coupleId}/${Date.now()}.jpg`;
 
         const { data, error } = await client.storage
           .from('memories')
           .upload(fileName, decode(base64), {
-            contentType,
+            contentType: 'image/jpeg',
           });
 
         if (error) {

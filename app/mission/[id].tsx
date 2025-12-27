@@ -160,6 +160,8 @@ export default function MissionDetailScreen() {
   // State for featured mission loaded from DB
   const [featuredMission, setFeaturedMission] = useState<Mission | null>(null);
   const [isLoadingFeaturedMission, setIsLoadingFeaturedMission] = useState(false);
+  // Additional promotional content from featured mission (affiliate links, etc.)
+  const [additionalContent, setAdditionalContent] = useState<string | null>(null);
 
   // Check if mission exists in local stores
   const localMission =
@@ -194,6 +196,12 @@ export default function MissionDetailScreen() {
           isPremium: false,
         };
         setFeaturedMission(converted);
+
+        // Set additional promotional content (language-aware)
+        const content = (isEnglish && data.additional_content_en)
+          ? data.additional_content_en
+          : data.additional_content;
+        setAdditionalContent(content || null);
       } catch (error) {
         console.error('[MissionDetail] Error loading featured mission:', error);
       } finally {
@@ -1409,6 +1417,17 @@ export default function MissionDetailScreen() {
           </BlurView>
         </View>
 
+        {/* Additional Content Card (Affiliate links, promotional content) */}
+        {additionalContent && (
+          <View style={styles.additionalContentCard}>
+            <BlurView intensity={30} tint="light" style={styles.cardBlur}>
+              <View style={styles.additionalContentInner}>
+                <Text style={styles.additionalContentText}>{additionalContent}</Text>
+              </View>
+            </BlurView>
+          </View>
+        )}
+
         {/* Mission Steps Card */}
         <View style={styles.stepsCard}>
           <BlurView intensity={30} tint="light" style={styles.cardBlur}>
@@ -1831,6 +1850,22 @@ const styles = StyleSheet.create({
   tagText: {
     fontSize: 12,
     color: COLORS.white,
+  },
+  additionalContentCard: {
+    borderRadius: 24,
+    overflow: 'hidden',
+    marginBottom: SPACING.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  additionalContentInner: {
+    padding: SPACING.lg,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  additionalContentText: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.9)',
+    lineHeight: 22,
   },
   stepsCard: {
     borderRadius: 24,

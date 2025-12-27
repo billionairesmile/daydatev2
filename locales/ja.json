@@ -1,0 +1,856 @@
+{
+  "common": {
+    "confirm": "確認",
+    "cancel": "キャンセル",
+    "ok": "OK",
+    "save": "保存",
+    "delete": "削除",
+    "edit": "編集",
+    "done": "完了",
+    "add": "追加",
+    "adding": "追加中...",
+    "reset": "リセット",
+    "close": "閉じる",
+    "next": "次へ",
+    "back": "戻る",
+    "yes": "はい",
+    "no": "いいえ",
+    "loading": "読み込み中...",
+    "error": "エラー",
+    "success": "成功",
+    "today": "今日",
+    "partner": "パートナー",
+    "me": "私",
+    "days": "日",
+    "daysCount": "日目"
+  },
+  "tabs": {
+    "home": "ホーム",
+    "mission": "ミッション",
+    "calendar": "カレンダー",
+    "memories": "思い出",
+    "more": "もっと見る"
+  },
+  "home": {
+    "anniversary": {
+      "title": "記念日",
+      "add": "記念日を追加",
+      "edit": "記念日を編集",
+      "delete": "記念日を削除",
+      "deleteConfirm": "「{{name}}」を削除しますか？",
+      "name": "記念日",
+      "namePlaceholder": "記念日の名前を入力",
+      "date": "日付",
+      "weddingAnniversary": "結婚記念日",
+      "datingAnniversary": "お付き合い",
+      "birthday": "誕生日",
+      "lunar": "(旧暦)",
+      "christmas": "クリスマス",
+      "valentinesDay": "バレンタインデー",
+      "whiteDay": "ホワイトデー",
+      "selectDate": "記念日"
+    },
+    "background": {
+      "title": "背景画像を変更",
+      "description": "選択した画像がすべてのページの背景に適用されます",
+      "selectFromGallery": "ギャラリーから選択",
+      "resetToDefault": "デフォルトに戻す",
+      "uploadFailed": "アップロード失敗",
+      "uploadFailedMessage": "画像のアップロードに失敗しました。もう一度お試しください。",
+      "uploadError": "画像のアップロード中にエラーが発生しました。"
+    },
+    "tutorial": {
+      "title": "背景画像を変更してみよう",
+      "description": "このボタンを押してカップル写真で\n背景をカスタマイズできます"
+    }
+  },
+  "mission": {
+    "title": "今日のミッション",
+    "subtitle": "今日はどんな時間を一緒に過ごす？",
+    "generate": "今日のミッションを受け取る",
+    "generating": "生成中...",
+    "generatingMessage": "ミッションを作成しています",
+    "pleaseWait": "少々お待ちください",
+    "start": "始める",
+    "completed": "完了",
+    "kept": "保存済み",
+    "keep": "Keep",
+    "anotherInProgress": "別のミッション進行中",
+    "questions": {
+      "canMeetToday": "今日会える？",
+      "yesMeet": "はい、会います",
+      "noMeet": "いいえ",
+      "availableTime": "今日一緒に過ごせる時間は？",
+      "todayMood": "今日の気分は？（複数選択可）"
+    },
+    "timeOptions": {
+      "30min": "30分",
+      "1hour": "1時間",
+      "2hour": "2時間以上",
+      "allday": "一日中"
+    },
+    "moodOptions": {
+      "fun": "笑いたい",
+      "deep_talk": "じっくり話したい",
+      "active": "アクティブに",
+      "healing": "癒やし・リラックス",
+      "culture": "カルチャー・感性",
+      "adventure": "新しい挑戦",
+      "romantic": "ロマンチック"
+    },
+    "alerts": {
+      "locationRequired": "位置情報の許可が必要",
+      "locationRequiredMessage": "ミッションを作成するには位置情報の許可が必要です。\n位置情報を許可してください。",
+      "allowPermission": "許可する",
+      "locationDenied": "位置情報が拒否されました",
+      "locationDeniedMessage": "位置情報が拒否されました。設定から位置情報を許可してください。",
+      "goToSettings": "設定へ移動",
+      "partnerLocationRequired": "パートナーの位置情報が必要",
+      "partnerLocationRequiredMessage": "ミッションを作成するにはパートナーも位置情報を許可する必要があります。\nパートナーに位置情報の許可をお願いしてください。",
+      "cannotKeep": "保存できません",
+      "alreadyCompletedKeep": "完了済みのミッションは保存できません。",
+      "keepMission": "ミッションを保存",
+      "keepMissionConfirm": "「{{title}}」を保存しますか？",
+      "keepLimit": "保存上限",
+      "keepLimitMessage": "ミッションは最大5つまで保存できます。\n保存済みのミッションを削除してから再度お試しください。",
+      "cannotStart": "ミッションを開始できません",
+      "anotherInProgressMessage": "すでに別のミッションが進行中です。\n進行中のミッションを完了してください！",
+      "dailyLimitMessage": "今日のミッションはすべて完了しました。\nまた明日チャレンジしましょう！"
+    }
+  },
+  "missionDetail": {
+    "headerTitle": "ミッション詳細",
+    "notFound": {
+      "title": "ミッションが見つかりません",
+      "description": "このミッションは利用できません。"
+    },
+    "camera": {
+      "title": "写真を撮る",
+      "confirmTitle": "写真の確認",
+      "permissionRequired": "カメラの許可が必要",
+      "permissionMessage": "写真を撮るにはカメラの許可が必要です。",
+      "photoError": "写真の撮影に失敗しました。もう一度お試しください。",
+      "usePhoto": "使用する",
+      "retake": "撮り直す",
+      "pinchToZoom": "ピンチでズーム",
+      "error": "カメラを起動できません"
+    },
+    "location": {
+      "noInfo": "位置情報なし"
+    },
+    "steps": {
+      "photo": {
+        "title": "写真を撮ろう",
+        "description": "二人の特別な瞬間を写真に残しましょう。",
+        "hint": "この瞬間のときめきと幸せを\n写真に残して思い出にしよう。"
+      },
+      "message": {
+        "title": "お互いへのひとこと",
+        "description": "この瞬間、相手に伝えたい気持ちを言葉にしてみましょう。心のこもったメッセージがより特別な思い出を作ります。",
+        "written": "記入済み",
+        "notWritten": "未記入"
+      },
+      "complete": "完了"
+    },
+    "status": {
+      "anotherInProgress": "別のミッション進行中",
+      "waitingPartner": "相手を待っています...",
+      "waitingPhoto": "写真を待っています...",
+      "writeMessage": "お互いへのひとことを書く",
+      "takePhoto": "写真を撮る"
+    },
+    "modal": {
+      "title": "お互いへのひとこと",
+      "placeholder": "相手に伝えたいことを書いてください"
+    },
+    "defaultPartnerMessage": "君と一緒で幸せ",
+    "completed": "完了",
+    "completeButton": "ミッション完了！",
+    "writeMessage": "メッセージを書く",
+    "messagePlaceholder": "今日のミッションを一緒に記録しよう",
+    "submitMission": "ミッションを完了する",
+    "partnerMessage": "相手のメッセージ",
+    "myMessage": "私のメッセージ",
+    "waitingPartner": "相手のメッセージを待っています",
+    "viewMemory": "思い出を見る"
+  },
+  "bookmark": {
+    "title": "保存済み",
+    "empty": "保存したミッションがありません",
+    "emptyHint": "気に入ったミッションをKeepしてみよう",
+    "deleteMission": "ミッションを削除",
+    "deleteConfirm": "「{{title}}」を削除しますか？"
+  },
+  "calendar": {
+    "title": "カレンダー",
+    "subtitle": "二人の時間を記録しよう",
+    "dayNames": [
+      "日",
+      "月",
+      "火",
+      "水",
+      "木",
+      "金",
+      "土"
+    ],
+    "settings": {
+      "title": "カレンダー機能設定",
+      "description": "表示する機能を選択してください"
+    },
+    "todo": {
+      "title": "やること",
+      "empty": "やることがありません",
+      "emptyHint": "ボタンを押して追加しよう",
+      "addPlaceholder": "例：映画のチケットを予約",
+      "addTitle": "やることを入力",
+      "add": "やることを追加",
+      "editTitle": "やることを編集",
+      "edit": "編集",
+      "delete": "削除",
+      "deleteConfirmTitle": "やることを削除",
+      "deleteConfirmMessage": "このやることを削除しますか？",
+      "deleteConfirmCancel": "キャンセル",
+      "deleteConfirmOk": "削除"
+    },
+    "period": {
+      "title": "生理情報",
+      "calendar": "生理カレンダー",
+      "calendarDesc": "生理周期を記録・予測できます",
+      "inputTitle": "生理情報を入力してください",
+      "settingsTitle": "生理情報設定",
+      "startDate": "生理開始日",
+      "lastStartDate": "前回の生理開始日",
+      "averageCycle": "平均周期",
+      "cycleLength": "周期",
+      "periodLength": "生理期間",
+      "cycleHint": "一般的な生理周期は21〜35日です",
+      "nextDate": "次の予定日",
+      "currentPeriod": "生理中",
+      "lastDate": "前回の開始日",
+      "daysUnit": "日",
+      "legend": {
+        "period": "生理日",
+        "fertile": "妊娠しやすい時期",
+        "ovulation": "排卵予定日"
+      },
+      "selectDate": "日付を選択"
+    },
+    "holidays": {
+      "newYear": "元日",
+      "lunarNewYear": "旧正月",
+      "lunarNewYearHoliday": "旧正月連休",
+      "independenceDay": "建国記念の日",
+      "childrenDay": "こどもの日",
+      "buddhasBirthday": "花まつり",
+      "memorialDay": "戦没者追悼の日",
+      "liberationDay": "終戦記念日",
+      "foundationDay": "建国記念日",
+      "chuseok": "秋夕",
+      "chuseokHoliday": "秋夕連休",
+      "hangulDay": "ハングルの日",
+      "christmas": "クリスマス"
+    }
+  },
+  "memories": {
+    "title": "思い出",
+    "subtitle": "二人で過ごした瞬間",
+    "empty": "完了したミッションがありません",
+    "emptyHint": "ミッションを完了してお互いへのひとことを書いてください",
+    "viewAll": "すべて見る",
+    "togetherMoment": "一緒に過ごした瞬間",
+    "itemCount": "{{count}}件",
+    "monthNames": [
+      "1月",
+      "2月",
+      "3月",
+      "4月",
+      "5月",
+      "6月",
+      "7月",
+      "8月",
+      "9月",
+      "10月",
+      "11月",
+      "12月"
+    ],
+    "yearFormat": "{{year}}年",
+    "yearMonthFormat": "{{year}}年{{month}}",
+    "filter": {
+      "all": "すべて",
+      "thisMonth": "今月",
+      "thisYear": "今年"
+    },
+    "album": {
+      "title": "アルバム",
+      "subtitle": "思い出に残る瞬間をアルバムにしよう",
+      "name": "アルバム名",
+      "coverPhoto": "カバー写真",
+      "fontStyle": "フォントスタイル",
+      "fontStyleDesc": "アルバムタイトルに使用するフォントを選択",
+      "basicFont": "基本フォント",
+      "basicFontDesc": "シンプルなスタイル",
+      "ransomStyle": "ランサムノートスタイル",
+      "basicFontHint": "シンプルなフォントが適用されます",
+      "ransomFontHint": "入力した文字に特別なスタイルが適用されます",
+      "namePlaceholder": "アルバム名を入力...",
+      "ransomPlaceholder": "英語のみ入力可能（A-Z、0-9）",
+      "selectPhoto": "写真を選択",
+      "dragHint": "テキストをドラッグして位置を調整",
+      "coverEditHint": "写真を選択してテキストの位置をドラッグで調整",
+      "color": "色",
+      "size": "サイズ",
+      "textSize": "テキストサイズ",
+      "addPhoto": "写真を追加",
+      "editCover": "カバーを編集",
+      "deleteAlbum": "アルバムを削除",
+      "deleteAlbumConfirm": "このアルバムを削除しますか？",
+      "readOnly": "読み取り専用",
+      "limitReached": "アルバム作成制限",
+      "limitReachedMessage": "無料プランではアルバムは5つまで作成できます。プレミアムにアップグレードすると無制限で作成できます。"
+    },
+    "photo": {
+      "select": "選択",
+      "delete": "削除",
+      "deleteTitle": "写真を削除",
+      "deleteConfirm": "{{count}}枚の写真を削除しますか？",
+      "deleteSingleConfirm": "この写真を削除しますか？",
+      "save": "写真を保存",
+      "tapToFlip": "タップして裏面を確認",
+      "tapToView": "タップして写真を見る"
+    },
+    "permission": {
+      "required": "許可が必要",
+      "photoAccess": "写真ライブラリへのアクセス許可が必要です。",
+      "saveAccess": "写真を保存するにはギャラリーへのアクセス許可が必要です。",
+      "saveSuccess": "保存完了",
+      "saveSuccessMessage": "写真がギャラリーに保存されました。",
+      "saveFailed": "保存失敗",
+      "saveFailedMessage": "写真の保存中にエラーが発生しました。"
+    }
+  },
+  "more": {
+    "title": "もっと見る",
+    "sections": {
+      "profile": "プロフィール",
+      "settings": "設定",
+      "support": "サポート",
+      "developer": "開発者"
+    },
+    "menu": {
+      "myProfile": "マイプロフィール",
+      "coupleProfile": "カップルプロフィール",
+      "settings": "設定",
+      "announcements": "お知らせ",
+      "customerService": "カスタマーサービス",
+      "onboardingReset": "オンボーディングリセット",
+      "missionReset": "ミッションリセット",
+      "fullReset": "完全リセット",
+      "logout": "ログアウト"
+    },
+    "announcements": {
+      "title": "お知らせ",
+      "empty": "お知らせはありません"
+    },
+    "help": {
+      "title": "ヘルプ",
+      "inquiry": "お問い合わせ",
+      "faq": "よくある質問"
+    },
+    "customerService": {
+      "title": "カスタマーサービス",
+      "faqTitle": "よくある質問",
+      "inquiryTitle": "ご不明な点はありますか？",
+      "inquiryDescription": "お問い合わせいただければ\n迅速に対応いたします。",
+      "kakaoButton": "お問い合わせ"
+    },
+    "others": {
+      "title": "その他",
+      "termsOfService": "利用規約",
+      "privacyPolicy": "プライバシーポリシー"
+    },
+    "alerts": {
+      "devReset": "開発者リセット",
+      "devResetMessage": "オンボーディング状態をリセットして最初からやり直しますか？",
+      "missionReset": "ミッションリセット",
+      "missionResetMessage": "今日のミッションと完了状態をすべてリセットしますか？",
+      "missionResetComplete": "リセット完了",
+      "missionResetCompleteMessage": "ミッションがリセットされました。ミッションタブで新しいミッションを作成してください。",
+      "fullReset": "完全リセット",
+      "fullResetMessage": "すべてのデータをリセットします。\n\n・オンボーディングデータ\n・ペアリング情報\n・カップル同期データ\n・ミッションデータ\n・すべてのローカルストレージ\n\n本当にリセットしますか？",
+      "fullResetComplete": "リセット完了",
+      "fullResetCompleteMessage": "すべてのデータがリセットされました。アプリを再起動します。",
+      "logout": "ログアウト",
+      "logoutMessage": "本当にログアウトしますか？"
+    }
+  },
+  "profile": {
+    "myProfile": "マイプロフィール",
+    "coupleProfile": "カップルプロフィール",
+    "nickname": "ニックネーム",
+    "birthDate": "生年月日",
+    "mbti": "MBTI",
+    "anniversaryDate": "記念日",
+    "relationshipType": "関係タイプ",
+    "dating": "交際中",
+    "married": "既婚",
+    "inviteCode": "招待コード",
+    "copyCode": "コードをコピー",
+    "codeCopied": "コードがコピーされました",
+    "disconnect": "接続解除",
+    "disconnectConfirm": "本当に接続を解除しますか？",
+    "disconnectWarning": "接続を解除するとすべてのカップルデータが削除されます。",
+    "notSet": "未設定",
+    "dateFormat": "{{year}}年{{month}}月{{day}}日",
+    "solar": "新暦",
+    "lunar": "旧暦",
+    "preferences": "好み設定",
+    "preferredActivities": "好きな活動",
+    "dateConcerns": "デートの悩み",
+    "constraints": "制約条件",
+    "activitiesCount": "{{count}}個のアクティビティ",
+    "noPreferences": "設定された好みはありません",
+    "editNickname": {
+      "title": "ニックネーム変更",
+      "description": "パートナーに表示される名前です",
+      "placeholder": "ニックネームを入力"
+    },
+    "editBirthday": {
+      "title": "生年月日の編集",
+      "description": "正確な生年月日を入力してください",
+      "selectDate": "日付を選択してください"
+    },
+    "editPreferences": {
+      "title": "好み設定",
+      "editTitle": "好み設定の編集",
+      "button": "編集する"
+    },
+    "couple": {
+      "title": "カップルプロフィール",
+      "anniversary": "記念日",
+      "accountInfo": "アカウント情報",
+      "myAccountInfo": "{{nickname}}のアカウント情報",
+      "myAccount": "私のアカウント",
+      "partnerAccountInfo": "{{nickname}}のアカウント情報",
+      "partnerAccount": "パートナーのアカウント",
+      "datingLabel": "付き合い始めた日",
+      "marriedLabel": "結婚記念日",
+      "datingType": "恋人",
+      "marriedType": "夫婦",
+      "editAnniversary": {
+        "title": "記念日の変更",
+        "description": "特別な日を編集してください",
+        "relationshipLabel": "関係タイプ",
+        "selectDate": "日付を選択してください",
+        "datingStart": "交際開始日",
+        "marriedAnniversary": "結婚記念日"
+      },
+      "accountDetail": {
+        "me": "私",
+        "partner": "パートナー",
+        "nickname": "ニックネーム",
+        "email": "メール",
+        "joinDate": "登録日",
+        "noInfo": "情報なし",
+        "defaultPartnerEmail": "接続済みパートナー"
+      }
+    },
+    "me": "私",
+    "partner": "パートナー"
+  },
+  "settings": {
+    "title": "設定",
+    "sections": {
+      "notifications": "通知",
+      "marketing": "マーケティング",
+      "premium": "プレミアム",
+      "other": "その他",
+      "account": "アカウント"
+    },
+    "notifications": {
+      "push": "プッシュ通知",
+      "pushDesc": "すべての通知を受け取る",
+      "mission": "ミッション通知",
+      "missionDesc": "新しいミッションが作成されたら通知",
+      "message": "ひとこと未記入通知",
+      "messageDesc": "ひとことを書いていない場合に通知"
+    },
+    "marketing": {
+      "news": "お知らせを受け取る",
+      "newsDesc": "イベントやアップデート情報",
+      "info": "マーケティング情報の受信",
+      "infoDesc": "プロモーションや割引情報"
+    },
+    "other": {
+      "language": "言語",
+      "selectLanguage": "言語を選択",
+      "timezone": "タイムゾーン",
+      "selectTimezone": "タイムゾーンを選択",
+      "timezoneAuto": "自動（デバイス設定）",
+      "timezoneAutoDesc": "デバイスのタイムゾーン設定に従います",
+      "timezoneManual": "手動選択",
+      "timezoneManualDesc": "遠距離カップル向けの手動タイムゾーン設定",
+      "timezoneHint": "ミッションリセットとD-day計算に適用されます",
+      "termsOfService": "利用規約",
+      "locationTerms": "位置情報利用規約",
+      "privacyPolicy": "プライバシーポリシー",
+      "version": "バージョン {{version}}",
+      "latestVersion": "最新版"
+    },
+    "account": {
+      "logout": "ログアウト",
+      "logoutTitle": "ログアウト",
+      "logoutMessage": "本当にログアウトしますか？",
+      "deleteAccount": "アカウント削除",
+      "unpair": "ペアリング解除"
+    },
+    "unpair": {
+      "title": "ペアリング解除",
+      "confirmAlertTitle": "ペアリング解除",
+      "confirmAlertMessage": "本当にペアリングを解除しますか？",
+      "confirmTitle": "ペアリング解除の確認",
+      "warningTitle": "本当にペアリングを解除しますか？",
+      "warningText": "ペアリングを解除するとパートナーとの接続が解除され、\n一部のデータにアクセスできなくなります。",
+      "checkTitle": "解除前にご確認ください",
+      "daysTogether": "一緒に過ごした期間",
+      "daysUnit": "日",
+      "completedMissions": "一緒に完了したミッション",
+      "missionsUnit": "個",
+      "recoveryPeriod": "復旧可能な期間",
+      "recoveryHint": "最大30日間復旧可能です",
+      "warningsTitle": "注意事項",
+      "warning1": "相手にペアリング解除の通知が送信されます",
+      "warning2": "ミッション履歴は個別のアカウントに保存されます",
+      "warning3": "30日以内に同じパートナーと再接続可能です",
+      "confirmPrompt": "続けるには下に「ペアリング解除」と\n正確に入力してください",
+      "confirmText": "ペアリング解除",
+      "button": "ペアリング解除",
+      "finalConfirmTitle": "最終確認",
+      "finalConfirmMessage": "本当にペアリングを解除しますか？\nこの操作は元に戻せません。",
+      "success": "ペアリング解除",
+      "successMessage": "ペアリングが解除されました。\n30日以内に同じパートナーと再接続すると既存データが復旧されます。",
+      "error": "ペアリング解除中にエラーが発生しました。",
+      "notificationTitle": "ペアリングが解除されました",
+      "notificationBody": "{{nickname}}さんがペアリングを解除しました。30日以内に再接続するとデータを復旧できます。",
+      "partnerDisconnectedTitle": "ペアリングが解除されました",
+      "partnerDisconnectedMessage": "相手がペアリングを解除しました。\n新しいパートナーと接続するか、30日以内に同じパートナーと再接続できます。",
+      "partnerDeletedAccountTitle": "相手がアカウントを削除しました",
+      "partnerDeletedAccountMessage": "相手がアカウントを削除したためペアリングが解除されました。\n再接続は不可能で、既存の思い出とデータは復旧できません。"
+    },
+    "deleteAccount": {
+      "title": "アカウント削除",
+      "confirmAlertTitle": "アカウント削除",
+      "confirmAlertMessage": "本当にアカウントを削除しますか？",
+      "warningText": "アカウントを削除するとすべてのデータが\n",
+      "permanentDelete": "完全に削除",
+      "warningEnd": "されます。",
+      "dataList": "削除されるデータ：プロフィール情報、カップル接続情報、完了したミッション記録、アルバムと写真、すべての設定",
+      "confirmPrompt": "続けるには下に「アカウント削除」と入力してください",
+      "confirmText": "アカウント削除",
+      "button": "アカウント削除",
+      "finalConfirmTitle": "最終確認",
+      "finalConfirmMessage": "本当にアカウントを削除しますか？\nすべてのデータが完全に削除されます。",
+      "deleting": "削除中...",
+      "success": "アカウント削除完了",
+      "successMessage": "すべてのデータが削除されました。\nご利用ありがとうございました。",
+      "error": "アカウント削除中にエラーが発生しました。",
+      "partnerNotificationTitle": "アカウント削除通知",
+      "partnerNotificationBody": "{{nickname}}さんがアカウントを削除しました。"
+    },
+    "language": "言語",
+    "theme": "テーマ",
+    "darkMode": "ダークモード",
+    "version": "バージョン",
+    "termsOfService": "利用規約",
+    "privacyPolicy": "プライバシーポリシー",
+    "licenses": "オープンソースライセンス"
+  },
+  "onboarding": {
+    "welcome": "ようこそ",
+    "welcomeTitle": "Daydateへ\nようこそ",
+    "welcomeSubtitle": "二人の特別な瞬間を\n一緒に記録して共有しよう",
+    "start": "始める",
+    "skip": "スキップ",
+    "complete": "完了",
+    "next": "次へ",
+    "previous": "前へ",
+    "continue": "続ける",
+    "confirm": "確認",
+    "defaultUser": "ユーザー",
+    "login": {
+      "google": "Googleで始める",
+      "kakao": "Kakaoで始める",
+      "or": "または",
+      "success": "ログイン成功",
+      "successMessage": "{{provider}}アカウントでログインしました。",
+      "failed": "ログイン失敗",
+      "failedMessage": "ログイン中にエラーが発生しました。もう一度お試しください。",
+      "failedProvider": "{{provider}}ログインに失敗しました。もう一度お試しください。",
+      "demoMode": "デモモード",
+      "demoModeMessage": "ソーシャルログインはデモモードでは使用できません。\n\n環境変数を設定してSupabaseを接続してください。",
+      "welcomeBack": "おかえりなさい！",
+      "alreadyConnected": "すでに相手と接続されています。基本情報入力から続けます。",
+      "termsDisclaimer": {
+        "prefix": "ログインすると16歳以上であり、",
+        "privacy": "プライバシーポリシー",
+        "terms": "利用規約",
+        "location": "位置情報サービス利用規約",
+        "comma": "、",
+        "suffix": "に同意したものとみなされます。"
+      }
+    },
+    "testMode": {
+      "title": "テストモード",
+      "message": "テストモードではデータはローカルにのみ保存され、サーバーと同期されません。\n\n開発テスト用にのみ使用してください。",
+      "confirm": "テストモードで開始",
+      "button": "テストモードで開始",
+      "divider": "開発者向け",
+      "hint": "データはローカルにのみ保存されます"
+    },
+    "basicInfo": {
+      "title": "基本情報を\n入力してください",
+      "nickname": "ニックネーム",
+      "nicknamePlaceholder": "ニックネームを入力",
+      "gender": "性別",
+      "male": "男",
+      "female": "女",
+      "birthDate": "生年月日",
+      "birthDatePlaceholder": "生年月日を選択",
+      "solar": "新暦",
+      "lunar": "旧暦"
+    },
+    "terms": {
+      "title": "利用規約への同意",
+      "subtitle": "サービスをご利用いただくため規約に同意してください",
+      "agreeAll": "すべてに同意",
+      "ageRequired": "【必須】14歳以上です",
+      "ageRequiredDesc": "サービスをご利用いただくには14歳以上である必要があります。14歳未満の方はサービスのご利用が制限されます。",
+      "serviceTerms": "【必須】利用規約に同意",
+      "serviceTermsTitle": "利用規約",
+      "locationTerms": "【必須】位置情報サービス利用規約に同意",
+      "locationTermsTitle": "位置情報サービス利用規約",
+      "privacyTerms": "【必須】個人情報の収集・利用に同意",
+      "privacyTermsTitle": "個人情報の収集・利用",
+      "marketingTerms": "【任意】広告通知の受信に同意"
+    },
+    "location": {
+      "permissionRequired": "位置情報の許可が必要",
+      "permissionMessage": "位置情報サービスを利用するには位置情報の許可が必要です。設定から位置情報を許可してください。",
+      "goToSettings": "設定へ移動"
+    },
+    "nickname": {
+      "title": "ニックネームを入力してください",
+      "placeholder": "ニックネーム",
+      "hint": "パートナーに表示される名前です"
+    },
+    "birthDate": {
+      "title": "生年月日を入力してください",
+      "solar": "新暦",
+      "lunar": "旧暦"
+    },
+    "mbti": {
+      "title": "MBTIを\n選択してください",
+      "skip": "わからない"
+    },
+    "relationship": {
+      "title": "関係タイプを選択してください",
+      "dating": "恋人",
+      "married": "夫婦"
+    },
+    "coupleInfo": {
+      "title": "カップル情報を\n入力してください",
+      "relationship": "関係",
+      "datingLabel": "付き合い始めた日",
+      "marriedLabel": "結婚記念日",
+      "selectDate": "{{label}}を選択"
+    },
+    "anniversary": {
+      "title": "記念日を入力してください",
+      "datingStart": "交際開始日",
+      "weddingDate": "結婚記念日"
+    },
+    "pairing": {
+      "title": "パートナーと\n接続しよう",
+      "subtitle": "ペアリングコードでパートナーとデータを共有",
+      "generateCode": "コードを生成",
+      "enterCode": "コードを入力",
+      "myCode": "パートナーに共有するコード",
+      "enterCodePlaceholder": "パートナーが生成したコードを入力",
+      "connect": "接続",
+      "connecting": "接続中...",
+      "waitingConnection": "接続待ち",
+      "shareCode": "コードを共有",
+      "waitingPartner": "パートナーがこのコードを入力すると\n自動的に接続されます",
+      "connected": "パートナーと接続されました！\n次へ進んでください",
+      "invalidCode": "無効なコードです。コードを確認してください。",
+      "alreadyPaired": "すでに使用されたコードです。",
+      "partnerNotReady": "パートナーがまだ準備できていません。しばらくしてから再度お試しください。",
+      "connectionError": "接続中にエラーが発生しました。もう一度お試しください。",
+      "coupleRestoreError": "カップル復旧中にエラーが発生しました。",
+      "coupleConnectionError": "カップル接続中にエラーが発生しました。",
+      "copied": "コピーされました",
+      "reconnected": "またお会いできて嬉しいです！",
+      "reconnectedMessage": "30日以内の再接続により既存データが復旧されました。"
+    },
+    "preferences": {
+      "title": "好きな活動を\n選択してください",
+      "subtitle": "複数選択可能です",
+      "indoor": "室内活動",
+      "outdoor": "屋外活動",
+      "active": "アクティブ",
+      "relaxing": "リラックス",
+      "food": "グルメ巡り",
+      "cafe": "カフェ",
+      "culture": "カルチャー",
+      "travel": "旅行"
+    },
+    "concerns": {
+      "title": "デートで\n何が悩み？",
+      "subtitle": "複数選択可能です",
+      "noIdeas": "デートのアイデアがない",
+      "sameRoutine": "毎回同じデートになる",
+      "budget": "予算が心配",
+      "time": "時間が足りない",
+      "distance": "距離が遠い"
+    },
+    "constraints": {
+      "title": "ミッションを選ぶ時の\n参考事項は？",
+      "subtitle": "該当するものをすべて選択してください"
+    },
+    "preferencesIntro": {
+      "title": "カスタマイズミッションのため\n好みを教えてください",
+      "subtitle": "お二人の好みを分析して\n最適なデートミッションをおすすめします",
+      "hint": "約1分程度かかります。\n「もっと見る > マイプロフィール」で\nいつでも変更できます",
+      "startAnalysis": "好み分析を開始"
+    },
+    "completeStep": {
+      "title": "{{nickname}}さん、ようこそ！",
+      "subtitle": "すべての設定が完了しました\n特別な瞬間を一緒に作っていきましょう！"
+    },
+    "dataRecovery": {
+      "title": "既存データの復旧",
+      "message": "以前入力した好み情報があります。\n好み入力をスキップして完了します。"
+    }
+  },
+  "premium": {
+    "title": "プレミアム",
+    "subtitle": "より特別なデートのためのプレミアム",
+    "heroTitle": "DayDate プレミアム",
+    "heroSubtitle": "恋人ともっと特別なデートを楽しもう",
+    "heroTitleNew": "今すぐプレミアムを始めよう",
+    "heroSubtitleNew": "支払いは1回、特典は2人で",
+    "coupleBenefitHighlight": "パートナーもプレミアム！",
+    "annual": "年間",
+    "monthly": "月間",
+    "perYear": "/年",
+    "perMonth": "/月",
+    "monthlyPrice": "490円",
+    "annualPrice": "4,200円",
+    "annualMonthlyEquivalent": "（350円/月）",
+    "originalAnnualPrice": "通常価格 5,880円/年",
+    "coupleSharing": "カップル共有対応",
+    "save27": "27%オフ",
+    "subscribe": "購読する",
+    "subscribeAnnualCTA": "年間プランで始める",
+    "subscribeMonthlyCTA": "月間プランで始める",
+    "termsOfUse": "利用規約",
+    "paymentNoticeTitle": "お支払いについて",
+    "paymentNotice1": "お支払い確認後、App StoreまたはGoogle Playアカウントに請求されます。",
+    "paymentNotice2": "現在の期間終了の24時間前までに解約しない限り、購読は自動更新されます。",
+    "paymentNotice3": "デバイスの購読設定からいつでも解約できます。",
+    "refundNoticeTitle": "返金について",
+    "refundNotice1": "返金はApp StoreまたはGoogle Playのポリシーに従って処理されます。",
+    "refundNotice2": "購読解約後も決済期間終了まではプレミアム特典をご利用いただけます。",
+    "coupleNoticeTitle": "カップル特典",
+    "coupleNotice": "購読するとペアリングしたパートナーもプレミアム特典を一緒に利用できます。",
+    "restoreSuccess": "購入復元完了",
+    "restoreSuccessMessage": "購入が正常に復元されました。",
+    "restoreFailed": "購入復元失敗",
+    "restoreFailedMessage": "以前の購入履歴が見つかりません。問題があると思われる場合はカスタマーサービスにお問い合わせください。",
+    "benefitsTitle": "プレミアム特典",
+    "comparisonTitle": "特典比較",
+    "free": "無料",
+    "premiumLabel": "プレミアム",
+    "features": {
+      "skipAds": "広告なしで利用",
+      "unlimitedMissions": "無制限ミッション生成",
+      "unlimitedBookmarks": "無制限ブックマーク",
+      "unlimitedAlbums": "無制限アルバム"
+    },
+    "status": {
+      "active": "プレミアム利用中",
+      "monthlyPlan": "月間プラン利用中",
+      "annualPlan": "年間プラン利用中",
+      "expiresOn": "{{date}}まで利用可能"
+    },
+    "managementTitle": "プレミアム管理",
+    "currentPlan": "現在購読中",
+    "monthlyPlan": "月間プラン",
+    "annualPlan": "年間プラン",
+    "perMonthEquivalent": "/月",
+    "savings": "2ヶ月以上お得！",
+    "subscribeMonthly": "月間プランを購読",
+    "subscribeAnnual": "年間プランを購読",
+    "restorePurchases": "購入を復元",
+    "manageSubscription": "購読を管理",
+    "termsOfService": "利用規約",
+    "privacyPolicy": "プライバシーポリシー",
+    "legalText": "購読は支払ったアカウントに帰属し、ペアリングしたパートナーもプレミアム特典を一緒に利用できます。購読解約はApp StoreまたはGoogle Playから直接可能で、解約後も決済した期間まで利用可能です。ペアリング解除またはアカウント削除時も購読は自動キャンセルされません。",
+    "benefits": {
+      "missionComplete": "ミッション完了",
+      "missionCompleteFree": "1個/日",
+      "missionCompletePremium": "無制限ミッション完了",
+      "missionCompletePremiumDesc": "1日に好きなだけミッションを完了して\nもっと多くの思い出を作ろう",
+      "missionGenerate": "ミッション生成",
+      "missionGenerateFree": "1回/日（3個）",
+      "missionGeneratePremium": "2倍のミッション生成",
+      "missionGeneratePremiumDesc": "毎日6つの様々なミッションを受け取り\n今日やりたいミッションを選ぼう",
+      "noAds": "広告",
+      "noAdsFree": "広告あり",
+      "noAdsPremium": "広告なしで快適に",
+      "noAdsPremiumDesc": "邪魔されずに恋人との\n大切な時間に集中しよう",
+      "homeFrame": "ホームフレーム",
+      "homeFrameFree": "ポラロイドのみ",
+      "homeFramePremium": "ポラロイド + カレンダー",
+      "missionKeep": "ミッション保存",
+      "missionKeepFree": "最大5個",
+      "missionKeepPremium": "無制限ミッション保存",
+      "missionKeepPremiumDesc": "気に入ったミッションを制限なく保存して\nいつでもチャレンジしよう",
+      "photoStoragePremium": "無制限写真保存",
+      "photoStoragePremiumDesc": "大切な思い出写真を\n容量を気にせず保存しよう",
+      "albumCreate": "アルバム作成",
+      "albumCreateFree": "最大5個",
+      "albumCreatePremium": "無制限アルバム作成",
+      "albumCreatePremiumDesc": "特別な瞬間をテーマ別に整理して\n自分だけの思い出アルバムを作ろう"
+    },
+    "button": {
+      "subscribe": "プレミアムプランを購読",
+      "manage": "プレミアムプランを管理"
+    },
+    "limits": {
+      "generationReached": "今日のミッション生成回数を使い切りました",
+      "completionReached": "今日のミッション完了回数を使い切りました",
+      "bookmarkReached": "ミッション保存がいっぱいです（最大5個）",
+      "albumReached": "アルバムをこれ以上作成できません（最大5個）",
+      "albumReadOnly": "このアルバムは読み取り専用です",
+      "upgradeToPremium": "プレミアムにアップグレードすると制限なく利用できます",
+      "upgradeForEdit": "プレミアムプランにアップグレードするとすべてのアルバムを編集できます"
+    },
+    "limitReached": {
+      "title": "1日の上限に達しました",
+      "completion": "今日のミッション完了上限に達しました。プレミアムにアップグレードしてもっと多くのミッションを完了しよう！"
+    },
+    "deleteWarning": {
+      "title": "購読確認",
+      "message": "アクティブな購読があります。アカウントを削除しても購読は自動キャンセルされません。まずApp StoreまたはGoogle Playで購読を解約してください。",
+      "manageSubscription": "購読を管理",
+      "continueDelete": "削除を続ける"
+    }
+  },
+  "errors": {
+    "networkError": "ネットワークエラーが発生しました",
+    "tryAgain": "もう一度お試しください",
+    "somethingWrong": "問題が発生しました",
+    "sessionExpired": "セッションが期限切れです",
+    "unauthorized": "権限がありません"
+  }
+}

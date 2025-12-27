@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Platform,
+  LayoutChangeEvent,
 } from 'react-native';
 import Constants from 'expo-constants';
 
@@ -59,6 +60,11 @@ export default function NativeAdMissionCard({
   const [nativeAd, setNativeAd] = useState<any>(null);
   const [adLoaded, setAdLoaded] = useState(false);
   const [adError, setAdError] = useState(false);
+  // Dimensions must be whole numbers to prevent SDK errors (GitHub issue #700)
+  const [adViewDimensions, setAdViewDimensions] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+
+  // Ref to track the current ad for cleanup
+  const adRef = useRef<any>(null);
 
   // Required for iOS to handle app state changes
   if (useForeground) {
@@ -67,24 +73,30 @@ export default function NativeAdMissionCard({
     });
   }
 
+  // Capture layout dimensions (must be whole numbers)
+  const handleLayout = useCallback((event: LayoutChangeEvent) => {
+    const { width, height } = event.nativeEvent.layout;
+    if (width > 0 && height > 0 && adViewDimensions.width === 0) {
+      const roundedWidth = Math.floor(width);
+      const roundedHeight = Math.ceil(height);
+      setAdViewDimensions({ width: roundedWidth, height: roundedHeight });
+    }
+  }, [adViewDimensions.width]);
+
+  // Load ad immediately
   useEffect(() => {
-    // Don't load ads in Expo Go or if NativeAd is not available
-    if (isExpoGo || !NativeAd) {
-      return;
-    }
+    if (isExpoGo || !NativeAd) return;
+    if (!shouldShowAds()) return;
 
-    // Don't load ads for premium users
-    if (!shouldShowAds()) {
-      return;
-    }
-
+    console.log('[Ads] Requesting native ad...');
     const NATIVE_AD_UNIT_ID = getNativeAdUnitId();
 
     NativeAd.createForAdRequest(NATIVE_AD_UNIT_ID, {
       requestNonPersonalizedAdsOnly: true,
     })
       .then((ad: any) => {
-        console.log('[Ads] Native ad loaded');
+        console.log('[Ads] Native ad loaded successfully');
+        adRef.current = ad;
         setNativeAd(ad);
         setAdLoaded(true);
         setAdError(false);
@@ -98,7 +110,10 @@ export default function NativeAdMissionCard({
       });
 
     return () => {
-      nativeAd?.destroy();
+      if (adRef.current) {
+        adRef.current.destroy();
+        adRef.current = null;
+      }
     };
   }, [shouldShowAds]);
 
@@ -117,88 +132,102 @@ export default function NativeAdMissionCard({
     return null;
   }
 
+  // Calculate dimensions - larger media size
+  const contentPadding = 20;
+  const mediaSize = Math.min(adViewDimensions.width - contentPadding * 2, 240); // Increased from 200 to 240
+  const contentWidth = adViewDimensions.width - contentPadding * 2;
+  // Calculate media left position (media is centered)
+  const mediaLeft = (adViewDimensions.width - mediaSize) / 2;
+
   return (
-    <View style={styles.wrapper}>
-      <NativeAdView nativeAd={nativeAd} style={styles.nativeAdView}>
-        {/* AD Badge */}
-        <View style={styles.adBadge}>
-          <Text style={styles.adBadgeText}>AD</Text>
-        </View>
-
-        {/* Content Container with safe padding */}
-        <View style={styles.content}>
-          {/* Media */}
-          <View style={styles.media}>
-            <NativeMediaView style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+    <View style={styles.wrapper} onLayout={handleLayout}>
+      {adViewDimensions.width > 0 && adViewDimensions.height > 0 ? (
+        <NativeAdView
+          nativeAd={nativeAd}
+          style={{
+            width: adViewDimensions.width,
+            height: adViewDimensions.height,
+          }}
+        >
+          {/* AD Badge - aligned with media left edge, AdChoices auto-added at top-right by SDK */}
+          <View style={[styles.adBadge, { left: mediaLeft }]}>
+            <Text style={styles.adBadgeText}>AD</Text>
           </View>
 
-          {/* Icon + Headline */}
-          <View style={styles.row}>
-            <NativeAsset assetType={NativeAssetType.ICON}>
-              <View style={styles.icon} />
-            </NativeAsset>
-            <View style={styles.textWrap}>
-              <NativeAsset assetType={NativeAssetType.HEADLINE}>
-                <Text style={styles.headline} numberOfLines={1} />
-              </NativeAsset>
-              <NativeAsset assetType={NativeAssetType.ADVERTISER}>
-                <Text style={styles.advertiser} numberOfLines={1} />
-              </NativeAsset>
+          {/* Main content */}
+          <View style={[styles.content, { width: adViewDimensions.width, paddingHorizontal: contentPadding }]}>
+            {/* Media - larger size */}
+            <View style={[styles.mediaContainer, { width: mediaSize, height: mediaSize }]}>
+              <NativeMediaView style={{ width: mediaSize, height: mediaSize }} resizeMode="contain" />
             </View>
+
+            {/* Icon + Headline */}
+            <View style={[styles.row, { width: contentWidth }]}>
+              <NativeAsset assetType={NativeAssetType.ICON}>
+                <View style={styles.icon} />
+              </NativeAsset>
+              <View style={styles.textWrap}>
+                <NativeAsset assetType={NativeAssetType.HEADLINE}>
+                  <Text style={styles.headline} numberOfLines={1} />
+                </NativeAsset>
+                <NativeAsset assetType={NativeAssetType.ADVERTISER}>
+                  <Text style={styles.advertiser} numberOfLines={1} />
+                </NativeAsset>
+              </View>
+            </View>
+
+            {/* Body */}
+            <NativeAsset assetType={NativeAssetType.BODY}>
+              <Text style={[styles.body, { width: contentWidth }]} numberOfLines={2} />
+            </NativeAsset>
+
+            {/* CTA Button */}
+            <NativeAsset assetType={NativeAssetType.CALL_TO_ACTION}>
+              <View style={[styles.ctaContainer, { width: contentWidth }]}>
+                <Text style={styles.ctaText} />
+              </View>
+            </NativeAsset>
           </View>
-
-          {/* Body */}
-          <NativeAsset assetType={NativeAssetType.BODY}>
-            <Text style={styles.body} numberOfLines={2} />
-          </NativeAsset>
-
-          {/* CTA Button */}
-          <NativeAsset assetType={NativeAssetType.CALL_TO_ACTION}>
-            <Text style={styles.cta} />
-          </NativeAsset>
-        </View>
-      </NativeAdView>
+        </NativeAdView>
+      ) : (
+        <View style={styles.placeholder} />
+      )}
     </View>
   );
 }
-
-// Card dimensions: 468px height, ~300px width, borderRadius 45
-// Safe area padding to avoid corner clipping
-const SAFE_PADDING = 20;
 
 const styles = StyleSheet.create({
   wrapper: {
     flex: 1,
     backgroundColor: '#000000',
-  },
-  nativeAdView: {
-    ...StyleSheet.absoluteFillObject,
+    borderRadius: 45,
+    overflow: 'hidden', // Clip content to rounded corners
   },
   content: {
-    flex: 1,
-    padding: SAFE_PADDING,
+    paddingTop: 54, // Space for AD badge (moved down +10)
+    paddingBottom: 24,
+    alignItems: 'center',
   },
+  // AD Badge - left position set dynamically to align with media
   adBadge: {
     position: 'absolute',
-    top: SAFE_PADDING + 4,
-    left: SAFE_PADDING + 4,
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 3,
-    zIndex: 10,
+    top: 26, // Moved down +10
+    // left is set inline to align with media container
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    zIndex: 100,
   },
   adBadgeText: {
-    fontSize: 8,
+    fontSize: 11,
     fontWeight: '700',
-    color: '#555',
+    color: '#333',
   },
-  media: {
-    flex: 1,
-    maxHeight: 300,
+  mediaContainer: {
     borderRadius: 12,
-    overflow: 'hidden',
     backgroundColor: '#1a1a1a',
+    overflow: 'hidden', // Clip landscape images to container bounds
   },
   row: {
     flexDirection: 'row',
@@ -211,7 +240,6 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 6,
     backgroundColor: '#1a1a1a',
-    overflow: 'hidden',
   },
   textWrap: {
     flex: 1,
@@ -231,15 +259,23 @@ const styles = StyleSheet.create({
     lineHeight: 14,
     marginTop: 6,
   },
-  cta: {
+  ctaContainer: {
     backgroundColor: '#4285F4',
+    paddingVertical: 12,
+    marginTop: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ctaText: {
     color: COLORS.white,
     fontSize: 13,
     fontWeight: '700',
     textAlign: 'center',
-    paddingVertical: 12,
-    marginTop: 10,
-    borderRadius: 8,
-    overflow: 'hidden',
+  },
+  placeholder: {
+    flex: 1,
+    backgroundColor: '#000000',
+    borderRadius: 45,
   },
 });

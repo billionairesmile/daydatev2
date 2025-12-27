@@ -11,12 +11,29 @@ import { useSubscriptionStore, SUBSCRIPTION_LIMITS } from '@/stores/subscription
 // Types
 // ============================================
 
+// 6 Region Classification (v3)
+export type RegionCode =
+  | 'EAST_ASIA'       // Korea, Japan, Taiwan, Hong Kong, China
+  | 'SOUTHEAST_ASIA'  // Thailand, Vietnam, Indonesia, Philippines, Singapore, Malaysia
+  | 'NORTH_AMERICA'   // USA, Canada
+  | 'EUROPE'          // European countries
+  | 'LATIN_AMERICA'   // South & Central America
+  | 'DEFAULT';        // Others (India, Middle East, Africa, Oceania, etc.)
+
+// Season types for different climate zones
+export type SeasonType =
+  | 'spring' | 'summer' | 'fall' | 'winter'  // 4 seasons (temperate)
+  | 'dry' | 'rainy'                           // Dry/Rainy (tropical)
+  | 'mild';                                   // Year-round mild (equatorial)
+
 export interface WeatherContext {
   temperature: number;
   condition: string;
-  season: 'spring' | 'summer' | 'fall' | 'winter';
+  season: SeasonType;
+  seasonLabel: string;
   isOutdoorFriendly: boolean;
   countryCode: CountryCode;
+  regionCode: RegionCode;
 }
 
 // Mission history summary for deduplication (hybrid approach)
@@ -61,7 +78,7 @@ const getOpenAIClient = () => {
 // ============================================
 
 // Detect country from coordinates using OpenWeatherMap reverse geocoding
-async function detectCountryFromCoordinates(latitude: number, longitude: number): Promise<CountryCode> {
+async function detectCountryFromCoordinates(latitude: number, longitude: number): Promise<string> {
   const apiKey = process.env.EXPO_PUBLIC_WEATHER_API_KEY;
   if (!apiKey) return 'DEFAULT';
 
@@ -74,19 +91,125 @@ async function detectCountryFromCoordinates(latitude: number, longitude: number)
 
     const data = await response.json();
     if (data && data.length > 0) {
-      const country = data[0].country;
-      // Map to supported country codes
-      if (country === 'KR') return 'KR';
-      if (country === 'US') return 'US';
-      if (country === 'GB') return 'GB';
-      if (country === 'AU') return 'AU';
-      if (country === 'CA') return 'CA';
+      return data[0].country || 'DEFAULT';
     }
     return 'DEFAULT';
   } catch (error) {
     console.error('[Country Detection] Failed:', error);
     return 'DEFAULT';
   }
+}
+
+// ============================================
+// Region Code Mapping (6 Regions - v3)
+// ============================================
+
+function getRegionCode(countryCode: string): RegionCode {
+  const regionMap: Record<string, RegionCode> = {
+    // ===== East Asia (Anniversary culture, cafes, photo spots) =====
+    'KR': 'EAST_ASIA',  // Korea
+    'JP': 'EAST_ASIA',  // Japan
+    'TW': 'EAST_ASIA',  // Taiwan
+    'HK': 'EAST_ASIA',  // Hong Kong
+    'CN': 'EAST_ASIA',  // China
+    'MO': 'EAST_ASIA',  // Macau
+
+    // ===== Southeast Asia (Night markets, tropical, food-centric) =====
+    'TH': 'SOUTHEAST_ASIA',  // Thailand
+    'VN': 'SOUTHEAST_ASIA',  // Vietnam
+    'ID': 'SOUTHEAST_ASIA',  // Indonesia
+    'PH': 'SOUTHEAST_ASIA',  // Philippines
+    'SG': 'SOUTHEAST_ASIA',  // Singapore
+    'MY': 'SOUTHEAST_ASIA',  // Malaysia
+    'MM': 'SOUTHEAST_ASIA',  // Myanmar
+    'KH': 'SOUTHEAST_ASIA',  // Cambodia
+    'LA': 'SOUTHEAST_ASIA',  // Laos
+
+    // ===== North America (Casual, outdoor, sports) =====
+    'US': 'NORTH_AMERICA',  // USA
+    'CA': 'NORTH_AMERICA',  // Canada
+
+    // ===== Europe (Independence, natural flow, wine/terrace) =====
+    'GB': 'EUROPE',  // UK
+    'FR': 'EUROPE',  // France
+    'DE': 'EUROPE',  // Germany
+    'IT': 'EUROPE',  // Italy
+    'ES': 'EUROPE',  // Spain
+    'NL': 'EUROPE',  // Netherlands
+    'PT': 'EUROPE',  // Portugal
+    'BE': 'EUROPE',  // Belgium
+    'CH': 'EUROPE',  // Switzerland
+    'AT': 'EUROPE',  // Austria
+    'SE': 'EUROPE',  // Sweden
+    'NO': 'EUROPE',  // Norway
+    'DK': 'EUROPE',  // Denmark
+    'FI': 'EUROPE',  // Finland
+    'IE': 'EUROPE',  // Ireland
+    'PL': 'EUROPE',  // Poland
+    'CZ': 'EUROPE',  // Czech Republic
+    'GR': 'EUROPE',  // Greece
+    'HU': 'EUROPE',  // Hungary
+    'RO': 'EUROPE',  // Romania
+
+    // ===== Latin America (Passionate, family OK, dance/music) =====
+    'BR': 'LATIN_AMERICA',  // Brazil
+    'MX': 'LATIN_AMERICA',  // Mexico
+    'AR': 'LATIN_AMERICA',  // Argentina
+    'CO': 'LATIN_AMERICA',  // Colombia
+    'CL': 'LATIN_AMERICA',  // Chile
+    'PE': 'LATIN_AMERICA',  // Peru
+    'VE': 'LATIN_AMERICA',  // Venezuela
+    'EC': 'LATIN_AMERICA',  // Ecuador
+    'GT': 'LATIN_AMERICA',  // Guatemala
+    'CU': 'LATIN_AMERICA',  // Cuba
+    'DO': 'LATIN_AMERICA',  // Dominican Republic
+    'CR': 'LATIN_AMERICA',  // Costa Rica
+    'PA': 'LATIN_AMERICA',  // Panama
+    'UY': 'LATIN_AMERICA',  // Uruguay
+    'PR': 'LATIN_AMERICA',  // Puerto Rico
+  };
+
+  return regionMap[countryCode] || 'DEFAULT';
+}
+
+// ============================================
+// Season Detection (Tropical/Southern Hemisphere)
+// ============================================
+
+function getSeason(
+  regionCode: RegionCode,
+  countryCode: string,
+  month: number
+): { season: SeasonType; label: string } {
+  // ===== Southeast Asia: Dry/Rainy season =====
+  if (regionCode === 'SOUTHEAST_ASIA') {
+    // Roughly: Rainy May-Oct, Dry Nov-Apr (varies by country)
+    if (month >= 5 && month <= 10) {
+      return { season: 'rainy', label: 'Rainy Season' };
+    }
+    return { season: 'dry', label: 'Dry Season' };
+  }
+
+  // ===== Southern Hemisphere: Reversed seasons =====
+  const southernCountries = ['AU', 'NZ', 'AR', 'CL', 'UY', 'ZA', 'BR'];
+  if (southernCountries.includes(countryCode)) {
+    if (month >= 3 && month <= 5) return { season: 'fall', label: 'Fall' };
+    if (month >= 6 && month <= 8) return { season: 'winter', label: 'Winter' };
+    if (month >= 9 && month <= 11) return { season: 'spring', label: 'Spring' };
+    return { season: 'summer', label: 'Summer' };
+  }
+
+  // ===== Equatorial (Year-round warm): Mild =====
+  const equatorialCountries = ['SG', 'EC', 'CO', 'KE', 'ID'];
+  if (equatorialCountries.includes(countryCode)) {
+    return { season: 'mild', label: 'Year-round Warm' };
+  }
+
+  // ===== Northern Hemisphere default (4 seasons) =====
+  if (month >= 3 && month <= 5) return { season: 'spring', label: 'Spring' };
+  if (month >= 6 && month <= 8) return { season: 'summer', label: 'Summer' };
+  if (month >= 9 && month <= 11) return { season: 'fall', label: 'Fall' };
+  return { season: 'winter', label: 'Winter' };
 }
 
 async function fetchWeather(latitude: number, longitude: number): Promise<WeatherContext> {
@@ -100,7 +223,7 @@ async function fetchWeather(latitude: number, longitude: number): Promise<Weathe
 
   try {
     // Fetch weather and country in parallel
-    const [weatherResponse, countryCode] = await Promise.all([
+    const [weatherResponse, rawCountryCode] = await Promise.all([
       fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${apiKey}&units=metric`),
       detectCountryFromCoordinates(latitude, longitude),
     ]);
@@ -115,28 +238,40 @@ async function fetchWeather(latitude: number, longitude: number): Promise<Weathe
     const weatherId = data.weather[0]?.id || 800;
     const weatherMain = data.weather[0]?.main || 'Clear';
 
-    // Determine condition based on country
-    const condition = getWeatherCondition(weatherId, weatherMain, countryCode);
+    // Get region code from country
+    const regionCode = getRegionCode(rawCountryCode);
 
-    // Determine season
-    const season = getCurrentSeason();
+    // Determine condition based on language preference
+    const language = useLanguageStore.getState().language;
+    const condition = getWeatherCondition(weatherId, weatherMain, language);
+
+    // Determine season based on region and hemisphere
+    const month = new Date().getMonth() + 1;
+    const { season, label: seasonLabel } = getSeason(regionCode, rawCountryCode, month);
 
     // Determine if outdoor-friendly
     const isOutdoorFriendly = checkOutdoorFriendly(weatherId, temp);
 
-    // Update detected country in store
+    // Update detected country in store (map to CountryCode type)
+    const countryCode = mapToCountryCode(rawCountryCode);
     useLanguageStore.getState().setDetectedCountry(countryCode);
 
-    return { temperature: temp, condition, season, isOutdoorFriendly, countryCode };
+    return { temperature: temp, condition, season, seasonLabel, isOutdoorFriendly, countryCode, regionCode };
   } catch (error) {
     console.error('[Weather] API fetch failed:', error);
     return getSeasonFallback();
   }
 }
 
-function getWeatherCondition(weatherId: number, weatherMain: string, countryCode: CountryCode): string {
+// Map raw country code to supported CountryCode type
+function mapToCountryCode(rawCode: string): CountryCode {
+  const supportedCodes: CountryCode[] = ['KR', 'US', 'GB', 'AU', 'CA', 'DEFAULT'];
+  return supportedCodes.includes(rawCode as CountryCode) ? (rawCode as CountryCode) : 'DEFAULT';
+}
+
+function getWeatherCondition(weatherId: number, weatherMain: string, language: SupportedLanguage): string {
   // Weather condition codes: https://openweathermap.org/weather-conditions
-  const isKorean = countryCode === 'KR';
+  const isKorean = language === 'ko';
 
   if (weatherId >= 200 && weatherId < 300) return isKorean ? '천둥번개' : 'Thunderstorm';
   if (weatherId >= 300 && weatherId < 400) return isKorean ? '이슬비' : 'Drizzle';
@@ -146,14 +281,6 @@ function getWeatherCondition(weatherId: number, weatherMain: string, countryCode
   if (weatherId === 800) return isKorean ? '맑음' : 'Clear';
   if (weatherId > 800) return isKorean ? '흐림' : 'Cloudy';
   return weatherMain;
-}
-
-function getCurrentSeason(): 'spring' | 'summer' | 'fall' | 'winter' {
-  const month = new Date().getMonth() + 1;
-  if (month >= 3 && month <= 5) return 'spring';
-  if (month >= 6 && month <= 8) return 'summer';
-  if (month >= 9 && month <= 11) return 'fall';
-  return 'winter';
 }
 
 function checkOutdoorFriendly(weatherId: number, temp: number): boolean {
@@ -166,23 +293,30 @@ function checkOutdoorFriendly(weatherId: number, temp: number): boolean {
 }
 
 function getSeasonFallback(countryCode: CountryCode = 'DEFAULT'): WeatherContext {
-  const season = getCurrentSeason();
   const language = useLanguageStore.getState().language;
   const isKorean = language === 'ko';
+  const regionCode = getRegionCode(countryCode);
+  const month = new Date().getMonth() + 1;
+  const { season, label: seasonLabel } = getSeason(regionCode, countryCode, month);
 
-  const seasonDefaults: Record<string, { temp: number; conditionKo: string; conditionEn: string; outdoor: boolean }> = {
-    spring: { temp: 15, conditionKo: '맑음', conditionEn: 'Clear', outdoor: true },
-    summer: { temp: 28, conditionKo: '맑음', conditionEn: 'Clear', outdoor: true },
-    fall: { temp: 18, conditionKo: '맑음', conditionEn: 'Clear', outdoor: true },
-    winter: { temp: 2, conditionKo: '맑음', conditionEn: 'Clear', outdoor: false },
+  // Get temperature based on season type
+  const tempDefaults: Record<string, number> = {
+    spring: 15, summer: 28, fall: 18, winter: 2,
+    dry: 30, rainy: 28, mild: 27,
   };
-  const defaults = seasonDefaults[season];
+  const outdoorDefaults: Record<string, boolean> = {
+    spring: true, summer: true, fall: true, winter: false,
+    dry: true, rainy: false, mild: true,
+  };
+
   return {
-    temperature: defaults.temp,
-    condition: isKorean ? defaults.conditionKo : defaults.conditionEn,
+    temperature: tempDefaults[season] || 20,
+    condition: isKorean ? '맑음' : 'Clear',
     season,
-    isOutdoorFriendly: defaults.outdoor,
+    seasonLabel,
+    isOutdoorFriendly: outdoorDefaults[season] ?? true,
     countryCode,
+    regionCode,
   };
 }
 
@@ -498,151 +632,268 @@ function buildDeduplicationContext(history: MissionHistorySummary | undefined, l
 }
 
 // ============================================
-// Culture-Specific Prompts
+// Culture-Specific Prompts (6 Regions - v3)
 // ============================================
 
-const CULTURE_PROMPTS: Record<string, { culture: string; trends: string; activities: string; food: string; smallJoys: string; seasonal: string; nightViews: string }> = {
-  KR: {
-    culture: '한국',
-    trends: '팝업스토어, 전시회, 원데이클래스, 플리마켓, 북카페, 빈티지샵, 레코드샵, 독립서점, 루프탑바, 야외 영화관, 한강 피크닉, 감성카페 투어',
-    activities: '방탈출, 보드게임카페, PC방, 코인노래방, VR게임, 스크린골프, 볼링, 다트바, 오락실, 롤러스케이트장, 클라이밍, 드로잉카페, 도자기공방, 향수공방, 캔들공방, 가죽공예, 꽃꽂이, 쿠킹클래스, 와인클래스',
-    food: '전통시장 투어, 길거리 음식, 맛집 웨이팅, 횟집, 고기집, 이자카야, 포장마차, 야시장, 디저트카페, 베이커리 투어, 브런치 맛집, 오마카세, 파인다이닝',
-    smallJoys: '편의점 데이트, 다이소 쇼핑, 네컷사진, 스티커사진',
-    seasonal: '벚꽃/단풍 명소, 한강 피크닉, 눈 오는 날 데이트',
-    nightViews: '드라이브, 루프탑, 야경 맛집, 한강 야경',
+interface CulturePrompt {
+  toneGuide: string;
+  trends: string;
+  freeActivities: string[];
+  paidActivities: string;
+  food: string;
+  seasonal: Record<string, string>;
+  coupleStyle: string;
+  anniversaryStyle: string;
+}
+
+const CULTURE_PROMPTS: Record<RegionCode, CulturePrompt> = {
+  EAST_ASIA: {
+    toneGuide: '감성적, 로맨틱, 기념일 강조, 포토스팟 중심, 섬세한 표현',
+    trends: '팝업스토어, 전시회, 플리마켓, 감성카페, 야경명소, 네컷사진',
+    freeActivities: [
+      '한강/강변 자전거',
+      '공원 피크닉',
+      '야경 드라이브',
+      '일출/일몰 산책',
+      '동네 산책',
+      '편의점 데이트',
+      '집에서 영화',
+      '별 보기',
+      '무료 전시회',
+      '야시장 구경',
+    ],
+    paidActivities: '방탈출, 보드게임카페, 원데이클래스, VR게임, 볼링, 노래방',
+    food: '맛집투어, 카페투어, 야시장, 포장마차, 디저트카페, 브런치',
+    seasonal: {
+      spring: '벚꽃/매화, 피크닉, 꽃구경',
+      summer: '물놀이, 야외페스티벌, 빙수, 야경',
+      fall: '단풍, 코스모스, 갈대밭, 억새',
+      winter: '일루미네이션, 온천, 눈 데이트, 크리스마스',
+    },
+    coupleStyle: '100일 기념일 중요, 커플템, SNS 공유 활발, 스킨십 중간',
+    anniversaryStyle: '100일, 200일, 300일... 일수 기념일 중요시',
   },
-  US: {
-    culture: 'American',
-    trends: 'Pop-up events, art exhibitions, wine tastings, farmers markets, flea markets, vintage shops, record stores, indie bookstores, rooftop bars, outdoor movies, picnics, coffee shop hopping, thrift shopping',
-    activities: 'Escape rooms, bowling, mini golf, arcade bars, karaoke nights, trivia nights, axe throwing, go-karting, roller skating, rock climbing, pottery classes, painting classes, cooking classes, wine tasting classes, dance classes, yoga sessions',
-    food: 'Brunch spots, food halls, local diners, taco trucks, pizza joints, BBQ joints, ice cream shops, dessert bars, bakery tours, food truck festivals, farm-to-table restaurants, speakeasy bars, rooftop dining',
-    smallJoys: 'Dollar store dates, Target runs, photo booth stops, convenience store snack runs',
-    seasonal: 'Fall foliage drives, beach days, holiday light displays, spring picnics',
-    nightViews: 'Night drives, rooftop bars, city skyline views, stargazing spots',
+  SOUTHEAST_ASIA: {
+    toneGuide: 'Casual, food-centric, night market culture, tropical vibes, temple/nature mix',
+    trends: 'Night markets, street food tours, temple visits, beach trips, cafe hopping, rooftop bars',
+    freeActivities: [
+      'Night market strolls',
+      'Beach walks',
+      'Temple visits',
+      'Street food hopping',
+      'Park walks (evening)',
+      'Motorbike sunset rides',
+      'Watching sunset at beach',
+      'Home cooking together',
+      'Free cultural events',
+      'River/canal walks',
+    ],
+    paidActivities: 'Spa/massage, cooking classes, island hopping, cafe hopping, rooftop bars',
+    food: 'Street food, night markets, local cafes, seafood spots, tropical fruits',
+    seasonal: {
+      dry: 'Beach trips, island hopping, outdoor temples, night markets, outdoor dining',
+      rainy: 'Indoor cafes, shopping malls, spa/massage, cooking classes, museum visits',
+    },
+    coupleStyle: 'Family-oriented, moderate PDA, food dates very important, relaxed vibe',
+    anniversaryStyle: 'Yearly anniversaries, less focus on day counts',
+  },
+  NORTH_AMERICA: {
+    toneGuide: 'Casual, fun, activity-focused, spontaneous, direct expression',
+    trends: 'Farmers markets, food trucks, craft breweries, hiking trails, sports events, road trips',
+    freeActivities: [
+      'Hiking/trail walks',
+      'Beach walks',
+      'Park picnics',
+      'Stargazing',
+      'City bike rides',
+      'Window shopping',
+      'Home movie night',
+      'Sunrise/sunset watching',
+      'Free outdoor concerts',
+      'Neighborhood exploration',
+    ],
+    paidActivities: 'Escape rooms, bowling, mini golf, axe throwing, go-karting, sports games',
+    food: 'Brunch spots, food halls, diners, BBQ, ice cream shops, craft breweries',
+    seasonal: {
+      spring: 'Cherry blossoms, outdoor picnics, hiking',
+      summer: 'Beach days, outdoor concerts, BBQ, road trips',
+      fall: 'Fall foliage drives, pumpkin patches, apple picking',
+      winter: 'Holiday lights, ice skating, cozy cafes, ski trips',
+    },
+    coupleStyle: 'Anniversary > day counts, dutch pay common, direct expressions, casual PDA',
+    anniversaryStyle: 'Yearly anniversaries only, monthly not common',
+  },
+  EUROPE: {
+    toneGuide: 'Relaxed, independent, natural flow, less emphasis on milestones, quality time',
+    trends: 'Cafe terraces, wine bars, walking tours, museums, vintage markets, local bistros',
+    freeActivities: [
+      'River/canal walks',
+      'Park strolls',
+      'City cycling',
+      'Sunset watching',
+      'Window shopping old town',
+      'Home cooking together',
+      'Picnic in plaza',
+      'Free museum days',
+      'Street performer watching',
+      'Architecture walks',
+    ],
+    paidActivities: 'Wine tasting, cooking classes, boat tours, theater, gallery visits, spa',
+    food: 'Cafe terraces, wine bars, local bistros, street markets, bakeries, cheese shops',
+    seasonal: {
+      spring: 'Outdoor terraces, flower markets, canal walks',
+      summer: 'Beach towns, festivals, rooftop bars, outdoor dining',
+      fall: 'Wine harvest, cozy pubs, autumn walks, harvest festivals',
+      winter: 'Christmas markets, mulled wine, cozy cafes, winter walks',
+    },
+    coupleStyle: 'Independence valued, less anniversary focus, natural progression, PDA normal',
+    anniversaryStyle: 'Less emphasis on anniversaries, Valentine\'s seen as commercial',
+  },
+  LATIN_AMERICA: {
+    toneGuide: 'Passionate, expressive, family-friendly OK, music/dance welcome, romantic gestures big',
+    trends: 'Dancing spots, beach clubs, street food tours, live music, family gatherings, festivals',
+    freeActivities: [
+      'Beach walks',
+      'Plaza strolls',
+      'Dancing in the park',
+      'Street food hopping',
+      'Sunset at the beach',
+      'Home cooking together',
+      'Walking the malecon',
+      'Free concerts/events',
+      'People watching at plaza',
+      'Neighborhood festivals',
+    ],
+    paidActivities: 'Salsa/tango classes, beach clubs, live music venues, boat trips, wine tours',
+    food: 'Street tacos, ceviche spots, local markets, beach restaurants, churros, empanadas',
+    seasonal: {
+      spring: 'Beach season starts, outdoor festivals, flower markets',
+      summer: 'Beach life, night markets, outdoor dancing, carnival prep',
+      fall: 'Dia de los Muertos, harvest festivals, wine tasting',
+      winter: 'Holiday celebrations, cozy cafes, indoor dancing, wine regions',
+    },
+    coupleStyle: 'Very expressive, family approval matters, traditional gender roles common, passionate PDA',
+    anniversaryStyle: 'Monthly anniversaries (mesiversarios) common, romantic gestures important',
   },
   DEFAULT: {
-    culture: 'local',
-    trends: 'pop-up events, exhibitions, workshops, local festivals, vintage shops, bookstores',
-    activities: 'escape rooms, game cafes, outdoor activities, cultural experiences, cooking classes, art workshops',
-    food: 'local restaurants, street food, cafes, food markets, brunch spots, dessert shops',
-    smallJoys: 'convenience store dates, photo booths, window shopping',
-    seasonal: 'seasonal festivals, outdoor picnics, weather-appropriate activities',
-    nightViews: 'night drives, rooftop spots, scenic viewpoints',
+    toneGuide: 'Universal, flexible, balanced between indoor and outdoor, culturally neutral',
+    trends: 'Local cafes, parks, shopping areas, cultural sites, restaurants',
+    freeActivities: [
+      'Park walks',
+      'Sunset watching',
+      'Home movie night',
+      'Cooking together',
+      'Window shopping',
+      'Neighborhood strolls',
+      'Free local events',
+      'Stargazing',
+      'Picnic in park',
+      'Photo walks',
+    ],
+    paidActivities: 'Cafes, restaurants, movies, bowling, local attractions',
+    food: 'Local restaurants, cafes, street food, dessert shops',
+    seasonal: {
+      mild: 'Outdoor walks, picnics, sightseeing',
+      hot: 'Indoor activities, evening outings, water-related activities',
+      cool: 'Cozy cafes, indoor activities, warm food dates',
+    },
+    coupleStyle: 'Balanced, respectful of local norms, flexible expression',
+    anniversaryStyle: 'Yearly anniversaries',
   },
 };
 
 // ============================================
-// System Prompt Generator (Hybrid: EN headers + localized content)
+// Cost Balance Logic
 // ============================================
 
-function getSystemPrompt(countryCode: CountryCode, language: SupportedLanguage): string {
-  const cultureData = CULTURE_PROMPTS[countryCode] || CULTURE_PROMPTS.DEFAULT;
-  const isKo = language === 'ko';
+function buildCostDirective(
+  missionCount: number,
+  language: SupportedLanguage
+): string {
+  // Always require at least 1 free/low-cost mission regardless of mission count
+  const requiredFree = 1;
 
-  // Language-specific content
-  const L = isKo ? {
-    role: `당신은 ${cultureData.culture} 2030 커플의 데이트 플래너입니다. 인스타그램, 유튜브, 틱톡 트렌드에 밝고, 소소하지만 특별한 순간을 만드는 데 탁월합니다.`,
-    philosophy: [
-      '"이거 해보고 싶다!" 설렘을 주는 아이디어',
-      '자연스럽게 사진 찍고 싶어지는 순간 설계',
-      '완료 후 "우리만의 추억"이 남는 경험',
-      '대화가 자연스럽게 이어지는 상황',
-    ],
-    titleRule: 'title: 감성적이고 시적인 문구 (15~25자)',
-    titleGood: '"반짝이는 트리 아래, 우리의 겨울", "함께 외치는 응원의 순간"',
-    titleBad: '"카페 가기", "방탈출 하기" (너무 직접적)',
-    titleHint: '미션명만으로 활동 유추 가능, 구체적 내용은 description에서',
-    descRule: 'description: 80자 이내, 구체적으로 "무엇을 하는 미션인지" 설명',
-    descExample: '"반짝이는 트리 아래, 우리의 겨울" → "크리스마스 트리 명소에서 함께 사진 찍기"',
-    noPrice: '금액 언급 금지 (X: "3000원으로")',
-    noFiller: '"후기 나누기", "이야기 나누기" 금지',
-    photoNatural: '사진 인증이 자연스러운 활동으로 구성',
-    remoteIntro: '커플 중 한 명만 현장에서 직접 사진 촬영하여 인증. 앨범 업로드 불가.',
-    remoteStructure: '"둘이 같은 걸 각자 하고, 한 명이 인증" 구조',
-    remoteExamples: '같은 책 읽기→페이지 인증, 같은 요리→결과물 인증, 손편지→사진 인증',
-    roleMain: '미션1 (메인): 사용자 고민/기분에 가장 적합',
-    roleAlt: '미션2 (대안): 비슷하지만 살짝 다른 방향',
-    roleSurprise: '미션3 (서프라이즈): 예상 못한 신선한 제안',
-    categoryNote: '세 미션의 카테고리는 서로 겹치지 않게!',
-    categoryDetails: [
-      'creative: DIY, 공예, 원데이클래스, 캔들/향수 만들기, 도자기, 그림, 가죽공예 등',
-      'culture: 전시회, 미술관, 박물관, 공연, 콘서트, 연극',
-      'learning: 언어교환, 스터디, 강연, 세미나',
-      'wellness: 스파, 마사지, 온천, 명상, 요가',
-    ],
-    categoryWarning: '위 목록에 없는 카테고리(diy, craft, workshop 등) 절대 금지!',
-    respond: '반드시 한국어로 응답하세요.',
-  } : {
-    role: `You are a date planner for couples in their 20s-30s familiar with ${cultureData.culture} culture. You excel at creating small but special moments, keeping up with Instagram, YouTube, and TikTok trends.`,
-    philosophy: [
-      'Ideas that spark excitement: "I want to try this!"',
-      'Design moments that naturally make couples want to take photos',
-      'Experiences that create "our special memories" after completion',
-      'Situations where conversation flows naturally',
-    ],
-    titleRule: 'title: Emotional, poetic phrase (8-15 words)',
-    titleGood: '"Under the Sparkling Lights, Our Winter Story", "Cheering Together, Hearts United"',
-    titleBad: '"Go to a cafe", "Do escape room" (too direct)',
-    titleHint: 'Title alone should hint at activity, details go in description',
-    descRule: 'description: Under 80 chars, clearly explain "what the mission is"',
-    descExample: '"Under the Sparkling Lights, Our Winter Story" → "Take photos together at a popular Christmas tree spot"',
-    noPrice: 'Never mention prices (X: "for $5")',
-    noFiller: 'No filler phrases like "share thoughts"',
-    photoNatural: 'Activities should naturally lend themselves to photo verification',
-    remoteIntro: 'Only one partner takes a photo on-site for verification. No album uploads.',
-    remoteStructure: 'Structure: "Both do the same thing separately, one verifies"',
-    remoteExamples: 'Same book→verify page, Same recipe→verify result, Handwritten letter→photo',
-    roleMain: 'Mission 1 (Main): Best match for user concerns/mood',
-    roleAlt: 'Mission 2 (Alternative): Similar but slightly different',
-    roleSurprise: 'Mission 3 (Surprise): Unexpected fresh suggestion',
-    categoryNote: 'Three missions should have different categories!',
-    categoryDetails: [
-      'creative: DIY, crafts, one-day classes, candle/perfume making, pottery, painting, leather crafts',
-      'culture: Exhibitions, art museums, museums, performances, concerts, theater',
-      'learning: Language exchange, study sessions, lectures, seminars',
-      'wellness: Spa, massage, hot springs, meditation, yoga',
-    ],
-    categoryWarning: 'Categories not in list (diy, craft, workshop, etc.) strictly prohibited!',
-    respond: 'Respond in English.',
-  };
+  if (language === 'ko') {
+    return `
+## 비용 균형 (중요!)
+매 미션 생성 시 반드시 무료/저비용 미션 1개 이상 포함:
 
-  return `${L.role}
+무료 (₩0): 산책, 자전거, 드라이브, 공원, 일출/일몰, 집에서 하는 활동
+저비용 (<₩10,000): 편의점 데이트, 포장음식 피크닉, 네컷사진, 길거리 음식
 
-## Mission Design Philosophy
-1. ${L.philosophy[0]}
-2. ${L.philosophy[1]}
-3. ${L.philosophy[2]}
-4. ${L.philosophy[3]}
+규칙: ${missionCount}개 미션 생성 시 → 반드시 최소 ${requiredFree}개는 무료/저비용 (difficulty: 1)`;
+  }
 
-## ${cultureData.culture} Date Culture
-- Trends: ${cultureData.trends}
-- Small joys: ${cultureData.smallJoys}
-- Seasonal: ${cultureData.seasonal}
-- Night views: ${cultureData.nightViews}
-- Activities: ${cultureData.activities}
-- Food: ${cultureData.food}
+  return `
+## COST BALANCE (Critical!)
+Every generation MUST include at least 1 FREE/LOW-COST mission:
+
+FREE ($0): Walking, cycling, driving, parks, sunrise/sunset, home activities
+LOW-COST (<$10): Convenience store date, takeout picnic, photo booth, street food
+
+RULE: Generate ${missionCount} missions → MUST include at least ${requiredFree} free/low-cost (difficulty: 1)`;
+}
+
+// ============================================
+// System Prompt Generator (Region-based v3)
+// ============================================
+
+function getSystemPrompt(
+  regionCode: RegionCode,
+  language: SupportedLanguage,
+  season: SeasonType,
+  missionCount: number
+): string {
+  const culture = CULTURE_PROMPTS[regionCode];
+  const seasonalActivities = culture.seasonal[season] || culture.seasonal['mild'] || '';
+  const costDirective = buildCostDirective(missionCount, language);
+  const outputInstruction = getOutputLanguageInstruction(language);
+
+  // System prompt in English for token efficiency, output in target language
+  return `You are a couple date mission generator.
+
+## CULTURE CONTEXT (${regionCode})
+Tone: ${culture.toneGuide}
+Trends: ${culture.trends}
+Couple Style: ${culture.coupleStyle}
+Anniversary Style: ${culture.anniversaryStyle}
+
+## SEASONAL CONTEXT
+Current Season: ${season}
+Recommended Activities: ${seasonalActivities}
+
+## FREE ACTIVITIES (Must include!)
+${culture.freeActivities.join(', ')}
+
+## PAID ACTIVITIES
+${culture.paidActivities}
+
+## FOOD OPTIONS
+${culture.food}
+
+${costDirective}
+
+## OUTPUT LANGUAGE
+${outputInstruction}
 
 ## Mission Writing Rules
-1. ${L.titleRule}
-   - Good: ${L.titleGood}
-   - Bad: ${L.titleBad}
-   - ${L.titleHint}
-2. ${L.descRule}
-   - Example: ${L.descExample}
-3. ${L.noPrice}
-4. ${L.noFiller}
-5. ${L.photoNatural}
+1. title: Emotional, poetic phrase (not direct like "Go to cafe")
+   - Good: "Under the Sparkling Lights, Our Winter Story"
+   - Bad: "Visit a cafe", "Do escape room"
+2. description: Under 80 chars, clearly explain what to do
+3. Never mention prices
+4. Activities should naturally lend themselves to photo verification
 
-## Remote Mission Rules (Important!)
-- ${L.remoteIntro}
-- ${L.remoteStructure}
-- Examples: ${L.remoteExamples}
+## Remote Mission Rules (When couple can't meet)
+- Only one partner takes a photo on-site for verification
+- Structure: "Both do the same thing separately, one verifies"
+- Examples: Same book→verify page, Same recipe→verify result
 
 ## Mission Role Distribution
-- ${L.roleMain}
-- ${L.roleAlt}
-- ${L.roleSurprise}
-※ ${L.categoryNote}
+- Mission 1: Best match for user concerns/mood
+- Mission 2: Similar but slightly different direction
+- Mission 3: Unexpected fresh suggestion
+※ Three missions should have different categories!
 
 ## Category List (Must use one!)
 Food: cafe, restaurant, streetfood, dessert, cooking, drink, brunch
@@ -651,74 +902,166 @@ Activity: culture, movie, sports, fitness, wellness, creative, game, shopping, p
 Special: romantic, anniversary, surprise, memory
 Online: online, challenge
 
-### Category Details
-- ${L.categoryDetails[0]}
-- ${L.categoryDetails[1]}
-- ${L.categoryDetails[2]}
-- ${L.categoryDetails[3]}
-⚠️ ${L.categoryWarning}
-
 ## JSON Output Format
-{"missions":[{"title":"","description":"","category":"","tags":["","",""]}]}
+{"missions":[{"title":"","description":"","category":"","difficulty":1-3,"tags":["",""]}]}
 
-${L.respond}`;
+difficulty scale:
+1 = FREE (walks, home activities, stargazing, convenience store)
+2 = LOW-COST (<$10, street food, photo booth, takeout picnic)
+3 = PAID ($10+, restaurants, classes, attractions)`;
+}
+
+// Output language instruction based on app language
+function getOutputLanguageInstruction(language: SupportedLanguage): string {
+  const instructions: Record<SupportedLanguage, string> = {
+    ko: '반드시 한국어로 미션을 생성하세요. 제목과 설명 모두 한국어로 작성합니다.',
+    en: 'Generate all missions in English. Both title and description must be in English.',
+    es: 'Genera todas las misiones en español. El título y la descripción deben estar en español.',
+    'zh-TW': '請用繁體中文生成所有任務。標題和描述都必須用繁體中文。',
+    ja: 'すべてのミッションを日本語で生成してください。タイトルと説明は日本語で書いてください。',
+  };
+  return instructions[language] || instructions.en;
 }
 
 // ============================================
-// Few-shot Examples (Language-specific)
+// Region-specific Few-shot Examples (Cultural context)
 // ============================================
 
-function getFewShotExamples(_language: SupportedLanguage): string {
-  // Note: Korean cultural nuances are provided via CULTURE_PROMPTS.KR
-  // English examples are sufficient for teaching JSON format structure
+const REGION_FEW_SHOTS: Record<RegionCode, string> = {
+  EAST_ASIA: `[
+  {"title":"노을 지는 강변, 우리의 시간","description":"강변 산책하며 일몰 감상하기","category":"outdoor","difficulty":1},
+  {"title":"별빛 아래 드라이브","description":"야경 드라이브하며 좋아하는 음악 듣기","category":"drive","difficulty":1},
+  {"title":"동네 한 바퀴, 손잡고","description":"집 근처 골목 산책하며 수다 떨기","category":"outdoor","difficulty":1},
+  {"title":"편의점 미식회","description":"편의점 음식 조합해서 나만의 메뉴 만들기","category":"streetfood","difficulty":1},
+  {"title":"우리 집 영화관","description":"넷플릭스 보며 집에서 팝콘 파티","category":"home","difficulty":1},
+  {"title":"단서를 찾아서","description":"방탈출 카페에서 협동 미션 클리어","category":"game","difficulty":3},
+  {"title":"오늘의 카페 탐험","description":"새로운 감성 카페에서 시그니처 메뉴 도전","category":"cafe","difficulty":2}
+]`,
+
+  SOUTHEAST_ASIA: `[
+  {"title":"Sunset Beach Stroll","description":"Walk barefoot on the beach as the sun sets","category":"outdoor","difficulty":1},
+  {"title":"Night Market Adventure","description":"Explore the local night market and try 3 different snacks","category":"streetfood","difficulty":1},
+  {"title":"Temple Morning","description":"Visit a nearby temple and make wishes together","category":"culture","difficulty":1},
+  {"title":"Street Food Hunt","description":"Find the best pad thai or pho in the neighborhood","category":"streetfood","difficulty":1},
+  {"title":"Motorbike Sunset","description":"Ride together and catch the sunset at a scenic spot","category":"outdoor","difficulty":1},
+  {"title":"Spa Day Together","description":"Relax with a couples massage at a local spa","category":"wellness","difficulty":3},
+  {"title":"Cooking Class Date","description":"Learn to cook local dishes together","category":"cooking","difficulty":3}
+]`,
+
+  NORTH_AMERICA: `[
+  {"title":"Chasing the Golden Hour","description":"Watch sunset together at a scenic viewpoint","category":"outdoor","difficulty":1},
+  {"title":"Trail Tales","description":"Hike a local trail and pack simple snacks","category":"nature","difficulty":1},
+  {"title":"Starlit Conversations","description":"Find a dark spot and stargaze together","category":"outdoor","difficulty":1},
+  {"title":"Neighborhood Wander","description":"Walk around the neighborhood and discover new spots","category":"outdoor","difficulty":1},
+  {"title":"Couch Cinema","description":"Movie marathon at home with homemade popcorn","category":"home","difficulty":1},
+  {"title":"Escape Together","description":"Team up to beat an escape room challenge","category":"game","difficulty":3},
+  {"title":"Brunch Vibes","description":"Try a new brunch spot and share plates","category":"brunch","difficulty":2}
+]`,
+
+  EUROPE: `[
+  {"title":"Canal-side Wander","description":"Walk along the canal as the sun sets","category":"outdoor","difficulty":1},
+  {"title":"Plaza People-watching","description":"Grab takeaway coffee, sit in a plaza, watch the world","category":"outdoor","difficulty":1},
+  {"title":"Sunset Picnic","description":"Simple picnic in the park with bread and cheese","category":"outdoor","difficulty":1},
+  {"title":"Old Town Stroll","description":"Explore cobblestone streets hand in hand","category":"outdoor","difficulty":1},
+  {"title":"Cook Together Night","description":"Make a simple pasta dinner at home together","category":"home","difficulty":1},
+  {"title":"Terrace Wine Hour","description":"Share a bottle at a cozy terrace bar","category":"drink","difficulty":2},
+  {"title":"Gallery Afternoon","description":"Wander through a gallery and discuss favorite pieces","category":"culture","difficulty":2}
+]`,
+
+  LATIN_AMERICA: `[
+  {"title":"Beach Sunset Walk","description":"Walk barefoot on the beach as the sun sets","category":"outdoor","difficulty":1},
+  {"title":"Plaza Dancing","description":"Dance to street musicians in the plaza","category":"outdoor","difficulty":1},
+  {"title":"Malecon Stroll","description":"Evening walk along the waterfront","category":"outdoor","difficulty":1},
+  {"title":"Street Food Adventure","description":"Try cheap street tacos from a local stand","category":"food","difficulty":1},
+  {"title":"Home Salsa Night","description":"Put on music and dance together at home","category":"home","difficulty":1},
+  {"title":"Salsa Class Date","description":"Take a beginner salsa class together","category":"activity","difficulty":3},
+  {"title":"Ceviche by the Sea","description":"Fresh ceviche at a beachside spot","category":"food","difficulty":2}
+]`,
+
+  DEFAULT: `[
+  {"title":"Sunset Watch","description":"Find a nice spot and watch the sunset together","category":"outdoor","difficulty":1},
+  {"title":"Park Picnic","description":"Pack simple snacks and enjoy a picnic in the park","category":"outdoor","difficulty":1},
+  {"title":"Neighborhood Walk","description":"Explore your neighborhood and find hidden gems","category":"outdoor","difficulty":1},
+  {"title":"Home Movie Night","description":"Pick a movie and make popcorn at home","category":"home","difficulty":1},
+  {"title":"Cook Together","description":"Try a new recipe and cook dinner together","category":"home","difficulty":1},
+  {"title":"Cafe Hopping","description":"Visit a new cafe and try their signature drink","category":"cafe","difficulty":2},
+  {"title":"Local Attraction","description":"Visit a local attraction you haven't been to","category":"culture","difficulty":2}
+]`,
+};
+
+// ============================================
+// Language-specific Few-shot Examples (Output format)
+// ============================================
+
+const LANGUAGE_FEW_SHOTS: Record<SupportedLanguage, string> = {
+  ko: `[
+  {"title":"노을 지는 강변, 우리의 시간","description":"강변 산책하며 일몰 감상하기","category":"outdoor","difficulty":1},
+  {"title":"별빛 아래 드라이브","description":"야경 드라이브하며 좋아하는 음악 듣기","category":"drive","difficulty":1},
+  {"title":"편의점 미식회","description":"편의점 음식 조합해서 나만의 메뉴 만들기","category":"streetfood","difficulty":1},
+  {"title":"우리 집 영화관","description":"넷플릭스 보며 집에서 팝콘 파티","category":"home","difficulty":1},
+  {"title":"오늘의 카페 탐험","description":"새로운 감성 카페에서 시그니처 메뉴 도전","category":"cafe","difficulty":2}
+]`,
+
+  en: `[
+  {"title":"Chasing the Golden Hour","description":"Watch sunset together at a scenic spot","category":"outdoor","difficulty":1},
+  {"title":"Starlit Drive","description":"Night drive while listening to favorite songs","category":"drive","difficulty":1},
+  {"title":"Convenience Store Challenge","description":"Create combo meals and rate each other's picks","category":"streetfood","difficulty":1},
+  {"title":"Couch Cinema","description":"Movie marathon at home with homemade popcorn","category":"home","difficulty":1},
+  {"title":"Cafe Discovery","description":"Find a new cafe and try their signature menu","category":"cafe","difficulty":2}
+]`,
+
+  es: `[
+  {"title":"Persiguiendo la Hora Dorada","description":"Ver el atardecer juntos en un lugar bonito","category":"outdoor","difficulty":1},
+  {"title":"Paseo Bajo las Estrellas","description":"Conducir de noche escuchando música favorita","category":"drive","difficulty":1},
+  {"title":"Aventura en la Tienda","description":"Crear combos de comida y probar las elecciones del otro","category":"streetfood","difficulty":1},
+  {"title":"Cine en Casa","description":"Maratón de películas en casa con palomitas caseras","category":"home","difficulty":1},
+  {"title":"Descubriendo Cafés","description":"Encontrar un café nuevo y probar su menú especial","category":"cafe","difficulty":2}
+]`,
+
+  'zh-TW': `[
+  {"title":"追逐金色時光","description":"一起在美麗的地方看日落","category":"outdoor","difficulty":1},
+  {"title":"星光下的兜風","description":"夜間開車兜風，聽喜歡的音樂","category":"drive","difficulty":1},
+  {"title":"便利店美食挑戰","description":"組合便利店食物，品嚐對方的選擇","category":"streetfood","difficulty":1},
+  {"title":"家庭電影院","description":"在家看電影馬拉松，配上自製爆米花","category":"home","difficulty":1},
+  {"title":"探索新咖啡館","description":"發現新咖啡館，嚐試他們的招牌菜單","category":"cafe","difficulty":2}
+]`,
+
+  ja: `[
+  {"title":"夕焼けを追いかけて","description":"景色の良い場所で一緒に夕日を見る","category":"outdoor","difficulty":1},
+  {"title":"星空ドライブ","description":"好きな音楽を聴きながら夜のドライブ","category":"drive","difficulty":1},
+  {"title":"コンビニグルメチャレンジ","description":"コンビニ食品を組み合わせて、お互いの選択を試す","category":"streetfood","difficulty":1},
+  {"title":"おうち映画館","description":"ポップコーンを作って家で映画マラソン","category":"home","difficulty":1},
+  {"title":"カフェ探検","description":"新しいカフェを見つけて、シグネチャーメニューを試す","category":"cafe","difficulty":2}
+]`,
+};
+
+// ============================================
+// Few-shot Examples Generator (Region + Language)
+// ============================================
+
+function getFewShotExamples(regionCode: RegionCode, language: SupportedLanguage): string {
+  const regionExamples = REGION_FEW_SHOTS[regionCode] || REGION_FEW_SHOTS.DEFAULT;
+  const languageExamples = LANGUAGE_FEW_SHOTS[language] || LANGUAGE_FEW_SHOTS.en;
+
   return `
-## Good Mission Examples (When Meeting) - Emotional title + Specific description
+## Cultural Context Examples (${regionCode})
+${regionExamples}
 
-[Romantic/Emotional]
-{"title":"Under the Sparkling Lights, Our Winter Story","description":"Take photos together at a popular Christmas tree spot","category":"romantic","tags":["Christmas","lights","hotspot"]}
-{"title":"Cozy Corner, Warm Sips","description":"Enjoy specialty drinks at a cozy cafe while watching the winter scenery","category":"cafe","tags":["cozy","cafe","winter"]}
-{"title":"City Nights, Cheers to Us","description":"Sip signature cocktails at a rooftop bar with a view","category":"drink","tags":["rooftop","nightview","cocktails"]}
-{"title":"Click, Our Moments Captured","description":"Tour trendy photo booths and create a photo strip collection","category":"photo","tags":["photobooth","photos","fun"]}
+## Output Language Format (${language})
+${languageExamples}
 
-[Activities]
-{"title":"Solving Mysteries, Side by Side","description":"Team up to conquer an escape room challenge together","category":"game","tags":["escaperoom","teamwork","game"]}
-{"title":"Beyond Reality, Into Adventure","description":"Experience a virtual reality date at a VR gaming zone","category":"game","tags":["VR","gaming","experience"]}
-{"title":"Our Recipe for Happiness","description":"Learn to cook together at a one-day cooking class","category":"cooking","tags":["cooking","class","experience"]}
-{"title":"Serious Competition, Hilarious Ending","description":"Challenge each other at an arcade - loser plans the next date!","category":"game","tags":["arcade","competition","fun"]}
-{"title":"Cheering Together, Hearts United","description":"Watch a live game and cheer passionately together","category":"sports","tags":["sports","cheering","excitement"]}
+## Online Mission Examples (When Can't Meet)
+[
+  {"title":"Dreams for Our Tomorrow","description":"Write a bucket list of things to do together next year","category":"online","difficulty":1},
+  {"title":"Same Page, Different Places","description":"Read the same book and verify with page photos","category":"online","difficulty":1},
+  {"title":"Same Taste, Miles Apart","description":"Cook the same recipe separately and share result photos","category":"online","difficulty":1}
+]
 
-[Food Adventures]
-{"title":"Flavors Down Every Alley","description":"Explore a local market sampling street food together","category":"streetfood","tags":["market","streetfood","tour"]}
-{"title":"Our Secret Recipe, Store Edition","description":"Create custom combo meals at a convenience store and rate them","category":"streetfood","tags":["convenience","combo","challenge"]}
-{"title":"Our Hidden Gem Discovery","description":"Find and try a hidden local restaurant with few reviews","category":"restaurant","tags":["hidden","local","discovery"]}
-
-[Unique/Fresh]
-{"title":"Silly but Fun, That's Just Us","description":"Pick useless but hilarious gifts for each other at a dollar store","category":"shopping","tags":["shopping","gifts","laughter"]}
-{"title":"Destiny Picks Our Drinks","description":"Close your eyes and randomly point at the cafe menu","category":"cafe","tags":["random","challenge","cafe"]}
-{"title":"Seven Poses, One Perfect Strip","description":"Challenge yourselves to 7 different poses at a photo booth","category":"photo","tags":["photobooth","challenge","photos"]}
-{"title":"To the End of the Line, Our Spontaneous Trip","description":"Hop on the first bus that arrives and ride to the last stop","category":"daytrip","tags":["spontaneous","adventure","trip"]}
-{"title":"A Day with You and Our Furry Friend","description":"Visit a pet-friendly cafe or park with your pet","category":"outdoor","tags":["pet","walk","relaxing"]}
-
-[Relaxation]
-{"title":"Warm Waters, Timeless Moments","description":"Relax and unwind at a spa or hot springs together","category":"wellness","tags":["spa","relaxation","wellness"]}
-{"title":"Turning Pages Together","description":"Read books at a book cafe and share favorite passages","category":"cafe","tags":["bookcafe","reading","cozy"]}
-{"title":"A Scent That's Uniquely You","description":"Create custom perfumes for each other at a fragrance workshop","category":"creative","tags":["perfume","workshop","gift"]}
-
-[Anniversary Special Missions]
-{"title":"Preserving Today, Forever","description":"Order a photo book with today's pictures","category":"anniversary","tags":["anniversary","photobook","memories"]}
-{"title":"Sweet Celebration, Wishes Made","description":"Blow out candles on a custom cake and make wishes together","category":"anniversary","tags":["cake","anniversary","romantic"]}
-{"title":"A Promise Sealed, Together","description":"Pick out matching couple rings or bracelets together","category":"anniversary","tags":["rings","gift","anniversary"]}
-{"title":"Letters to Our Future Selves","description":"Write letters to each other to open in one year","category":"romantic","tags":["timecapsule","letter","promise"]}
-{"title":"Whispered Wishes Under the Stars","description":"Watch the night sky and share wishes with each other","category":"romantic","tags":["stars","nightview","romantic"]}
-
----
-## Missions When You Can't Meet (One person takes photo on-site for verification)
-
-{"title":"Dreams for Our Tomorrow","description":"Write a bucket list of things to do together next year","category":"online","tags":["bucketlist","planning","photo"]}
-{"title":"Same Page, Different Places","description":"Read the same book and verify with page photos","category":"online","tags":["reading","book","verification"]}
-{"title":"Words from the Heart, Ink on Paper","description":"Write a handwritten letter and share a photo","category":"online","tags":["letter","heartfelt","analog"]}
-{"title":"Same Scene, Different Couches","description":"Watch the same movie simultaneously and verify with screen photos","category":"online","tags":["movie","watching","verification"]}
-{"title":"Same Taste, Miles Apart","description":"Cook the same recipe separately and share result photos","category":"online","tags":["cooking","challenge","verification"]}
+## Important Notes
+- Titles should be emotional/poetic, not literal descriptions
+- Descriptions should be specific and actionable
+- difficulty: 1=FREE, 2=LOW-COST, 3=PAID
+- At least one difficulty:1 mission required per batch
 `;
 }
 
@@ -778,6 +1121,72 @@ Respond only in JSON format.`;
 }
 
 // ============================================
+// Category Validation (Fallback to valid category)
+// ============================================
+
+const VALID_CATEGORIES: MissionCategory[] = [
+  'cafe', 'restaurant', 'streetfood', 'dessert', 'cooking', 'drink', 'brunch',
+  'outdoor', 'home', 'travel', 'daytrip', 'drive', 'night', 'nature',
+  'culture', 'movie', 'sports', 'fitness', 'wellness', 'creative', 'game', 'shopping', 'photo', 'learning',
+  'romantic', 'anniversary', 'surprise', 'memory',
+  'online', 'challenge'
+];
+
+// Map invalid categories to valid ones
+const CATEGORY_FALLBACK_MAP: Record<string, MissionCategory> = {
+  'food': 'streetfood',
+  'activity': 'culture',
+  'entertainment': 'game',
+  'sport': 'sports',
+  'art': 'creative',
+  'music': 'culture',
+  'education': 'learning',
+  'exercise': 'fitness',
+  'relaxation': 'wellness',
+  'date': 'romantic',
+  'special': 'romantic',
+  'trip': 'travel',
+  'walk': 'outdoor',
+  'park': 'outdoor',
+  'beach': 'nature',
+  'bar': 'drink',
+  'pub': 'drink',
+  'club': 'night',
+};
+
+function validateCategory(category: string): MissionCategory {
+  // Check if it's already a valid category
+  if (VALID_CATEGORIES.includes(category as MissionCategory)) {
+    return category as MissionCategory;
+  }
+
+  // Try to map to a valid category
+  const lowercaseCategory = category.toLowerCase();
+  if (CATEGORY_FALLBACK_MAP[lowercaseCategory]) {
+    console.log(`[MissionGenerator] Mapping invalid category "${category}" to "${CATEGORY_FALLBACK_MAP[lowercaseCategory]}"`);
+    return CATEGORY_FALLBACK_MAP[lowercaseCategory];
+  }
+
+  // Default fallback based on common patterns
+  if (lowercaseCategory.includes('food') || lowercaseCategory.includes('eat') || lowercaseCategory.includes('meal')) {
+    return 'restaurant';
+  }
+  if (lowercaseCategory.includes('drink') || lowercaseCategory.includes('bar') || lowercaseCategory.includes('wine')) {
+    return 'drink';
+  }
+  if (lowercaseCategory.includes('outdoor') || lowercaseCategory.includes('walk') || lowercaseCategory.includes('park')) {
+    return 'outdoor';
+  }
+  if (lowercaseCategory.includes('game') || lowercaseCategory.includes('play') || lowercaseCategory.includes('fun')) {
+    return 'game';
+  }
+
+  // Ultimate fallback: use 'outdoor' as it has many images
+  console.warn(`[MissionGenerator] Unknown category "${category}", defaulting to "outdoor"`);
+  return 'outdoor';
+}
+
+// ============================================
 // Main Generation Function
 // ============================================
 
@@ -820,9 +1229,9 @@ export async function generateMissionsWithAI(input: MissionGenerationInput): Pro
     ? SUBSCRIPTION_LIMITS.premium.missionsPerGeneration
     : SUBSCRIPTION_LIMITS.free.missionsPerGeneration;
 
-  // Get language-specific prompts
-  const systemPrompt = getSystemPrompt(weather.countryCode, language);
-  const fewShotExamples = getFewShotExamples(language);
+  // Get region and language-specific prompts
+  const systemPrompt = getSystemPrompt(weather.regionCode, language, weather.season, missionCount);
+  const fewShotExamples = getFewShotExamples(weather.regionCode, language);
   const userPrompt = getUserPrompt(contextString, fewShotExamples, language, deduplicationContext, missionCount);
 
   try {
@@ -872,17 +1281,22 @@ export async function generateMissionsWithAI(input: MissionGenerationInput): Pro
       throw new Error('No missions generated');
     }
 
-    // Convert to Mission format
-    const missions: Mission[] = missionsData.slice(0, 3).map((data, index) => ({
-      id: `ai-${Date.now()}-${index}`,
-      title: data.title,
-      description: data.description,
-      category: data.category as MissionCategory,
-      tags: data.tags,
-      imageUrl: getRandomImage(data.category as MissionCategory),
-      isPremium: false,
-      moodTags: todayMoods,
-    }));
+    // Convert to Mission format with category validation
+    const missions: Mission[] = missionsData.slice(0, missionCount).map((data, index) => {
+      // Validate and normalize category to ensure image loading works
+      const validatedCategory = validateCategory(data.category);
+
+      return {
+        id: `ai-${Date.now()}-${index}`,
+        title: data.title,
+        description: data.description,
+        category: validatedCategory,
+        tags: data.tags || [],
+        imageUrl: getRandomImage(validatedCategory),
+        isPremium: false,
+        moodTags: todayMoods,
+      };
+    });
 
     return missions;
   } catch (error) {
@@ -905,7 +1319,7 @@ export function generateMissionsFallback(todayMoods: string[]): Mission[] {
     ? SUBSCRIPTION_LIMITS.premium.missionsPerGeneration
     : SUBSCRIPTION_LIMITS.free.missionsPerGeneration;
 
-  // Language-specific fallback missions (6 missions for premium)
+  // Language-specific fallback missions (5 missions for premium, 3 for free)
   const allFallbackMissions: Mission[] = language === 'ko'
     ? [
         {

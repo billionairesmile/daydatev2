@@ -13,10 +13,11 @@ import 'react-native-reanimated';
 import '@/lib/i18n';
 import { useTranslation } from 'react-i18next';
 
-import { useAuthStore, useOnboardingStore, useTimezoneStore } from '@/stores';
+import { useAuthStore, useOnboardingStore, useTimezoneStore, useSubscriptionStore } from '@/stores';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
 import { BackgroundProvider, useBackground } from '@/contexts';
 import { preloadCharacterAssets } from '@/utils';
+import { CharacterPreloader } from '@/components/ransom';
 import { db, isDemoMode, supabase } from '@/lib/supabase';
 import { updateUserLocationInDB, checkLocationPermission } from '@/lib/locationUtils';
 import { initializeNetworkMonitoring, subscribeToNetwork } from '@/lib/useNetwork';
@@ -123,6 +124,8 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={styles.container}>
+      {/* Preload all ransom character images at app startup */}
+      <CharacterPreloader />
       <BackgroundProvider>
         <BackgroundLoadedHandler setBackgroundLoaded={setBackgroundLoaded} />
         <RootLayoutNav />
@@ -152,12 +155,23 @@ function RootLayoutNav() {
   const { initializeSync, cleanup: cleanupSync, processPendingOperations, loadMissionProgress, loadSharedMissions } = useCoupleSyncStore();
   const { setStep: setOnboardingStep, updateData: updateOnboardingData } = useOnboardingStore();
   const { syncFromCouple } = useTimezoneStore();
+  const { initializeRevenueCat, loadFromDatabase, _hasHydrated: subscriptionHydrated } = useSubscriptionStore();
   const [isNavigationReady, setIsNavigationReady] = useState(false);
   const appState = useRef(AppState.currentState);
   const lastFetchTime = useRef<number>(0);
+  const subscriptionInitialized = useRef(false);
 
   // Initialize push notifications
   usePushNotifications();
+
+  // Initialize subscription/premium status when user is authenticated
+  useEffect(() => {
+    if (user?.id && subscriptionHydrated && !subscriptionInitialized.current) {
+      subscriptionInitialized.current = true;
+      console.log('[Layout] Initializing subscription for user:', user.id);
+      initializeRevenueCat(user.id);
+    }
+  }, [user?.id, subscriptionHydrated, initializeRevenueCat]);
 
   // Initialize network monitoring and handle reconnection sync
   useEffect(() => {
@@ -401,7 +415,7 @@ function RootLayoutNav() {
     updateUserLocation();
   }, [updateUserLocation]);
 
-  // Refresh partner data, location, and mission progress when app comes to foreground
+  // Refresh partner data, location, mission progress, and subscription when app comes to foreground
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
       if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
@@ -411,6 +425,8 @@ function RootLayoutNav() {
         // Refresh mission data to sync any changes from partner
         loadMissionProgress();
         loadSharedMissions();
+        // Refresh subscription/premium status from database
+        loadFromDatabase();
       }
       appState.current = nextAppState;
     });
@@ -418,7 +434,7 @@ function RootLayoutNav() {
     return () => {
       subscription.remove();
     };
-  }, [fetchCoupleAndPartnerData, updateUserLocation, loadMissionProgress, loadSharedMissions]);
+  }, [fetchCoupleAndPartnerData, updateUserLocation, loadMissionProgress, loadSharedMissions, loadFromDatabase]);
 
   // Also refresh if partner data is incomplete (partner might have completed onboarding)
   useEffect(() => {

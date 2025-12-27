@@ -1,12 +1,12 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, memo } from 'react';
 import {
   View,
-  Image,
   StyleSheet,
   ViewStyle,
   StyleProp,
   Text,
 } from 'react-native';
+import { Image } from 'expo-image';
 import {
   getCharacterImage,
   getRandomRotation,
@@ -38,7 +38,85 @@ interface WordData {
   isSpace: boolean;
 }
 
-export function RansomText({
+// Memoized character image component for better performance
+interface CharacterImageProps {
+  image: ReturnType<typeof getCharacterImage>;
+  size: number;
+  rotation: number;
+  yOffset: number;
+  spacing: number;
+  globalIndex: number;
+}
+
+const CharacterImage = memo(function CharacterImage({
+  image,
+  size,
+  rotation,
+  yOffset,
+  spacing,
+  globalIndex,
+}: CharacterImageProps) {
+  return (
+    <View
+      key={`char-${globalIndex}`}
+      style={[
+        styles.characterWrapper,
+        {
+          marginHorizontal: spacing / 2,
+          transform: [
+            { rotate: `${rotation}deg` },
+            { translateY: yOffset },
+          ],
+        },
+      ]}
+    >
+      <Image
+        source={image}
+        style={{
+          width: size,
+          height: size,
+        }}
+        contentFit="contain"
+        cachePolicy="memory-disk"
+        transition={0}
+        priority="high"
+        recyclingKey={`char-${globalIndex}`}
+      />
+    </View>
+  );
+});
+
+// Memoized fallback text component
+interface FallbackTextProps {
+  char: string;
+  size: number;
+  spacing: number;
+  globalIndex: number;
+}
+
+const FallbackText = memo(function FallbackText({
+  char,
+  size,
+  spacing,
+  globalIndex,
+}: FallbackTextProps) {
+  return (
+    <Text
+      key={`fallback-${globalIndex}`}
+      style={[
+        styles.fallbackText,
+        {
+          fontSize: size * 0.8,
+          marginHorizontal: spacing / 2,
+        },
+      ]}
+    >
+      {char}
+    </Text>
+  );
+});
+
+export const RansomText = memo(function RansomText({
   text,
   seed = Math.floor(Math.random() * 1000000),
   characterSize = 40,
@@ -105,55 +183,34 @@ export function RansomText({
 
   const spaceWidth = characterSize * 0.3; // Reduced space width
 
-  const renderCharacter = (charData: CharacterData, index: number) => {
+  const renderCharacter = (charData: CharacterData) => {
     // Handle unsupported character (show as text fallback)
     if (!charData.image) {
       if (!isCharacterSupported(charData.char)) {
         return (
-          <Text
+          <FallbackText
             key={`fallback-${charData.globalIndex}`}
-            style={[
-              styles.fallbackText,
-              {
-                fontSize: characterSize * 0.8,
-                marginHorizontal: spacing / 2,
-              },
-            ]}
-          >
-            {charData.char}
-          </Text>
+            char={charData.char}
+            size={characterSize}
+            spacing={spacing}
+            globalIndex={charData.globalIndex}
+          />
         );
       }
       return null;
     }
 
-    // Render character image
+    // Render character image using memoized component
     return (
-      <View
+      <CharacterImage
         key={`char-${charData.globalIndex}`}
-        style={[
-          styles.characterWrapper,
-          {
-            marginHorizontal: spacing / 2,
-            transform: [
-              { rotate: `${charData.rotation}deg` },
-              { translateY: charData.yOffset },
-            ],
-          },
-        ]}
-      >
-        <Image
-          source={charData.image}
-          style={[
-            styles.characterImage,
-            {
-              width: characterSize,
-              height: characterSize,
-            },
-          ]}
-          resizeMode="contain"
-        />
-      </View>
+        image={charData.image}
+        size={characterSize}
+        rotation={charData.rotation}
+        yOffset={charData.yOffset}
+        spacing={spacing}
+        globalIndex={charData.globalIndex}
+      />
     );
   };
 
@@ -173,15 +230,15 @@ export function RansomText({
         // Render word as a group (keeps characters together when wrapping)
         return (
           <View key={`word-${wordIndex}`} style={styles.wordContainer}>
-            {wordData.characters.map((charData, charIndex) =>
-              renderCharacter(charData, charIndex)
+            {wordData.characters.map((charData) =>
+              renderCharacter(charData)
             )}
           </View>
         );
       })}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: {
@@ -198,9 +255,6 @@ const styles = StyleSheet.create({
   characterWrapper: {
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  characterImage: {
-    // Base styles, size is set dynamically
   },
   fallbackText: {
     fontWeight: 'bold',

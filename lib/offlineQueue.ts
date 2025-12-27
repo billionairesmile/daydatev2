@@ -5,6 +5,7 @@ const OFFLINE_QUEUE_KEY = '@daydate_offline_queue';
 export type OfflineOperationType =
   | 'ADD_TODO'
   | 'TOGGLE_TODO'
+  | 'UPDATE_TODO'
   | 'DELETE_TODO'
   | 'ADD_BOOKMARK'
   | 'REMOVE_BOOKMARK';
