@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import Constants from 'expo-constants';
 
-import { COLORS, SPACING } from '@/constants/design';
+import { COLORS } from '@/constants/design';
 import { useSubscriptionStore } from '@/stores/subscriptionStore';
 
 // Check if we're running in Expo Go (not a development build)
@@ -37,10 +37,6 @@ if (!isExpoGo) {
   }
 }
 
-// Fixed card dimensions matching mission card
-const CARD_HEIGHT = 468;
-const CARD_MARGIN = 10;
-
 // Ad unit ID - replace with actual ID in production
 const getNativeAdUnitId = () => {
   if (!TestIds) return '';
@@ -53,13 +49,11 @@ const getNativeAdUnitId = () => {
 interface NativeAdMissionCardProps {
   onAdLoaded?: () => void;
   onAdFailed?: () => void;
-  cardWidth: number;
 }
 
 export default function NativeAdMissionCard({
   onAdLoaded,
   onAdFailed,
-  cardWidth,
 }: NativeAdMissionCardProps) {
   const { shouldShowAds } = useSubscriptionStore();
   const [nativeAd, setNativeAd] = useState<any>(null);
@@ -124,104 +118,128 @@ export default function NativeAdMissionCard({
   }
 
   return (
-    <NativeAdView
-      nativeAd={nativeAd}
-      style={[styles.nativeAdContainer, { width: cardWidth }]}
-    >
-      {/* AD Badge at top left */}
-      <View style={styles.adBadge}>
-        <Text style={styles.adBadgeText}>AD</Text>
-      </View>
+    <View style={styles.wrapper}>
+      <NativeAdView nativeAd={nativeAd} style={styles.nativeAdView}>
+        {/* AD Badge */}
+        <View style={styles.adBadge}>
+          <Text style={styles.adBadgeText}>AD</Text>
+        </View>
 
-      {/* Media with contain mode - centered */}
-      <View style={styles.mediaContainer}>
-        <NativeMediaView
-          style={styles.mediaView}
-          resizeMode="contain"
-        />
-      </View>
+        {/* Content Container with safe padding */}
+        <View style={styles.content}>
+          {/* Media */}
+          <View style={styles.media}>
+            <NativeMediaView style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+          </View>
 
-      {/* Content section - centered */}
-      <View style={styles.contentSection}>
-        {/* Headline */}
-        <NativeAsset assetType={NativeAssetType.HEADLINE}>
-          <Text style={styles.headlineText} numberOfLines={2} />
-        </NativeAsset>
+          {/* Icon + Headline */}
+          <View style={styles.row}>
+            <NativeAsset assetType={NativeAssetType.ICON}>
+              <View style={styles.icon} />
+            </NativeAsset>
+            <View style={styles.textWrap}>
+              <NativeAsset assetType={NativeAssetType.HEADLINE}>
+                <Text style={styles.headline} numberOfLines={1} />
+              </NativeAsset>
+              <NativeAsset assetType={NativeAssetType.ADVERTISER}>
+                <Text style={styles.advertiser} numberOfLines={1} />
+              </NativeAsset>
+            </View>
+          </View>
 
-        {/* Body */}
-        <NativeAsset assetType={NativeAssetType.BODY}>
-          <Text style={styles.bodyText} numberOfLines={3} />
-        </NativeAsset>
+          {/* Body */}
+          <NativeAsset assetType={NativeAssetType.BODY}>
+            <Text style={styles.body} numberOfLines={2} />
+          </NativeAsset>
 
-        {/* Advertiser */}
-        <NativeAsset assetType={NativeAssetType.ADVERTISER}>
-          <Text style={styles.advertiserText} numberOfLines={1} />
-        </NativeAsset>
-      </View>
-    </NativeAdView>
+          {/* CTA Button */}
+          <NativeAsset assetType={NativeAssetType.CALL_TO_ACTION}>
+            <Text style={styles.cta} />
+          </NativeAsset>
+        </View>
+      </NativeAdView>
+    </View>
   );
 }
 
+// Card dimensions: 468px height, ~300px width, borderRadius 45
+// Safe area padding to avoid corner clipping
+const SAFE_PADDING = 20;
+
 const styles = StyleSheet.create({
-  nativeAdContainer: {
-    height: CARD_HEIGHT,
-    marginHorizontal: CARD_MARGIN,
-    borderRadius: 45,
-    overflow: 'hidden',
-    backgroundColor: '#1a1a2e',
-    padding: 24,
-    alignItems: 'center',
+  wrapper: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+  nativeAdView: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  content: {
+    flex: 1,
+    padding: SAFE_PADDING,
   },
   adBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 4,
-    marginBottom: 12,
+    position: 'absolute',
+    top: SAFE_PADDING + 4,
+    left: SAFE_PADDING + 4,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 3,
+    zIndex: 10,
   },
   adBadgeText: {
-    fontSize: 10,
+    fontSize: 8,
     fontWeight: '700',
-    color: '#666',
+    color: '#555',
   },
-  mediaContainer: {
+  media: {
     flex: 1,
-    width: '100%',
-    borderRadius: 16,
+    maxHeight: 300,
+    borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: '#2a2a3e',
-    marginBottom: 16,
+    backgroundColor: '#1a1a1a',
+  },
+  row: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 8,
+    marginTop: 10,
   },
-  mediaView: {
-    width: '100%',
-    height: '100%',
+  icon: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    backgroundColor: '#1a1a1a',
+    overflow: 'hidden',
   },
-  contentSection: {
-    width: '100%',
-    paddingBottom: 4,
+  textWrap: {
+    flex: 1,
   },
-  headlineText: {
-    fontSize: 16,
+  headline: {
+    fontSize: 13,
     color: COLORS.white,
-    fontWeight: '700',
-    marginBottom: 4,
-    lineHeight: 22,
-    textAlign: 'left',
+    fontWeight: '600',
   },
-  bodyText: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.7)',
-    lineHeight: 16,
-    marginBottom: 6,
-    textAlign: 'left',
+  advertiser: {
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.6)',
   },
-  advertiserText: {
+  body: {
     fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.5)',
-    fontWeight: '500',
-    textAlign: 'left',
+    color: 'rgba(255,255,255,0.7)',
+    lineHeight: 14,
+    marginTop: 6,
+  },
+  cta: {
+    backgroundColor: '#4285F4',
+    color: COLORS.white,
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
+    paddingVertical: 12,
+    marginTop: 10,
+    borderRadius: 8,
+    overflow: 'hidden',
   },
 });

@@ -697,14 +697,45 @@ export default function CalendarScreen() {
     if (!lastPeriodDate || !cycleLength) return null;
 
     const today = getTodayInTimezone();
-    const nextPeriodDate = new Date(lastPeriodDate);
-    nextPeriodDate.setDate(nextPeriodDate.getDate() + cycleLength);
+    const PERIOD_DURATION = 5; // Period lasts 5 days (day 0 to day 4)
 
-    const dDay = Math.ceil(
-      (nextPeriodDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+    // Find the current or most recent period start date
+    let currentPeriodStart = new Date(lastPeriodDate);
+
+    // Move forward in cycles until we find the period that includes or is closest to today
+    while (true) {
+      const nextCycleStart = new Date(currentPeriodStart);
+      nextCycleStart.setDate(nextCycleStart.getDate() + cycleLength);
+
+      if (nextCycleStart.getTime() > today.getTime()) {
+        // nextCycleStart is in the future, so currentPeriodStart is the most recent
+        break;
+      }
+      currentPeriodStart = nextCycleStart;
+    }
+
+    // Calculate days since period start
+    const daysSincePeriodStart = Math.floor(
+      (today.getTime() - currentPeriodStart.getTime()) / (1000 * 60 * 60 * 24)
     );
 
-    return { nextPeriodDate, dDay };
+    // Check if today is within the current period (day 0 to day 4)
+    if (daysSincePeriodStart >= 0 && daysSincePeriodStart < PERIOD_DURATION) {
+      // Currently in period - show D-Day, D+1, D+2, D+3, D+4
+      // dDay: 0 for day 0 (D-Day), -1 for day 1 (D+1), -2 for day 2 (D+2), etc.
+      const dDay = daysSincePeriodStart === 0 ? 0 : -daysSincePeriodStart;
+      return { nextPeriodDate: currentPeriodStart, dDay };
+    } else {
+      // Period has ended - show next upcoming period
+      const nextPeriodDate = new Date(currentPeriodStart);
+      nextPeriodDate.setDate(nextPeriodDate.getDate() + cycleLength);
+
+      const dDay = Math.ceil(
+        (nextPeriodDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+      );
+
+      return { nextPeriodDate, dDay };
+    }
   };
 
   const periodInfo = calculatePeriodInfo();
@@ -1076,7 +1107,9 @@ export default function CalendarScreen() {
                         <Droplet color={COLORS.white} size={20} strokeWidth={2} />
                       </LinearGradient>
                       <View>
-                        <Text style={styles.nextPeriodLabel}>{t('calendar.period.nextDate')}</Text>
+                        <Text style={styles.nextPeriodLabel}>
+                          {periodInfo.dDay <= 0 ? t('calendar.period.currentPeriod') : t('calendar.period.nextDate')}
+                        </Text>
                         <Text style={styles.nextPeriodDate}>
                           {i18n.language === 'ko'
                             ? `${periodInfo.nextPeriodDate.getMonth() + 1}월 ${periodInfo.nextPeriodDate.getDate()}일`

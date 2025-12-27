@@ -217,6 +217,7 @@
       "periodLength": "생리 기간",
       "cycleHint": "일반적인 생리 주기는 21~35일입니다",
       "nextDate": "다음 예정일",
+      "currentPeriod": "생리 중",
       "lastDate": "지난 시작일",
       "daysUnit": "일",
       "legend": {

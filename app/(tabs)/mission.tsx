@@ -569,10 +569,10 @@ export default function MissionScreen() {
       const scale = index === 0 && !isScrollInitialized
         ? 1
         : scrollX.interpolate({
-            inputRange,
-            outputRange: [0.9, 1, 0.9],
-            extrapolate: 'clamp',
-          });
+          inputRange,
+          outputRange: [0.9, 1, 0.9],
+          extrapolate: 'clamp',
+        });
 
       // Don't use opacity animation - it causes cards to be invisible until scroll event
       // The scale animation provides enough visual feedback for carousel effect
@@ -589,7 +589,9 @@ export default function MissionScreen() {
               },
             ]}
           >
-            <NativeAdMissionCard cardWidth={CARD_WIDTH} />
+            <View style={styles.cardInner}>
+              <NativeAdMissionCard />
+            </View>
           </Animated.View>
         );
       }

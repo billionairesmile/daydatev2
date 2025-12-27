@@ -214,6 +214,7 @@
       "periodLength": "Duración del Período",
       "cycleHint": "Un ciclo típico dura entre 21-35 días",
       "nextDate": "Próxima Fecha Esperada",
+      "currentPeriod": "En Período",
       "lastDate": "Última Fecha de Inicio",
       "daysUnit": "días",
       "legend": {

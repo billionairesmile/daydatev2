@@ -217,6 +217,7 @@
       "periodLength": "Period Length",
       "cycleHint": "Typical cycle is 21-35 days",
       "nextDate": "Next Expected Date",
+      "currentPeriod": "In Period",
       "lastDate": "Last Start Date",
       "daysUnit": "days",
       "legend": {

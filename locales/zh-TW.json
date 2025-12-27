@@ -214,6 +214,7 @@
       "periodLength": "生理期天數",
       "cycleHint": "一般生理週期為21~35天",
       "nextDate": "下次預計日",
+      "currentPeriod": "生理期中",
       "lastDate": "上次開始日",
       "daysUnit": "天",
       "legend": {
