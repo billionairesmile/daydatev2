@@ -1,6 +1,30 @@
 // Date utility functions for Daydate app
 
 /**
+ * Formats a Date object to YYYY-MM-DD string in a specific timezone
+ * Uses Intl.DateTimeFormat for accurate timezone conversion
+ */
+export const formatDateInTimezone = (date: Date, timezone: string): string => {
+  try {
+    const options: Intl.DateTimeFormatOptions = {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    };
+    const parts = new Intl.DateTimeFormat('en-CA', options).formatToParts(date);
+    const year = parts.find(p => p.type === 'year')?.value || '';
+    const month = parts.find(p => p.type === 'month')?.value || '';
+    const day = parts.find(p => p.type === 'day')?.value || '';
+    return `${year}-${month}-${day}`;
+  } catch (e) {
+    console.error('[formatDateInTimezone] Error:', e);
+    // Fallback to local formatting
+    return formatDateToLocal(date);
+  }
+};
+
+/**
  * Formats a Date object or date string to YYYY-MM-DD string in local timezone
  * This avoids the UTC conversion issue that occurs with toISOString()
  * Handles both Date objects and string inputs (from storage/JSON)

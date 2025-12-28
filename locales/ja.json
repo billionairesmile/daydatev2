@@ -490,6 +490,8 @@
       "timezoneManual": "手動選択",
       "timezoneManualDesc": "遠距離カップル向けの手動タイムゾーン設定",
       "timezoneHint": "ミッションリセットとD-day計算に適用されます",
+      "timezoneMismatchTitle": "タイムゾーンが異なります",
+      "timezoneMismatchDesc": "パートナーのデバイスは{{partnerTimezone}}を使用しています。ここをタップして共通のタイムゾーンを設定してください。",
       "termsOfService": "利用規約",
       "locationTerms": "位置情報利用規約",
       "privacyPolicy": "プライバシーポリシー",

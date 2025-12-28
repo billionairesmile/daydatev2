@@ -1,12 +1,13 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Localization from 'expo-localization';
 import { db, isInTestMode, supabase } from '@/lib/supabase';
 import type { Mission } from '@/types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { useMemoryStore, dbToCompletedMission } from './memoryStore';
 import { formatDateToLocal } from '@/lib/dateUtils';
-import { getTodayInTimezone } from './timezoneStore';
+import { getTodayInTimezone, useTimezoneStore } from './timezoneStore';
 import { offlineQueue, OfflineOperationType } from '@/lib/offlineQueue';
 import { getIsOnline } from '@/lib/useNetwork';
 import {
@@ -167,6 +168,10 @@ interface CoupleSyncState {
   isLoadingSettings: boolean;
   isLoadingProgress: boolean;
   isLoadingAlbums: boolean;
+
+  // Timezone mismatch detection
+  hasTimezoneMismatch: boolean; // True if couple members have different device timezones and no shared timezone is set
+  partnerDeviceTimezone: string | null; // Partner's device timezone for display
 }
 
 interface CoupleSyncActions {
@@ -246,6 +251,10 @@ interface CoupleSyncActions {
 
   // Offline sync
   processPendingOperations: () => Promise<void>;
+
+  // Timezone mismatch detection
+  updateDeviceTimezoneAndCheckMismatch: () => Promise<void>;
+  dismissTimezoneMismatch: () => void;
 }
 
 // Store channels for cleanup
@@ -289,6 +298,10 @@ const initialState: CoupleSyncState = {
   isLoadingSettings: false,
   isLoadingProgress: false,
   isLoadingAlbums: false,
+
+  // Timezone mismatch detection
+  hasTimezoneMismatch: false,
+  partnerDeviceTimezone: null,
 };
 
 export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
@@ -319,6 +332,9 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       get().loadMissionProgress(),
       get().loadAlbums(),
     ]);
+
+    // Update device timezone and check for mismatch
+    get().updateDeviceTimezoneAndCheckMismatch();
 
     // Setup real-time subscriptions
     // 1. Mission subscription
@@ -2213,6 +2229,70 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
 
     offlineQueue.setProcessing(false);
     console.log('[CoupleSyncStore] Finished processing pending operations');
+  },
+
+  // ============================================
+  // TIMEZONE MISMATCH DETECTION
+  // ============================================
+
+  updateDeviceTimezoneAndCheckMismatch: async () => {
+    const { coupleId, userId } = get();
+    if (!coupleId || !userId || isInTestMode()) return;
+
+    try {
+      // Get device timezone
+      let deviceTimezone = 'Asia/Seoul'; // fallback
+      try {
+        const calendars = Localization.getCalendars();
+        if (calendars && calendars.length > 0 && calendars[0].timeZone) {
+          deviceTimezone = calendars[0].timeZone;
+        } else {
+          deviceTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        }
+      } catch {
+        deviceTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      }
+
+      console.log('[CoupleSyncStore] Device timezone:', deviceTimezone);
+
+      // Update device timezone in profile
+      await db.profiles.updateDeviceTimezone(userId, deviceTimezone);
+
+      // Check if couple has a manually set timezone
+      const coupleTimezone = useTimezoneStore.getState().timezone;
+
+      // If timezone is manually set (not 'auto'), no need to check for mismatch
+      if (coupleTimezone !== 'auto') {
+        set({ hasTimezoneMismatch: false, partnerDeviceTimezone: null });
+        return;
+      }
+
+      // Get both members' device timezones
+      const { data: profiles, error } = await db.profiles.getCoupleDeviceTimezones(coupleId);
+      if (error || !profiles || profiles.length < 2) {
+        // Only one member or error - no mismatch to detect
+        set({ hasTimezoneMismatch: false, partnerDeviceTimezone: null });
+        return;
+      }
+
+      // Find partner's device timezone
+      const partnerProfile = profiles.find(p => p.id !== userId);
+      const partnerTimezone = partnerProfile?.device_timezone;
+
+      // Check if timezones are different
+      if (partnerTimezone && partnerTimezone !== deviceTimezone) {
+        console.log('[CoupleSyncStore] Timezone mismatch detected:', deviceTimezone, 'vs', partnerTimezone);
+        set({ hasTimezoneMismatch: true, partnerDeviceTimezone: partnerTimezone });
+      } else {
+        set({ hasTimezoneMismatch: false, partnerDeviceTimezone: null });
+      }
+    } catch (error) {
+      console.error('[CoupleSyncStore] Error checking timezone mismatch:', error);
+    }
+  },
+
+  dismissTimezoneMismatch: () => {
+    set({ hasTimezoneMismatch: false });
   },
 }),
   {

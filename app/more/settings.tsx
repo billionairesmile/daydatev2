@@ -62,6 +62,7 @@ export default function SettingsScreen() {
   const { language, setLanguage } = useLanguageStore();
   const { timezone, updateTimezoneInDb, getEffectiveTimezone } = useTimezoneStore();
   const { isPremium } = useSubscriptionStore();
+  const { hasTimezoneMismatch, partnerDeviceTimezone, dismissTimezoneMismatch } = useCoupleSyncStore();
 
   // Notification settings
   const [pushEnabled, setPushEnabled] = useState(true);
@@ -183,6 +184,10 @@ export default function SettingsScreen() {
     if (couple?.id) {
       // Save to DB for couple-level sync
       await updateTimezoneInDb(couple.id, tzId);
+      // Dismiss timezone mismatch warning when user selects a timezone
+      if (tzId !== 'auto') {
+        dismissTimezoneMismatch();
+      }
     }
   };
 
@@ -485,6 +490,24 @@ export default function SettingsScreen() {
           </Pressable>
 
           <View style={styles.settingDivider} />
+
+          {/* Timezone mismatch warning */}
+          {hasTimezoneMismatch && (
+            <Pressable
+              style={styles.timezoneMismatchBanner}
+              onPress={() => setShowTimezoneModal(true)}
+            >
+              <AlertTriangle color="#F59E0B" size={20} />
+              <View style={styles.timezoneMismatchTextContainer}>
+                <Text style={styles.timezoneMismatchTitle}>
+                  {t('settings.other.timezoneMismatchTitle')}
+                </Text>
+                <Text style={styles.timezoneMismatchDesc}>
+                  {t('settings.other.timezoneMismatchDesc', { partnerTimezone: partnerDeviceTimezone })}
+                </Text>
+              </View>
+            </Pressable>
+          )}
 
           <Pressable style={styles.menuItem} onPress={() => setShowTimezoneModal(true)}>
             <View style={styles.settingItemLeft}>
@@ -1074,6 +1097,33 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  // Timezone Mismatch Banner Styles
+  timezoneMismatchBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    marginHorizontal: SPACING.md,
+    marginBottom: SPACING.sm,
+    gap: SPACING.sm,
+  },
+  timezoneMismatchTextContainer: {
+    flex: 1,
+  },
+  timezoneMismatchTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#92400E',
+    marginBottom: 4,
+  },
+  timezoneMismatchDesc: {
+    fontSize: 13,
+    color: '#B45309',
+    lineHeight: 18,
   },
   // Policy Modal Styles
   policyModalContainer: {

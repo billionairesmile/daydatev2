@@ -490,6 +490,8 @@
       "timezoneManual": "Manual Selection",
       "timezoneManualDesc": "Manual timezone for long-distance couples",
       "timezoneHint": "Applied to mission reset and D-day calculations",
+      "timezoneMismatchTitle": "Different timezones detected",
+      "timezoneMismatchDesc": "Your partner's device uses {{partnerTimezone}}. Tap here to set a shared timezone.",
       "termsOfService": "Terms of Service",
       "locationTerms": "Location Terms",
       "privacyPolicy": "Privacy Policy",

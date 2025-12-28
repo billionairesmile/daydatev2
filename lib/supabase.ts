@@ -3,8 +3,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { File as ExpoFile } from 'expo-file-system';
 import { decode } from 'base64-arraybuffer';
-import { formatDateToLocal } from './dateUtils';
+import { formatDateToLocal, formatDateInTimezone } from './dateUtils';
 import * as ImageManipulator from 'expo-image-manipulator';
+import { useTimezoneStore } from '@/stores/timezoneStore';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -354,6 +355,30 @@ export const db = {
         .upsert(profile)
         .select()
         .single();
+      return { data, error };
+    },
+
+    /**
+     * Update user's device timezone for mismatch detection
+     */
+    async updateDeviceTimezone(userId: string, deviceTimezone: string) {
+      const client = getSupabase();
+      const { error } = await client
+        .from('profiles')
+        .update({ device_timezone: deviceTimezone })
+        .eq('id', userId);
+      return { error };
+    },
+
+    /**
+     * Get both partner profiles' device timezones for a couple
+     */
+    async getCoupleDeviceTimezones(coupleId: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('profiles')
+        .select('id, device_timezone')
+        .eq('couple_id', coupleId);
       return { data, error };
     },
 
@@ -1138,7 +1163,9 @@ export const db = {
   featuredMissions: {
     async getActiveForToday() {
       const client = getSupabase();
-      const today = formatDateToLocal(new Date());
+      // Use effective timezone for date comparison
+      const effectiveTimezone = useTimezoneStore.getState().getEffectiveTimezone();
+      const today = formatDateInTimezone(new Date(), effectiveTimezone);
 
       const { data, error } = await client
         .from('featured_missions')

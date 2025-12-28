@@ -487,6 +487,8 @@
       "timezoneManual": "手動選擇",
       "timezoneManualDesc": "遠距離情侶的手動時區設定",
       "timezoneHint": "適用於任務重置和紀念日計算",
+      "timezoneMismatchTitle": "時區不同",
+      "timezoneMismatchDesc": "伴侶的裝置使用 {{partnerTimezone}}。點擊此處設定共用時區。",
       "termsOfService": "服務條款",
       "locationTerms": "位置資訊服務條款",
       "privacyPolicy": "隱私權政策",

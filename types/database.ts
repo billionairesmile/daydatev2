@@ -19,6 +19,8 @@ export interface Profile {
   privacy_agreed?: boolean;
   marketing_agreed?: boolean;
   consent_given_at?: string;
+  // Device timezone for mismatch detection
+  device_timezone?: string; // IANA timezone format (e.g., 'Asia/Seoul')
   created_at?: string;
   updated_at?: string;
 }
