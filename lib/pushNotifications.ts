@@ -2,6 +2,7 @@ import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { db, supabase, isDemoMode } from './supabase';
+import { useTimezoneStore } from '@/stores/timezoneStore';
 
 // Check if running in Expo Go (push notifications don't work in Expo Go as of SDK 53)
 const isExpoGo = Constants.appOwnership === 'expo';
@@ -689,21 +690,41 @@ export async function scheduleHourlyReminders(
     await cancelHourlyReminders();
 
     const now = new Date();
-    const currentHour = now.getHours();
+    const currentDeviceHour = now.getHours();
     const scheduledIds: string[] = [];
 
     const messages = notificationMessages.hourlyReminder[language];
 
+    // Get effective timezone for quiet hours check
+    const effectiveTimezone = useTimezoneStore.getState().getEffectiveTimezone();
+
     // Schedule reminders for the next several hours
-    // Start from the next hour, end before midnight (23:00)
+    // Start from the next hour, end before midnight (23:00 device local)
+    // Skip if the effective timezone hour is in quiet period (0:00-11:59)
     for (let i = 1; i <= MAX_HOURLY_REMINDERS; i++) {
-      const reminderHour = currentHour + i;
+      const deviceHour = currentDeviceHour + i;
 
-      // Don't schedule past 23:00 (11 PM) - let people sleep!
-      if (reminderHour >= 23) break;
+      // Don't schedule past 23:00 (11 PM) device local time
+      if (deviceHour >= 23) break;
 
-      // Calculate trigger time
-      const triggerDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), reminderHour, 0, 0);
+      // Calculate trigger time in device local time
+      const triggerDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), deviceHour, 0, 0);
+
+      // Check what hour this is in the effective timezone
+      const hourInEffectiveTimezone = parseInt(
+        new Intl.DateTimeFormat('en-US', {
+          timeZone: effectiveTimezone,
+          hour: 'numeric',
+          hour12: false,
+        }).format(triggerDate),
+        10
+      );
+
+      // Skip midnight to noon (0:00-11:59) in effective timezone - quiet morning hours
+      if (hourInEffectiveTimezone < 12) {
+        console.log('[Push] Skipping reminder at', triggerDate.toLocaleTimeString(), '- quiet hours in', effectiveTimezone);
+        continue;
+      }
 
       const identifier = `${HOURLY_REMINDER_PREFIX}${i}`;
 
@@ -722,7 +743,7 @@ export async function scheduleHourlyReminders(
       });
 
       scheduledIds.push(identifier);
-      console.log('[Push] Hourly reminder scheduled for', triggerDate.toLocaleTimeString());
+      console.log('[Push] Hourly reminder scheduled for', triggerDate.toLocaleTimeString(), '(', hourInEffectiveTimezone, ':00 in', effectiveTimezone, ')');
     }
 
     console.log('[Push] Scheduled', scheduledIds.length, 'hourly reminders');
