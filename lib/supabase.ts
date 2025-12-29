@@ -5,7 +5,9 @@ import { File as ExpoFile } from 'expo-file-system';
 import { decode } from 'base64-arraybuffer';
 import { formatDateToLocal, formatDateInTimezone } from './dateUtils';
 import * as ImageManipulator from 'expo-image-manipulator';
-import { useTimezoneStore } from '@/stores/timezoneStore';
+
+// Note: useTimezoneStore is imported dynamically to avoid require cycle
+// supabase.ts <-> timezoneStore.ts
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -1164,6 +1166,9 @@ export const db = {
     async getActiveForToday() {
       const client = getSupabase();
       // Use effective timezone for date comparison
+      // Dynamic import to avoid require cycle (supabase.ts <-> timezoneStore.ts)
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { useTimezoneStore } = require('@/stores/timezoneStore');
       const effectiveTimezone = useTimezoneStore.getState().getEffectiveTimezone();
       const today = formatDateInTimezone(new Date(), effectiveTimezone);
 

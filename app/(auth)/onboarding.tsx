@@ -569,9 +569,10 @@ export default function OnboardingScreen() {
 
           // Go directly to pairing (terms removed from flow)
           console.log('[Onboarding] User login success, going to pairing');
+          const providerName = provider === 'google' ? 'Google' : provider === 'kakao' ? 'Kakao' : 'Apple';
           Alert.alert(
             t('onboarding.login.success'),
-            t('onboarding.login.successMessage', { provider: provider === 'google' ? 'Google' : 'Kakao' }),
+            t('onboarding.login.successMessage', { provider: providerName }),
             [
               {
                 text: t('onboarding.continue'),
@@ -972,9 +973,10 @@ function WelcomeStep({ onSocialLogin }: { onSocialLogin: (provider: 'google' | '
       console.log(`[WelcomeStep] onSocialLogin completed for ${provider}`);
     } catch (error) {
       console.error(`[WelcomeStep] ${provider} login error:`, error);
+      const providerName = provider === 'google' ? 'Google' : provider === 'kakao' ? 'Kakao' : 'Apple';
       Alert.alert(
         t('onboarding.login.failed'),
-        t('onboarding.login.failedProvider', { provider: provider === 'google' ? 'Google' : 'Kakao' }),
+        t('onboarding.login.failedProvider', { provider: providerName }),
         [{ text: t('onboarding.confirm') }]
       );
     } finally {
@@ -992,100 +994,106 @@ function WelcomeStep({ onSocialLogin }: { onSocialLogin: (provider: 'google' | '
       {/* Login buttons fixed at bottom */}
       <View style={styles.welcomeBottomContainer}>
         <View style={styles.socialLoginContainer}>
-        {/* Apple Login Button (iOS only) - First */}
-        {Platform.OS === 'ios' && (
+          {/* Apple Login Button (iOS only) - First */}
+          {Platform.OS === 'ios' && (
+            <TouchableOpacity
+              style={[styles.socialButton, styles.appleButton, isLoading !== null && styles.disabledButton]}
+              onPress={() => handleSocialLogin('apple')}
+              disabled={isLoading !== null}
+              activeOpacity={0.7}
+            >
+              {isLoading === 'apple' ? (
+                <ActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <>
+                  <View style={styles.socialIconContainer}>
+                    <Ionicons name="logo-apple" size={20} color="#ffffff" />
+                  </View>
+                  <Text style={styles.appleButtonText}>{t('onboarding.login.apple')}</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+
+          {/* Google Login Button */}
           <TouchableOpacity
-            style={[styles.socialButton, styles.appleButton, isLoading !== null && styles.disabledButton]}
-            onPress={() => handleSocialLogin('apple')}
+            style={[styles.socialButton, styles.googleButton, isLoading !== null && styles.disabledButton]}
+            onPress={() => handleSocialLogin('google')}
             disabled={isLoading !== null}
             activeOpacity={0.7}
           >
-            {isLoading === 'apple' ? (
-              <ActivityIndicator size="small" color="#ffffff" />
+            {isLoading === 'google' ? (
+              <ActivityIndicator size="small" color="#757575" />
             ) : (
               <>
-                <Ionicons name="logo-apple" size={24} color="#ffffff" style={styles.appleIcon} />
-                <Text style={styles.appleButtonText}>{t('onboarding.login.apple')}</Text>
+                <View style={styles.socialIconContainer}>
+                  <Image
+                    source={{ uri: 'https://developers.google.com/identity/images/g-logo.png' }}
+                    style={styles.googleIcon}
+                    contentFit="contain"
+                    cachePolicy="memory-disk"
+                  />
+                </View>
+                <Text style={styles.googleButtonText}>{t('onboarding.login.google')}</Text>
               </>
             )}
           </TouchableOpacity>
-        )}
 
-        {/* Google Login Button */}
-        <TouchableOpacity
-          style={[styles.socialButton, styles.googleButton, isLoading !== null && styles.disabledButton]}
-          onPress={() => handleSocialLogin('google')}
-          disabled={isLoading !== null}
-          activeOpacity={0.7}
-        >
-          {isLoading === 'google' ? (
-            <ActivityIndicator size="small" color="#757575" />
-          ) : (
-            <>
-              <Image
-                source={{ uri: 'https://developers.google.com/identity/images/g-logo.png' }}
-                style={styles.socialIcon}
-                contentFit="contain"
-                cachePolicy="memory-disk"
-              />
-              <Text style={styles.googleButtonText}>{t('onboarding.login.google')}</Text>
-            </>
-          )}
-        </TouchableOpacity>
+          {/* Kakao Login Button */}
+          <TouchableOpacity
+            style={[styles.socialButton, styles.kakaoButton, isLoading !== null && styles.disabledButton]}
+            onPress={() => handleSocialLogin('kakao')}
+            disabled={isLoading !== null}
+            activeOpacity={0.7}
+          >
+            {isLoading === 'kakao' ? (
+              <ActivityIndicator size="small" color="#3C1E1E" />
+            ) : (
+              <>
+                <View style={styles.socialIconContainer}>
+                  <Image
+                    source={{ uri: 'https://developers.kakao.com/assets/img/about/logos/kakaolink/kakaolink_btn_medium.png' }}
+                    style={styles.kakaoIcon}
+                    contentFit="contain"
+                    cachePolicy="memory-disk"
+                  />
+                </View>
+                <Text style={styles.kakaoButtonText}>{t('onboarding.login.kakao')}</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
 
-        {/* Kakao Login Button */}
-        <TouchableOpacity
-          style={[styles.socialButton, styles.kakaoButton, isLoading !== null && styles.disabledButton]}
-          onPress={() => handleSocialLogin('kakao')}
-          disabled={isLoading !== null}
-          activeOpacity={0.7}
-        >
-          {isLoading === 'kakao' ? (
-            <ActivityIndicator size="small" color="#3C1E1E" />
-          ) : (
-            <>
-              <Image
-                source={{ uri: 'https://developers.kakao.com/assets/img/about/logos/kakaolink/kakaolink_btn_medium.png' }}
-                style={styles.kakaoIcon}
-                contentFit="contain"
-                cachePolicy="memory-disk"
-              />
-              <Text style={styles.kakaoButtonText}>{t('onboarding.login.kakao')}</Text>
-            </>
-          )}
-        </TouchableOpacity>
-      </View>
-
-      {/* Terms disclaimer */}
-      <View style={styles.termsDisclaimerContainer}>
-        <Text style={styles.termsDisclaimerText}>
-          {t('onboarding.login.termsDisclaimer.prefix')}
-          <Text
-            style={styles.termsDisclaimerLink}
-            onPress={() => Linking.openURL('https://daydate.my/policy/privacy')}
-            suppressHighlighting={true}
-          >
-            {t('onboarding.login.termsDisclaimer.privacy')}
+        {/* Terms disclaimer */}
+        <View style={styles.termsDisclaimerContainer}>
+          <Text style={styles.termsDisclaimerText}>
+            {t('onboarding.login.termsDisclaimer.prefix')}
+            <Text
+              style={styles.termsDisclaimerLink}
+              onPress={() => Linking.openURL('https://daydate.my/policy/privacy')}
+              suppressHighlighting={true}
+            >
+              {t('onboarding.login.termsDisclaimer.privacy')}
+            </Text>
+            {t('onboarding.login.termsDisclaimer.comma')}
+            <Text
+              style={styles.termsDisclaimerLink}
+              onPress={() => Linking.openURL('https://daydate.my/policy/terms')}
+              suppressHighlighting={true}
+            >
+              {t('onboarding.login.termsDisclaimer.terms')}
+            </Text>
+            {',\n'}
+            <Text
+              style={styles.termsDisclaimerLink}
+              onPress={() => Linking.openURL('https://daydate.my/policy/location')}
+              suppressHighlighting={true}
+            >
+              {t('onboarding.login.termsDisclaimer.location')}
+            </Text>
+            {t('onboarding.login.termsDisclaimer.suffix')}
           </Text>
-          {t('onboarding.login.termsDisclaimer.comma')}
-          <Text
-            style={styles.termsDisclaimerLink}
-            onPress={() => Linking.openURL('https://daydate.my/policy/terms')}
-            suppressHighlighting={true}
-          >
-            {t('onboarding.login.termsDisclaimer.terms')}
-          </Text>
-          {',\n'}
-          <Text
-            style={styles.termsDisclaimerLink}
-            onPress={() => Linking.openURL('https://daydate.my/policy/location')}
-            suppressHighlighting={true}
-          >
-            {t('onboarding.login.termsDisclaimer.location')}
-          </Text>
-          {t('onboarding.login.termsDisclaimer.suffix')}
-        </Text>
-      </View>
+        </View>
       </View>
     </View>
   );
@@ -1738,7 +1746,7 @@ function PairingStep({
     // Only run when generatedCode is set and hasn't been setup yet
     // Use both code check AND mutex to prevent race conditions (React Strict Mode double-mount)
     if (isCreatingCode && !isInTestMode() && !isCodeSaved && generatedCode &&
-        setupStartedRef.current !== generatedCode && !setupInProgressRef.current) {
+      setupStartedRef.current !== generatedCode && !setupInProgressRef.current) {
       setupStartedRef.current = generatedCode; // Track which code was setup
       setupInProgressRef.current = true; // Set mutex immediately before any async work
       const setupPairing = async (codeToUse: string, retryCount = 0) => {
@@ -2041,28 +2049,28 @@ function PairingStep({
               console.log('[PairingStep] Cleaning up old pending couples for creator');
               await db.couples.cleanupPendingCouples(creatorUserId, newCouple.id);
 
-            // Only update user in authStore if not already logged in
-            if (!isExistingUser) {
-              setUser({
-                id: creatorUserId,
-                email: '',
-                nickname: '',
-                inviteCode: finalCode,
-                preferences: {
-                  weekendActivity: '',
-                  dateEnergy: '',
-                  dateTypes: [],
-                  adventureLevel: '',
-                  photoPreference: '',
-                  dateStyle: '',
-                  planningStyle: '',
-                  foodStyles: [],
-                  preferredTimes: [],
-                  budgetStyle: '',
-                },
-                createdAt: new Date(),
-              });
-            }
+              // Only update user in authStore if not already logged in
+              if (!isExistingUser) {
+                setUser({
+                  id: creatorUserId,
+                  email: '',
+                  nickname: '',
+                  inviteCode: finalCode,
+                  preferences: {
+                    weekendActivity: '',
+                    dateEnergy: '',
+                    dateTypes: [],
+                    adventureLevel: '',
+                    photoPreference: '',
+                    dateStyle: '',
+                    planningStyle: '',
+                    foodStyles: [],
+                    preferredTimes: [],
+                    budgetStyle: '',
+                  },
+                  createdAt: new Date(),
+                });
+              }
             }
           } finally {
             coupleCreationInProgressRef.current = false;
@@ -4025,38 +4033,43 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
     marginBottom: SPACING.lg,
   },
+  socialIconContainer: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  socialIcon: {
+    width: 20,
+    height: 20,
+  },
+  googleIcon: {
+    width: 18,
+    height: 18,
+  },
+  kakaoIcon: {
+    width: 22,
+    height: 22,
+    borderRadius: 4,
+  },
   googleButton: {
     backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: '#dbdbdb',
+    paddingLeft: 10,
   },
   kakaoButton: {
     backgroundColor: '#FEE500',
+    paddingLeft: 3,
   },
   appleButton: {
     backgroundColor: '#000000',
-  },
-  appleIcon: {
-    marginRight: 10,
   },
   appleButtonText: {
     fontSize: 15,
     color: '#ffffff',
     fontWeight: '500',
-  },
-  disabledButton: {
-    opacity: 0.5,
-  },
-  socialIcon: {
-    width: 22,
-    height: 22,
-    marginRight: 12,
-  },
-  kakaoIcon: {
-    width: 22,
-    height: 22,
-    marginRight: 12,
-    borderRadius: 4,
   },
   googleButtonText: {
     fontSize: 15,
@@ -4067,6 +4080,9 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#3C1E1E',
     fontWeight: '500',
+  },
+  disabledButton: {
+    opacity: 0.5,
   },
   // Terms disclaimer styles
   termsDisclaimerContainer: {

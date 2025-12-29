@@ -489,6 +489,7 @@
       "timezoneHint": "適用於任務重置和紀念日計算",
       "timezoneMismatchTitle": "時區不同",
       "timezoneMismatchDesc": "伴侶的裝置使用 {{partnerTimezone}}。請前往更多 > 設定 > 時區來設定共用時區。",
+      "termsAndPolicies": "條款與政策",
       "termsOfService": "服務條款",
       "locationTerms": "位置資訊服務條款",
       "privacyPolicy": "隱私權政策",

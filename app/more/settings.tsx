@@ -12,13 +12,11 @@ import {
   Alert,
   SafeAreaView,
   StatusBar,
-  ActivityIndicator,
   Animated,
   Keyboard,
   Platform,
   Linking,
 } from 'react-native';
-import { WebView } from 'react-native-webview';
 import {
   ChevronLeft,
   ChevronRight,
@@ -27,13 +25,10 @@ import {
   UserX,
   Link2Off,
   AlertTriangle,
-  X,
   FileText,
-  Shield,
   Info,
   Globe,
   Check,
-  MapPin,
   LogOut,
   Gift,
   Clock,
@@ -81,11 +76,6 @@ export default function SettingsScreen() {
   // Timezone selection modal
   const [showTimezoneModal, setShowTimezoneModal] = useState(false);
 
-  // Policy modal
-  const [policyModalVisible, setPolicyModalVisible] = useState(false);
-  const [policyUrl, setPolicyUrl] = useState('');
-  const [policyTitle, setPolicyTitle] = useState('');
-  const [webViewLoading, setWebViewLoading] = useState(true);
 
   // Keyboard animation for modals
   const modalAnimatedValue = useRef(new Animated.Value(0)).current;
@@ -189,13 +179,6 @@ export default function SettingsScreen() {
         dismissTimezoneMismatch();
       }
     }
-  };
-
-  const openPolicyModal = (url: string, title: string) => {
-    setPolicyUrl(url);
-    setPolicyTitle(title);
-    setWebViewLoading(true);
-    setPolicyModalVisible(true);
   };
 
   const handleLogout = () => {
@@ -536,36 +519,12 @@ export default function SettingsScreen() {
 
           <View style={styles.settingDivider} />
 
-          <Pressable style={styles.menuItem} onPress={() => openPolicyModal('https://daydate.my/policy/terms', t('settings.other.termsOfService'))}>
+          <Pressable style={styles.menuItem} onPress={() => router.push('/more/terms')}>
             <View style={styles.settingItemLeft}>
               <View style={styles.iconWrapper}>
                 <FileText color={COLORS.black} size={20} />
               </View>
-              <Text style={styles.settingItemLabel}>{t('settings.other.termsOfService')}</Text>
-            </View>
-            <ChevronRight color="#999" size={20} />
-          </Pressable>
-
-          <View style={styles.settingDivider} />
-
-          <Pressable style={styles.menuItem} onPress={() => openPolicyModal('https://daydate.my/policy/location', t('settings.other.locationTerms'))}>
-            <View style={styles.settingItemLeft}>
-              <View style={styles.iconWrapper}>
-                <MapPin color={COLORS.black} size={20} />
-              </View>
-              <Text style={styles.settingItemLabel}>{t('settings.other.locationTerms')}</Text>
-            </View>
-            <ChevronRight color="#999" size={20} />
-          </Pressable>
-
-          <View style={styles.settingDivider} />
-
-          <Pressable style={styles.menuItem} onPress={() => openPolicyModal('https://daydate.my/policy/privacy', t('settings.other.privacyPolicy'))}>
-            <View style={styles.settingItemLeft}>
-              <View style={styles.iconWrapper}>
-                <Shield color={COLORS.black} size={20} />
-              </View>
-              <Text style={styles.settingItemLabel}>{t('settings.other.privacyPolicy')}</Text>
+              <Text style={styles.settingItemLabel}>{t('settings.other.termsAndPolicies')}</Text>
             </View>
             <ChevronRight color="#999" size={20} />
           </Pressable>
@@ -691,38 +650,6 @@ export default function SettingsScreen() {
             </ScrollView>
           </View>
         </Pressable>
-      </Modal>
-
-      {/* Policy Modal with WebView */}
-      <Modal
-        visible={policyModalVisible}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setPolicyModalVisible(false)}
-      >
-        <SafeAreaView style={styles.policyModalContainer}>
-          <View style={styles.policyModalHeader}>
-            <Text style={styles.policyModalTitle}>{policyTitle}</Text>
-            <Pressable
-              style={styles.policyModalCloseButton}
-              onPress={() => setPolicyModalVisible(false)}
-            >
-              <X color={COLORS.black} size={24} />
-            </Pressable>
-          </View>
-          {webViewLoading && (
-            <View style={styles.webViewLoading}>
-              <ActivityIndicator size="large" color={COLORS.black} />
-            </View>
-          )}
-          <WebView
-            source={{ uri: policyUrl }}
-            style={styles.webView}
-            onLoadStart={() => setWebViewLoading(true)}
-            onLoadEnd={() => setWebViewLoading(false)}
-            startInLoadingState={true}
-          />
-        </SafeAreaView>
       </Modal>
 
       {/* Account Deletion Confirmation Modal */}
@@ -1124,44 +1051,5 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#B45309',
     lineHeight: 18,
-  },
-  // Policy Modal Styles
-  policyModalContainer: {
-    flex: 1,
-    backgroundColor: COLORS.white,
-  },
-  policyModalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-    position: 'relative',
-  },
-  policyModalTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: COLORS.black,
-  },
-  policyModalCloseButton: {
-    position: 'absolute',
-    right: SPACING.lg,
-    padding: SPACING.xs,
-  },
-  webView: {
-    flex: 1,
-  },
-  webViewLoading: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.white,
-    zIndex: 1,
   },
 });

@@ -492,6 +492,7 @@
       "timezoneHint": "Applied to mission reset and D-day calculations",
       "timezoneMismatchTitle": "Different timezones detected",
       "timezoneMismatchDesc": "Your partner's device uses {{partnerTimezone}}. Go to More > Settings > Timezone to set a shared timezone.",
+      "termsAndPolicies": "Terms & Policies",
       "termsOfService": "Terms of Service",
       "locationTerms": "Location Terms",
       "privacyPolicy": "Privacy Policy",

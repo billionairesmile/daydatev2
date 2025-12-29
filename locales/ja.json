@@ -492,6 +492,7 @@
       "timezoneHint": "ミッションリセットとD-day計算に適用されます",
       "timezoneMismatchTitle": "タイムゾーンが異なります",
       "timezoneMismatchDesc": "パートナーのデバイスは{{partnerTimezone}}を使用しています。その他 > 設定 > タイムゾーンで共通のタイムゾーンを設定してください。",
+      "termsAndPolicies": "利用規約・ポリシー",
       "termsOfService": "利用規約",
       "locationTerms": "位置情報利用規約",
       "privacyPolicy": "プライバシーポリシー",

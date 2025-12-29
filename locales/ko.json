@@ -492,6 +492,7 @@
       "timezoneHint": "미션 초기화 및 D-day 계산에 적용됩니다",
       "timezoneMismatchTitle": "시간대가 다릅니다",
       "timezoneMismatchDesc": "파트너의 기기는 {{partnerTimezone}} 시간대를 사용합니다. 더보기 > 설정 > 시간대에서 파트너와 동일한 시간대를 설정해주세요.",
+      "termsAndPolicies": "약관 및 정책",
       "termsOfService": "서비스 이용약관",
       "locationTerms": "위치정보 이용약관",
       "privacyPolicy": "개인정보 처리방침",
