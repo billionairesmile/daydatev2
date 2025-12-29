@@ -1,5 +1,7 @@
 import { makeRedirectUri } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import { Platform } from 'react-native';
 import { supabase, isDemoMode } from './supabase';
 
 // Required for web only
@@ -17,7 +19,7 @@ const redirectTo = makeRedirectUri({
 // Log the redirect URI for debugging
 console.log('[SocialAuth] Redirect URI:', redirectTo);
 
-export type SocialProvider = 'google' | 'kakao';
+export type SocialProvider = 'google' | 'kakao' | 'apple';
 
 interface AuthSession {
   access_token: string;
@@ -223,6 +225,96 @@ export const signInWithKakao = async () => {
 };
 
 /**
+ * Sign in with Apple (iOS only, native authentication)
+ */
+export const signInWithApple = async (): Promise<AuthSession | null> => {
+  console.log('[SocialAuth] signInWithApple called');
+  console.log(`[SocialAuth] Platform: ${Platform.OS}, isDemoMode: ${isDemoMode}`);
+
+  if (isDemoMode || !supabase) {
+    console.log('Demo mode - Apple login not available');
+    return null;
+  }
+
+  if (Platform.OS !== 'ios') {
+    console.log('[SocialAuth] Apple Sign-In is only available on iOS');
+    return null;
+  }
+
+  try {
+    // Check if Apple Sign-In is available on this device
+    const isAvailable = await AppleAuthentication.isAvailableAsync();
+    if (!isAvailable) {
+      console.log('[SocialAuth] Apple Sign-In is not available on this device');
+      return null;
+    }
+
+    console.log('[SocialAuth] Starting Apple Sign-In...');
+
+    // Request Apple Sign-In
+    const credential = await AppleAuthentication.signInAsync({
+      requestedScopes: [
+        AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+        AppleAuthentication.AppleAuthenticationScope.EMAIL,
+      ],
+    });
+
+    console.log('[SocialAuth] Apple credential received:', {
+      hasIdentityToken: !!credential.identityToken,
+      hasAuthorizationCode: !!credential.authorizationCode,
+      hasEmail: !!credential.email,
+      hasFullName: !!credential.fullName,
+    });
+
+    if (!credential.identityToken) {
+      console.error('[SocialAuth] No identity token received from Apple');
+      return null;
+    }
+
+    // Sign in to Supabase using the Apple identity token
+    console.log('[SocialAuth] Signing in to Supabase with Apple token...');
+    const { data, error } = await supabase.auth.signInWithIdToken({
+      provider: 'apple',
+      token: credential.identityToken,
+    });
+
+    if (error) {
+      console.error('[SocialAuth] Supabase Apple sign in error:', error);
+      throw error;
+    }
+
+    if (data.session) {
+      console.log('[SocialAuth] Apple Sign-In successful, user:', data.session.user.id);
+
+      // If we got name from Apple (first sign in only), update user metadata
+      if (credential.fullName?.givenName || credential.fullName?.familyName) {
+        const fullName = [credential.fullName?.givenName, credential.fullName?.familyName]
+          .filter(Boolean)
+          .join(' ');
+
+        if (fullName) {
+          console.log('[SocialAuth] Updating user name:', fullName);
+          await supabase.auth.updateUser({
+            data: { full_name: fullName, name: fullName }
+          });
+        }
+      }
+
+      return data.session as unknown as AuthSession;
+    }
+
+    return null;
+  } catch (error: any) {
+    if (error.code === 'ERR_REQUEST_CANCELED') {
+      console.log('[SocialAuth] User cancelled Apple Sign-In');
+      return null;
+    }
+    console.error('[SocialAuth] Apple Sign-In failed:', error);
+    throw error;
+  }
+};
+
+/**
  * Get the current user's auth provider from session
  */
 export const getAuthProvider = async (): Promise<SocialProvider | 'email' | null> => {
@@ -236,7 +328,7 @@ export const getAuthProvider = async (): Promise<SocialProvider | 'email' | null
     // Check the app_metadata for provider info
     const provider = session.user.app_metadata?.provider;
 
-    if (provider === 'google' || provider === 'kakao') {
+    if (provider === 'google' || provider === 'kakao' || provider === 'apple') {
       return provider;
     }
 
@@ -311,6 +403,7 @@ export const handleDeepLink = async (url: string) => {
 export default {
   signInWithGoogle,
   signInWithKakao,
+  signInWithApple,
   signInWithProvider,
   signOut,
   getSession,

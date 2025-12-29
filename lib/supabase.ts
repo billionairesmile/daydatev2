@@ -1167,16 +1167,26 @@ export const db = {
       const effectiveTimezone = useTimezoneStore.getState().getEffectiveTimezone();
       const today = formatDateInTimezone(new Date(), effectiveTimezone);
 
-      const { data, error } = await client
+      // Fetch all active featured missions first, then filter by date in JS
+      // This avoids issues with chaining multiple .or() calls in Supabase
+      const { data: allData, error } = await client
         .from('featured_missions')
         .select('*')
         .eq('is_active', true)
-        .or(`start_date.is.null,start_date.lte.${today}`)
-        .or(`end_date.is.null,end_date.gte.${today}`)
-        .order('priority', { ascending: false })
-        .limit(2); // 최대 2개
+        .order('priority', { ascending: false });
 
-      return { data, error };
+      if (error || !allData) {
+        return { data: null, error };
+      }
+
+      // Filter by date range in JavaScript for reliable NULL handling
+      const filteredData = allData.filter(mission => {
+        const startOk = !mission.start_date || mission.start_date <= today;
+        const endOk = !mission.end_date || mission.end_date >= today;
+        return startOk && endOk;
+      }); // 개수 제한 없음
+
+      return { data: filteredData, error: null };
     },
 
     async getAll() {

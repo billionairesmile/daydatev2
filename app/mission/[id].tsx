@@ -15,6 +15,7 @@ import {
   ActivityIndicator,
   useWindowDimensions,
   Animated,
+  Linking,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { BlurView } from 'expo-blur';
@@ -224,6 +225,66 @@ export default function MissionDetailScreen() {
       imageUrl: '',
       isPremium: false,
     };
+
+  // Render rich content with clickable links and images
+  const renderRichContent = (content: string) => {
+    // URL regex pattern
+    const urlRegex = /(https?:\/\/[^\s]+)/gi;
+    // Image URL pattern
+    const imageExtensions = /\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i;
+
+    // Split content by URLs while keeping the URLs
+    const parts = content.split(urlRegex);
+
+    return (
+      <View>
+        {parts.map((part, index) => {
+          // Check if this part is a URL
+          if (urlRegex.test(part)) {
+            // Reset regex lastIndex
+            urlRegex.lastIndex = 0;
+
+            // Check if it's an image URL
+            if (imageExtensions.test(part)) {
+              return (
+                <Pressable
+                  key={index}
+                  onPress={() => Linking.openURL(part)}
+                  style={styles.additionalContentImageContainer}
+                >
+                  <ExpoImage
+                    source={{ uri: part }}
+                    style={styles.additionalContentImage}
+                    contentFit="cover"
+                  />
+                </Pressable>
+              );
+            }
+
+            // It's a regular link
+            return (
+              <Pressable
+                key={index}
+                onPress={() => Linking.openURL(part)}
+              >
+                <Text style={styles.additionalContentLink}>{part}</Text>
+              </Pressable>
+            );
+          }
+
+          // Regular text - handle newlines
+          if (part.trim()) {
+            return (
+              <Text key={index} style={styles.additionalContentText}>
+                {part}
+              </Text>
+            );
+          }
+          return null;
+        })}
+      </View>
+    );
+  };
 
   // Get the progress for THIS specific mission (not just the active one)
   const thisMissionProgress = getMissionProgressByMissionId(mission.id);
@@ -1422,7 +1483,7 @@ export default function MissionDetailScreen() {
           <View style={styles.additionalContentCard}>
             <BlurView intensity={30} tint="light" style={styles.cardBlur}>
               <View style={styles.additionalContentInner}>
-                <Text style={styles.additionalContentText}>{additionalContent}</Text>
+                {renderRichContent(additionalContent)}
               </View>
             </BlurView>
           </View>
@@ -1866,6 +1927,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'rgba(255,255,255,0.9)',
     lineHeight: 22,
+  },
+  additionalContentLink: {
+    fontSize: 14,
+    color: '#60A5FA',
+    lineHeight: 22,
+    textDecorationLine: 'underline',
+    marginVertical: 4,
+  },
+  additionalContentImageContainer: {
+    marginVertical: 8,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  additionalContentImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 12,
   },
   stepsCard: {
     borderRadius: 24,

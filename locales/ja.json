@@ -582,6 +582,7 @@
     "login": {
       "google": "Googleで始める",
       "kakao": "Kakaoで始める",
+      "apple": "Appleで始める",
       "or": "または",
       "success": "ログイン成功",
       "successMessage": "{{provider}}アカウントでログインしました。",

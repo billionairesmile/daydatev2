@@ -582,6 +582,7 @@
     "login": {
       "google": "Sign in with Google",
       "kakao": "Sign in with Kakao",
+      "apple": "Sign in with Apple",
       "or": "or",
       "success": "Login Successful",
       "successMessage": "Logged in with {{provider}} account.",

@@ -37,7 +37,9 @@ import Constants from 'expo-constants';
 import { WebView } from 'react-native-webview';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { signInWithGoogle, signInWithKakao, onAuthStateChange, signOut } from '@/lib/socialAuth';
+import { signInWithGoogle, signInWithKakao, signInWithApple, onAuthStateChange, signOut } from '@/lib/socialAuth';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import { Ionicons } from '@expo/vector-icons';
 
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '@/constants/design';
 import { useAuthStore } from '@/stores';
@@ -375,15 +377,17 @@ export default function OnboardingScreen() {
   }, [animateTransition, setStep]);
 
   // Social Login Handler
-  const handleSocialLogin = useCallback(async (provider: 'google' | 'kakao') => {
+  const handleSocialLogin = useCallback(async (provider: 'google' | 'kakao' | 'apple') => {
     try {
       console.log(`[Onboarding] Starting ${provider} login...`);
 
       let session = null;
       if (provider === 'google') {
         session = await signInWithGoogle();
-      } else {
+      } else if (provider === 'kakao') {
         session = await signInWithKakao();
+      } else if (provider === 'apple') {
+        session = await signInWithApple();
       }
 
       if (session && session.user) {
@@ -930,9 +934,9 @@ export default function OnboardingScreen() {
 // ========== STEP COMPONENTS ==========
 
 // Welcome Step
-function WelcomeStep({ onSocialLogin }: { onSocialLogin: (provider: 'google' | 'kakao') => Promise<void> }) {
+function WelcomeStep({ onSocialLogin }: { onSocialLogin: (provider: 'google' | 'kakao' | 'apple') => Promise<void> }) {
   const { t, i18n } = useTranslation();
-  const [isLoading, setIsLoading] = useState<'google' | 'kakao' | null>(null);
+  const [isLoading, setIsLoading] = useState<'google' | 'kakao' | 'apple' | null>(null);
 
   // Use Bricolage Grotesque for Latin languages (en, es), Jua for CJK languages (ko, ja, zh-TW)
   const isLatinLanguage = ['en', 'es'].includes(i18n.language);
@@ -941,7 +945,7 @@ function WelcomeStep({ onSocialLogin }: { onSocialLogin: (provider: 'google' | '
   const taglineLetterSpacing = isLatinLanguage ? -1.92 : -1;
   const taglineLineHeight = isLatinLanguage ? 52 : 58;
 
-  const handleSocialLogin = async (provider: 'google' | 'kakao') => {
+  const handleSocialLogin = async (provider: 'google' | 'kakao' | 'apple') => {
     console.log(`[WelcomeStep] Button pressed for ${provider}, isLoading: ${isLoading}, isDemoMode: ${isDemoMode}`);
 
     if (isLoading) {
@@ -988,6 +992,25 @@ function WelcomeStep({ onSocialLogin }: { onSocialLogin: (provider: 'google' | '
       {/* Login buttons fixed at bottom */}
       <View style={styles.welcomeBottomContainer}>
         <View style={styles.socialLoginContainer}>
+        {/* Apple Login Button (iOS only) - First */}
+        {Platform.OS === 'ios' && (
+          <TouchableOpacity
+            style={[styles.socialButton, styles.appleButton, isLoading !== null && styles.disabledButton]}
+            onPress={() => handleSocialLogin('apple')}
+            disabled={isLoading !== null}
+            activeOpacity={0.7}
+          >
+            {isLoading === 'apple' ? (
+              <ActivityIndicator size="small" color="#ffffff" />
+            ) : (
+              <>
+                <Ionicons name="logo-apple" size={24} color="#ffffff" style={styles.appleIcon} />
+                <Text style={styles.appleButtonText}>{t('onboarding.login.apple')}</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
+
         {/* Google Login Button */}
         <TouchableOpacity
           style={[styles.socialButton, styles.googleButton, isLoading !== null && styles.disabledButton]}
@@ -3998,8 +4021,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignSelf: 'center',
     width: '85%',
-    paddingVertical: 14,
-    borderRadius: 12,
+    height: 50,
+    borderRadius: RADIUS.md,
     marginBottom: SPACING.lg,
   },
   googleButton: {
@@ -4009,6 +4032,17 @@ const styles = StyleSheet.create({
   },
   kakaoButton: {
     backgroundColor: '#FEE500',
+  },
+  appleButton: {
+    backgroundColor: '#000000',
+  },
+  appleIcon: {
+    marginRight: 10,
+  },
+  appleButtonText: {
+    fontSize: 15,
+    color: '#ffffff',
+    fontWeight: '500',
   },
   disabledButton: {
     opacity: 0.5,

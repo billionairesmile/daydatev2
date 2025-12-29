@@ -16,6 +16,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.daydate.app",
+      "usesAppleSignIn": true,
       "infoPlist": {
         "NSCameraUsageDescription": "Daydate needs camera access to capture your special moments together.",
         "NSPhotoLibraryUsageDescription": "Daydate needs photo library access to save and share your memories.",
@@ -89,6 +90,7 @@
       ],
       "expo-asset",
       "expo-web-browser",
+      "expo-apple-authentication",
       [
         "react-native-google-mobile-ads",
         {
