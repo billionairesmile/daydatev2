@@ -491,7 +491,7 @@
       "timezoneManualDesc": "遠距離カップル向けの手動タイムゾーン設定",
       "timezoneHint": "ミッションリセットとD-day計算に適用されます",
       "timezoneMismatchTitle": "タイムゾーンが異なります",
-      "timezoneMismatchDesc": "パートナーのデバイスは{{partnerTimezone}}を使用しています。ここをタップして共通のタイムゾーンを設定してください。",
+      "timezoneMismatchDesc": "パートナーのデバイスは{{partnerTimezone}}を使用しています。その他 > 設定 > タイムゾーンで共通のタイムゾーンを設定してください。",
       "termsOfService": "利用規約",
       "locationTerms": "位置情報利用規約",
       "privacyPolicy": "プライバシーポリシー",
@@ -567,6 +567,7 @@
     "licenses": "オープンソースライセンス"
   },
   "onboarding": {
+    "tagline": "毎日、\n新しい\nデートミッション。",
     "welcome": "ようこそ",
     "welcomeTitle": "Daydateへ\nようこそ",
     "welcomeSubtitle": "二人の特別な瞬間を\n一緒に記録して共有しよう",

@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import { Jua_400Regular } from '@expo-google-fonts/jua';
 import { JustMeAgainDownHere_400Regular } from '@expo-google-fonts/just-me-again-down-here';
+import { BricolageGrotesque_800ExtraBold } from '@expo-google-fonts/bricolage-grotesque';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -95,6 +96,7 @@ export default function RootLayout() {
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
     Jua: Jua_400Regular,
     JustMeAgainDownHere: JustMeAgainDownHere_400Regular,
+    BricolageGrotesque: BricolageGrotesque_800ExtraBold,
   });
 
   // Preload character assets for ransom text

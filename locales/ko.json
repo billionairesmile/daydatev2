@@ -491,7 +491,7 @@
       "timezoneManualDesc": "장거리 커플을 위한 수동 시간대 설정",
       "timezoneHint": "미션 초기화 및 D-day 계산에 적용됩니다",
       "timezoneMismatchTitle": "시간대가 다릅니다",
-      "timezoneMismatchDesc": "파트너의 기기는 {{partnerTimezone}} 시간대를 사용합니다. 동일한 시간대를 사용하려면 여기를 눌러 시간대를 설정해주세요.",
+      "timezoneMismatchDesc": "파트너의 기기는 {{partnerTimezone}} 시간대를 사용합니다. 더보기 > 설정 > 시간대에서 파트너와 동일한 시간대를 설정해주세요.",
       "termsOfService": "서비스 이용약관",
       "locationTerms": "위치정보 이용약관",
       "privacyPolicy": "개인정보 처리방침",
@@ -567,6 +567,7 @@
     "licenses": "오픈소스 라이선스"
   },
   "onboarding": {
+    "tagline": "매일,\n새로운\n데이트 미션.",
     "welcome": "환영합니다",
     "welcomeTitle": "Daydate에\n오신 것을 환영해요",
     "welcomeSubtitle": "두 사람의 특별한 순간들을\n함께 기록하고 공유해보세요",

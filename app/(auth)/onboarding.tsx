@@ -14,6 +14,7 @@ import {
   Modal,
   Alert,
   ActivityIndicator,
+  StatusBar,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -727,11 +728,14 @@ export default function OnboardingScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, effectiveStep === 'welcome' && styles.whiteContainer]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       enabled={effectiveStep !== 'basic_info' && effectiveStep !== 'pairing'}
     >
+      {/* Status bar style - dark for welcome (white bg), light for others */}
+      <StatusBar barStyle={effectiveStep === 'welcome' ? 'dark-content' : 'light-content'} />
+
       {/* Background - White for welcome step, image for others */}
       {effectiveStep !== 'welcome' && (
         <>
@@ -927,8 +931,15 @@ export default function OnboardingScreen() {
 
 // Welcome Step
 function WelcomeStep({ onSocialLogin }: { onSocialLogin: (provider: 'google' | 'kakao') => Promise<void> }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [isLoading, setIsLoading] = useState<'google' | 'kakao' | null>(null);
+
+  // Use Bricolage Grotesque for Latin languages (en, es), Jua for CJK languages (ko, ja, zh-TW)
+  const isLatinLanguage = ['en', 'es'].includes(i18n.language);
+  const taglineFont = isLatinLanguage ? TYPOGRAPHY.fontFamily.displayLatin : TYPOGRAPHY.fontFamily.display;
+  // Letter spacing -4% for Latin (48px * -0.04 = -1.92), appropriate line height
+  const taglineLetterSpacing = isLatinLanguage ? -1.92 : -1;
+  const taglineLineHeight = isLatinLanguage ? 52 : 58;
 
   const handleSocialLogin = async (provider: 'google' | 'kakao') => {
     console.log(`[WelcomeStep] Button pressed for ${provider}, isLoading: ${isLoading}, isDemoMode: ${isDemoMode}`);
@@ -968,17 +979,15 @@ function WelcomeStep({ onSocialLogin }: { onSocialLogin: (provider: 'google' | '
   };
 
   return (
-    <View style={styles.centeredStepContainer}>
-      <View style={styles.welcomeLogoContainer}>
-        <Image
-          source={require('@/assets/images/daydate-logo.png')}
-          style={styles.welcomeLogo}
-          contentFit="contain"
-          cachePolicy="memory-disk"
-        />
+    <View style={styles.welcomeStepContainer}>
+      {/* Tagline at top-left with responsive spacing */}
+      <View style={styles.welcomeTaglineContainer}>
+        <Text style={[styles.welcomeTagline, { fontFamily: taglineFont, letterSpacing: taglineLetterSpacing, lineHeight: taglineLineHeight }]}>{t('onboarding.tagline')}</Text>
       </View>
 
-      <View style={styles.socialLoginContainer}>
+      {/* Login buttons fixed at bottom */}
+      <View style={styles.welcomeBottomContainer}>
+        <View style={styles.socialLoginContainer}>
         {/* Google Login Button */}
         <TouchableOpacity
           style={[styles.socialButton, styles.googleButton, isLoading !== null && styles.disabledButton]}
@@ -1053,6 +1062,7 @@ function WelcomeStep({ onSocialLogin }: { onSocialLogin: (provider: 'google' | '
           </Text>
           {t('onboarding.login.termsDisclaimer.suffix')}
         </Text>
+      </View>
       </View>
     </View>
   );
@@ -3651,6 +3661,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.black,
   },
+  whiteContainer: {
+    backgroundColor: '#FFFFFF',
+  },
   backgroundImage: {
     position: 'absolute',
     top: 0,
@@ -3762,6 +3775,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingTop: 60,
     paddingBottom: 100,
+  },
+  welcomeStepContainer: {
+    flex: 1,
+    width: '100%',
+    justifyContent: 'space-between',
+  },
+  welcomeTaglineContainer: {
+    width: '100%',
+    paddingHorizontal: SPACING.xl,
+    paddingTop: height * 0.10, // Responsive 10% from top
+    alignItems: 'flex-start',
+  },
+  welcomeTagline: {
+    // fontFamily, letterSpacing, lineHeight applied dynamically based on language
+    // Bricolage Grotesque ExtraBold for en/es (letterSpacing -4%), Jua for ko/ja/zh-TW
+    fontSize: 48,
+    color: '#000000',
+    textAlign: 'left',
+  },
+  welcomeBottomContainer: {
+    width: '100%',
+    paddingBottom: SPACING.lg,
   },
   welcomeSubtitle: {
     fontFamily: TYPOGRAPHY.fontFamily.display,

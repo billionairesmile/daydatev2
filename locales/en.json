@@ -491,7 +491,7 @@
       "timezoneManualDesc": "Manual timezone for long-distance couples",
       "timezoneHint": "Applied to mission reset and D-day calculations",
       "timezoneMismatchTitle": "Different timezones detected",
-      "timezoneMismatchDesc": "Your partner's device uses {{partnerTimezone}}. Tap here to set a shared timezone.",
+      "timezoneMismatchDesc": "Your partner's device uses {{partnerTimezone}}. Go to More > Settings > Timezone to set a shared timezone.",
       "termsOfService": "Terms of Service",
       "locationTerms": "Location Terms",
       "privacyPolicy": "Privacy Policy",
@@ -567,6 +567,7 @@
     "licenses": "Open Source Licenses"
   },
   "onboarding": {
+    "tagline": "Everyday,\na new date",
     "welcome": "Welcome",
     "welcomeTitle": "Welcome to\nDaydate",
     "welcomeSubtitle": "Record and share your special moments\ntogether as a couple",

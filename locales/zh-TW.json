@@ -488,7 +488,7 @@
       "timezoneManualDesc": "遠距離情侶的手動時區設定",
       "timezoneHint": "適用於任務重置和紀念日計算",
       "timezoneMismatchTitle": "時區不同",
-      "timezoneMismatchDesc": "伴侶的裝置使用 {{partnerTimezone}}。點擊此處設定共用時區。",
+      "timezoneMismatchDesc": "伴侶的裝置使用 {{partnerTimezone}}。請前往更多 > 設定 > 時區來設定共用時區。",
       "termsOfService": "服務條款",
       "locationTerms": "位置資訊服務條款",
       "privacyPolicy": "隱私權政策",
@@ -564,6 +564,7 @@
     "licenses": "開源授權"
   },
   "onboarding": {
+    "tagline": "每天，\n新的\n約會任務。",
     "welcome": "歡迎",
     "welcomeTitle": "歡迎來到\nDaydate",
     "welcomeSubtitle": "一起記錄和分享\n兩人的特別時刻吧",

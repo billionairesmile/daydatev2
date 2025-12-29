@@ -146,6 +146,8 @@ export const TYPOGRAPHY = {
     handwriting: 'System', // Will be replaced with Gloria Hallelujah
     // Korean display font (Jua) - for anniversary section
     display: 'Jua',
+    // Latin display font (Bricolage Grotesque ExtraBold) - for English/Spanish taglines
+    displayLatin: 'BricolageGrotesque',
   },
 
   // Font sizes

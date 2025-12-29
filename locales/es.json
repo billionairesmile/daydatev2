@@ -488,7 +488,7 @@
       "timezoneManualDesc": "Zona horaria manual para parejas a distancia",
       "timezoneHint": "Se aplica al reinicio de misiones y cálculos de D-day",
       "timezoneMismatchTitle": "Zonas horarias diferentes",
-      "timezoneMismatchDesc": "El dispositivo de tu pareja usa {{partnerTimezone}}. Toca aquí para configurar una zona horaria compartida.",
+      "timezoneMismatchDesc": "El dispositivo de tu pareja usa {{partnerTimezone}}. Ve a Más > Ajustes > Zona horaria para configurar una zona horaria compartida.",
       "termsOfService": "Términos de Servicio",
       "locationTerms": "Términos de Ubicación",
       "privacyPolicy": "Política de Privacidad",
@@ -564,6 +564,7 @@
     "licenses": "Licencias de Código Abierto"
   },
   "onboarding": {
+    "tagline": "Cada día,\nuna nueva cita",
     "welcome": "Bienvenido",
     "welcomeTitle": "Bienvenido a\nDaydate",
     "welcomeSubtitle": "Registra y comparte tus momentos especiales\njuntos como pareja",
