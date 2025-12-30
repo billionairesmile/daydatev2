@@ -18,6 +18,7 @@ import {
   RotateCcw,
   Megaphone,
   Headphones,
+  FileText,
   Trash2,
   Crown,
 } from 'lucide-react-native';
@@ -55,7 +56,9 @@ export default function MoreScreen() {
   const resetAuth = useAuthStore((state) => state.reset);
   const coupleSyncCleanup = useCoupleSyncStore((state) => state.cleanup);
   const resetAllMissions = useCoupleSyncStore((state) => state.resetAllMissions);
-  const { isPremium, plan, resetDailyUsage } = useSubscriptionStore();
+  const { isPremium, partnerIsPremium, plan, resetDailyUsage } = useSubscriptionStore();
+  // Combined premium status - user has premium benefits if they OR their partner has premium
+  const hasPremiumAccess = isPremium || partnerIsPremium;
   const couple = useAuthStore((state) => state.couple);
 
   // Premium modal state
@@ -167,6 +170,7 @@ export default function MoreScreen() {
       items: [
         { icon: Megaphone, label: t('more.menu.announcements'), onPress: () => router.push('/more/announcements') },
         { icon: Headphones, label: t('more.menu.customerService'), onPress: () => router.push('/more/customer-service') },
+        { icon: FileText, label: t('settings.other.termsAndPolicies'), onPress: () => router.push('/more/terms') },
       ],
     },
     {
@@ -248,27 +252,29 @@ export default function MoreScreen() {
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>{t('settings.sections.premium')}</Text>
                 <Pressable
-                  style={[styles.premiumCard, isPremium && styles.premiumCardActive]}
+                  style={[styles.premiumCard, hasPremiumAccess && styles.premiumCardActive]}
                   onPress={() => setShowPremiumModal(true)}
                 >
                   <View style={styles.premiumCardLeft}>
-                    <View style={[styles.premiumIconWrapper, isPremium && styles.premiumIconWrapperActive]}>
-                      <Crown color={isPremium ? '#FFD700' : 'rgba(255, 255, 255, 0.8)'} size={22} />
+                    <View style={[styles.premiumIconWrapper, hasPremiumAccess && styles.premiumIconWrapperActive]}>
+                      <Crown color={hasPremiumAccess ? '#D97706' : COLORS.black} size={22} />
                     </View>
                     <View style={styles.premiumInfo}>
-                      <Text style={[styles.premiumTitle, isPremium && styles.premiumTitleActive]}>
-                        {isPremium ? t('premium.status.active') : t('premium.title')}
+                      <Text style={[styles.premiumTitle, hasPremiumAccess && styles.premiumTitleActive]}>
+                        {hasPremiumAccess ? t('premium.status.active') : t('premium.title')}
                       </Text>
                       <Text style={styles.premiumDescription}>
-                        {isPremium
-                          ? plan === 'monthly'
-                            ? t('premium.status.monthlyPlan')
-                            : t('premium.status.annualPlan')
+                        {hasPremiumAccess
+                          ? isPremium
+                            ? plan === 'monthly'
+                              ? t('premium.status.monthlyPlan')
+                              : t('premium.status.annualPlan')
+                            : t('premium.status.partnerPlan')
                           : t('premium.subtitle')}
                       </Text>
                     </View>
                   </View>
-                  <ChevronRight color={isPremium ? '#FFD700' : 'rgba(255, 255, 255, 0.4)'} size={20} />
+                  <ChevronRight color={hasPremiumAccess ? '#D97706' : '#999'} size={20} />
                 </Pressable>
               </View>
             )}
@@ -373,17 +379,14 @@ const styles = StyleSheet.create({
   premiumCard: {
     borderRadius: 20,
     overflow: 'hidden',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: COLORS.white,
     padding: SPACING.lg,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   premiumCardActive: {
-    backgroundColor: 'rgba(255, 215, 0, 0.15)',
-    borderColor: 'rgba(255, 215, 0, 0.4)',
+    backgroundColor: '#FFFFFF',
   },
   premiumCardLeft: {
     flexDirection: 'row',
@@ -394,13 +397,13 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#f5f5f5',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: SPACING.md,
   },
   premiumIconWrapperActive: {
-    backgroundColor: 'rgba(255, 215, 0, 0.2)',
+    backgroundColor: '#FEF3C7',
   },
   premiumInfo: {
     flex: 1,
@@ -408,14 +411,14 @@ const styles = StyleSheet.create({
   premiumTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: COLORS.white,
+    color: COLORS.black,
     marginBottom: 2,
   },
   premiumTitleActive: {
-    color: '#FFD700',
+    color: '#D97706',
   },
   premiumDescription: {
     fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: '#666',
   },
 });

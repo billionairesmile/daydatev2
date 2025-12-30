@@ -14,12 +14,14 @@ import {
 } from 'react-native';
 import {
   Crown,
-  Sparkles,
+  Target,
   Bookmark,
   Ban,
   ChevronRight,
   X,
   Image as ImageIcon,
+  RefreshCw,
+  Zap,
 } from 'lucide-react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -42,6 +44,7 @@ export default function PremiumSubscriptionModal({
   const { language } = useLanguageStore();
   const {
     isPremium,
+    partnerIsPremium,
     plan,
     offerings,
     isLoading,
@@ -107,31 +110,35 @@ export default function PremiumSubscriptionModal({
     }
   };
 
-  // Premium benefits data (4 items for 2x2 grid)
+  // Premium benefits data (6 items for 2x3 grid)
   const premiumBenefits = [
     {
       title: t('premium.benefits.noAdsPremium'),
-      subtitle: t('premium.benefits.noAdsPremiumDesc'),
       icon: Ban,
     },
     {
       title: t('premium.benefits.missionCompletePremium'),
-      subtitle: t('premium.benefits.missionCompletePremiumDesc'),
-      icon: Sparkles,
+      icon: Target,
+    },
+    {
+      title: t('premium.benefits.missionGeneratePremiumShort'),
+      icon: RefreshCw,
     },
     {
       title: t('premium.benefits.missionKeepPremium'),
-      subtitle: t('premium.benefits.missionKeepPremiumDesc'),
       icon: Bookmark,
     },
     {
       title: t('premium.benefits.photoStoragePremium'),
-      subtitle: t('premium.benefits.photoStoragePremiumDesc'),
       icon: ImageIcon,
+    },
+    {
+      title: t('premium.benefits.newFeaturesPremium'),
+      icon: Zap,
     },
   ];
 
-  // If already premium, show management view
+  // If user has their own premium subscription, show management view
   if (isPremium) {
     return (
       <Modal
@@ -156,22 +163,27 @@ export default function PremiumSubscriptionModal({
             </Pressable>
           </View>
 
-          <View style={styles.managementContent}>
-            <View style={styles.premiumBadgeLarge}>
+          {/* Centered Content Container */}
+          <View style={styles.managementCenterContainer}>
+            {/* Crown Icon at Top */}
+            <View style={styles.premiumBadgeTop}>
               <Crown color="#FFD700" size={48} />
             </View>
-            <Text style={styles.managementTitle}>{t('premium.currentPlan')}</Text>
-            <Text style={styles.managementPlan}>
-              {plan === 'monthly' ? t('premium.monthlyPlan') : t('premium.annualPlan')}
-            </Text>
 
-            <Pressable
-              style={styles.manageButton}
-              onPress={openSubscriptionManagement}
-            >
-              <Text style={styles.manageButtonText}>{t('premium.manageSubscription')}</Text>
-              <ChevronRight color="#333" size={18} />
-            </Pressable>
+            <View style={styles.managementContent}>
+              <Text style={styles.managementTitle}>{t('premium.currentPlan')}</Text>
+              <Text style={styles.managementPlan}>
+                {plan === 'monthly' ? t('premium.monthlyPlan') : t('premium.annualPlan')}
+              </Text>
+
+              <Pressable
+                style={styles.manageButton}
+                onPress={openSubscriptionManagement}
+              >
+                <Text style={styles.manageButtonText}>{t('premium.manageSubscription')}</Text>
+                <ChevronRight color="#333" size={18} />
+              </Pressable>
+            </View>
           </View>
         </SafeAreaView>
       </Modal>
@@ -211,21 +223,17 @@ export default function PremiumSubscriptionModal({
             <Text style={styles.heroSubtitle}>{t('premium.heroSubtitleNew')}</Text>
           </View>
 
-          {/* Premium Benefits - 2x2 Grid */}
+          {/* Premium Benefits - 2x3 Grid */}
           <View style={styles.benefitsSection}>
-            <Text style={styles.benefitsSectionTitle}>{t('premium.benefitsTitle')}</Text>
+            <View style={styles.benefitsTitleWrapper}>
+              <View style={styles.benefitsTitleHighlight} />
+              <Text style={styles.benefitsSectionTitle}>{t('premium.benefitsTitle')}</Text>
+            </View>
             <View style={styles.benefitsGrid}>
               {premiumBenefits.map((benefit, index) => (
                 <View key={index} style={styles.benefitItem}>
-                  <View style={styles.benefitIconWrapper}>
-                    <benefit.icon color="#3B82F6" size={24} />
-                  </View>
-                  <View style={styles.benefitTextWrapper}>
-                    <Text style={styles.benefitTitle}>{benefit.title}</Text>
-                    {benefit.subtitle && (
-                      <Text style={styles.benefitSubtitle}>{benefit.subtitle}</Text>
-                    )}
-                  </View>
+                  <benefit.icon color={COLORS.black} size={24} />
+                  <Text style={styles.benefitTitle}>{benefit.title}</Text>
                 </View>
               ))}
             </View>
@@ -290,12 +298,21 @@ export default function PremiumSubscriptionModal({
             </Pressable>
           </View>
 
+          {/* Important Notes */}
+          <View style={styles.noticeSection}>
+            <Text style={styles.noticeSectionTitle}>{t('premium.importantNoticeTitle')}</Text>
+            <Text style={styles.noticeText}>• {t('premium.importantNotice1')}</Text>
+            <Text style={styles.noticeText}>• {t('premium.importantNotice2')}</Text>
+            <Text style={styles.noticeText}>• {t('premium.importantNotice3')}</Text>
+          </View>
+
           {/* Payment Notice */}
           <View style={styles.noticeSection}>
             <Text style={styles.noticeSectionTitle}>{t('premium.paymentNoticeTitle')}</Text>
             <Text style={styles.noticeText}>• {t('premium.paymentNotice1')}</Text>
             <Text style={styles.noticeText}>• {t('premium.paymentNotice2')}</Text>
             <Text style={styles.noticeText}>• {t('premium.paymentNotice3')}</Text>
+            <Text style={styles.noticeText}>• {t('premium.paymentNotice4')}</Text>
           </View>
 
           {/* Refund Notice */}
@@ -303,6 +320,7 @@ export default function PremiumSubscriptionModal({
             <Text style={styles.noticeSectionTitle}>{t('premium.refundNoticeTitle')}</Text>
             <Text style={styles.noticeText}>• {t('premium.refundNotice1')}</Text>
             <Text style={styles.noticeText}>• {t('premium.refundNotice2')}</Text>
+            <Text style={styles.noticeText}>• {t('premium.refundNotice3')}</Text>
           </View>
 
           {/* Restore Purchases & Legal Links */}
@@ -333,20 +351,28 @@ export default function PremiumSubscriptionModal({
 
         {/* Fixed Bottom CTA Button */}
         <View style={styles.fixedBottomContainer}>
+          {/* Partner premium notice */}
+          {partnerIsPremium && (
+            <Text style={styles.partnerPremiumBannerText}>
+              {t('premium.partnerPremiumNote')}
+            </Text>
+          )}
           <Pressable
-            style={[styles.ctaButton, (isLoading || !selectedPlan) && styles.ctaButtonDisabled]}
+            style={[styles.ctaButton, (isLoading || !selectedPlan || partnerIsPremium) && styles.ctaButtonDisabled]}
             onPress={handlePurchase}
-            disabled={isLoading || !selectedPlan}
+            disabled={isLoading || !selectedPlan || partnerIsPremium}
           >
             {isLoading ? (
               <ActivityIndicator color={COLORS.white} />
             ) : (
               <Text style={styles.ctaText}>
-                {selectedPlan === 'annual'
-                  ? t('premium.subscribeAnnualCTA')
-                  : selectedPlan === 'monthly'
-                  ? t('premium.subscribeMonthlyCTA')
-                  : t('premium.subscribe')}
+                {partnerIsPremium
+                  ? t('premium.alreadyHaveBenefits')
+                  : selectedPlan === 'annual'
+                    ? t('premium.subscribeAnnualCTA')
+                    : selectedPlan === 'monthly'
+                      ? t('premium.subscribeMonthlyCTA')
+                      : t('premium.subscribe')}
               </Text>
             )}
           </Pressable>
@@ -395,7 +421,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.black,
     textAlign: 'left',
-    marginBottom: SPACING.xs,
+    marginBottom: SPACING.md,
   },
   heroSubtitle: {
     fontSize: 15,
@@ -405,52 +431,54 @@ const styles = StyleSheet.create({
   // Benefits Section
   benefitsSection: {
     backgroundColor: '#FAFAFA',
-    borderRadius: RADIUS.sm,
+    borderRadius: RADIUS.md,
     padding: SPACING.lg,
     marginBottom: SPACING.lg,
+    borderWidth: 4,
+    borderColor: '#FEF3C7',
+  },
+  benefitsTitleWrapper: {
+    alignSelf: 'center',
+    marginBottom: SPACING.lg,
+  },
+  benefitsTitleHighlight: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: '50%',
+    backgroundColor: '#FEF3C7',
+    borderRadius: 4,
   },
   benefitsSectionTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: COLORS.black,
     textAlign: 'center',
-    marginBottom: SPACING.lg,
+    paddingHorizontal: SPACING.sm,
   },
   benefitsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
   },
   benefitItem: {
-    width: '50%',
+    width: '47%',
     alignItems: 'center',
     paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.xs,
-    gap: SPACING.xs,
-  },
-  benefitIconWrapper: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#EFF6FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.xs,
-  },
-  benefitTextWrapper: {
-    alignItems: 'center',
+    paddingHorizontal: SPACING.sm,
+    gap: SPACING.xxl,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    borderRadius: RADIUS.md,
+    marginBottom: SPACING.sm,
+    marginHorizontal: '1.5%',
+    backgroundColor: COLORS.white,
   },
   benefitTitle: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '600',
     color: COLORS.black,
     textAlign: 'center',
-  },
-  benefitSubtitle: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 4,
-    textAlign: 'center',
-    lineHeight: 16,
   },
   // Pricing Section
   pricingSection: {
@@ -474,7 +502,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 8,
+    marginBottom: 32,
   },
   pricingCardTitle: {
     fontSize: 18,
@@ -606,20 +634,19 @@ const styles = StyleSheet.create({
     color: '#DDD',
   },
   // Management view styles
-  managementContent: {
+  managementCenterContainer: {
     flex: 1,
-    alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: SPACING.xl,
+    alignItems: 'center',
   },
-  premiumBadgeLarge: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#FFF9E6',
+  premiumBadgeTop: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: SPACING.xl,
+    marginBottom: SPACING.lg,
+  },
+  managementContent: {
+    alignItems: 'center',
+    paddingHorizontal: SPACING.xl,
   },
   managementTitle: {
     fontSize: 14,
@@ -630,7 +657,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '700',
     color: COLORS.black,
-    marginBottom: SPACING.xxxl,
+    marginBottom: SPACING.xl,
   },
   manageButton: {
     flexDirection: 'row',
@@ -645,5 +672,19 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#333',
+  },
+  partnerPremiumNote: {
+    fontSize: 14,
+    color: '#888',
+    textAlign: 'center',
+    lineHeight: 20,
+    paddingHorizontal: SPACING.lg,
+  },
+  partnerPremiumBannerText: {
+    fontSize: 13,
+    color: '#D97706',
+    textAlign: 'center',
+    marginBottom: SPACING.sm,
+    fontWeight: '500',
   },
 });

@@ -531,14 +531,18 @@ export default function CalendarScreen() {
     }
   }, [couple?.id, loadFromDB]);
 
-  // Reset swipe state when screen comes into focus
+  // Reset swipe state and reload memories when screen comes into focus
   useFocusEffect(
     useCallback(() => {
       // Increment key to force SwipeableTodoItem components to reset
       setSwipeResetKey((prev) => prev + 1);
       // Also ensure scroll is enabled
       setScrollEnabled(true);
-    }, [])
+      // Reload memories from database to ensure sync between paired devices
+      if (!isDemoMode && couple?.id) {
+        loadFromDB(couple.id);
+      }
+    }, [couple?.id, loadFromDB])
   );
 
   useEffect(() => {

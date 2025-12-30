@@ -114,6 +114,18 @@
       "cannotStart": "無法開始任務",
       "anotherInProgressMessage": "已有其他任務進行中。\n請先完成進行中的任務！",
       "dailyLimitMessage": "今天可完成的任務已全部完成。\n明天再來挑戰吧！"
+    },
+    "refresh": {
+      "questionLine1": "沒有找到",
+      "questionLine2": "喜歡的任務嗎？",
+      "button": "獲取新任務",
+      "hint": "觀看廣告後可獲得新任務",
+      "modalTitle": "新任務",
+      "modalButton": "獲取新任務",
+      "partnerGenerating": "對方正在生成任務",
+      "adLoadingFailed": "廣告載入失敗",
+      "adLoadingFailedMessage": "廣告載入失敗。\n請稍後再試。",
+      "generating": "正在生成新任務..."
     }
   },
   "missionDetail": {
@@ -597,6 +609,7 @@
         "terms": "服務條款",
         "location": "位置資訊服務條款",
         "comma": "、",
+        "connector": "、",
         "suffix": "。"
       }
     },
@@ -682,6 +695,7 @@
       "waitingConnection": "等待連結",
       "shareCode": "分享代碼",
       "waitingPartner": "伴侶輸入此代碼後\n將自動連結",
+      "generatingCode": "生成代碼中...",
       "connected": "已與伴侶連結！\n請繼續下一步",
       "invalidCode": "無效的代碼，請確認代碼。",
       "alreadyPaired": "此代碼已被使用。",
@@ -716,7 +730,38 @@
     },
     "constraints": {
       "title": "生成任務時\n需要注意什麼？",
-      "subtitle": "請選擇所有適用項目"
+      "subtitle": "請選擇所有適用項目",
+      "pet": "有寵物",
+      "child": "有小孩",
+      "long_distance": "遠距離",
+      "no_car": "沒有車",
+      "no_alcohol": "不喝酒",
+      "none": "沒有"
+    },
+    "activityTypes": {
+      "home": "宅家",
+      "cafe_restaurant": "咖啡廳",
+      "outdoor": "戶外活動",
+      "culture": "文化生活",
+      "activity": "運動娛樂",
+      "home_activity": "DIY手作",
+      "travel": "旅行",
+      "drive": "兜風",
+      "shopping": "購物逛街",
+      "cooking": "烹飪烘焙",
+      "sports": "運動健身",
+      "nightlife": "夜生活",
+      "healing": "療癒放鬆",
+      "photo": "拍照攝影",
+      "learning": "學習課程"
+    },
+    "dateWorries": {
+      "no_idea": "不知道要做什麼",
+      "same_pattern": "每次都一樣",
+      "budget": "預算有壓力",
+      "time": "時間不夠",
+      "talk": "需要聊天",
+      "none": "沒有特別的！"
     },
     "preferencesIntro": {
       "title": "告訴我們您的偏好\n以獲得客製化任務",
@@ -738,7 +783,7 @@
     "subtitle": "為更特別的約會而設的Premium",
     "heroTitle": "DayDate Premium",
     "heroSubtitle": "與伴侶享受更特別的約會",
-    "heroTitleNew": "立即開始 Premium",
+    "heroTitleNew": "現在，\n開始 Premium 方案。",
     "heroSubtitleNew": "一次付款，兩人享受",
     "coupleBenefitHighlight": "伴侶也享Premium!",
     "annual": "年繳",
@@ -759,9 +804,15 @@
     "paymentNotice1": "確認付款後將從 App Store 或 Google Play 帳戶收取費用。",
     "paymentNotice2": "如果在當前期間結束前至少24小時未取消，訂閱將自動續訂。",
     "paymentNotice3": "您可以隨時在裝置的訂閱設定中取消。",
+    "paymentNotice4": "進行付款即表示您同意付款相關條款。",
     "refundNoticeTitle": "退款政策",
     "refundNotice1": "退款將按照 App Store 或 Google Play 政策處理。",
     "refundNotice2": "取消後，您可以繼續使用 Premium 優惠直到當前計費期結束。",
+    "refundNotice3": "使用 Premium 功能後無法退款。",
+    "importantNoticeTitle": "注意事項",
+    "importantNotice1": "一人訂閱後，已連結的伴侶也可以一起享受 Premium。",
+    "importantNotice2": "解除配對或刪除帳戶時，訂閱不會自動取消。如不想繼續使用，請自行取消。",
+    "importantNotice3": "在訂閱狀態下與新伴侶連結時，可以繼續使用 Premium 功能。",
     "coupleNoticeTitle": "情侶優惠",
     "coupleNotice": "訂閱後，已配對的伴侶也可以一起享受 Premium 優惠。",
     "restoreSuccess": "恢復成功",
@@ -782,6 +833,7 @@
       "active": "Premium使用中",
       "monthlyPlan": "月訂閱使用中",
       "annualPlan": "年訂閱使用中",
+      "partnerPlan": "伴侶的Premium優惠",
       "expiresOn": "可使用至{{date}}"
     },
     "managementTitle": "Premium管理",
@@ -796,6 +848,8 @@
     "subscribeAnnual": "年訂閱",
     "restorePurchases": "恢復購買",
     "manageSubscription": "管理訂閱",
+    "partnerPremiumNote": "您正在享受伴侶的Premium訂閱優惠",
+    "alreadyHaveBenefits": "正在享有Premium優惠",
     "termsOfService": "服務條款",
     "privacyPolicy": "隱私權政策",
     "legalText": "訂閱歸屬於付款帳戶，配對的伴侶也可以一起享受Premium優惠。可以直接在App Store或Google Play取消訂閱，取消後仍可使用至付款期間結束。解除配對或刪除帳戶時，訂閱不會自動取消。",
@@ -804,11 +858,6 @@
       "missionCompleteFree": "1個/天",
       "missionCompletePremium": "無限任務完成",
       "missionCompletePremiumDesc": "想完成多少任務就完成多少\n一起創造更多美好回憶",
-      "missionGenerate": "任務生成",
-      "missionGenerateFree": "1次/天 (3個)",
-      "missionGeneratePremium": "2倍任務生成",
-      "missionGeneratePremiumDesc": "每天獲得6個多樣化任務\n選擇今天想做的事",
-      "noAds": "廣告",
       "noAdsFree": "有廣告",
       "noAdsPremium": "無廣告舒適體驗",
       "noAdsPremiumDesc": "專注於與伴侶的\n珍貴時刻，不受打擾",
@@ -824,7 +873,9 @@
       "albumCreate": "相簿創建",
       "albumCreateFree": "最多5個",
       "albumCreatePremium": "無限相簿創建",
-      "albumCreatePremiumDesc": "按主題整理特別時刻\n打造專屬回憶相簿"
+      "albumCreatePremiumDesc": "按主題整理特別時刻\n打造專屬回憶相簿",
+      "missionGeneratePremiumShort": "每日生成10個任務",
+      "newFeaturesPremium": "免費使用新功能"
     },
     "button": {
       "subscribe": "訂閱Premium方案",

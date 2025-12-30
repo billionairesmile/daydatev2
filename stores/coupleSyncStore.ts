@@ -269,6 +269,7 @@ let progressChannel: ReturnType<SupabaseClient['channel']> | null = null;
 let albumsChannel: ReturnType<SupabaseClient['channel']> | null = null;
 let albumPhotosChannel: ReturnType<SupabaseClient['channel']> | null = null;
 let completedMissionsChannel: ReturnType<SupabaseClient['channel']> | null = null;
+let coupleUpdatesChannel: ReturnType<SupabaseClient['channel']> | null = null;
 
 const initialState: CoupleSyncState = {
   isInitialized: false,
@@ -551,23 +552,39 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       // Clean up old entries after 5 seconds
       setTimeout(() => processedAlbumPhotoEvents.delete(eventKey), 5000);
 
-      // Handle DELETE specially - album_id may not be in payload
+      // Handle DELETE - with REPLICA IDENTITY FULL, album_id is available in payload.old
       if (payload.eventType === 'DELETE') {
-        // Search for the photo in all albums to find its album_id
-        let targetAlbumId: string | undefined;
-        for (const [albumId, photos] of Object.entries(albumPhotosMap)) {
-          const matchingPhoto = photos.find(p => p.id === albumPhoto.id || p.memory_id === albumPhoto.memory_id);
-          if (matchingPhoto) {
-            targetAlbumId = albumId;
-            break;
+        const photoId = albumPhoto.id;
+        const memoryId = albumPhoto.memory_id;
+
+        // Use album_id from payload.old directly (available with REPLICA IDENTITY FULL)
+        let targetAlbumId: string | undefined = albumPhoto.album_id;
+
+        // Fallback: search through all albums if album_id not in payload
+        if (!targetAlbumId) {
+          for (const [albumId, photos] of Object.entries(albumPhotosMap)) {
+            const matchingPhoto = photos.find(p => p.id === photoId || p.memory_id === memoryId);
+            if (matchingPhoto) {
+              targetAlbumId = albumId;
+              break;
+            }
           }
         }
 
         if (!targetAlbumId) {
+          console.log('[AlbumPhotos Realtime] DELETE: Photo not found in any album, skipping');
           return;
         }
-        const photoId = albumPhoto.id;
-        const memoryId = albumPhoto.memory_id;
+
+        // Verify album belongs to this couple before removing
+        const albumBelongsToCouple = coupleAlbums.some(album => album.id === targetAlbumId);
+        if (!albumBelongsToCouple) {
+          console.log('[AlbumPhotos Realtime] DELETE: Album does not belong to this couple, skipping');
+          return;
+        }
+
+        console.log('[AlbumPhotos Realtime] DELETE: Removing photo', { photoId, memoryId, albumId: targetAlbumId });
+
         set((state) => ({
           albumPhotosMap: {
             ...state.albumPhotosMap,
@@ -663,6 +680,13 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       }
     });
 
+    // 11. Couple updates subscription (for timezone sync between partners)
+    coupleUpdatesChannel = db.couples.subscribeToCoupleUpdates(coupleId, (payload) => {
+      console.log('[CoupleSyncStore] Received couple update - timezone:', payload.timezone);
+      // Sync timezone to timezoneStore when partner changes it
+      useTimezoneStore.getState().syncFromCouple(payload.timezone);
+    });
+
     set({ isInitialized: true });
   },
 
@@ -708,6 +732,10 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     if (completedMissionsChannel) {
       db.completedMissions.unsubscribeFromCompletedMissions(completedMissionsChannel);
       completedMissionsChannel = null;
+    }
+    if (coupleUpdatesChannel) {
+      db.couples.unsubscribeFromCoupleUpdates(coupleUpdatesChannel);
+      coupleUpdatesChannel = null;
     }
 
     set(initialState);

@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   TextInput,
   Animated,
+  Easing,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
@@ -146,15 +147,9 @@ export default function OnboardingScreen() {
     }
   }, [shouldShowWelcome, currentStep, setStep]);
 
-  // Generate a new pairing code when entering pairing step after unpair
-  // This ensures users always get a fresh code when returning to pairing screen
-  useEffect(() => {
-    if (currentStep === 'pairing' && !data.isPairingConnected) {
-      const newCode = generatePairingCode();
-      console.log('[Onboarding] Generating new pairing code for pairing step:', newCode);
-      setGeneratedCode(newCode);
-    }
-  }, [currentStep, data.isPairingConnected]);
+  // NOTE: Code regeneration is now handled entirely within PairingStep's setupPairing
+  // This prevents race conditions where code is regenerated while setupPairing is running
+  // The initial code from useState is used, and setupPairing will update it if needed
 
   // Set isExistingUser based on currentUser (for users coming from unpair/disconnect)
   useEffect(() => {
@@ -233,13 +228,15 @@ export default function OnboardingScreen() {
   const animateTransition = useCallback((callback: () => void) => {
     Animated.timing(fadeAnim, {
       toValue: 0,
-      duration: 150,
+      duration: 200,
+      easing: Easing.out(Easing.ease),
       useNativeDriver: true,
     }).start(() => {
       callback();
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 150,
+        duration: 250,
+        easing: Easing.in(Easing.ease),
         useNativeDriver: true,
       }).start();
     });
@@ -733,30 +730,16 @@ export default function OnboardingScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={[styles.container, effectiveStep === 'welcome' && styles.whiteContainer]}
+      style={[styles.container, styles.whiteContainer]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       enabled={effectiveStep !== 'basic_info' && effectiveStep !== 'pairing'}
     >
-      {/* Status bar style - dark for welcome (white bg), light for others */}
-      <StatusBar barStyle={effectiveStep === 'welcome' ? 'dark-content' : 'light-content'} />
+      {/* Status bar style - dark for all screens (white bg) */}
+      <StatusBar barStyle="dark-content" />
 
-      {/* Background - White for welcome step, image for others */}
-      {effectiveStep !== 'welcome' && (
-        <>
-          <Image
-            source={backgroundImage}
-            style={styles.backgroundImage}
-            contentFit="cover"
-            blurRadius={40}
-            cachePolicy="memory-disk"
-          />
-          <View style={styles.overlay} />
-        </>
-      )}
-      {effectiveStep === 'welcome' && (
-        <View style={styles.whiteBackground} />
-      )}
+      {/* Background - White for all steps */}
+      <View style={styles.whiteBackground} />
 
       {/* Progress Bar */}
       {showProgress && (
@@ -783,7 +766,7 @@ export default function OnboardingScreen() {
           }}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <LogOut size={18} color={COLORS.white} />
+          <LogOut size={18} color={COLORS.black} />
           <Text style={styles.logoutButtonText}>{t('settings.account.logout')}</Text>
         </Pressable>
       )}
@@ -939,12 +922,21 @@ function WelcomeStep({ onSocialLogin }: { onSocialLogin: (provider: 'google' | '
   const { t, i18n } = useTranslation();
   const [isLoading, setIsLoading] = useState<'google' | 'kakao' | 'apple' | null>(null);
 
-  // Use Bricolage Grotesque for Latin languages (en, es), Jua for CJK languages (ko, ja, zh-TW)
-  const isLatinLanguage = ['en', 'es'].includes(i18n.language);
-  const taglineFont = isLatinLanguage ? TYPOGRAPHY.fontFamily.displayLatin : TYPOGRAPHY.fontFamily.display;
-  // Letter spacing -4% for Latin (48px * -0.04 = -1.92), appropriate line height
-  const taglineLetterSpacing = isLatinLanguage ? -1.92 : -1;
-  const taglineLineHeight = isLatinLanguage ? 52 : 58;
+  // Font and style settings per language
+  // English/Spanish: Poetsen One, Japanese: Mochiy Pop One, Chinese: Chiron GoRound TC, Korean: Jua
+  const getTaglineStyle = () => {
+    const lang = i18n.language;
+    if (['en', 'es'].includes(lang)) {
+      return { font: 'PoetsenOne', letterSpacing: 0, lineHeight: 48, fontSize: 38, fontWeight: '400' as const };
+    } else if (lang === 'ja') {
+      return { font: 'MochiyPopOne', letterSpacing: 0, lineHeight: 40, fontSize: 28, fontWeight: '400' as const };
+    } else if (lang === 'zh-TW') {
+      return { font: 'ChironGoRoundTC', letterSpacing: 0, lineHeight: 42, fontSize: 30, fontWeight: '400' as const };
+    }
+    // Korean default
+    return { font: TYPOGRAPHY.fontFamily.display, letterSpacing: -1, lineHeight: 58, fontSize: 42, fontWeight: '400' as const };
+  };
+  const taglineStyle = getTaglineStyle();
 
   const handleSocialLogin = async (provider: 'google' | 'kakao' | 'apple') => {
     console.log(`[WelcomeStep] Button pressed for ${provider}, isLoading: ${isLoading}, isDemoMode: ${isDemoMode}`);
@@ -988,7 +980,7 @@ function WelcomeStep({ onSocialLogin }: { onSocialLogin: (provider: 'google' | '
     <View style={styles.welcomeStepContainer}>
       {/* Tagline at top-left with responsive spacing */}
       <View style={styles.welcomeTaglineContainer}>
-        <Text style={[styles.welcomeTagline, { fontFamily: taglineFont, letterSpacing: taglineLetterSpacing, lineHeight: taglineLineHeight }]}>{t('onboarding.tagline')}</Text>
+        <Text style={[styles.welcomeTagline, { fontFamily: taglineStyle.font, letterSpacing: taglineStyle.letterSpacing, lineHeight: taglineStyle.lineHeight, fontSize: taglineStyle.fontSize, fontWeight: taglineStyle.fontWeight }]}>{t('onboarding.tagline')}</Text>
       </View>
 
       {/* Login buttons fixed at bottom */}
@@ -1003,11 +995,11 @@ function WelcomeStep({ onSocialLogin }: { onSocialLogin: (provider: 'google' | '
               activeOpacity={0.7}
             >
               {isLoading === 'apple' ? (
-                <ActivityIndicator size="small" color="#ffffff" />
+                <ActivityIndicator size="small" color="#000000" />
               ) : (
                 <>
                   <View style={styles.socialIconContainer}>
-                    <Ionicons name="logo-apple" size={20} color="#ffffff" />
+                    <Ionicons name="logo-apple" size={20} color="#000000" />
                   </View>
                   <Text style={styles.appleButtonText}>{t('onboarding.login.apple')}</Text>
                 </>
@@ -1028,10 +1020,9 @@ function WelcomeStep({ onSocialLogin }: { onSocialLogin: (provider: 'google' | '
               <>
                 <View style={styles.socialIconContainer}>
                   <Image
-                    source={{ uri: 'https://developers.google.com/identity/images/g-logo.png' }}
+                    source={require('@/assets/images/google-logo.png')}
                     style={styles.googleIcon}
                     contentFit="contain"
-                    cachePolicy="memory-disk"
                   />
                 </View>
                 <Text style={styles.googleButtonText}>{t('onboarding.login.google')}</Text>
@@ -1052,10 +1043,9 @@ function WelcomeStep({ onSocialLogin }: { onSocialLogin: (provider: 'google' | '
               <>
                 <View style={styles.socialIconContainer}>
                   <Image
-                    source={{ uri: 'https://developers.kakao.com/assets/img/about/logos/kakaolink/kakaolink_btn_medium.png' }}
+                    source={require('@/assets/images/kakao-logo.png')}
                     style={styles.kakaoIcon}
                     contentFit="contain"
-                    cachePolicy="memory-disk"
                   />
                 </View>
                 <Text style={styles.kakaoButtonText}>{t('onboarding.login.kakao')}</Text>
@@ -1083,7 +1073,7 @@ function WelcomeStep({ onSocialLogin }: { onSocialLogin: (provider: 'google' | '
             >
               {t('onboarding.login.termsDisclaimer.terms')}
             </Text>
-            {',\n'}
+            {t('onboarding.login.termsDisclaimer.connector')}
             <Text
               style={styles.termsDisclaimerLink}
               onPress={() => Linking.openURL('https://daydate.my/policy/location')}
@@ -1176,7 +1166,7 @@ function BasicInfoStep({
           <Text style={styles.basicInfoLabel}>{t('onboarding.basicInfo.nickname')}</Text>
           <TextInput
             style={styles.basicInfoInput}
-            placeholderTextColor="rgba(255, 255, 255, 0.4)"
+            placeholderTextColor="rgba(0, 0, 0, 0.4)"
             placeholder={t('onboarding.basicInfo.nicknamePlaceholder')}
             value={nickname}
             onChangeText={setNickname}
@@ -1197,7 +1187,7 @@ function BasicInfoStep({
               <Text style={[styles.basicInfoDateText, birthDate && styles.basicInfoDateTextSelected]}>
                 {birthDate ? formatDate(birthDate) : t('onboarding.basicInfo.birthDatePlaceholder')}
               </Text>
-              <Calendar color={birthDate ? COLORS.white : 'rgba(255, 255, 255, 0.4)'} size={20} />
+              <Calendar color={birthDate ? COLORS.black : 'rgba(0, 0, 0, 0.4)'} size={20} />
             </Pressable>
             {/* Calendar Type buttons on the right */}
             <View style={styles.calendarTypeButtons}>
@@ -1813,6 +1803,9 @@ function PairingStep({
               console.error('Error creating pairing code:', createError);
               return;
             }
+            // Ensure displayed code matches the saved code
+            console.log('[PairingStep] Successfully saved code to database:', codeToUse);
+            finalCode = codeToUse;
             codeCreatedAt = createdCode?.created_at ? new Date(createdCode.created_at) : new Date();
           }
 
@@ -2076,6 +2069,8 @@ function PairingStep({
             coupleCreationInProgressRef.current = false;
           }
 
+          // Ensure displayed code matches the saved code before marking as saved
+          setGeneratedCode(finalCode);
           setIsCodeSaved(true);
 
           // Subscribe to changes (realtime) - use finalCode which might be existing or new
@@ -3067,26 +3062,35 @@ function PairingStep({
             <View style={styles.codeDisplayContainer}>
               <View style={styles.codeLabelRow}>
                 <Text style={styles.codeLabel}>{t('onboarding.pairing.myCode')}</Text>
-                <Text style={styles.codeTimer}>({timeRemaining})</Text>
+                {isCodeSaved && <Text style={styles.codeTimer}>({timeRemaining})</Text>}
               </View>
               <View style={styles.codeBoxRow}>
                 <View style={styles.codeBoxSpacer} />
-                <Text style={styles.codeText}>{generatedCode}</Text>
+                {isCodeSaved ? (
+                  <Text style={styles.codeText}>{generatedCode}</Text>
+                ) : (
+                  <ActivityIndicator size="small" color={COLORS.primary} />
+                )}
                 <Pressable
-                  style={styles.copyButton}
-                  onPress={handleCopyCode}
+                  style={[styles.copyButton, !isCodeSaved && { opacity: 0.3 }]}
+                  onPress={isCodeSaved ? handleCopyCode : undefined}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  disabled={!isCodeSaved}
                 >
-                  <Copy size={20} color="rgba(255,255,255,0.7)" />
+                  <Copy size={20} color="rgba(0,0,0,0.5)" />
                 </Pressable>
               </View>
               {isPairingConnected ? (
                 <Text style={[styles.codeHint, { color: '#4CAF50' }]}>
                   {t('onboarding.pairing.connected')}
                 </Text>
-              ) : (
+              ) : isCodeSaved ? (
                 <Text style={styles.codeHint}>
                   {t('onboarding.pairing.waitingPartner')}
+                </Text>
+              ) : (
+                <Text style={styles.codeHint}>
+                  {t('onboarding.pairing.generatingCode')}
                 </Text>
               )}
             </View>
@@ -3257,7 +3261,7 @@ function CoupleInfoStep({
             <Text style={[styles.basicInfoDateText, anniversaryDate && styles.basicInfoDateTextSelected]}>
               {anniversaryDate ? formatDate(anniversaryDate) : t('onboarding.coupleInfo.selectDate', { label: getAnniversaryLabel() })}
             </Text>
-            <Calendar color={anniversaryDate ? COLORS.white : 'rgba(255, 255, 255, 0.4)'} size={20} />
+            <Calendar color={anniversaryDate ? COLORS.black : 'rgba(0, 0, 0, 0.4)'} size={20} />
           </Pressable>
         </View>
       </ScrollView>
@@ -3467,7 +3471,7 @@ function ActivityTypeStep({
               >
                 <Text style={styles.activityIconSmall}>{option.icon}</Text>
                 <Text style={[styles.activityButtonTextSmall, activityTypes.includes(option.id) && styles.activityButtonTextActive]}>
-                  {option.label}
+                  {t(option.labelKey)}
                 </Text>
               </Pressable>
             ))}
@@ -3546,7 +3550,7 @@ function DateWorriesStep({
               <View style={styles.dateWorryLeft}>
                 <Text style={styles.dateWorryIcon}>{option.icon}</Text>
                 <Text style={[styles.dateWorryButtonText, worries.includes(option.id) && styles.dateWorryButtonTextActive]}>
-                  {option.label}
+                  {t(option.labelKey)}
                 </Text>
               </View>
               <View style={styles.checkIconPlaceholder}>
@@ -3628,7 +3632,7 @@ function ConstraintsStep({
             >
               <Text style={styles.constraintIcon}>{option.icon}</Text>
               <Text style={[styles.constraintButtonText, constraints.includes(option.id) && styles.constraintButtonTextActive]}>
-                {option.label}
+                {t(option.labelKey)}
               </Text>
             </Pressable>
           ))}
@@ -3666,7 +3670,7 @@ function CompleteStep({
     <View style={styles.centeredStepContainer}>
       <View style={styles.centeredContent}>
         <View style={styles.celebrationIconContainer}>
-          <Gift color={COLORS.white} size={48} />
+          <Gift color={COLORS.black} size={48} />
         </View>
 
         <Text style={styles.celebrationTitle}>
@@ -3736,13 +3740,13 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
     borderRadius: 2,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.black,
     borderRadius: 2,
   },
   scrollView: {
@@ -3788,6 +3792,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
+    paddingBottom: 100,
   },
   welcomeCenteredContent: {
     flex: 1,
@@ -3832,7 +3837,7 @@ const styles = StyleSheet.create({
   welcomeSubtitle: {
     fontFamily: TYPOGRAPHY.fontFamily.display,
     fontSize: 18,
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: 'rgba(0, 0, 0, 0.9)',
     textAlign: 'center',
     marginTop: SPACING.xxl,
     lineHeight: 28,
@@ -3880,16 +3885,16 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: SPACING.lg,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: 'rgba(0, 0, 0, 0.1)',
   },
   welcomeTitle: {
     fontSize: 40,
-    color: COLORS.white,
+    color: COLORS.black,
     fontWeight: '700',
     textAlign: 'center',
     lineHeight: 48,
@@ -3897,14 +3902,14 @@ const styles = StyleSheet.create({
   },
   welcomeDescription: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: 'rgba(0, 0, 0, 0.7)',
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: SPACING.xxxl,
   },
   stepTitle: {
     fontSize: 28,
-    color: COLORS.white,
+    color: COLORS.black,
     fontWeight: '700',
     textAlign: 'center',
     lineHeight: 36,
@@ -3913,7 +3918,7 @@ const styles = StyleSheet.create({
   },
   stepSubtitle: {
     fontSize: 18,
-    color: COLORS.white,
+    color: COLORS.black,
     fontWeight: '600',
     textAlign: 'center',
   },
@@ -3925,14 +3930,14 @@ const styles = StyleSheet.create({
   },
   stepDescription: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: 'rgba(0, 0, 0, 0.6)',
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: SPACING.md,
   },
   sectionLabel: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: 'rgba(0, 0, 0, 0.8)',
     fontWeight: '600',
     alignSelf: 'flex-start',
     marginBottom: SPACING.sm,
@@ -3945,13 +3950,13 @@ const styles = StyleSheet.create({
   textInput: {
     width: '100%',
     height: 56,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#f5f5f5',
     borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: '#e0e0e0',
     paddingHorizontal: SPACING.lg,
     fontSize: 16,
-    color: COLORS.white,
+    color: COLORS.black,
   },
   codeInput: {
     fontSize: 24,
@@ -3961,7 +3966,7 @@ const styles = StyleSheet.create({
   },
   codeInputHint: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.5)',
+    color: 'rgba(0, 0, 0, 0.5)',
     textAlign: 'center',
     marginTop: SPACING.sm,
   },
@@ -3979,19 +3984,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: '100%',
     height: 52,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.black,
     borderRadius: RADIUS.full,
   },
   primaryButtonDisabled: {
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
   },
   primaryButtonText: {
     fontSize: 16,
-    color: COLORS.black,
+    color: COLORS.white,
     fontWeight: '600',
   },
   buttonDisabled: {
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
   },
   buttonTextDisabled: {
     color: 'rgba(0, 0, 0, 0.4)',
@@ -4001,22 +4006,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#f5f5f5',
     borderRadius: RADIUS.full,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: '#e0e0e0',
   },
   secondaryButtonText: {
     fontSize: 16,
-    color: COLORS.white,
+    color: COLORS.black,
     fontWeight: '600',
   },
   secondaryButtonDisabled: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#f5f5f5',
+    borderColor: '#e0e0e0',
   },
   secondaryButtonTextDisabled: {
-    color: 'rgba(255, 255, 255, 0.3)',
+    color: 'rgba(0, 0, 0, 0.3)',
   },
   // Social Login Styles
   socialLoginContainer: {
@@ -4064,16 +4069,18 @@ const styles = StyleSheet.create({
     paddingLeft: 3,
   },
   appleButton: {
-    backgroundColor: '#000000',
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#dbdbdb',
   },
   appleButtonText: {
     fontSize: 15,
-    color: '#ffffff',
+    color: '#000000',
     fontWeight: '500',
   },
   googleButtonText: {
     fontSize: 15,
-    color: '#757575',
+    color: '#000000',
     fontWeight: '500',
   },
   kakaoButtonText: {
@@ -4109,12 +4116,12 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
   },
   dividerText: {
     paddingHorizontal: SPACING.md,
     fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.5)',
+    color: 'rgba(0, 0, 0, 0.5)',
   },
   skipButton: {
     marginTop: SPACING.lg,
@@ -4122,7 +4129,7 @@ const styles = StyleSheet.create({
   },
   skipButtonText: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: 'rgba(0, 0, 0, 0.6)',
     fontWeight: '500',
   },
   skipButtonTopRight: {
@@ -4135,7 +4142,7 @@ const styles = StyleSheet.create({
   },
   skipButtonTopRightText: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: 'rgba(0, 0, 0, 0.6)',
     fontWeight: '500',
   },
   toggleRow: {
@@ -4149,32 +4156,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#f5f5f5',
     borderRadius: RADIUS.full,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: '#e0e0e0',
   },
   toggleButtonSmall: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 8,
     paddingHorizontal: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#f5f5f5',
     borderRadius: RADIUS.full,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: '#e0e0e0',
   },
   toggleButtonActive: {
-    backgroundColor: COLORS.white,
-    borderColor: COLORS.white,
+    backgroundColor: COLORS.black,
+    borderColor: COLORS.black,
   },
   toggleButtonText: {
     fontSize: 14,
-    color: COLORS.white,
+    color: '#666',
     fontWeight: '600',
   },
   toggleButtonTextActive: {
-    color: COLORS.black,
+    color: COLORS.white,
   },
   pairingContentArea: {
     width: '100%',
@@ -4187,15 +4194,15 @@ const styles = StyleSheet.create({
   codeDisplayContainer: {
     width: '100%',
     padding: SPACING.xl,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#f5f5f5',
     borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: '#e0e0e0',
     alignItems: 'center',
   },
   codeLabel: {
     fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: 'rgba(0, 0, 0, 0.6)',
     fontWeight: '500',
   },
   codeLabelRow: {
@@ -4207,7 +4214,7 @@ const styles = StyleSheet.create({
   },
   codeTimer: {
     fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.5)',
+    color: 'rgba(0, 0, 0, 0.5)',
     fontWeight: '400',
   },
   codeBoxRow: {
@@ -4221,7 +4228,7 @@ const styles = StyleSheet.create({
   },
   codeText: {
     fontSize: 32,
-    color: COLORS.white,
+    color: COLORS.black,
     fontWeight: '700',
     letterSpacing: 8,
   },
@@ -4242,7 +4249,7 @@ const styles = StyleSheet.create({
     zIndex: 20,
   },
   logoutButtonText: {
-    color: COLORS.white,
+    color: COLORS.black,
     fontSize: 14,
     fontWeight: '500',
   },
@@ -4269,17 +4276,17 @@ const styles = StyleSheet.create({
   },
   codeHint: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.5)',
+    color: 'rgba(0, 0, 0, 0.5)',
     textAlign: 'center',
     lineHeight: 18,
     marginTop: SPACING.sm,
   },
   termsContainer: {
     width: '100%',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#f5f5f5',
     borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: '#e0e0e0',
     marginBottom: SPACING.lg,
     overflow: 'hidden',
   },
@@ -4291,12 +4298,12 @@ const styles = StyleSheet.create({
   },
   termsAllText: {
     fontSize: 16,
-    color: COLORS.white,
+    color: COLORS.black,
     fontWeight: '600',
   },
   termsDivider: {
     height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
   },
   termsItem: {
     flexDirection: 'row',
@@ -4317,21 +4324,21 @@ const styles = StyleSheet.create({
   termsItemText: {
     flex: 1,
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: 'rgba(0, 0, 0, 0.8)',
   },
   checkbox: {
     width: 24,
     height: 24,
     borderRadius: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#f5f5f5',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderColor: '#e0e0e0',
     alignItems: 'center',
     justifyContent: 'center',
   },
   checkboxChecked: {
-    backgroundColor: COLORS.white,
-    borderColor: COLORS.white,
+    backgroundColor: '#4CAF50',
+    borderColor: '#4CAF50',
   },
   termsStepContainer: {
     flex: 1,
@@ -4362,7 +4369,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   termsDescriptionBox: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: 'rgba(0, 0, 0, 0.03)',
     borderRadius: RADIUS.sm,
     padding: SPACING.md,
     marginLeft: SPACING.lg + 24 + SPACING.md,
@@ -4371,7 +4378,7 @@ const styles = StyleSheet.create({
   },
   termsDescriptionText: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: 'rgba(0, 0, 0, 0.6)',
     lineHeight: 18,
   },
   policyModalContainer: {
@@ -4423,18 +4430,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#f5f5f5',
     borderRadius: RADIUS.full,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: '#e0e0e0',
   },
   relationshipButtonActive: {
-    backgroundColor: COLORS.white,
-    borderColor: COLORS.white,
+    backgroundColor: '#e8f5e9',
+    borderColor: '#4CAF50',
   },
   relationshipButtonText: {
     fontSize: 15,
-    color: COLORS.white,
+    color: '#666',
     fontWeight: '600',
   },
   relationshipButtonTextActive: {
@@ -4445,20 +4452,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '100%',
     height: 56,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#f5f5f5',
     borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: '#e0e0e0',
     paddingHorizontal: SPACING.lg,
     gap: SPACING.md,
     marginBottom: SPACING.lg,
   },
   datePickerText: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.4)',
+    color: 'rgba(0, 0, 0, 0.4)',
   },
   datePickerTextSelected: {
-    color: COLORS.white,
+    color: COLORS.black,
   },
   datePickerModal: {
     flex: 1,
@@ -4494,19 +4501,19 @@ const styles = StyleSheet.create({
   preferencesInfoBox: {
     width: '100%',
     padding: SPACING.lg,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#f5f5f5',
     borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: '#e0e0e0',
     marginBottom: SPACING.xl,
   },
   preferencesInfoBoxBottom: {
     width: '100%',
     padding: SPACING.lg,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#f5f5f5',
     borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: '#e0e0e0',
     marginBottom: SPACING.lg,
     marginTop: SPACING.xxl,
     marginHorizontal: SPACING.xl,
@@ -4518,22 +4525,22 @@ const styles = StyleSheet.create({
     left: SPACING.lg,
     right: SPACING.lg,
     padding: SPACING.lg,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#f5f5f5',
     borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: '#e0e0e0',
   },
   preferencesInfoBoxInline: {
     width: '100%',
     padding: SPACING.lg,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#f5f5f5',
     borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: '#e0e0e0',
   },
   preferencesInfoText: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: 'rgba(0, 0, 0, 0.7)',
     textAlign: 'center',
     lineHeight: 22,
   },
@@ -4549,18 +4556,18 @@ const styles = StyleSheet.create({
     height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#f5f5f5',
     borderRadius: RADIUS.sm,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: '#e0e0e0',
   },
   mbtiButtonActive: {
-    backgroundColor: COLORS.white,
-    borderColor: COLORS.white,
+    backgroundColor: '#e8f5e9',
+    borderColor: '#4CAF50',
   },
   mbtiButtonText: {
     fontSize: 13,
-    color: COLORS.white,
+    color: '#666',
     fontWeight: '600',
   },
   mbtiButtonTextActive: {
@@ -4578,18 +4585,18 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#f5f5f5',
     borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: '#e0e0e0',
   },
   optionButtonActive: {
-    backgroundColor: COLORS.white,
-    borderColor: COLORS.white,
+    backgroundColor: '#e8f5e9',
+    borderColor: '#4CAF50',
   },
   optionButtonText: {
     fontSize: 14,
-    color: COLORS.white,
+    color: '#666',
     fontWeight: '500',
   },
   optionButtonTextActive: {
@@ -4600,18 +4607,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#f5f5f5',
     borderRadius: RADIUS.full,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: '#e0e0e0',
   },
   styleButtonActive: {
-    backgroundColor: COLORS.white,
-    borderColor: COLORS.white,
+    backgroundColor: '#e8f5e9',
+    borderColor: '#4CAF50',
   },
   styleButtonText: {
     fontSize: 15,
-    color: COLORS.white,
+    color: '#666',
     fontWeight: '600',
   },
   styleButtonTextActive: {
@@ -4636,10 +4643,10 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#f5f5f5',
     borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: '#e0e0e0',
     gap: 6,
   },
   activityButtonSmall: {
@@ -4647,15 +4654,15 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#f5f5f5',
     borderRadius: RADIUS.sm,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: '#e0e0e0',
     gap: 4,
   },
   activityButtonActive: {
-    backgroundColor: COLORS.white,
-    borderColor: COLORS.white,
+    backgroundColor: '#e8f5e9',
+    borderColor: '#4CAF50',
   },
   activityIcon: {
     fontSize: 24,
@@ -4665,12 +4672,12 @@ const styles = StyleSheet.create({
   },
   activityButtonText: {
     fontSize: 13,
-    color: COLORS.white,
+    color: '#666',
     fontWeight: '500',
   },
   activityButtonTextSmall: {
     fontSize: 11,
-    color: COLORS.white,
+    color: '#666',
     fontWeight: '500',
   },
   activityButtonTextActive: {
@@ -4691,14 +4698,14 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingVertical: 14,
     paddingHorizontal: SPACING.lg,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#f5f5f5',
     borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: '#e0e0e0',
   },
   dateWorryButtonActive: {
-    backgroundColor: COLORS.white,
-    borderColor: COLORS.white,
+    backgroundColor: '#e8f5e9',
+    borderColor: '#4CAF50',
   },
   dateWorryLeft: {
     flexDirection: 'row',
@@ -4710,7 +4717,7 @@ const styles = StyleSheet.create({
   },
   dateWorryButtonText: {
     fontSize: 14,
-    color: COLORS.white,
+    color: '#666',
     fontWeight: '500',
   },
   dateWorryButtonTextActive: {
@@ -4734,22 +4741,22 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#f5f5f5',
     borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: '#e0e0e0',
     gap: 6,
   },
   constraintButtonActive: {
-    backgroundColor: COLORS.white,
-    borderColor: COLORS.white,
+    backgroundColor: '#e8f5e9',
+    borderColor: '#4CAF50',
   },
   constraintIcon: {
     fontSize: 24,
   },
   constraintButtonText: {
     fontSize: 13,
-    color: COLORS.white,
+    color: '#666',
     fontWeight: '500',
   },
   constraintButtonTextActive: {
@@ -4762,18 +4769,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 16,
     paddingHorizontal: SPACING.lg,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#f5f5f5',
     borderRadius: RADIUS.full,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: '#e0e0e0',
   },
   constraintButtonVerticalActive: {
-    backgroundColor: COLORS.white,
-    borderColor: COLORS.white,
+    backgroundColor: '#e8f5e9',
+    borderColor: '#4CAF50',
   },
   constraintButtonVerticalText: {
     fontSize: 14,
-    color: COLORS.white,
+    color: '#666',
     fontWeight: '500',
     flex: 1,
   },
@@ -4789,14 +4796,14 @@ const styles = StyleSheet.create({
   },
   celebrationTitle: {
     fontSize: 36,
-    color: COLORS.white,
+    color: COLORS.black,
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: SPACING.md,
   },
   celebrationDescription: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: 'rgba(0, 0, 0, 0.7)',
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: SPACING.xxxl,
@@ -4830,17 +4837,17 @@ const styles = StyleSheet.create({
     right: '10%',
   },
   rewardBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: '#f5f5f5',
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.lg,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.25)',
+    borderColor: '#e0e0e0',
     marginTop: SPACING.xl,
   },
   rewardBadgeText: {
     fontSize: 15,
-    color: COLORS.white,
+    color: COLORS.black,
     fontWeight: '600',
     textAlign: 'center',
   },
@@ -4855,22 +4862,22 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.md,
     borderRadius: RADIUS.lg,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#f5f5f5',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: '#e0e0e0',
     alignItems: 'center',
   },
   calendarTypeButtonActive: {
-    backgroundColor: COLORS.white,
-    borderColor: COLORS.white,
+    backgroundColor: COLORS.black,
+    borderColor: COLORS.black,
   },
   calendarTypeButtonText: {
     fontSize: 12,
     fontWeight: '600',
-    color: COLORS.white,
+    color: '#666',
   },
   calendarTypeButtonTextActive: {
-    color: COLORS.black,
+    color: COLORS.white,
   },
   // Basic Info styles
   basicInfoScrollView: {
@@ -4888,29 +4895,29 @@ const styles = StyleSheet.create({
   basicInfoLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: COLORS.white,
+    color: COLORS.black,
     marginBottom: SPACING.sm,
     marginLeft: SPACING.xs,
   },
   basicInfoInput: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#f5f5f5',
     borderRadius: RADIUS.lg,
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
     fontSize: 16,
-    color: COLORS.white,
+    color: COLORS.black,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: '#e0e0e0',
     height: 50,
     letterSpacing: 0,
   },
   basicInfoDateButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#f5f5f5',
     borderRadius: RADIUS.lg,
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: '#e0e0e0',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -4921,12 +4928,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   birthDateButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#f5f5f5',
     borderRadius: RADIUS.lg,
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: '#e0e0e0',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -4941,21 +4948,21 @@ const styles = StyleSheet.create({
     width: 56,
     height: 50,
     borderRadius: RADIUS.lg,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#f5f5f5',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: '#e0e0e0',
     alignItems: 'center',
     justifyContent: 'center',
   },
   birthDateButtonFull: {
     width: '100%',
     height: 50,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#f5f5f5',
     borderRadius: RADIUS.lg,
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: '#e0e0e0',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -4966,12 +4973,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   anniversaryDateButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#f5f5f5',
     borderRadius: RADIUS.lg,
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: '#e0e0e0',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -4986,18 +4993,18 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: RADIUS.lg,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#f5f5f5',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: '#e0e0e0',
     alignItems: 'center',
     justifyContent: 'center',
   },
   basicInfoDateText: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.4)',
+    color: 'rgba(0, 0, 0, 0.4)',
   },
   basicInfoDateTextSelected: {
-    color: COLORS.white,
+    color: COLORS.black,
   },
   calendarTypeRow: {
     flexDirection: 'row',
@@ -5012,31 +5019,31 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 50,
     borderRadius: RADIUS.lg,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#f5f5f5',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: '#e0e0e0',
     alignItems: 'center',
     justifyContent: 'center',
   },
   relationshipTypeButtonActive: {
-    backgroundColor: COLORS.white,
-    borderColor: COLORS.white,
+    backgroundColor: COLORS.black,
+    borderColor: COLORS.black,
   },
   relationshipTypeButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: COLORS.white,
+    color: '#666',
   },
   relationshipTypeButtonTextActive: {
-    color: COLORS.black,
+    color: COLORS.white,
   },
   relationshipDropdownButton: {
     width: 70,
     height: 50,
     borderRadius: RADIUS.lg,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#f5f5f5',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: '#e0e0e0',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -5045,29 +5052,29 @@ const styles = StyleSheet.create({
   relationshipDropdownText: {
     fontSize: 14,
     fontWeight: '600',
-    color: COLORS.white,
+    color: COLORS.black,
   },
   relationshipDropdownMenu: {
     marginTop: SPACING.sm,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: '#f5f5f5',
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: '#e0e0e0',
     overflow: 'hidden',
   },
   relationshipDropdownItem: {
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.lg,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
   },
   relationshipDropdownItemActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: '#e8f5e9',
   },
   relationshipDropdownItemText: {
     fontSize: 15,
     fontWeight: '500',
-    color: COLORS.white,
+    color: COLORS.black,
     textAlign: 'center',
   },
   relationshipDropdownItemTextActive: {

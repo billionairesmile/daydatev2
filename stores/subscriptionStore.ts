@@ -787,6 +787,7 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
       },
 
       // Load premium status from database (for admin-granted premium or testing)
+      // Also syncs local state if database says free but local says premium
       loadFromDatabase: async () => {
         try {
           if (!supabase) return;
@@ -811,9 +812,10 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
             ? new Date(profile.subscription_expires_at)
             : null;
 
+          const state = get();
+
           // If database says premium and not expired, grant premium
           if (dbPlan !== 'free' && dbExpiryDate && dbExpiryDate > new Date()) {
-            const state = get();
             // Only apply if RevenueCat didn't already grant premium
             if (!state.isPremium) {
               console.log('[Subscription] Granting premium from database:', dbPlan);
@@ -822,6 +824,31 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
                 plan: dbPlan,
                 expiryDate: dbExpiryDate,
               });
+            }
+          } else if (dbPlan === 'free' && state.isPremium) {
+            // Database says free but local state says premium
+            // This can happen if premium expired or was revoked
+            // Check if we should trust RevenueCat or database
+            if (!state.isRevenueCatConfigured) {
+              // RevenueCat not configured, trust database
+              console.log('[Subscription] Downgrading to free based on database (RevenueCat not configured)');
+              set({
+                isPremium: false,
+                plan: 'free',
+                expiryDate: null,
+              });
+            } else {
+              // RevenueCat is configured - check if it also says free
+              // If RevenueCat has no active entitlement, trust database
+              const hasActiveEntitlement = state.customerInfo?.entitlements?.active?.[ENTITLEMENT_ID];
+              if (!hasActiveEntitlement) {
+                console.log('[Subscription] Downgrading to free based on database (RevenueCat also shows no active entitlement)');
+                set({
+                  isPremium: false,
+                  plan: 'free',
+                  expiryDate: null,
+                });
+              }
             }
           }
         } catch (error) {

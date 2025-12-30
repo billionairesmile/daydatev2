@@ -4,6 +4,10 @@ import { useFonts } from 'expo-font';
 import { Jua_400Regular } from '@expo-google-fonts/jua';
 import { JustMeAgainDownHere_400Regular } from '@expo-google-fonts/just-me-again-down-here';
 import { BricolageGrotesque_800ExtraBold } from '@expo-google-fonts/bricolage-grotesque';
+import { Chewy_400Regular } from '@expo-google-fonts/chewy';
+import { MochiyPopOne_400Regular } from '@expo-google-fonts/mochiy-pop-one';
+import { ChironGoRoundTC_400Regular } from '@expo-google-fonts/chiron-goround-tc';
+import { PoetsenOne_400Regular } from '@expo-google-fonts/poetsen-one';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -97,6 +101,10 @@ export default function RootLayout() {
     Jua: Jua_400Regular,
     JustMeAgainDownHere: JustMeAgainDownHere_400Regular,
     BricolageGrotesque: BricolageGrotesque_800ExtraBold,
+    Chewy: Chewy_400Regular,
+    MochiyPopOne: MochiyPopOne_400Regular,
+    ChironGoRoundTC: ChironGoRoundTC_400Regular,
+    PoetsenOne: PoetsenOne_400Regular,
   });
 
   // Preload character assets for ransom text
@@ -157,7 +165,7 @@ function RootLayoutNav() {
   const { initializeSync, cleanup: cleanupSync, processPendingOperations, loadMissionProgress, loadSharedMissions } = useCoupleSyncStore();
   const { setStep: setOnboardingStep, updateData: updateOnboardingData } = useOnboardingStore();
   const { syncFromCouple } = useTimezoneStore();
-  const { initializeRevenueCat, loadFromDatabase, _hasHydrated: subscriptionHydrated } = useSubscriptionStore();
+  const { initializeRevenueCat, loadFromDatabase, checkCouplePremium, setPartnerIsPremium, _hasHydrated: subscriptionHydrated } = useSubscriptionStore();
   const [isNavigationReady, setIsNavigationReady] = useState(false);
   const appState = useRef(AppState.currentState);
   const lastFetchTime = useRef<number>(0);
@@ -174,6 +182,33 @@ function RootLayoutNav() {
       initializeRevenueCat(user.id);
     }
   }, [user?.id, subscriptionHydrated, initializeRevenueCat]);
+
+  // Check couple premium status to determine if partner has premium (for shared premium benefits)
+  useEffect(() => {
+    const checkPartnerPremium = async () => {
+      if (!couple?.id || !user?.id || isDemoMode) {
+        return;
+      }
+
+      try {
+        console.log('[Layout] Checking couple premium status for couple:', couple.id);
+        const isCouplePremium = await checkCouplePremium(couple.id);
+        // If the couple has premium but user doesn't, it means partner has premium
+        // setPartnerIsPremium will update the state for ad removal and UI
+        const { isPremium } = useSubscriptionStore.getState();
+        if (isCouplePremium && !isPremium) {
+          console.log('[Layout] Partner has premium - enabling shared premium benefits');
+          setPartnerIsPremium(true);
+        } else if (!isCouplePremium) {
+          setPartnerIsPremium(false);
+        }
+      } catch (error) {
+        console.error('[Layout] Error checking couple premium status:', error);
+      }
+    };
+
+    checkPartnerPremium();
+  }, [couple?.id, user?.id, checkCouplePremium, setPartnerIsPremium]);
 
   // Initialize network monitoring and handle reconnection sync
   useEffect(() => {

@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
 import type { DailyMission, Mission, MissionState, KeptMission, TodayCompletedMission } from '@/types';
-import { generateMissionsWithAI, generateMissionsFallback, type MissionHistorySummary } from '@/services/missionGenerator';
+import { generateMissionsWithAI, generateMissionsFallback, type MissionHistorySummary, type ExcludedMission } from '@/services/missionGenerator';
 import { db, isDemoMode } from '@/lib/supabase';
 import {
   useOnboardingStore,
@@ -91,13 +91,16 @@ interface MissionActions {
   getTodayCompletedMissionId: () => string | null;
   isTodayCompletedMission: (missionId: string) => boolean;
   // Mission generation actions
-  generateTodayMissions: (answers: MissionGenerationAnswers) => Promise<{ status: 'success' | 'locked' | 'exists' | 'location_required' | 'preferences_required' | 'limit_reached'; message?: string }>;
+  generateTodayMissions: (answers: MissionGenerationAnswers, excludedMissions?: ExcludedMission[]) => Promise<{ status: 'success' | 'locked' | 'exists' | 'location_required' | 'preferences_required' | 'limit_reached'; message?: string }>;
   hasTodayMissions: () => boolean;
   getTodayMissions: () => Mission[];
   checkAndResetMissions: () => void;
   resetGeneratedMissions: () => void;
   resetTodayCompletedMission: () => void;
   resetAllTodayMissions: () => void;
+  // Refresh tracking
+  setRefreshUsedToday: () => void;
+  hasUsedRefreshToday: () => boolean;
   // In-progress mission actions
   saveInProgressMission: (data: Partial<InProgressMissionData> & { missionId: string }) => void;
   getInProgressMission: (missionId: string) => InProgressMissionData | null;
@@ -108,6 +111,7 @@ interface MissionActions {
 interface ExtendedMissionState extends MissionState {
   generatedMissionData: GeneratedMissionData | null;
   inProgressMissions: Record<string, InProgressMissionData>;
+  refreshUsedDate: string | null; // Date when refresh was used (YYYY-MM-DD format)
 }
 
 const initialState: ExtendedMissionState = {
@@ -117,6 +121,7 @@ const initialState: ExtendedMissionState = {
   todayCompletedMission: null,
   generatedMissionData: null,
   inProgressMissions: {},
+  refreshUsedDate: null,
   isLoading: false,
   error: null,
 };
@@ -286,7 +291,8 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
 
       // Generate today's missions based on user answers (with AI)
       // Returns: { status: 'success' | 'locked' | 'error' | 'location_required' | 'preferences_required', message?: string }
-      generateTodayMissions: async (answers) => {
+      // excludedMissions: Optional list of missions to exclude (used for refresh to avoid duplicates)
+      generateTodayMissions: async (answers, excludedMissions) => {
         const today = getTodayDateString();
         const syncStore = useCoupleSyncStore.getState();
         const { user, partner } = useAuthStore.getState();
@@ -410,6 +416,7 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
             userBPreferences: partnerPreferences as OnboardingData | undefined,
             todayAnswers: answers,
             missionHistory, // Pass history for deduplication
+            excludedMissions, // Pass excluded missions for refresh (to avoid duplicates)
             location: currentLocation ? {
               latitude: currentLocation.latitude,
               longitude: currentLocation.longitude,
@@ -535,12 +542,17 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
 
       // Check and reset missions if date changed (called on app focus)
       checkAndResetMissions: () => {
-        const { generatedMissionData, inProgressMissions } = get();
+        const { generatedMissionData, inProgressMissions, refreshUsedDate } = get();
         const today = getTodayDateString();
 
         // Reset generated missions if date changed
         if (generatedMissionData && generatedMissionData.generatedDate !== today) {
           set({ generatedMissionData: null });
+        }
+
+        // Reset refresh used date if date changed
+        if (refreshUsedDate && refreshUsedDate !== today) {
+          set({ refreshUsedDate: null });
         }
 
         // Clean up old in-progress missions (from previous days)
@@ -579,6 +591,19 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
           todayCompletedMission: null,
           inProgressMissions: {},
         });
+      },
+
+      // Mark refresh as used today
+      setRefreshUsedToday: () => {
+        const today = getTodayDateString();
+        set({ refreshUsedDate: today });
+      },
+
+      // Check if refresh has been used today
+      hasUsedRefreshToday: () => {
+        const { refreshUsedDate } = get();
+        if (!refreshUsedDate) return false;
+        return refreshUsedDate === getTodayDateString();
       },
 
       // Save in-progress mission data (for persistence across navigation)

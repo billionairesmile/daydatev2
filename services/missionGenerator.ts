@@ -43,12 +43,19 @@ export interface MissionHistorySummary {
   totalCompleted: number;
 }
 
+// Excluded mission info for refresh (to avoid duplicates)
+export interface ExcludedMission {
+  title: string;
+  category: string;
+}
+
 interface MissionGenerationInput {
   userAPreferences?: OnboardingData;
   userBPreferences?: OnboardingData;
   todayAnswers: MissionGenerationAnswers;
   location?: { latitude: number; longitude: number };
   missionHistory?: MissionHistorySummary;  // For deduplication
+  excludedMissions?: ExcludedMission[];  // Missions to exclude (for refresh - original missions)
 }
 
 interface GeneratedMissionData {
@@ -632,6 +639,38 @@ function buildDeduplicationContext(history: MissionHistorySummary | undefined, l
 }
 
 // ============================================
+// Excluded Missions Context (for Refresh - CRITICAL)
+// ============================================
+
+function buildExcludedMissionsContext(excludedMissions: ExcludedMission[] | undefined, language: SupportedLanguage): string {
+  if (!excludedMissions || excludedMissions.length === 0) {
+    return '';
+  }
+
+  const parts: string[] = [];
+  const titles = excludedMissions.map(m => m.title);
+  const categories = [...new Set(excludedMissions.map(m => m.category))];
+
+  if (language === 'ko') {
+    parts.push(`\n🚨🚨🚨 [절대 금지 - 오늘 이미 받은 미션! 100% 다른 미션 생성 필수!] 🚨🚨🚨`);
+    parts.push(`❌ 금지된 미션 제목: ${titles.join(' | ')}`);
+    parts.push(`❌ 금지된 카테고리: ${categories.join(', ')} - 이 카테고리들은 사용 금지!`);
+    parts.push(`\n⚠️ 위 미션들과 유사하거나 같은 활동, 같은 장소 유형도 금지!`);
+    parts.push(`✅ 완전히 다른 카테고리, 완전히 새로운 활동만 생성하세요!`);
+    parts.push(`✅ 예: 카페→야외활동, 게임→문화체험, 사진→요리 등 완전히 다른 방향으로!`);
+  } else {
+    parts.push(`\n🚨🚨🚨 [STRICTLY FORBIDDEN - Already received today! MUST generate 100% different missions!] 🚨🚨🚨`);
+    parts.push(`❌ Forbidden mission titles: ${titles.join(' | ')}`);
+    parts.push(`❌ Forbidden categories: ${categories.join(', ')} - DO NOT use these categories!`);
+    parts.push(`\n⚠️ Similar activities, same activity types, and same place types are also FORBIDDEN!`);
+    parts.push(`✅ Generate COMPLETELY different categories and ENTIRELY new activities!`);
+    parts.push(`✅ Example: cafe→outdoor, game→culture, photo→cooking - completely different direction!`);
+  }
+
+  return parts.join('\n');
+}
+
+// ============================================
 // Culture-Specific Prompts (6 Regions - v3)
 // ============================================
 
@@ -1074,16 +1113,19 @@ function getUserPrompt(
   fewShotExamples: string,
   language: SupportedLanguage,
   deduplicationContext: string,
+  excludedMissionsContext: string,
   missionCount: number = 3
 ): string {
   if (language === 'ko') {
     return `다음 상황의 커플을 위한 데이트 미션 ${missionCount}개를 생성해주세요.
 
 ${contextString}
+${excludedMissionsContext}
 ${deduplicationContext}
 
 ---
 💡 [미션 다양성 유지 - 중요!]
+${excludedMissionsContext ? '- 🚨 위 "절대 금지" 미션들과 완전히 다른 미션만 생성! 동일/유사 미션 = 실패!' : ''}
 - 🚫 위 "최근 완료한 미션"과 비슷한 미션 절대 금지
 - 💡 "덜 해본 카테고리" 위주로 새로운 경험 추천
 - 창의적이고 신선한 아이디어 우선
@@ -1102,10 +1144,12 @@ ${fewShotExamples}
   return `Please generate ${missionCount} date missions for the following couple's situation.
 
 ${contextString}
+${excludedMissionsContext}
 ${deduplicationContext}
 
 ---
 💡 [Mission Diversity - Important!]
+${excludedMissionsContext ? '- 🚨 Generate COMPLETELY different missions from "STRICTLY FORBIDDEN" above! Same/similar = FAIL!' : ''}
 - 🚫 NEVER suggest missions similar to "Recently Completed" above
 - 💡 Prioritize "Less explored" categories for new experiences
 - Focus on creative and fresh ideas
@@ -1222,6 +1266,15 @@ export async function generateMissionsWithAI(input: MissionGenerationInput): Pro
   // Build deduplication context from mission history (token-efficient)
   const deduplicationContext = buildDeduplicationContext(input.missionHistory, language);
 
+  // Build excluded missions context for refresh (CRITICAL - avoid duplicates)
+  const excludedMissionsContext = buildExcludedMissionsContext(input.excludedMissions, language);
+
+  // Log if we're in refresh mode
+  if (input.excludedMissions && input.excludedMissions.length > 0) {
+    console.log(`[MissionGenerator] Refresh mode - excluding ${input.excludedMissions.length} original missions:`,
+      input.excludedMissions.map(m => m.title).join(', '));
+  }
+
   // Determine mission count based on subscription status
   const subscriptionState = useSubscriptionStore.getState();
   const isCouplePremium = subscriptionState.isPremium || subscriptionState.partnerIsPremium;
@@ -1232,7 +1285,7 @@ export async function generateMissionsWithAI(input: MissionGenerationInput): Pro
   // Get region and language-specific prompts
   const systemPrompt = getSystemPrompt(weather.regionCode, language, weather.season, missionCount);
   const fewShotExamples = getFewShotExamples(weather.regionCode, language);
-  const userPrompt = getUserPrompt(contextString, fewShotExamples, language, deduplicationContext, missionCount);
+  const userPrompt = getUserPrompt(contextString, fewShotExamples, language, deduplicationContext, excludedMissionsContext, missionCount);
 
   try {
     // Increase max_tokens for premium users (6 missions need more tokens)

@@ -47,62 +47,68 @@ export default function TermsScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" />
 
       {/* Header */}
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={8}>
+        <Pressable onPress={() => router.back()} style={styles.backButton}>
           <ChevronLeft color={COLORS.black} size={24} />
         </Pressable>
         <Text style={styles.headerTitle}>{t('settings.other.termsAndPolicies')}</Text>
-        <View style={{ width: 24 }} />
+        <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.settingCard}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Terms Section */}
+        <Text style={styles.sectionTitle}>{t('settings.other.termsAndPolicies')}</Text>
+        <View style={styles.termsContainer}>
           {/* Terms of Service */}
           <Pressable
             style={styles.menuItem}
             onPress={() => openPolicyModal('https://daydate.my/policy/terms', t('settings.other.termsOfService'))}
           >
-            <View style={styles.settingItemLeft}>
+            <View style={styles.menuItemLeft}>
               <View style={styles.iconWrapper}>
                 <FileText color={COLORS.black} size={20} />
               </View>
-              <Text style={styles.settingItemLabel}>{t('settings.other.termsOfService')}</Text>
+              <Text style={styles.menuItemLabel}>{t('settings.other.termsOfService')}</Text>
             </View>
             <ChevronRight color="#999" size={20} />
           </Pressable>
 
-          <View style={styles.settingDivider} />
+          <View style={styles.divider} />
 
           {/* Location Terms */}
           <Pressable
             style={styles.menuItem}
             onPress={() => openPolicyModal('https://daydate.my/policy/location', t('settings.other.locationTerms'))}
           >
-            <View style={styles.settingItemLeft}>
+            <View style={styles.menuItemLeft}>
               <View style={styles.iconWrapper}>
                 <MapPin color={COLORS.black} size={20} />
               </View>
-              <Text style={styles.settingItemLabel}>{t('settings.other.locationTerms')}</Text>
+              <Text style={styles.menuItemLabel}>{t('settings.other.locationTerms')}</Text>
             </View>
             <ChevronRight color="#999" size={20} />
           </Pressable>
 
-          <View style={styles.settingDivider} />
+          <View style={styles.divider} />
 
           {/* Privacy Policy */}
           <Pressable
             style={styles.menuItem}
             onPress={() => openPolicyModal('https://daydate.my/policy/privacy', t('settings.other.privacyPolicy'))}
           >
-            <View style={styles.settingItemLeft}>
+            <View style={styles.menuItemLeft}>
               <View style={styles.iconWrapper}>
                 <Shield color={COLORS.black} size={20} />
               </View>
-              <Text style={styles.settingItemLabel}>{t('settings.other.privacyPolicy')}</Text>
+              <Text style={styles.menuItemLabel}>{t('settings.other.privacyPolicy')}</Text>
             </View>
             <ChevronRight color="#999" size={20} />
           </Pressable>
@@ -140,47 +146,68 @@ export default function TermsScreen() {
           />
         </SafeAreaView>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.white,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.xl + 44,
-    paddingBottom: SPACING.md,
-    backgroundColor: COLORS.background,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: COLORS.black,
   },
-  content: {
-    flex: 1,
-    paddingHorizontal: SPACING.lg,
+  headerSpacer: {
+    width: 40,
   },
-  settingCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.lg,
-    marginTop: SPACING.md,
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingVertical: SPACING.lg,
+    paddingBottom: 100,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#999',
+    marginLeft: SPACING.lg,
+    marginBottom: SPACING.sm,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  termsContainer: {
+    marginHorizontal: SPACING.lg,
+    backgroundColor: '#f8f8f8',
+    borderRadius: RADIUS.md,
     overflow: 'hidden',
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.lg,
   },
-  settingItemLeft: {
+  menuItemLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
@@ -189,20 +216,22 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: COLORS.white,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: SPACING.md,
   },
-  settingItemLabel: {
+  menuItemLabel: {
     fontSize: 15,
-    color: COLORS.black,
     fontWeight: '500',
+    color: COLORS.black,
+    flex: 1,
+    paddingRight: SPACING.sm,
   },
-  settingDivider: {
+  divider: {
     height: 1,
-    backgroundColor: '#f0f0f0',
-    marginLeft: SPACING.md + 36 + SPACING.md,
+    backgroundColor: '#e8e8e8',
+    marginLeft: SPACING.lg + 36 + SPACING.md,
   },
   policyModalContainer: {
     flex: 1,

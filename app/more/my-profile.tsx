@@ -478,7 +478,7 @@ export default function MyProfileScreen() {
                     const option = ACTIVITY_TYPE_OPTIONS.find((o) => o.id === type);
                     return option ? (
                       <View key={type} style={styles.hashtag}>
-                        <Text style={styles.hashtagText}>#{option.label}</Text>
+                        <Text style={styles.hashtagText}>#{t(option.labelKey)}</Text>
                       </View>
                     ) : null;
                   })}
@@ -495,7 +495,7 @@ export default function MyProfileScreen() {
                     const option = DATE_WORRY_OPTIONS.find((o) => o.id === worry);
                     return option ? (
                       <View key={worry} style={styles.hashtag}>
-                        <Text style={styles.hashtagText}>#{option.label.slice(0, 10)}...</Text>
+                        <Text style={styles.hashtagText}>#{t(option.labelKey)}</Text>
                       </View>
                     ) : null;
                   })}
@@ -512,7 +512,7 @@ export default function MyProfileScreen() {
                     const option = CONSTRAINT_OPTIONS.find((o) => o.id === con);
                     return option ? (
                       <View key={con} style={styles.hashtag}>
-                        <Text style={styles.hashtagText}>#{option.label}</Text>
+                        <Text style={styles.hashtagText}>#{t(option.labelKey)}</Text>
                       </View>
                     ) : null;
                   })}
@@ -575,7 +575,7 @@ export default function MyProfileScreen() {
             >
               <Text style={styles.activityIcon}>{option.icon}</Text>
               <Text style={[styles.activityButtonText, tempActivityTypes.includes(option.id) && styles.activityButtonTextActive]}>
-                {option.label}
+                {t(option.labelKey)}
               </Text>
             </Pressable>
           ))}
@@ -594,7 +594,7 @@ export default function MyProfileScreen() {
             >
               <Text style={styles.dateWorryIcon}>{option.icon}</Text>
               <Text style={[styles.dateWorryButtonText, tempDateWorries.includes(option.id) && styles.dateWorryButtonTextActive]}>
-                {option.label}
+                {t(option.labelKey)}
               </Text>
             </Pressable>
           ))}
@@ -613,7 +613,7 @@ export default function MyProfileScreen() {
             >
               <Text style={styles.constraintIcon}>{option.icon}</Text>
               <Text style={[styles.constraintButtonText, tempConstraints.includes(option.id) && styles.constraintButtonTextActive]}>
-                {option.label}
+                {t(option.labelKey)}
               </Text>
             </Pressable>
           ))}

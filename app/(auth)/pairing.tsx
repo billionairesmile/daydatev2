@@ -1,17 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ImageBackground,
-  Dimensions,
   TouchableOpacity,
   Alert,
   Share,
+  TextInput,
+  ActivityIndicator,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import {
-  Heart,
   Copy,
   Share2,
   ArrowRight,
@@ -22,15 +20,11 @@ import { useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '@/constants/design';
-import { GlassCard, GlassButton, GlassInput } from '@/components/glass';
 import { useAuthStore } from '@/stores';
-
-const { width, height } = Dimensions.get('window');
-const BACKGROUND_IMAGE = 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?w=800';
 
 export default function PairingScreen() {
   const router = useRouter();
-  const { user, setIsOnboardingComplete } = useAuthStore();
+  const { user } = useAuthStore();
 
   const [mode, setMode] = useState<'select' | 'share' | 'enter'>('select');
   const [partnerCode, setPartnerCode] = useState('');
@@ -103,7 +97,7 @@ export default function PairingScreen() {
     switch (mode) {
       case 'share':
         return (
-          <GlassCard style={styles.card}>
+          <View style={styles.card}>
             <View style={styles.cardHeader}>
               <TouchableOpacity
                 onPress={() => setMode('select')}
@@ -127,29 +121,29 @@ export default function PairingScreen() {
             </View>
 
             <View style={styles.buttonRow}>
-              <GlassButton
+              <TouchableOpacity
                 onPress={handleCopyCode}
-                variant="secondary"
-                icon={<Copy size={18} color={COLORS.white} />}
-                style={styles.halfButton}
+                style={[styles.secondaryButton, styles.halfButton]}
+                activeOpacity={0.7}
               >
-                복사하기
-              </GlassButton>
-              <GlassButton
+                <Copy size={18} color={COLORS.white} />
+                <Text style={styles.secondaryButtonText}>복사하기</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
                 onPress={handleShareCode}
-                variant="primary"
-                icon={<Share2 size={18} color={COLORS.black} />}
-                style={styles.halfButton}
+                style={[styles.primaryButton, styles.halfButton]}
+                activeOpacity={0.7}
               >
-                공유하기
-              </GlassButton>
+                <Share2 size={18} color={COLORS.white} />
+                <Text style={styles.primaryButtonText}>공유하기</Text>
+              </TouchableOpacity>
             </View>
-          </GlassCard>
+          </View>
         );
 
       case 'enter':
         return (
-          <GlassCard style={styles.card}>
+          <View style={styles.card}>
             <View style={styles.cardHeader}>
               <TouchableOpacity
                 onPress={() => setMode('select')}
@@ -168,30 +162,34 @@ export default function PairingScreen() {
               연인에게 받은 6자리 코드를 입력해주세요
             </Text>
 
-            <GlassInput
+            <TextInput
+              style={styles.textInput}
               placeholder="XXXXXX"
+              placeholderTextColor="rgba(0, 0, 0, 0.4)"
               value={partnerCode}
               onChangeText={(text) => setPartnerCode(text.toUpperCase())}
               autoCapitalize="characters"
               maxLength={6}
-              inputStyle={styles.codeInput}
             />
 
-            <GlassButton
+            <TouchableOpacity
               onPress={handleConnect}
-              variant="primary"
-              fullWidth
-              loading={loading}
+              style={[styles.primaryButton, styles.fullWidthButton, partnerCode.length !== 6 && styles.buttonDisabled]}
+              activeOpacity={0.7}
               disabled={partnerCode.length !== 6}
             >
-              연결하기
-            </GlassButton>
-          </GlassCard>
+              {loading ? (
+                <ActivityIndicator size="small" color={COLORS.white} />
+              ) : (
+                <Text style={styles.primaryButtonText}>연결하기</Text>
+              )}
+            </TouchableOpacity>
+          </View>
         );
 
       default:
         return (
-          <GlassCard style={styles.card}>
+          <View style={styles.card}>
             <View style={styles.iconWrapper}>
               <Users size={40} color={COLORS.primary} />
             </View>
@@ -217,7 +215,7 @@ export default function PairingScreen() {
                     내 코드를 연인에게 보내기
                   </Text>
                 </View>
-                <ArrowRight size={20} color={COLORS.glass.white40} />
+                <ArrowRight size={20} color="rgba(0, 0, 0, 0.4)" />
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -234,31 +232,20 @@ export default function PairingScreen() {
                     연인에게 받은 코드 입력하기
                   </Text>
                 </View>
-                <ArrowRight size={20} color={COLORS.glass.white40} />
+                <ArrowRight size={20} color="rgba(0, 0, 0, 0.4)" />
               </TouchableOpacity>
             </View>
 
             <TouchableOpacity onPress={handleSkip} style={styles.skipButton}>
               <Text style={styles.skipText}>나중에 연결하기</Text>
             </TouchableOpacity>
-          </GlassCard>
+          </View>
         );
     }
   };
 
   return (
     <View style={styles.container}>
-      <ImageBackground
-        source={{ uri: BACKGROUND_IMAGE }}
-        style={styles.backgroundImage}
-        blurRadius={25}
-      >
-        <LinearGradient
-          colors={['rgba(0,0,0,0.4)', 'rgba(0,0,0,0.7)']}
-          style={styles.overlay}
-        />
-      </ImageBackground>
-
       <View style={styles.content}>
         {/* Progress */}
         <View style={styles.progressContainer}>
@@ -277,15 +264,7 @@ export default function PairingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.black,
-  },
-  backgroundImage: {
-    position: 'absolute',
-    width,
-    height,
-  },
-  overlay: {
-    flex: 1,
+    backgroundColor: COLORS.white,
   },
   content: {
     flex: 1,
@@ -301,17 +280,17 @@ const styles = StyleSheet.create({
   progressBar: {
     flex: 1,
     height: 4,
-    backgroundColor: COLORS.glass.white20,
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
     borderRadius: 2,
     marginRight: SPACING.md,
   },
   progressFill: {
     height: '100%',
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.black,
     borderRadius: 2,
   },
   progressText: {
-    color: COLORS.glass.white60,
+    color: 'rgba(0, 0, 0, 0.6)',
     fontSize: TYPOGRAPHY.fontSize.sm,
   },
   card: {
@@ -324,14 +303,14 @@ const styles = StyleSheet.create({
     padding: SPACING.xs,
   },
   backLinkText: {
-    color: COLORS.glass.white60,
+    color: 'rgba(0, 0, 0, 0.6)',
     fontSize: TYPOGRAPHY.fontSize.sm,
   },
   iconWrapper: {
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: COLORS.glass.white10,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'center',
@@ -340,36 +319,45 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: TYPOGRAPHY.fontSize.xl,
     fontWeight: TYPOGRAPHY.fontWeight.semiBold,
-    color: COLORS.white,
+    color: COLORS.black,
     textAlign: 'center',
     marginBottom: SPACING.sm,
   },
   cardDescription: {
     fontSize: TYPOGRAPHY.fontSize.md,
-    color: COLORS.glass.white70,
+    color: 'rgba(0, 0, 0, 0.7)',
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: SPACING.xl,
   },
   codeContainer: {
-    backgroundColor: COLORS.glass.white10,
+    backgroundColor: '#f5f5f5',
     borderRadius: RADIUS.xl,
     paddingVertical: SPACING.lg,
     marginBottom: SPACING.xl,
     borderWidth: 1,
-    borderColor: COLORS.glass.white20,
+    borderColor: '#e0e0e0',
   },
   codeText: {
     fontSize: TYPOGRAPHY.fontSize.hero,
     fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.white,
+    color: COLORS.black,
     textAlign: 'center',
     letterSpacing: 8,
   },
-  codeInput: {
+  textInput: {
+    width: '100%',
+    height: 56,
+    backgroundColor: '#f5f5f5',
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    paddingHorizontal: SPACING.lg,
     fontSize: TYPOGRAPHY.fontSize.xxl,
+    color: COLORS.black,
     textAlign: 'center',
     letterSpacing: 6,
+    marginBottom: SPACING.lg,
   },
   buttonRow: {
     flexDirection: 'row',
@@ -377,6 +365,42 @@ const styles = StyleSheet.create({
   },
   halfButton: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+  },
+  primaryButton: {
+    height: 52,
+    backgroundColor: COLORS.black,
+    borderRadius: RADIUS.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+  },
+  primaryButtonText: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: TYPOGRAPHY.fontWeight.semiBold,
+    color: COLORS.white,
+  },
+  secondaryButton: {
+    height: 52,
+    backgroundColor: '#f5f5f5',
+    borderRadius: RADIUS.full,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    paddingVertical: SPACING.md,
+  },
+  secondaryButtonText: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: TYPOGRAPHY.fontWeight.semiBold,
+    color: COLORS.black,
+  },
+  fullWidthButton: {
+    width: '100%',
+  },
+  buttonDisabled: {
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
   },
   optionContainer: {
     gap: SPACING.md,
@@ -386,16 +410,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: SPACING.lg,
-    backgroundColor: COLORS.glass.white10,
+    backgroundColor: '#f5f5f5',
     borderRadius: RADIUS.xl,
     borderWidth: 1,
-    borderColor: COLORS.glass.white20,
+    borderColor: '#e0e0e0',
   },
   optionIcon: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: COLORS.glass.white10,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: SPACING.md,
@@ -406,19 +430,19 @@ const styles = StyleSheet.create({
   optionTitle: {
     fontSize: TYPOGRAPHY.fontSize.md,
     fontWeight: TYPOGRAPHY.fontWeight.semiBold,
-    color: COLORS.white,
+    color: COLORS.black,
     marginBottom: 2,
   },
   optionDescription: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.glass.white60,
+    color: 'rgba(0, 0, 0, 0.6)',
   },
   skipButton: {
     padding: SPACING.md,
     alignItems: 'center',
   },
   skipText: {
-    color: COLORS.glass.white50,
+    color: 'rgba(0, 0, 0, 0.5)',
     fontSize: TYPOGRAPHY.fontSize.md,
   },
 });

@@ -223,40 +223,40 @@ export const MBTI_OPTIONS = [
   'ISTP', 'ISFP', 'ESTP', 'ESFP',
 ];
 
-export const ACTIVITY_TYPE_OPTIONS: { id: ActivityType; label: string; icon: string }[] = [
-  { id: 'home', label: '집콕', icon: '🏠' },
-  { id: 'cafe_restaurant', label: '카페·식당', icon: '☕' },
-  { id: 'outdoor', label: '야외 활동', icon: '🌳' },
-  { id: 'culture', label: '문화생활', icon: '🎬' },
-  { id: 'activity', label: '액티비티', icon: '⚽' },
-  { id: 'home_activity', label: '집에서 만드는 활동', icon: '🎲' },
-  { id: 'travel', label: '여행', icon: '✈️' },
-  { id: 'drive', label: '드라이브', icon: '🚗' },
-  { id: 'shopping', label: '쇼핑·구경', icon: '🛍️' },
-  { id: 'cooking', label: '요리·베이킹', icon: '🍳' },
-  { id: 'sports', label: '운동·스포츠', icon: '🏃' },
-  { id: 'nightlife', label: '술·나이트라이프', icon: '🍷' },
-  { id: 'healing', label: '힐링·스파', icon: '🧘' },
-  { id: 'photo', label: '사진·영상', icon: '📸' },
-  { id: 'learning', label: '배움·클래스', icon: '📚' },
+export const ACTIVITY_TYPE_OPTIONS: { id: ActivityType; labelKey: string; icon: string }[] = [
+  { id: 'home', labelKey: 'onboarding.activityTypes.home', icon: '🏠' },
+  { id: 'cafe_restaurant', labelKey: 'onboarding.activityTypes.cafe_restaurant', icon: '☕' },
+  { id: 'outdoor', labelKey: 'onboarding.activityTypes.outdoor', icon: '🌳' },
+  { id: 'culture', labelKey: 'onboarding.activityTypes.culture', icon: '🎬' },
+  { id: 'activity', labelKey: 'onboarding.activityTypes.activity', icon: '⚽' },
+  { id: 'home_activity', labelKey: 'onboarding.activityTypes.home_activity', icon: '🎲' },
+  { id: 'travel', labelKey: 'onboarding.activityTypes.travel', icon: '✈️' },
+  { id: 'drive', labelKey: 'onboarding.activityTypes.drive', icon: '🚗' },
+  { id: 'shopping', labelKey: 'onboarding.activityTypes.shopping', icon: '🛍️' },
+  { id: 'cooking', labelKey: 'onboarding.activityTypes.cooking', icon: '🍳' },
+  { id: 'sports', labelKey: 'onboarding.activityTypes.sports', icon: '🏃' },
+  { id: 'nightlife', labelKey: 'onboarding.activityTypes.nightlife', icon: '🍷' },
+  { id: 'healing', labelKey: 'onboarding.activityTypes.healing', icon: '🧘' },
+  { id: 'photo', labelKey: 'onboarding.activityTypes.photo', icon: '📸' },
+  { id: 'learning', labelKey: 'onboarding.activityTypes.learning', icon: '📚' },
 ];
 
-export const DATE_WORRY_OPTIONS: { id: DateWorry; label: string; icon: string }[] = [
-  { id: 'no_idea', label: '뭐 할지 모르겠어요', icon: '🤔' },
-  { id: 'same_pattern', label: '맨날 비슷한 거만 해요', icon: '💁🏻' },
-  { id: 'budget', label: '돈이 부담돼요', icon: '💵' },
-  { id: 'time', label: '시간이 부족해요', icon: '⏰' },
-  { id: 'talk', label: '대화가 필요해요', icon: '💬' },
-  { id: 'none', label: '딱히 없어요! 그냥 더 재밌게 놀고싶어요', icon: '✨' },
+export const DATE_WORRY_OPTIONS: { id: DateWorry; labelKey: string; icon: string }[] = [
+  { id: 'no_idea', labelKey: 'onboarding.dateWorries.no_idea', icon: '🤔' },
+  { id: 'same_pattern', labelKey: 'onboarding.dateWorries.same_pattern', icon: '💁🏻' },
+  { id: 'budget', labelKey: 'onboarding.dateWorries.budget', icon: '💵' },
+  { id: 'time', labelKey: 'onboarding.dateWorries.time', icon: '⏰' },
+  { id: 'talk', labelKey: 'onboarding.dateWorries.talk', icon: '💬' },
+  { id: 'none', labelKey: 'onboarding.dateWorries.none', icon: '✨' },
 ];
 
-export const CONSTRAINT_OPTIONS: { id: Constraint; label: string; icon: string }[] = [
-  { id: 'pet', label: '반려동물', icon: '🐾' },
-  { id: 'child', label: '아이 있음', icon: '👶' },
-  { id: 'long_distance', label: '장거리', icon: '✈️' },
-  { id: 'no_car', label: '차/면허 없음', icon: '🚘' },
-  { id: 'no_alcohol', label: '술 안함', icon: '🍻' },
-  { id: 'none', label: '없음', icon: '❌' },
+export const CONSTRAINT_OPTIONS: { id: Constraint; labelKey: string; icon: string }[] = [
+  { id: 'pet', labelKey: 'onboarding.constraints.pet', icon: '🐾' },
+  { id: 'child', labelKey: 'onboarding.constraints.child', icon: '👶' },
+  { id: 'long_distance', labelKey: 'onboarding.constraints.long_distance', icon: '✈️' },
+  { id: 'no_car', labelKey: 'onboarding.constraints.no_car', icon: '🚘' },
+  { id: 'no_alcohol', labelKey: 'onboarding.constraints.no_alcohol', icon: '🍻' },
+  { id: 'none', labelKey: 'onboarding.constraints.none', icon: '❌' },
 ];
 
 export default useOnboardingStore;

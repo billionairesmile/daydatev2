@@ -24,6 +24,7 @@ import * as Location from 'expo-location';
 
 import { COLORS, SPACING, RADIUS } from '@/constants/design';
 import { useMissionStore, MOOD_OPTIONS, TIME_OPTIONS, type TodayMood, type AvailableTime, type MissionGenerationAnswers } from '@/stores/missionStore';
+import type { ExcludedMission } from '@/services/missionGenerator';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useSubscriptionStore } from '@/stores/subscriptionStore';
@@ -31,11 +32,13 @@ import { useBackground } from '@/contexts';
 import { BookmarkedMissionsPage } from '@/components/BookmarkedMissionsPage';
 import { CircularLoadingAnimation } from '@/components/CircularLoadingAnimation';
 import NativeAdMissionCard from '@/components/ads/NativeAdMissionCard';
+import RefreshMissionCard from '@/components/RefreshMissionCard';
 import type { Mission, FeaturedMission } from '@/types';
 import { db, isDemoMode } from '@/lib/supabase';
+import { rewardedAdManager } from '@/lib/rewardedAd';
 
-// Type for carousel items (Mission or Ad placeholder)
-type CarouselItem = Mission | { type: 'ad'; id: string };
+// Type for carousel items (Mission, Ad placeholder, or Refresh card)
+type CarouselItem = Mission | { type: 'ad'; id: string } | { type: 'refresh'; id: string };
 
 // Fixed card dimensions (width is calculated dynamically in component)
 const CARD_HEIGHT = 468;
@@ -83,6 +86,8 @@ export default function MissionScreen() {
   const [loadedImagesCount, setLoadedImagesCount] = useState(0);
   const [totalImagesToLoad, setTotalImagesToLoad] = useState(0);
   const [isWaitingForImages, setIsWaitingForImages] = useState(false);
+  const [isRefreshMode, setIsRefreshMode] = useState(false);
+  const [isLoadingAd, setIsLoadingAd] = useState(false);
   const isWaitingForImagesRef = useRef(false);
   const scrollX = useRef(new Animated.Value(0)).current;
   const scrollViewRef = useRef<Animated.FlatList<CarouselItem>>(null);
@@ -97,6 +102,9 @@ export default function MissionScreen() {
     getTodayMissions,
     generateTodayMissions,
     checkAndResetMissions,
+    resetGeneratedMissions,
+    setRefreshUsedToday,
+    hasUsedRefreshToday,
     generatedMissionData, // Subscribe to this state to trigger re-renders
   } = useMissionStore();
 
@@ -112,6 +120,7 @@ export default function MissionScreen() {
     lockedMissionId,
     allMissionProgress,
     coupleId,
+    resetAllMissions,
   } = useCoupleSyncStore();
 
   // Get partner info from auth store
@@ -174,6 +183,7 @@ export default function MissionScreen() {
 
   // Combine AI-generated missions with featured missions (only show featured after daily missions are generated)
   // Also insert native ad at random position (2nd, 3rd, or 4th) if user should see ads
+  // Add refresh card at the end for free users
   const allMissions = React.useMemo((): CarouselItem[] => {
     let missions: CarouselItem[] = [];
 
@@ -199,8 +209,16 @@ export default function MissionScreen() {
       ];
     }
 
+    // Add refresh card at the end for ALL users (both free and premium)
+    // Only show if missions exist and refresh not used today
+    // Refresh is available once per day for everyone
+    if (hasGeneratedMissions && todayMissions.length > 0 && !hasUsedRefreshToday()) {
+      const refreshPlaceholder: CarouselItem = { type: 'refresh', id: 'refresh-card' };
+      missions = [...missions, refreshPlaceholder];
+    }
+
     return missions;
-  }, [todayMissions, featuredMissions, hasGeneratedMissions, shouldShowAds, adPosition]);
+  }, [todayMissions, featuredMissions, hasGeneratedMissions, shouldShowAds, adPosition, hasUsedRefreshToday]);
 
   // Force FlatList to render properly when missions change from empty to populated
   // This handles cases where the list mounts before React has finished updating
@@ -427,19 +445,290 @@ export default function MissionScreen() {
   const handleGenerateMissions = useCallback(async () => {
     if (canMeetToday === null || availableTime === null || selectedMoods.length === 0) return;
 
-    // Close modal first
-    setShowGenerationModal(false);
-
-    // Show loading animation
-    setIsGenerating(true);
-    setPartnerGeneratingMessage(null);
-
     // Prepare answers
     const answers: MissionGenerationAnswers = {
       canMeetToday,
       availableTime,
       todayMoods: selectedMoods,
     };
+
+    // Handle refresh mode
+    if (isRefreshMode) {
+      // Premium users skip the ad and directly generate missions
+      const isPremiumUser = !shouldShowAds();
+
+      if (isPremiumUser) {
+        // Premium user - no ad required, directly generate
+        setShowGenerationModal(false);
+        setIsRefreshMode(false);
+        setIsGenerating(true);
+        setPartnerGeneratingMessage(null);
+
+        // Save original missions before reset (for deduplication)
+        const originalMissions = getTodayMissions();
+        const excludedMissions: ExcludedMission[] = originalMissions.map(m => ({
+          title: m.title,
+          category: m.category,
+        }));
+        console.log('[Mission Refresh] Premium user - excluding original missions:', excludedMissions.map(m => m.title).join(', '));
+
+        // Reset existing missions first (both local and shared)
+        resetGeneratedMissions();
+        await resetAllMissions();
+
+        // Generate new missions with excluded missions to avoid duplicates
+        const result = await generateTodayMissions(answers, excludedMissions);
+
+        if (result && result.status === 'locked') {
+          setPartnerGeneratingMessage(t('mission.refresh.partnerGenerating'));
+          return;
+        }
+
+        if (result && result.status === 'exists') {
+          setIsGenerating(false);
+          setPartnerGeneratingMessage(null);
+          return;
+        }
+
+        const newMissions = getTodayMissions();
+
+        // Mark refresh as used for today (only once per day - applies to premium too)
+        if (newMissions.length > 0) {
+          setRefreshUsedToday();
+        }
+
+        // Prefetch and load images
+        if (newMissions.length > 0) {
+          const imagesToLoad = newMissions.filter(mission => mission.imageUrl);
+
+          try {
+            const imagePromises = imagesToLoad.map(mission =>
+              ExpoImage.prefetch(`${mission.imageUrl}?w=800&h=1000&fit=crop`)
+            );
+
+            await Promise.race([
+              Promise.all(imagePromises),
+              new Promise(resolve => setTimeout(resolve, 8000)),
+            ]);
+          } catch (error) {
+            console.log('Image prefetch error:', error);
+          }
+
+          setLoadedImagesCount(0);
+          setTotalImagesToLoad(imagesToLoad.length);
+          setIsWaitingForImages(true);
+          isWaitingForImagesRef.current = true;
+
+          setTimeout(() => {
+            if (isWaitingForImagesRef.current) {
+              setIsGenerating(false);
+              setIsWaitingForImages(false);
+              isWaitingForImagesRef.current = false;
+              setLoadedImagesCount(0);
+              setTotalImagesToLoad(0);
+            }
+          }, 10000);
+        } else {
+          setIsGenerating(false);
+        }
+
+        setCanMeetToday(null);
+        setAvailableTime(null);
+        setSelectedMoods([]);
+        return;
+      }
+
+      // Free user - show rewarded ad first
+      // Save original missions before showing ad (for deduplication after ad completes)
+      const originalMissionsForAd = getTodayMissions();
+      const excludedMissionsForAd: ExcludedMission[] = originalMissionsForAd.map(m => ({
+        title: m.title,
+        category: m.category,
+      }));
+      console.log('[Mission Refresh] Free user - saving original missions for deduplication:', excludedMissionsForAd.map(m => m.title).join(', '));
+
+      setIsLoadingAd(true);
+
+      // Load and show rewarded ad
+      const adShown = await rewardedAdManager.loadAndShow({
+        onAdClosed: async () => {
+          // Close modal
+          setShowGenerationModal(false);
+          setIsLoadingAd(false);
+          setIsRefreshMode(false);
+
+          // Show loading animation
+          setIsGenerating(true);
+          setPartnerGeneratingMessage(null);
+
+          // Reset existing missions first (both local and shared)
+          resetGeneratedMissions();
+          await resetAllMissions();
+
+          // Generate new missions with excluded missions to avoid duplicates
+          const result = await generateTodayMissions(answers, excludedMissionsForAd);
+
+          // Handle different generation statuses
+          if (result && result.status === 'locked') {
+            // Partner is already generating - show their message
+            setPartnerGeneratingMessage(t('mission.refresh.partnerGenerating'));
+            return;
+          }
+
+          if (result && result.status === 'exists') {
+            setIsGenerating(false);
+            setPartnerGeneratingMessage(null);
+            return;
+          }
+
+          // Get the newly generated missions
+          const newMissions = getTodayMissions();
+
+          // Mark refresh as used for today (only once per day)
+          if (newMissions.length > 0) {
+            setRefreshUsedToday();
+          }
+
+          // Prefetch and load images
+          if (newMissions.length > 0) {
+            const imagesToLoad = newMissions.filter(mission => mission.imageUrl);
+
+            try {
+              const imagePromises = imagesToLoad.map(mission =>
+                ExpoImage.prefetch(`${mission.imageUrl}?w=800&h=1000&fit=crop`)
+              );
+
+              await Promise.race([
+                Promise.all(imagePromises),
+                new Promise(resolve => setTimeout(resolve, 8000)),
+              ]);
+            } catch (error) {
+              console.log('Image prefetch error:', error);
+            }
+
+            setLoadedImagesCount(0);
+            setTotalImagesToLoad(imagesToLoad.length);
+            setIsWaitingForImages(true);
+            isWaitingForImagesRef.current = true;
+
+            setTimeout(() => {
+              if (isWaitingForImagesRef.current) {
+                setIsGenerating(false);
+                setIsWaitingForImages(false);
+                isWaitingForImagesRef.current = false;
+                setLoadedImagesCount(0);
+                setTotalImagesToLoad(0);
+              }
+            }, 10000);
+          } else {
+            setIsGenerating(false);
+          }
+
+          // Reset form
+          setCanMeetToday(null);
+          setAvailableTime(null);
+          setSelectedMoods([]);
+        },
+        onAdFailedToLoad: () => {
+          setIsLoadingAd(false);
+          // Show error alert
+          Alert.alert(
+            t('mission.refresh.adLoadingFailed'),
+            t('mission.refresh.adLoadingFailedMessage'),
+            [{ text: t('common.confirm') }]
+          );
+        },
+      });
+
+      // If ad loading failed or was not shown (e.g., in Expo Go), show error
+      if (!adShown) {
+        setIsLoadingAd(false);
+        // For Expo Go / development, skip ad and proceed directly
+        if (__DEV__) {
+          // Close modal
+          setShowGenerationModal(false);
+          setIsRefreshMode(false);
+
+          // Show loading animation
+          setIsGenerating(true);
+          setPartnerGeneratingMessage(null);
+
+          // Reset existing missions first (both local and shared)
+          resetGeneratedMissions();
+          await resetAllMissions();
+
+          // Generate new missions with excluded missions to avoid duplicates
+          // Note: excludedMissionsForAd was saved before loading ad, so it's still available
+          const result = await generateTodayMissions(answers, excludedMissionsForAd);
+
+          if (result && result.status === 'locked') {
+            setPartnerGeneratingMessage(t('mission.refresh.partnerGenerating'));
+            return;
+          }
+
+          if (result && result.status === 'exists') {
+            setIsGenerating(false);
+            setPartnerGeneratingMessage(null);
+            return;
+          }
+
+          const newMissions = getTodayMissions();
+
+          // Mark refresh as used for today (only once per day)
+          if (newMissions.length > 0) {
+            setRefreshUsedToday();
+          }
+
+          if (newMissions.length > 0) {
+            const imagesToLoad = newMissions.filter(mission => mission.imageUrl);
+
+            try {
+              const imagePromises = imagesToLoad.map(mission =>
+                ExpoImage.prefetch(`${mission.imageUrl}?w=800&h=1000&fit=crop`)
+              );
+
+              await Promise.race([
+                Promise.all(imagePromises),
+                new Promise(resolve => setTimeout(resolve, 8000)),
+              ]);
+            } catch (error) {
+              console.log('Image prefetch error:', error);
+            }
+
+            setLoadedImagesCount(0);
+            setTotalImagesToLoad(imagesToLoad.length);
+            setIsWaitingForImages(true);
+            isWaitingForImagesRef.current = true;
+
+            setTimeout(() => {
+              if (isWaitingForImagesRef.current) {
+                setIsGenerating(false);
+                setIsWaitingForImages(false);
+                isWaitingForImagesRef.current = false;
+                setLoadedImagesCount(0);
+                setTotalImagesToLoad(0);
+              }
+            }, 10000);
+          } else {
+            setIsGenerating(false);
+          }
+
+          setCanMeetToday(null);
+          setAvailableTime(null);
+          setSelectedMoods([]);
+        }
+      }
+
+      return;
+    }
+
+    // Normal mode (not refresh)
+    // Close modal first
+    setShowGenerationModal(false);
+
+    // Show loading animation
+    setIsGenerating(true);
+    setPartnerGeneratingMessage(null);
 
     // Generate missions (this calls AI API)
     const result = await generateTodayMissions(answers);
@@ -507,7 +796,7 @@ export default function MissionScreen() {
     setCanMeetToday(null);
     setAvailableTime(null);
     setSelectedMoods([]);
-  }, [canMeetToday, availableTime, selectedMoods, generateTodayMissions, getTodayMissions, scrollX]);
+  }, [canMeetToday, availableTime, selectedMoods, isRefreshMode, generateTodayMissions, getTodayMissions, resetGeneratedMissions, resetAllMissions, setRefreshUsedToday, t, scrollX]);
 
   const toggleMood = (mood: TodayMood) => {
     if (selectedMoods.includes(mood)) {
@@ -555,6 +844,17 @@ export default function MissionScreen() {
     return 'type' in item && item.type === 'ad';
   };
 
+  // Helper function to check if item is a refresh card
+  const isRefreshItem = (item: CarouselItem): item is { type: 'refresh'; id: string } => {
+    return 'type' in item && item.type === 'refresh';
+  };
+
+  // Handle refresh button press - open modal in refresh mode
+  const handleRefreshPress = useCallback(() => {
+    setIsRefreshMode(true);
+    setShowGenerationModal(true);
+  }, []);
+
   const renderCard = useCallback(
     ({ item, index }: { item: CarouselItem; index: number }) => {
       const inputRange = [
@@ -595,6 +895,23 @@ export default function MissionScreen() {
         );
       }
 
+      // Render refresh card if item is refresh placeholder
+      if (isRefreshItem(item)) {
+        return (
+          <Animated.View
+            style={[
+              styles.card,
+              {
+                width: CARD_WIDTH,
+                transform: [{ scale }],
+              },
+            ]}
+          >
+            <RefreshMissionCard onRefreshPress={handleRefreshPress} />
+          </Animated.View>
+        );
+      }
+
       // Render mission card
       return (
         <Animated.View
@@ -621,7 +938,7 @@ export default function MissionScreen() {
         </Animated.View>
       );
     },
-    [scrollX, handleMissionPress, handleKeepMission, checkIsKept, canStartMission, isTodayCompletedMission, lockedMissionId, isScrollInitialized, isAnotherMissionInProgress, handleMissionImageLoad, SNAP_INTERVAL, CARD_WIDTH]
+    [scrollX, handleMissionPress, handleKeepMission, checkIsKept, canStartMission, isTodayCompletedMission, lockedMissionId, isScrollInitialized, isAnotherMissionInProgress, handleMissionImageLoad, handleRefreshPress, SNAP_INTERVAL, CARD_WIDTH]
   );
 
   return (
@@ -765,12 +1082,16 @@ export default function MissionScreen() {
             {/* Modal Header */}
             <View style={styles.whiteModalHeader}>
               <View style={styles.modalHeaderSpacer} />
-              <Text style={styles.whiteModalTitle}>{t('mission.title')}</Text>
+              <Text style={styles.whiteModalTitle}>
+                {isRefreshMode ? t('mission.refresh.modalTitle') : t('mission.title')}
+              </Text>
               <Pressable
                 style={styles.whiteModalCloseButton}
                 onPress={() => {
                   setShowGenerationModal(false);
+                  setIsRefreshMode(false);
                   setCanMeetToday(null);
+                  setAvailableTime(null);
                   setSelectedMoods([]);
                 }}
               >
@@ -875,18 +1196,22 @@ export default function MissionScreen() {
                   !isGenerationFormValid && styles.whiteModalGenerateButtonDisabled,
                 ]}
                 onPress={handleGenerateMissions}
-                disabled={!isGenerationFormValid || isGenerating}
+                disabled={!isGenerationFormValid || isGenerating || isLoadingAd}
               >
-                {isGenerating ? (
+                {isGenerating || isLoadingAd ? (
                   <View style={styles.generatingContent}>
                     <ActivityIndicator color={COLORS.white} size="small" />
-                    <Text style={styles.whiteModalGenerateButtonText}>{t('mission.generating')}</Text>
+                    <Text style={styles.whiteModalGenerateButtonText}>
+                      {isLoadingAd ? t('mission.refresh.generating') : t('mission.generating')}
+                    </Text>
                   </View>
                 ) : (
                   <Text style={[
                     styles.whiteModalGenerateButtonText,
                     !isGenerationFormValid && styles.whiteModalGenerateButtonTextDisabled,
-                  ]}>{t('mission.generate')}</Text>
+                  ]}>
+                    {isRefreshMode ? t('mission.refresh.modalButton') : t('mission.generate')}
+                  </Text>
                 )}
               </Pressable>
             </View>
@@ -1460,7 +1785,7 @@ const styles = StyleSheet.create({
   whiteTimeOptionLabel: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#333',
+    color: '#666',
   },
   whiteTimeOptionLabelActive: {
     color: COLORS.black,

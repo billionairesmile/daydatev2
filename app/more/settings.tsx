@@ -44,7 +44,7 @@ import type { SupportedLanguage, TimezoneId } from '@/stores';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
 import { db, isDemoMode } from '@/lib/supabase';
 import { signOut as supabaseSignOut } from '@/lib/socialAuth';
-import { notifyPartnerUnpaired } from '@/lib/pushNotifications';
+import { notifyPartnerUnpaired, getNotificationPermissionStatus } from '@/lib/pushNotifications';
 
 const { width } = Dimensions.get('window');
 
@@ -80,7 +80,7 @@ export default function SettingsScreen() {
   // Keyboard animation for modals
   const modalAnimatedValue = useRef(new Animated.Value(0)).current;
 
-  // Load notification settings from DB on mount
+  // Load notification settings from DB on mount, syncing with OS permission status
   useEffect(() => {
     const loadSettings = async () => {
       if (!user?.id || isDemoMode) {
@@ -89,11 +89,28 @@ export default function SettingsScreen() {
       }
 
       try {
+        // Check OS-level notification permission status
+        const osPermissionGranted = await getNotificationPermissionStatus();
+
         const { data: profile } = await db.profiles.get(user.id);
         if (profile) {
-          setPushEnabled(profile.push_enabled ?? true);
+          // If OS permission is OFF, force push_enabled to OFF regardless of DB value
+          // This ensures the toggle reflects the actual system state
+          const effectivePushEnabled = osPermissionGranted && (profile.push_enabled ?? true);
+
+          setPushEnabled(effectivePushEnabled);
           setNewsEnabled(profile.news_agreed ?? false);
           setMarketingEnabled(profile.marketing_agreed ?? false);
+
+          // Sync DB with OS permission if they're out of sync
+          // (e.g., user turned off notifications in system settings)
+          if (!osPermissionGranted && profile.push_enabled) {
+            console.log('[Settings] OS permission OFF but DB shows ON - syncing to OFF');
+            await db.profiles.update(user.id, { push_enabled: false });
+          }
+        } else {
+          // No profile data - just check OS permission
+          setPushEnabled(osPermissionGranted);
         }
       } catch (error) {
         console.error('[Settings] Error loading notification settings:', error);

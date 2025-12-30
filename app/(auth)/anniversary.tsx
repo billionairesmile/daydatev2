@@ -3,23 +3,17 @@ import {
   View,
   Text,
   StyleSheet,
-  ImageBackground,
-  Dimensions,
   TouchableOpacity,
   Alert,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Calendar, Heart, Check } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '@/constants/design';
-import { GlassCard, GlassButton } from '@/components/glass';
 import { useAuthStore } from '@/stores';
 import type { AnniversaryType } from '@/types';
-
-const { width, height } = Dimensions.get('window');
-const BACKGROUND_IMAGE = 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?w=800';
 
 const ANNIVERSARY_TYPES: { type: AnniversaryType; label: string; emoji: string }[] = [
   { type: '연애 시작일', label: '연애 시작일', emoji: '💕' },
@@ -95,17 +89,6 @@ export default function AnniversaryScreen() {
 
   return (
     <View style={styles.container}>
-      <ImageBackground
-        source={{ uri: BACKGROUND_IMAGE }}
-        style={styles.backgroundImage}
-        blurRadius={25}
-      >
-        <LinearGradient
-          colors={['rgba(0,0,0,0.4)', 'rgba(0,0,0,0.7)']}
-          style={styles.overlay}
-        />
-      </ImageBackground>
-
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.content}
@@ -119,7 +102,7 @@ export default function AnniversaryScreen() {
           <Text style={styles.progressText}>2/3</Text>
         </View>
 
-        <GlassCard style={styles.card}>
+        <View style={styles.card}>
           <View style={styles.iconWrapper}>
             <Calendar size={32} color={COLORS.primary} />
           </View>
@@ -262,20 +245,23 @@ export default function AnniversaryScreen() {
             </View>
           )}
 
-          <GlassButton
+          <TouchableOpacity
             onPress={handleComplete}
-            variant="primary"
-            fullWidth
-            loading={loading}
-            style={styles.completeButton}
+            style={[styles.primaryButton, styles.completeButton]}
+            activeOpacity={0.7}
+            disabled={loading}
           >
-            완료
-          </GlassButton>
+            {loading ? (
+              <ActivityIndicator size="small" color={COLORS.white} />
+            ) : (
+              <Text style={styles.primaryButtonText}>완료</Text>
+            )}
+          </TouchableOpacity>
 
           <TouchableOpacity onPress={handleSkip} style={styles.skipButton}>
             <Text style={styles.skipText}>나중에 설정하기</Text>
           </TouchableOpacity>
-        </GlassCard>
+        </View>
       </ScrollView>
     </View>
   );
@@ -284,15 +270,7 @@ export default function AnniversaryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.black,
-  },
-  backgroundImage: {
-    position: 'absolute',
-    width,
-    height,
-  },
-  overlay: {
-    flex: 1,
+    backgroundColor: COLORS.white,
   },
   scrollView: {
     flex: 1,
@@ -311,17 +289,17 @@ const styles = StyleSheet.create({
   progressBar: {
     flex: 1,
     height: 4,
-    backgroundColor: COLORS.glass.white20,
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
     borderRadius: 2,
     marginRight: SPACING.md,
   },
   progressFill: {
     height: '100%',
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.black,
     borderRadius: 2,
   },
   progressText: {
-    color: COLORS.glass.white60,
+    color: 'rgba(0, 0, 0, 0.6)',
     fontSize: TYPOGRAPHY.fontSize.sm,
   },
   card: {
@@ -331,7 +309,7 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: COLORS.glass.white10,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'center',
@@ -340,13 +318,13 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: TYPOGRAPHY.fontSize.xl,
     fontWeight: TYPOGRAPHY.fontWeight.semiBold,
-    color: COLORS.white,
+    color: COLORS.black,
     textAlign: 'center',
     marginBottom: SPACING.sm,
   },
   cardDescription: {
     fontSize: TYPOGRAPHY.fontSize.md,
-    color: COLORS.glass.white70,
+    color: 'rgba(0, 0, 0, 0.7)',
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: SPACING.xl,
@@ -354,7 +332,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: TYPOGRAPHY.fontSize.md,
     fontWeight: TYPOGRAPHY.fontWeight.semiBold,
-    color: COLORS.white,
+    color: COLORS.black,
     marginBottom: SPACING.md,
   },
   typeGrid: {
@@ -366,10 +344,10 @@ const styles = StyleSheet.create({
   typeCard: {
     width: '48%',
     padding: SPACING.md,
-    backgroundColor: COLORS.glass.white10,
+    backgroundColor: '#f5f5f5',
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.glass.white20,
+    borderColor: '#e0e0e0',
     alignItems: 'center',
     position: 'relative',
   },
@@ -383,10 +361,10 @@ const styles = StyleSheet.create({
   },
   typeLabel: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.glass.white70,
+    color: 'rgba(0, 0, 0, 0.7)',
   },
   typeLabelSelected: {
-    color: COLORS.white,
+    color: COLORS.black,
     fontWeight: TYPOGRAPHY.fontWeight.medium,
   },
   checkIcon: {
@@ -410,13 +388,13 @@ const styles = StyleSheet.create({
   },
   dateLabel: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.glass.white60,
+    color: 'rgba(0, 0, 0, 0.6)',
     textAlign: 'center',
     marginBottom: SPACING.sm,
   },
   dateScroll: {
     height: 150,
-    backgroundColor: COLORS.glass.white10,
+    backgroundColor: '#f5f5f5',
     borderRadius: RADIUS.lg,
   },
   dateItem: {
@@ -424,14 +402,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   dateItemSelected: {
-    backgroundColor: COLORS.glass.white20,
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
   },
   dateItemText: {
     fontSize: TYPOGRAPHY.fontSize.md,
-    color: COLORS.glass.white70,
+    color: 'rgba(0, 0, 0, 0.7)',
   },
   dateItemTextSelected: {
-    color: COLORS.white,
+    color: COLORS.black,
     fontWeight: TYPOGRAPHY.fontWeight.semiBold,
   },
   ddayContainer: {
@@ -441,13 +419,26 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
     marginBottom: SPACING.xl,
     padding: SPACING.md,
-    backgroundColor: COLORS.glass.white10,
+    backgroundColor: '#f5f5f5',
     borderRadius: RADIUS.lg,
   },
   ddayText: {
     fontSize: TYPOGRAPHY.fontSize.xxl,
     fontWeight: TYPOGRAPHY.fontWeight.bold,
     color: COLORS.primary,
+  },
+  primaryButton: {
+    height: 52,
+    backgroundColor: COLORS.black,
+    borderRadius: RADIUS.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  primaryButtonText: {
+    fontSize: TYPOGRAPHY.fontSize.md,
+    fontWeight: TYPOGRAPHY.fontWeight.semiBold,
+    color: COLORS.white,
   },
   completeButton: {
     marginTop: SPACING.sm,
@@ -457,7 +448,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   skipText: {
-    color: COLORS.glass.white50,
+    color: 'rgba(0, 0, 0, 0.5)',
     fontSize: TYPOGRAPHY.fontSize.md,
   },
 });

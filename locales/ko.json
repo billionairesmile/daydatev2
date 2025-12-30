@@ -116,6 +116,18 @@
       "cannotStart": "미션 시작 불가",
       "anotherInProgressMessage": "이미 다른 미션이 진행 중이에요.\n진행 중인 미션을 완료해주세요!",
       "dailyLimitMessage": "오늘 가능한 미션을 모두 완료했어요.\n내일 다시 도전해보세요!"
+    },
+    "refresh": {
+      "questionLine1": "마음에 드는",
+      "questionLine2": "미션이 없나요?",
+      "button": "새로운 미션 받기",
+      "hint": "광고 시청 후 새 미션을 받을 수 있어요",
+      "modalTitle": "새로운 미션",
+      "modalButton": "새로운 미션 받기",
+      "partnerGenerating": "상대방이 미션을 생성 중이에요",
+      "adLoadingFailed": "광고 로딩 실패",
+      "adLoadingFailedMessage": "광고를 불러오는데 실패했어요.\n잠시 후 다시 시도해주세요.",
+      "generating": "새로운 미션 생성 중..."
     }
   },
   "missionDetail": {
@@ -600,6 +612,7 @@
         "terms": "이용약관",
         "location": "위치정보 서비스 이용약관",
         "comma": ", ",
+        "connector": ", ",
         "suffix": "에 동의한 것으로 간주됩니다."
       }
     },
@@ -685,6 +698,7 @@
       "waitingConnection": "연결 대기중",
       "shareCode": "코드 공유하기",
       "waitingPartner": "파트너가 이 코드를 입력하면\n자동으로 연결됩니다",
+      "generatingCode": "코드 생성 중...",
       "connected": "파트너와 연결되었습니다!\n다음으로 진행하세요",
       "invalidCode": "유효하지 않은 코드입니다. 코드를 확인해주세요.",
       "alreadyPaired": "이미 사용된 코드입니다.",
@@ -719,7 +733,38 @@
     },
     "constraints": {
       "title": "미션을 줄 때\n참고할 사항은?",
-      "subtitle": "해당하는 것을 모두 선택해주세요"
+      "subtitle": "해당하는 것을 모두 선택해주세요",
+      "pet": "반려동물",
+      "child": "아이 있음",
+      "long_distance": "장거리",
+      "no_car": "차/면허 없음",
+      "no_alcohol": "술 안함",
+      "none": "없음"
+    },
+    "activityTypes": {
+      "home": "집콕",
+      "cafe_restaurant": "카페·식당",
+      "outdoor": "야외 활동",
+      "culture": "문화생활",
+      "activity": "액티비티",
+      "home_activity": "집에서 활동",
+      "travel": "여행",
+      "drive": "드라이브",
+      "shopping": "쇼핑·구경",
+      "cooking": "요리·베이킹",
+      "sports": "운동·스포츠",
+      "nightlife": "술·나이트",
+      "healing": "힐링·스파",
+      "photo": "사진·영상",
+      "learning": "배움·클래스"
+    },
+    "dateWorries": {
+      "no_idea": "뭐 할지 모르겠어요",
+      "same_pattern": "맨날 비슷한 거만 해요",
+      "budget": "돈이 부담돼요",
+      "time": "시간이 부족해요",
+      "talk": "대화가 필요해요",
+      "none": "딱히 없어요!"
     },
     "preferencesIntro": {
       "title": "맞춤형 미션을 위해\n취향을 알려주세요",
@@ -741,7 +786,7 @@
     "subtitle": "더 특별한 데이트를 위한 프리미엄",
     "heroTitle": "DayDate 프리미엄",
     "heroSubtitle": "연인과 더 특별한 데이트를 즐겨보세요",
-    "heroTitleNew": "지금, 프리미엄을 시작하세요",
+    "heroTitleNew": "지금,\n프리미엄을 시작하세요.",
     "heroSubtitleNew": "결제는 한 번, 혜택은 둘이서",
     "coupleBenefitHighlight": "파트너도 함께 프리미엄!",
     "annual": "연간",
@@ -758,13 +803,19 @@
     "subscribeAnnualCTA": "연간 구독으로 시작하기",
     "subscribeMonthlyCTA": "월간 구독으로 시작하기",
     "termsOfUse": "이용약관",
+    "importantNoticeTitle": "유의사항",
+    "importantNotice1": "한 명이 결제하면 연결된 상대방도 함께 프리미엄을 이용할 수 있습니다.",
+    "importantNotice2": "연결 해제나 탈퇴 시에도 구독은 자동 취소되지 않아요. 이용을 원치 않으시면 직접 해지해 주세요.",
+    "importantNotice3": "구독 상태로 새롭게 커플 연결이 되었을 때 계속해서 프리미엄 기능을 이용하실 수 있습니다.",
     "paymentNoticeTitle": "결제 안내",
     "paymentNotice1": "결제 확인 시 App Store 또는 Google Play 계정으로 청구됩니다.",
     "paymentNotice2": "구독은 현재 기간 종료 최소 24시간 전에 해지하지 않으면 자동으로 갱신됩니다.",
     "paymentNotice3": "기기의 구독 설정에서 언제든지 해지할 수 있습니다.",
+    "paymentNotice4": "결제 진행 시 결제 관련 약관에 동의한 것으로 간주됩니다.",
     "refundNoticeTitle": "환불 안내",
     "refundNotice1": "환불은 App Store 또는 Google Play 정책에 따라 처리됩니다.",
     "refundNotice2": "구독 취소 후에도 결제 기간 종료 시까지 프리미엄 혜택을 이용하실 수 있습니다.",
+    "refundNotice3": "프리미엄 기능 이용 후에는 환불이 불가합니다.",
     "coupleNoticeTitle": "커플 혜택",
     "coupleNotice": "구독하시면 페어링된 파트너도 프리미엄 혜택을 함께 이용할 수 있습니다.",
     "restoreSuccess": "구매 복원 완료",
@@ -785,6 +836,7 @@
       "active": "프리미엄 이용 중",
       "monthlyPlan": "월간 구독 이용 중",
       "annualPlan": "연간 구독 이용 중",
+      "partnerPlan": "파트너 프리미엄 혜택",
       "expiresOn": "{{date}}까지 이용 가능"
     },
     "managementTitle": "프리미엄 관리",
@@ -797,6 +849,8 @@
     "subscribeAnnual": "연간 구독하기",
     "restorePurchases": "구매 복원",
     "manageSubscription": "구독 관리",
+    "partnerPremiumNote": "파트너의 프리미엄 구독으로 혜택을 이용 중입니다",
+    "alreadyHaveBenefits": "프리미엄 혜택 이용 중",
     "termsOfService": "이용약관",
     "privacyPolicy": "개인정보처리방침",
     "legalText": "구독은 결제한 계정에 귀속되며, 페어링된 파트너도 프리미엄 혜택을 함께 이용할 수 있습니다. 구독 해지는 App Store 또는 Google Play에서 직접 가능하며, 해지 후에도 결제한 기간까지 이용 가능합니다. 페어링 해제 또는 계정 탈퇴 시에도 구독은 자동 취소되지 않습니다.",
@@ -818,14 +872,16 @@
       "homeFramePremium": "폴라로이드 + 캘린더",
       "missionKeep": "미션 보관",
       "missionKeepFree": "최대 5개",
-      "missionKeepPremium": "무제한 미션 보관",
+      "missionKeepPremium": "미션 keep 무제한",
       "missionKeepPremiumDesc": "마음에 드는 미션을 제한 없이 저장하고\n원할 때 언제든 도전하세요",
-      "photoStoragePremium": "무제한 사진 보관",
+      "photoStoragePremium": "사진 보관 무제한",
       "photoStoragePremiumDesc": "소중한 추억 사진을\n용량 걱정 없이 보관하세요",
       "albumCreate": "앨범 생성",
       "albumCreateFree": "최대 5개",
-      "albumCreatePremium": "무제한 앨범 생성",
-      "albumCreatePremiumDesc": "특별한 순간들을 테마별로 정리해서\n나만의 추억 앨범을 만들어보세요"
+      "albumCreatePremium": "앨범 생성 무제한",
+      "albumCreatePremiumDesc": "특별한 순간들을 테마별로 정리해서\n나만의 추억 앨범을 만들어보세요",
+      "missionGeneratePremiumShort": "하루 미션 생성 10개",
+      "newFeaturesPremium": "새로운 기능 무료 이용"
     },
     "button": {
       "subscribe": "프리미엄 플랜 구독하기",
