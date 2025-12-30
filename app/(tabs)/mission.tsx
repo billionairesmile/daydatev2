@@ -36,6 +36,7 @@ import RefreshMissionCard from '@/components/RefreshMissionCard';
 import type { Mission, FeaturedMission } from '@/types';
 import { db, isDemoMode } from '@/lib/supabase';
 import { rewardedAdManager } from '@/lib/rewardedAd';
+import { cancelHourlyReminders, cancelMissionReminderNotification } from '@/lib/pushNotifications';
 
 // Type for carousel items (Mission, Ad placeholder, or Refresh card)
 type CarouselItem = Mission | { type: 'ad'; id: string } | { type: 'refresh'; id: string };
@@ -226,6 +227,8 @@ export default function MissionScreen() {
     if (allMissions.length > 0 && !isGenerating && !isWaitingForImages) {
       // Reset scroll initialization state when missions change
       setIsScrollInitialized(false);
+      setCurrentIndex(0);
+      scrollX.setValue(0);
 
       // Trigger a scroll to ensure the FlatList renders the items
       // Then set scroll as initialized after a brief delay
@@ -240,7 +243,7 @@ export default function MissionScreen() {
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [allMissions.length, isGenerating, isWaitingForImages]);
+  }, [allMissions.length, isGenerating, isWaitingForImages, scrollX]);
 
   // Handle image loading completion - hide loading when all images are loaded
   useEffect(() => {
@@ -335,6 +338,11 @@ export default function MissionScreen() {
         setShowBookmarkedMissions(false);
       }
       loadFeaturedMissions(); // Load featured missions on focus
+
+      // Cancel scheduled mission reminder notifications when user visits mission screen
+      // This prevents duplicate reminders after user has already checked the app
+      cancelHourlyReminders();
+      cancelMissionReminderNotification();
     }, [checkAndResetMissions, loadFeaturedMissions, showBookmark])
   );
 

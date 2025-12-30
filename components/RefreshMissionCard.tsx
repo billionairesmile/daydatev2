@@ -9,6 +9,7 @@ import { RefreshCw } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 
 import { COLORS, SPACING, RADIUS } from '@/constants/design';
+import { usePremiumFeature } from '@/stores/subscriptionStore';
 
 interface RefreshMissionCardProps {
   onRefreshPress: () => void;
@@ -16,6 +17,7 @@ interface RefreshMissionCardProps {
 
 export default function RefreshMissionCard({ onRefreshPress }: RefreshMissionCardProps) {
   const { t } = useTranslation();
+  const { isPremium } = usePremiumFeature();
 
   return (
     <View style={styles.container}>
@@ -43,10 +45,12 @@ export default function RefreshMissionCard({ onRefreshPress }: RefreshMissionCar
           </Text>
         </Pressable>
 
-        {/* Hint text */}
-        <Text style={styles.hintText}>
-          {t('mission.refresh.hint')}
-        </Text>
+        {/* Hint text - only show for non-premium users */}
+        {!isPremium && (
+          <Text style={styles.hintText}>
+            {t('mission.refresh.hint')}
+          </Text>
+        )}
       </View>
     </View>
   );

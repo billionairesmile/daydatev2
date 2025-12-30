@@ -700,7 +700,7 @@ export async function scheduleHourlyReminders(
 
     // Schedule reminders for the next several hours
     // Start from the next hour, end before midnight (23:00 device local)
-    // Skip if the effective timezone hour is in quiet period (0:00-11:59)
+    // Skip if the effective timezone hour is in quiet period (0:00-8:59)
     for (let i = 1; i <= MAX_HOURLY_REMINDERS; i++) {
       const deviceHour = currentDeviceHour + i;
 
@@ -720,8 +720,8 @@ export async function scheduleHourlyReminders(
         10
       );
 
-      // Skip midnight to noon (0:00-11:59) in effective timezone - quiet morning hours
-      if (hourInEffectiveTimezone < 12) {
+      // Skip midnight to 9 AM (0:00-8:59) in effective timezone - quiet hours
+      if (hourInEffectiveTimezone < 9) {
         console.log('[Push] Skipping reminder at', triggerDate.toLocaleTimeString(), '- quiet hours in', effectiveTimezone);
         continue;
       }
