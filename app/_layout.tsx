@@ -20,7 +20,7 @@ import 'react-native-reanimated';
 import '@/lib/i18n';
 import { useTranslation } from 'react-i18next';
 
-import { useAuthStore, useOnboardingStore, useTimezoneStore, useSubscriptionStore } from '@/stores';
+import { useAuthStore, useOnboardingStore, useTimezoneStore, useSubscriptionStore, useLanguageStore } from '@/stores';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
 import { BackgroundProvider, useBackground } from '@/contexts';
 import { preloadCharacterAssets } from '@/utils';
@@ -194,10 +194,12 @@ function RootLayoutNav() {
   const { setStep: setOnboardingStep, updateData: updateOnboardingData } = useOnboardingStore();
   const { syncFromCouple } = useTimezoneStore();
   const { initializeRevenueCat, loadFromDatabase, checkCouplePremium, setPartnerIsPremium, _hasHydrated: subscriptionHydrated } = useSubscriptionStore();
+  const { syncLanguageToDatabase } = useLanguageStore();
   const [isNavigationReady, setIsNavigationReady] = useState(false);
   const appState = useRef(AppState.currentState);
   const lastFetchTime = useRef<number>(0);
   const subscriptionInitialized = useRef(false);
+  const languageSynced = useRef(false);
 
   // Initialize push notifications
   usePushNotifications();
@@ -210,6 +212,15 @@ function RootLayoutNav() {
       initializeRevenueCat(user.id);
     }
   }, [user?.id, subscriptionHydrated, initializeRevenueCat]);
+
+  // Sync user's language preference to database for push notification localization
+  useEffect(() => {
+    if (user?.id && !languageSynced.current && !isDemoMode) {
+      languageSynced.current = true;
+      console.log('[Layout] Syncing language to database for push notifications');
+      syncLanguageToDatabase();
+    }
+  }, [user?.id, syncLanguageToDatabase]);
 
   // Check couple premium status to determine if partner has premium (for shared premium benefits)
   useEffect(() => {

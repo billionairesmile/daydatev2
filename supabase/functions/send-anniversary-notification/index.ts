@@ -57,6 +57,10 @@ const notificationMessages = {
       title: (icon: string) => `${icon} 紀念日還有一週就到了！`,
       body: (title: string, daysLeft: number) => `距離${title}還有${daysLeft}天，來計劃一些特別的事吧！💕`,
     },
+    ja: {
+      title: (icon: string) => `${icon} 記念日まであと1週間！`,
+      body: (title: string, daysLeft: number) => `${title}まであと${daysLeft}日です。特別な計画を立ててみてね！💕`,
+    },
   },
   today: {
     ko: {
@@ -75,13 +79,17 @@ const notificationMessages = {
       title: (icon: string) => `${icon} 今天是特別的日子！`,
       body: (title: string) => `今天是${title}！和心愛的人一起度過美好的一天吧 💕`,
     },
+    ja: {
+      title: (icon: string) => `${icon} 今日は特別な日です！`,
+      body: (title: string) => `今日は${title}です！大切な人と素敵な一日を過ごしてね 💕`,
+    },
   },
 };
 
-type SupportedLanguage = "ko" | "en" | "es" | "zh-TW";
+type SupportedLanguage = "ko" | "en" | "es" | "zh-TW" | "ja";
 
 function getLanguage(lang: string | null): SupportedLanguage {
-  if (lang && ["ko", "en", "es", "zh-TW"].includes(lang)) {
+  if (lang && ["ko", "en", "es", "zh-TW", "ja"].includes(lang)) {
     return lang as SupportedLanguage;
   }
   return "ko";

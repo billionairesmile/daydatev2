@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import i18n from '@/lib/i18n';
+import { db, isDemoMode } from '@/lib/supabase';
+import { useAuthStore } from '@/stores/authStore';
 
 // Supported languages
 export type SupportedLanguage = 'ko' | 'en' | 'es' | 'zh-TW' | 'ja';
@@ -21,7 +23,30 @@ interface LanguageState {
   setLanguage: (language: SupportedLanguage) => void;
   setDetectedCountry: (country: CountryCode) => void;
   resetToDeviceLanguage: () => void;
+  syncLanguageToDatabase: () => Promise<void>;
 }
+
+// Sync language to database for push notification localization
+const syncLanguageToDatabase = async (language: SupportedLanguage) => {
+  if (isDemoMode) return;
+
+  const userId = useAuthStore.getState().user?.id;
+  if (!userId) {
+    console.log('[LanguageStore] No user ID, skipping database sync');
+    return;
+  }
+
+  try {
+    const { error } = await db.profiles.update(userId, { language });
+    if (error) {
+      console.error('[LanguageStore] Failed to sync language to database:', error);
+    } else {
+      console.log('[LanguageStore] Language synced to database:', language);
+    }
+  } catch (e) {
+    console.error('[LanguageStore] Error syncing language to database:', e);
+  }
+};
 
 // Get device language
 const getDeviceLanguage = (): SupportedLanguage => {
@@ -58,6 +83,8 @@ export const useLanguageStore = create<LanguageState>()(
         // Update i18n language
         i18n.changeLanguage(language);
         set({ language, isManuallySet: true });
+        // Sync to database for push notification localization
+        syncLanguageToDatabase(language);
       },
 
       setDetectedCountry: (country: CountryCode) => {
@@ -68,6 +95,13 @@ export const useLanguageStore = create<LanguageState>()(
         const deviceLanguage = getDeviceLanguage();
         i18n.changeLanguage(deviceLanguage);
         set({ language: deviceLanguage, isManuallySet: false });
+        // Sync to database for push notification localization
+        syncLanguageToDatabase(deviceLanguage);
+      },
+
+      syncLanguageToDatabase: async () => {
+        const { language } = get();
+        await syncLanguageToDatabase(language);
       },
     }),
     {

@@ -428,9 +428,59 @@ const notificationMessages = {
       body: (nickname: string) => `${nickname}さんが写真をアップしました。お互いにひとことを残してね！`,
     },
   },
+  coupleUnpaired: {
+    ko: {
+      title: '💔 페어링이 해제되었어요',
+      body: (nickname: string) => `${nickname}님이 페어링을 해제했어요.`,
+    },
+    en: {
+      title: '💔 Pairing disconnected',
+      body: (nickname: string) => `${nickname} has disconnected the pairing.`,
+    },
+    es: {
+      title: '💔 Emparejamiento desconectado',
+      body: (nickname: string) => `${nickname} ha desconectado el emparejamiento.`,
+    },
+    'zh-TW': {
+      title: '💔 配對已解除',
+      body: (nickname: string) => `${nickname}已解除配對。`,
+    },
+    ja: {
+      title: '💔 ペアリングが解除されました',
+      body: (nickname: string) => `${nickname}さんがペアリングを解除しました。`,
+    },
+  },
 } as const;
 
 type SupportedLanguage = 'ko' | 'en' | 'es' | 'zh-TW' | 'ja';
+
+/**
+ * Get user's language preference from database
+ * This is used to send push notifications in the recipient's language
+ */
+async function getUserLanguage(userId: string): Promise<SupportedLanguage> {
+  if (isDemoMode || !supabase) {
+    return 'ko';
+  }
+
+  try {
+    const { data, error } = await db.profiles.get(userId);
+    if (error || !data) {
+      console.log('[Push] Could not fetch user language, using default:', error?.message);
+      return 'ko';
+    }
+
+    const language = (data as { language?: string }).language;
+    if (language && ['ko', 'en', 'es', 'zh-TW', 'ja'].includes(language)) {
+      return language as SupportedLanguage;
+    }
+
+    return 'ko';
+  } catch (e) {
+    console.error('[Push] Error fetching user language:', e);
+    return 'ko';
+  }
+}
 
 /**
  * Send push notification via Supabase Edge Function
@@ -467,13 +517,16 @@ export async function sendPushNotification(params: SendNotificationParams): Prom
 
 /**
  * Send mission generated notification to partner
+ * Uses the recipient's language preference from the database
  */
 export async function notifyPartnerMissionGenerated(
   partnerId: string,
   generatorNickname: string,
-  language: SupportedLanguage = 'ko'
+  _language?: SupportedLanguage // Deprecated: language is now fetched from recipient's profile
 ): Promise<boolean> {
-  const messages = notificationMessages.missionGenerated[language];
+  // Fetch the recipient's language preference
+  const recipientLanguage = await getUserLanguage(partnerId);
+  const messages = notificationMessages.missionGenerated[recipientLanguage];
   return sendPushNotification({
     targetUserId: partnerId,
     type: 'mission_generated',
@@ -485,14 +538,17 @@ export async function notifyPartnerMissionGenerated(
 
 /**
  * Send mission reminder notification
+ * Uses the recipient's language preference from the database
  */
 export async function notifyMissionReminder(
   userId: string,
   partnerNickname: string,
   hasPartnerWritten: boolean,
-  language: SupportedLanguage = 'ko'
+  _language?: SupportedLanguage // Deprecated: language is now fetched from recipient's profile
 ): Promise<boolean> {
-  const messages = notificationMessages.missionReminder[language];
+  // Fetch the recipient's language preference
+  const recipientLanguage = await getUserLanguage(userId);
+  const messages = notificationMessages.missionReminder[recipientLanguage];
   const body = hasPartnerWritten
     ? messages.bodyWithPartner(partnerNickname)
     : messages.bodyWithoutPartner;
@@ -508,13 +564,16 @@ export async function notifyMissionReminder(
 
 /**
  * Send photo uploaded notification to partner
+ * Uses the recipient's language preference from the database
  */
 export async function notifyPartnerPhotoUploaded(
   partnerId: string,
   uploaderNickname: string,
-  language: SupportedLanguage = 'ko'
+  _language?: SupportedLanguage // Deprecated: language is now fetched from recipient's profile
 ): Promise<boolean> {
-  const messages = notificationMessages.photoUploaded[language];
+  // Fetch the recipient's language preference
+  const recipientLanguage = await getUserLanguage(partnerId);
+  const messages = notificationMessages.photoUploaded[recipientLanguage];
   return sendPushNotification({
     targetUserId: partnerId,
     type: 'photo_uploaded',
@@ -526,31 +585,38 @@ export async function notifyPartnerPhotoUploaded(
 
 /**
  * Send unpair notification to partner
+ * Uses the recipient's language preference from the database
  */
 export async function notifyPartnerUnpaired(
   partnerId: string,
-  partnerNickname: string,
-  title: string,
-  body: string
+  unpairedByNickname: string,
+  _title?: string, // Deprecated: translations are now used
+  _body?: string   // Deprecated: translations are now used
 ): Promise<boolean> {
+  // Fetch the recipient's language preference
+  const recipientLanguage = await getUserLanguage(partnerId);
+  const messages = notificationMessages.coupleUnpaired[recipientLanguage];
   return sendPushNotification({
     targetUserId: partnerId,
     type: 'couple_unpaired',
-    title,
-    body,
+    title: messages.title,
+    body: messages.body(unpairedByNickname),
     data: { screen: 'onboarding' },
   });
 }
 
 /**
  * Send notification when partner writes their message (한마디)
+ * Uses the recipient's language preference from the database
  */
 export async function notifyPartnerMessageWritten(
   partnerId: string,
   writerNickname: string,
-  language: SupportedLanguage = 'ko'
+  _language?: SupportedLanguage // Deprecated: language is now fetched from recipient's profile
 ): Promise<boolean> {
-  const messages = notificationMessages.partnerMessageWritten[language];
+  // Fetch the recipient's language preference
+  const recipientLanguage = await getUserLanguage(partnerId);
+  const messages = notificationMessages.partnerMessageWritten[recipientLanguage];
   return sendPushNotification({
     targetUserId: partnerId,
     type: 'partner_message_written',
