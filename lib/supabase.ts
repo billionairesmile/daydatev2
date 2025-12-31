@@ -2397,6 +2397,23 @@ export const db = {
 
     async add(albumId: string, memoryId: string, userId: string) {
       const client = getSupabase();
+      console.log('[db.albumPhotos.add] Inserting:', { albumId, memoryId, userId });
+
+      // First verify the memory exists in completed_missions
+      const { data: memoryCheck, error: memoryCheckError } = await client
+        .from('completed_missions')
+        .select('id')
+        .eq('id', memoryId)
+        .single();
+
+      if (memoryCheckError || !memoryCheck) {
+        console.error('[db.albumPhotos.add] Memory not found in completed_missions:', memoryId);
+        console.error('[db.albumPhotos.add] Error:', memoryCheckError);
+        return { data: null, error: memoryCheckError || new Error('Memory not found in database') };
+      }
+
+      console.log('[db.albumPhotos.add] Memory exists, proceeding with insert');
+
       const { data, error } = await client
         .from('album_photos')
         .insert({
@@ -2406,16 +2423,79 @@ export const db = {
         })
         .select()
         .single();
+
+      // Handle duplicate key error (23505) - photo already exists in album
+      if (error && error.code === '23505') {
+        console.log('[db.albumPhotos.add] Photo already exists in album, fetching existing record');
+        // Fetch the existing record instead - treat as success
+        const { data: existingData, error: fetchError } = await client
+          .from('album_photos')
+          .select()
+          .eq('album_id', albumId)
+          .eq('memory_id', memoryId)
+          .single();
+
+        if (fetchError) {
+          console.error('[db.albumPhotos.add] Failed to fetch existing record:', fetchError);
+          return { data: null, error: fetchError };
+        }
+
+        console.log('[db.albumPhotos.add] Returning existing record:', existingData);
+        return { data: existingData, error: null };
+      }
+
+      if (error) {
+        console.error('[db.albumPhotos.add] Insert error:', error);
+        console.error('[db.albumPhotos.add] Error details:', JSON.stringify(error, null, 2));
+      } else {
+        console.log('[db.albumPhotos.add] Insert successful:', data);
+
+        // Touch the album's updated_at to trigger real-time sync for partners
+        // This is necessary because album_photos table doesn't have couple_id,
+        // so we use the album update event (which has couple_id filter) to notify partners
+        const { error: touchError } = await client
+          .from('couple_albums')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('id', albumId);
+
+        if (touchError) {
+          console.warn('[db.albumPhotos.add] Failed to touch album updated_at:', touchError);
+        } else {
+          console.log('[db.albumPhotos.add] Album updated_at touched for sync');
+        }
+      }
+
       return { data, error };
     },
 
     async remove(albumId: string, memoryId: string) {
       const client = getSupabase();
+      console.log('[db.albumPhotos.remove] Deleting:', { albumId, memoryId });
+
       const { error } = await client
         .from('album_photos')
         .delete()
         .eq('album_id', albumId)
         .eq('memory_id', memoryId);
+
+      if (error) {
+        console.error('[db.albumPhotos.remove] Delete error:', error);
+      } else {
+        console.log('[db.albumPhotos.remove] Delete successful');
+
+        // Touch the album's updated_at to trigger real-time sync for partners
+        const { error: touchError } = await client
+          .from('couple_albums')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('id', albumId);
+
+        if (touchError) {
+          console.warn('[db.albumPhotos.remove] Failed to touch album updated_at:', touchError);
+        } else {
+          console.log('[db.albumPhotos.remove] Album updated_at touched for sync');
+        }
+      }
+
       return { error };
     },
 
@@ -2433,6 +2513,7 @@ export const db = {
       callback: (payload: { eventType: string; albumPhoto: unknown }) => void
     ) {
       const client = getSupabase();
+      console.log('[db.albumPhotos.subscribeToAlbumPhotos] Setting up subscription for couple:', coupleId);
       // Subscribe to all album_photos changes for albums belonging to this couple
       // Note: Filtered at application level since we can't filter by couple_id directly
       const channel = client
@@ -2445,13 +2526,17 @@ export const db = {
             table: 'album_photos',
           },
           (payload) => {
+            console.log('[db.albumPhotos.subscribeToAlbumPhotos] Received realtime event:', payload.eventType);
+            console.log('[db.albumPhotos.subscribeToAlbumPhotos] Payload:', JSON.stringify(payload.new || payload.old, null, 2));
             callback({
               eventType: payload.eventType,
               albumPhoto: payload.eventType === 'DELETE' ? payload.old : payload.new,
             });
           }
         )
-        .subscribe();
+        .subscribe((status) => {
+          console.log('[db.albumPhotos.subscribeToAlbumPhotos] Subscription status:', status);
+        });
       return channel;
     },
 

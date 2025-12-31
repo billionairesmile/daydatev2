@@ -113,8 +113,8 @@ interface MonthData {
 export default function MemoriesScreen() {
   const { t, i18n } = useTranslation();
   const { backgroundImage } = useBackground();
-  const { memories, deleteMemory } = useMemoryStore();
-  const { user, partner } = useAuthStore();
+  const { memories, deleteMemory, loadFromDB } = useMemoryStore();
+  const { user, partner, couple } = useAuthStore();
 
   // Album sync store
   const {
@@ -127,6 +127,7 @@ export default function MemoriesScreen() {
     deleteAlbum: syncDeleteAlbum,
     addPhotoToAlbum: syncAddPhotoToAlbum,
     removePhotoFromAlbum: syncRemovePhotoFromAlbum,
+    loadAlbums: syncLoadAlbums,
   } = useCoupleSyncStore();
 
   // Subscription store for read-only album checks and album limit
@@ -209,6 +210,22 @@ export default function MemoriesScreen() {
       });
     });
   }, [albumPhotos]);
+
+  // Load memories from database to ensure we have the correct database IDs
+  useEffect(() => {
+    if (couple?.id && isSyncInitialized) {
+      console.log('[Memories] Loading memories from database for couple:', couple.id);
+      loadFromDB(couple.id);
+    }
+  }, [couple?.id, isSyncInitialized, loadFromDB]);
+
+  // Load albums and album photos from database to ensure local state is in sync
+  useEffect(() => {
+    if (isSyncInitialized) {
+      console.log('[Memories] Refreshing albums from database');
+      syncLoadAlbums();
+    }
+  }, [isSyncInitialized, syncLoadAlbums]);
 
   // Album creation states
   const [showAlbumModal, setShowAlbumModal] = useState(false);
