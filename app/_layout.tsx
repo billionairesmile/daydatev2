@@ -10,6 +10,8 @@ import { ChironGoRoundTC_400Regular } from '@expo-google-fonts/chiron-goround-tc
 import { PoetsenOne_400Regular } from '@expo-google-fonts/poetsen-one';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import * as Location from 'expo-location';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StyleSheet, AppState, AppStateStatus, Alert } from 'react-native';
 import 'react-native-reanimated';
@@ -118,6 +120,30 @@ export default function RootLayout() {
   useEffect(() => {
     if (fontError) throw fontError;
   }, [fontError]);
+
+  // Request location permission on first app launch
+  useEffect(() => {
+    const requestLocationOnFirstLaunch = async () => {
+      try {
+        const hasRequestedLocation = await AsyncStorage.getItem('hasRequestedLocationPermission');
+        if (hasRequestedLocation) {
+          // Already requested before, skip
+          return;
+        }
+
+        // Mark as requested before actually requesting (to prevent duplicate requests)
+        await AsyncStorage.setItem('hasRequestedLocationPermission', 'true');
+
+        // Request location permission - this shows the native OS dialog
+        await Location.requestForegroundPermissionsAsync();
+        console.log('[Layout] Location permission requested on first launch');
+      } catch (error) {
+        console.error('[Layout] Error requesting location permission:', error);
+      }
+    };
+
+    requestLocationOnFirstLaunch();
+  }, []);
 
   useEffect(() => {
     // Include authHydrated to prevent flash of home screen before auth state is known
