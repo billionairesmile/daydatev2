@@ -96,6 +96,7 @@ safeSplashScreen.preventAutoHide();
 export default function RootLayout() {
   const [assetsLoaded, setAssetsLoaded] = useState(false);
   const [backgroundLoaded, setBackgroundLoaded] = useState(false);
+  const authHydrated = useAuthStore((state) => state._hasHydrated);
   const [fontsLoaded, fontError] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
     Jua: Jua_400Regular,
@@ -119,14 +120,15 @@ export default function RootLayout() {
   }, [fontError]);
 
   useEffect(() => {
-    if (fontsLoaded && assetsLoaded && backgroundLoaded) {
+    // Include authHydrated to prevent flash of home screen before auth state is known
+    if (fontsLoaded && assetsLoaded && backgroundLoaded && authHydrated) {
       // Add minimum display time for splash screen (1.5 seconds)
       const timer = setTimeout(() => {
         safeSplashScreen.hide();
       }, 1500);
       return () => clearTimeout(timer);
     }
-  }, [fontsLoaded, assetsLoaded, backgroundLoaded]);
+  }, [fontsLoaded, assetsLoaded, backgroundLoaded, authHydrated]);
 
   if (!fontsLoaded || !assetsLoaded) {
     return null;
@@ -161,7 +163,7 @@ function RootLayoutNav() {
   const router = useRouter();
   const segments = useSegments();
   const { t } = useTranslation();
-  const { isAuthenticated, isOnboardingComplete, setIsOnboardingComplete, couple, user, setCouple, setPartner, partner } = useAuthStore();
+  const { isAuthenticated, isOnboardingComplete, setIsOnboardingComplete, couple, user, setCouple, setPartner, partner, _hasHydrated: authHydrated } = useAuthStore();
   const { initializeSync, cleanup: cleanupSync, processPendingOperations, loadMissionProgress, loadSharedMissions } = useCoupleSyncStore();
   const { setStep: setOnboardingStep, updateData: updateOnboardingData } = useOnboardingStore();
   const { syncFromCouple } = useTimezoneStore();
@@ -733,16 +735,19 @@ function RootLayoutNav() {
     };
   }, [isOnboardingComplete, couple?.id, setCouple, setPartner, setIsOnboardingComplete, cleanupSync, router, setOnboardingStep, updateOnboardingData]);
 
-  // Wait for navigation to be ready before redirecting
+  // Wait for auth hydration and navigation to be ready before redirecting
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsNavigationReady(true);
-    }, 100);
-    return () => clearTimeout(timer);
-  }, []);
+    // Only set navigation ready after auth store is hydrated
+    if (authHydrated) {
+      const timer = setTimeout(() => {
+        setIsNavigationReady(true);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [authHydrated]);
 
   useEffect(() => {
-    if (!isNavigationReady) return;
+    if (!isNavigationReady || !authHydrated) return;
 
     const inAuthGroup = segments[0] === '(auth)';
 
@@ -754,7 +759,12 @@ function RootLayoutNav() {
     else if (isOnboardingComplete && inAuthGroup) {
       router.replace('/(tabs)');
     }
-  }, [isNavigationReady, isOnboardingComplete]);
+  }, [isNavigationReady, isOnboardingComplete, authHydrated]);
+
+  // Don't render Stack until auth state is hydrated to prevent flash of home screen
+  if (!authHydrated) {
+    return null;
+  }
 
   return (
     <>
