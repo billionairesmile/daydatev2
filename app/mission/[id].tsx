@@ -256,6 +256,7 @@ export default function MissionDetailScreen() {
                     source={{ uri: part }}
                     style={styles.additionalContentImage}
                     contentFit="cover"
+                    cachePolicy="memory-disk"
                   />
                 </Pressable>
               );

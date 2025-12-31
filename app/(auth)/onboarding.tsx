@@ -2638,12 +2638,13 @@ function PairingStep({
                 createdAt: creatorProfile.created_at ? new Date(creatorProfile.created_at) : new Date(),
               });
 
-              // Cleanup orphaned pending couples for both users
-              console.log('[PairingStep] Reconnection cleanup: removing orphaned pending couples');
-              await Promise.all([
-                db.couples.cleanupPendingCouples(joinerId, restoredCouple.id),
-                db.couples.cleanupPendingCouples(partnerId, restoredCouple.id),
-              ]);
+              // Cleanup orphaned pending couples for PARTNER only (they created the reconnection code)
+              // NOTE: We intentionally do NOT clean up joiner's pending couples here because:
+              // 1. The joiner's pairing code might still be used by someone else (race condition)
+              // 2. FK constraint (ON DELETE SET NULL) would invalidate their code if we delete the couple
+              // 3. Joiner's pending couples will be cleaned up when they create a new code or expire naturally
+              console.log('[PairingStep] Reconnection cleanup: removing partner orphaned pending couples');
+              await db.couples.cleanupPendingCouples(partnerId, restoredCouple.id);
 
               // Update pairing code's couple_id to point to the restored couple
               // This is important for creator's realtime handler to find the correct couple
@@ -2820,14 +2821,14 @@ function PairingStep({
           createdAt: creatorProfile?.created_at ? new Date(creatorProfile.created_at) : new Date(),
         });
 
-        // Cleanup orphaned pending couples for both users
-        // - Joiner might have old pending couples from previous pairing attempts
+        // Cleanup orphaned pending couples for CREATOR only
         // - Creator might have old pending couples from previous pairing attempts
-        console.log('[PairingStep] Cleaning up orphaned pending couples');
-        await Promise.all([
-          db.couples.cleanupPendingCouples(joinerId, updatedCouple.id),
-          db.couples.cleanupPendingCouples(updatedCouple.user1_id, updatedCouple.id),
-        ]);
+        // NOTE: We intentionally do NOT clean up joiner's pending couples here because:
+        // 1. The joiner's pairing code might still be used by someone else (race condition)
+        // 2. FK constraint (ON DELETE SET NULL) would invalidate their code if we delete the couple
+        // 3. Joiner's pending couples will be cleaned up when they create a new code or expire naturally
+        console.log('[PairingStep] Cleaning up creator orphaned pending couples');
+        await db.couples.cleanupPendingCouples(updatedCouple.user1_id, updatedCouple.id);
       }
 
       console.log('[PairingStep] Setting isPairingConnected to true');
