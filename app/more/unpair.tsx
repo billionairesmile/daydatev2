@@ -35,10 +35,17 @@ export default function UnpairScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const { couple } = useAuthStore();
-  const { memories } = useMemoryStore();
+  const { memories, loadFromDB } = useMemoryStore();
 
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirmText, setConfirmText] = useState('');
+
+  // Load fresh memory count from database when screen opens
+  useEffect(() => {
+    if (couple?.id) {
+      loadFromDB(couple.id);
+    }
+  }, [couple?.id, loadFromDB]);
 
   // Keyboard animation for modal
   const modalAnimatedValue = useRef(new Animated.Value(0)).current;

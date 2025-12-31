@@ -86,7 +86,7 @@ const getOpenAIClient = () => {
 
 // Detect country from coordinates using OpenWeatherMap reverse geocoding
 async function detectCountryFromCoordinates(latitude: number, longitude: number): Promise<string> {
-  const apiKey = process.env.EXPO_PUBLIC_WEATHER_API_KEY;
+  const apiKey = process.env.EXPO_PUBLIC_OPENWEATHER_API_KEY;
   if (!apiKey) return 'DEFAULT';
 
   try {
@@ -220,11 +220,11 @@ function getSeason(
 }
 
 async function fetchWeather(latitude: number, longitude: number): Promise<WeatherContext> {
-  const apiKey = process.env.EXPO_PUBLIC_WEATHER_API_KEY;
+  const apiKey = process.env.EXPO_PUBLIC_OPENWEATHER_API_KEY;
 
   // Fallback to season-based default if no API key
   if (!apiKey) {
-    console.log('[Weather] No API key, using season fallback');
+    console.log('[Weather] No API key (EXPO_PUBLIC_OPENWEATHER_API_KEY), using season fallback');
     return getSeasonFallback();
   }
 

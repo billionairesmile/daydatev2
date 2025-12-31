@@ -121,28 +121,38 @@ export default function RootLayout() {
     if (fontError) throw fontError;
   }, [fontError]);
 
-  // Request location permission on first app launch
+  // Request location and notification permissions on first app launch
   useEffect(() => {
-    const requestLocationOnFirstLaunch = async () => {
+    const requestPermissionsOnFirstLaunch = async () => {
       try {
-        const hasRequestedLocation = await AsyncStorage.getItem('hasRequestedLocationPermission');
-        if (hasRequestedLocation) {
+        const hasRequestedPermissions = await AsyncStorage.getItem('hasRequestedInitialPermissions');
+        if (hasRequestedPermissions) {
           // Already requested before, skip
           return;
         }
 
         // Mark as requested before actually requesting (to prevent duplicate requests)
-        await AsyncStorage.setItem('hasRequestedLocationPermission', 'true');
+        await AsyncStorage.setItem('hasRequestedInitialPermissions', 'true');
 
         // Request location permission - this shows the native OS dialog
         await Location.requestForegroundPermissionsAsync();
         console.log('[Layout] Location permission requested on first launch');
+
+        // Request push notification permission - this shows the native OS dialog
+        // Import dynamically to avoid issues in Expo Go
+        try {
+          const { requestNotificationPermission } = await import('@/lib/pushNotifications');
+          const granted = await requestNotificationPermission();
+          console.log('[Layout] Notification permission requested on first launch, granted:', granted);
+        } catch (notifError) {
+          console.log('[Layout] Could not request notification permission:', notifError);
+        }
       } catch (error) {
-        console.error('[Layout] Error requesting location permission:', error);
+        console.error('[Layout] Error requesting permissions on first launch:', error);
       }
     };
 
-    requestLocationOnFirstLaunch();
+    requestPermissionsOnFirstLaunch();
   }, []);
 
   useEffect(() => {

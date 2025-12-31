@@ -116,7 +116,8 @@ export const useMemoryStore = create<MemoryState & MemoryActions>()(
             const memories = data.map(dbToCompletedMission);
             set({ memories, isLoading: false });
           } else {
-            set({ isLoading: false });
+            // Clear memories when database returns empty (e.g., after deletion)
+            set({ memories: [], isLoading: false });
           }
         } catch (error) {
           console.error('Error loading memories from DB:', error);

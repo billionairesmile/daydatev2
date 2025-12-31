@@ -222,3 +222,152 @@ export const isDateTodayInTimezone = (dateString: string): boolean => {
   const today = getTodayInTimezone();
   return dateString === today;
 };
+
+// Helper: Get the next midnight in specified timezone as ISO string (UTC)
+// This is used for mission expiration times
+export const getNextMidnightInTimezone = (timezone?: string): string => {
+  const tz = timezone || useTimezoneStore.getState().getEffectiveTimezone();
+
+  try {
+    // Get tomorrow's date in the target timezone
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: tz,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+
+    const parts = formatter.formatToParts(now);
+    const yearPart = parts.find(p => p.type === 'year')?.value;
+    const monthPart = parts.find(p => p.type === 'month')?.value;
+    const dayPart = parts.find(p => p.type === 'day')?.value;
+
+    // Validate parts exist
+    if (!yearPart || !monthPart || !dayPart) {
+      throw new Error('Failed to parse date parts from formatter');
+    }
+
+    const year = parseInt(yearPart, 10);
+    const month = parseInt(monthPart, 10) - 1; // 0-indexed
+    const day = parseInt(dayPart, 10);
+
+    // Validate parsed values
+    if (isNaN(year) || isNaN(month) || isNaN(day)) {
+      throw new Error(`Invalid date values: year=${year}, month=${month}, day=${day}`);
+    }
+
+    // Get the timezone offset for the target timezone
+    const tzOffset = getTimezoneOffsetMinutes(tz);
+
+    // Validate offset is a finite number
+    if (!isFinite(tzOffset)) {
+      console.warn('[TimezoneStore] Invalid timezone offset:', tzOffset, 'for timezone:', tz);
+      throw new Error(`Invalid timezone offset: ${tzOffset}`);
+    }
+
+    // Create tomorrow at midnight in UTC first
+    // day + 1 is safe because Date.UTC handles overflow (e.g., day 32 becomes next month day 1)
+    const tomorrowMidnightUTC = new Date(Date.UTC(year, month, day + 1, 0, 0, 0, 0));
+
+    // Validate the date is valid
+    if (isNaN(tomorrowMidnightUTC.getTime())) {
+      throw new Error('Created invalid date for tomorrow midnight');
+    }
+
+    // Adjust for timezone offset (subtract offset to get UTC time that corresponds to local midnight)
+    // If timezone is UTC+9 (tzOffset = 540), midnight local = 15:00 UTC previous day
+    // So we subtract the offset: 00:00 - 540min = 15:00 UTC previous day
+    const adjustedTime = tomorrowMidnightUTC.getTime() - (tzOffset * 60 * 1000);
+
+    // Validate adjusted time
+    if (!isFinite(adjustedTime)) {
+      throw new Error(`Invalid adjusted time: ${adjustedTime}`);
+    }
+
+    const result = new Date(adjustedTime);
+
+    // Final validation
+    if (isNaN(result.getTime())) {
+      throw new Error('Final result is invalid date');
+    }
+
+    return result.toISOString();
+  } catch (e) {
+    console.error('[TimezoneStore] Error calculating next midnight:', e);
+    // Fallback to device local time
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    return tomorrow.toISOString();
+  }
+};
+
+// Helper: Get timezone offset in minutes for a given IANA timezone
+const getTimezoneOffsetMinutes = (timezone: string): number => {
+  try {
+    // Use Intl.DateTimeFormat to get reliable timezone offset
+    const now = new Date();
+
+    // Get formatted date parts for target timezone
+    const targetFormatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+
+    // Get formatted date parts for UTC
+    const utcFormatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'UTC',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+
+    const targetParts = targetFormatter.formatToParts(now);
+    const utcParts = utcFormatter.formatToParts(now);
+
+    const getPart = (parts: Intl.DateTimeFormatPart[], type: string): number => {
+      const part = parts.find(p => p.type === type);
+      return part ? parseInt(part.value, 10) : 0;
+    };
+
+    // Calculate total minutes from midnight for both
+    const targetDay = getPart(targetParts, 'day');
+    const targetHour = getPart(targetParts, 'hour');
+    const targetMinute = getPart(targetParts, 'minute');
+
+    const utcDay = getPart(utcParts, 'day');
+    const utcHour = getPart(utcParts, 'hour');
+    const utcMinute = getPart(utcParts, 'minute');
+
+    // Calculate day difference (handle month boundaries)
+    let dayDiff = targetDay - utcDay;
+    if (dayDiff > 15) dayDiff -= 31; // Target is in previous month relative to UTC
+    if (dayDiff < -15) dayDiff += 31; // Target is in next month relative to UTC
+
+    // Total offset in minutes
+    const targetTotalMinutes = (dayDiff * 24 * 60) + (targetHour * 60) + targetMinute;
+    const utcTotalMinutes = (utcHour * 60) + utcMinute;
+
+    const offset = targetTotalMinutes - utcTotalMinutes;
+
+    // Sanity check: offset should be between -14 hours and +14 hours
+    if (offset < -14 * 60 || offset > 14 * 60) {
+      console.warn('[TimezoneStore] Calculated offset out of range:', offset, 'minutes for timezone:', timezone);
+      return 0;
+    }
+
+    return offset;
+  } catch (e) {
+    console.error('[TimezoneStore] Error getting timezone offset:', e);
+    return 0; // Default to UTC
+  }
+};

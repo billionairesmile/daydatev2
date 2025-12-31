@@ -100,7 +100,7 @@ interface MissionActions {
   resetTodayCompletedMission: () => void;
   resetAllTodayMissions: () => void;
   // Refresh tracking
-  setRefreshUsedToday: () => void;
+  setRefreshUsedToday: () => Promise<void>;
   hasUsedRefreshToday: () => boolean;
   // In-progress mission actions
   saveInProgressMission: (data: Partial<InProgressMissionData> & { missionId: string }) => void;
@@ -652,10 +652,25 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
         });
       },
 
-      // Mark refresh as used today
-      setRefreshUsedToday: () => {
+      // Mark refresh as used today (syncs to DB for couple sync)
+      setRefreshUsedToday: async () => {
         const today = getTodayDateString();
         set({ refreshUsedDate: today });
+
+        // Also sync to database so partner sees the same state
+        const syncStore = useCoupleSyncStore.getState();
+        if (syncStore.isInitialized && syncStore.coupleId && !isDemoMode) {
+          try {
+            const { error } = await db.coupleMissions.setRefreshed(syncStore.coupleId);
+            if (error) {
+              console.error('[MissionStore] Failed to sync refresh status to DB:', error);
+            } else {
+              console.log('[MissionStore] Successfully synced refresh status to DB');
+            }
+          } catch (e) {
+            console.error('[MissionStore] Error syncing refresh status:', e);
+          }
+        }
       },
 
       // Check if refresh has been used today

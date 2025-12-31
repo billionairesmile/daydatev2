@@ -7,7 +7,7 @@ import type { Mission } from '@/types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { useMemoryStore, dbToCompletedMission } from './memoryStore';
 import { formatDateToLocal } from '@/lib/dateUtils';
-import { getTodayInTimezone, useTimezoneStore } from './timezoneStore';
+import { getTodayInTimezone, getNextMidnightInTimezone, useTimezoneStore } from './timezoneStore';
 import { offlineQueue, OfflineOperationType } from '@/lib/offlineQueue';
 import { getIsOnline } from '@/lib/useNetwork';
 import {
@@ -134,6 +134,7 @@ interface CoupleSyncState {
   // Mission sync
   sharedMissions: Mission[];
   sharedMissionsDate: string | null; // Track the date missions were generated (YYYY-MM-DD)
+  sharedMissionsRefreshedAt: string | null; // Track when missions were refreshed (synced between users)
   missionGenerationStatus: MissionGenerationStatus;
   generatingUserId: string | null;
   lastMissionUpdate: Date | null;
@@ -277,6 +278,7 @@ const initialState: CoupleSyncState = {
   userId: null,
   sharedMissions: [],
   sharedMissionsDate: null,
+  sharedMissionsRefreshedAt: null,
   missionGenerationStatus: 'idle',
   generatingUserId: null,
   lastMissionUpdate: null,
@@ -348,8 +350,22 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
         set({
           sharedMissions: [],
           sharedMissionsDate: null,
+          sharedMissionsRefreshedAt: null,
           missionGenerationStatus: 'idle',
           generatingUserId: null,
+        });
+        return;
+      }
+
+      // Handle UPDATE event - missions were updated (e.g., refreshed_at changed)
+      if (payload.eventType === 'UPDATE') {
+        console.log('[CoupleSyncStore] Received UPDATE event - syncing refreshed_at:', payload.refreshed_at);
+        // Only update refreshed_at and missions data, preserve other state
+        const missions = payload.missions as Mission[];
+        set({
+          sharedMissions: missions,
+          sharedMissionsRefreshedAt: payload.refreshed_at || null,
+          lastMissionUpdate: new Date(),
         });
         return;
       }
@@ -359,6 +375,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       set({
         sharedMissions: missions,
         sharedMissionsDate: today, // Set the date when receiving missions via real-time
+        sharedMissionsRefreshedAt: payload.refreshed_at || null, // Also include refreshed_at on insert
         lastMissionUpdate: new Date(),
         missionGenerationStatus: 'completed',
         generatingUserId: payload.generated_by,
@@ -813,19 +830,24 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     const today = getTodayInTimezone();
 
     if (!coupleId || !userId || isInTestMode()) {
-      set({ sharedMissions: missions, sharedMissionsDate: today, lastMissionUpdate: new Date() });
+      set({ sharedMissions: missions, sharedMissionsDate: today, sharedMissionsRefreshedAt: null, lastMissionUpdate: new Date() });
       return;
     }
 
     // Expire old missions first
     await db.coupleMissions.expireOld(coupleId);
 
-    // Save new missions
-    const { error } = await db.coupleMissions.create(coupleId, missions, answers, userId);
+    // Calculate expiration time based on couple's timezone setting
+    const expiresAt = getNextMidnightInTimezone();
+    console.log('[CoupleSyncStore] Mission expires at (UTC):', expiresAt, 'Timezone:', useTimezoneStore.getState().getEffectiveTimezone());
+
+    // Save new missions with timezone-aware expiration
+    const { error } = await db.coupleMissions.create(coupleId, missions, answers, userId, expiresAt);
     if (!error) {
       set({
         sharedMissions: missions,
         sharedMissionsDate: today,
+        sharedMissionsRefreshedAt: null, // Reset refreshed state for new missions
         lastMissionUpdate: new Date(),
         missionGenerationStatus: 'completed',
       });
@@ -870,9 +892,11 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
 
       if (!error && data) {
         const missions = data.missions as Mission[];
+        const refreshedAt = (data as { refreshed_at?: string }).refreshed_at || null;
         set({
           sharedMissions: missions,
           sharedMissionsDate: today,
+          sharedMissionsRefreshedAt: refreshedAt,
           lastMissionUpdate: new Date(data.generated_at),
           missionGenerationStatus: 'completed',
           generatingUserId: data.generated_by,

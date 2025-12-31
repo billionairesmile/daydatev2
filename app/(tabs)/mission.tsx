@@ -127,6 +127,7 @@ export default function MissionScreen() {
     missionGenerationStatus,
     sharedMissions,
     sharedMissionsDate,
+    sharedMissionsRefreshedAt,
     sharedBookmarks,
     isInitialized: isSyncInitialized,
     addBookmark,
@@ -226,10 +227,23 @@ export default function MissionScreen() {
     // Add refresh card at the end for ALL users (both free and premium)
     // Only show if missions exist and refresh not used today
     // Refresh is available once per day for everyone
-    // Use direct date comparison instead of function call for proper reactivity
+    // Use synced sharedMissionsRefreshedAt (from DB) if sync is initialized, otherwise fallback to local refreshUsedDate
+    // This ensures both users see the same refresh card status
     const now = new Date();
     const todayDateString = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    const hasUsedRefresh = refreshUsedDate === todayDateString;
+
+    // Check if refresh was used today:
+    // 1. If sync is initialized, use sharedMissionsRefreshedAt (synced from DB)
+    // 2. Otherwise, fallback to local refreshUsedDate
+    let hasUsedRefresh = false;
+    if (isSyncInitialized && sharedMissionsRefreshedAt) {
+      // Check if sharedMissionsRefreshedAt is from today
+      const refreshedDate = sharedMissionsRefreshedAt.split('T')[0]; // Get YYYY-MM-DD part
+      hasUsedRefresh = refreshedDate === todayDateString;
+    } else {
+      // Fallback to local state
+      hasUsedRefresh = refreshUsedDate === todayDateString;
+    }
 
     if (hasGeneratedMissions && todayMissions.length > 0 && !hasUsedRefresh) {
       const refreshPlaceholder: CarouselItem = { type: 'refresh', id: 'refresh-card' };
@@ -238,7 +252,7 @@ export default function MissionScreen() {
 
     return missions;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [todayMissions, featuredMissions, hasGeneratedMissions, shouldShowAds, adPosition, refreshUsedDate]);
+  }, [todayMissions, featuredMissions, hasGeneratedMissions, shouldShowAds, adPosition, refreshUsedDate, isSyncInitialized, sharedMissionsRefreshedAt]);
 
   // Force FlatList to render properly when missions change from empty to populated
   // This handles cases where the list mounts before React has finished updating
@@ -523,7 +537,7 @@ export default function MissionScreen() {
 
         // Mark refresh as used for today (only once per day - applies to premium too)
         if (newMissions.length > 0) {
-          setRefreshUsedToday();
+          await setRefreshUsedToday();
         }
 
         // Prefetch and load images
@@ -647,7 +661,7 @@ export default function MissionScreen() {
 
           // Mark refresh as used for today (only once per day)
           if (newMissions.length > 0) {
-            setRefreshUsedToday();
+            await setRefreshUsedToday();
           }
 
           // Prefetch and load images
@@ -735,7 +749,7 @@ export default function MissionScreen() {
 
           // Mark refresh as used for today (only once per day)
           if (newMissions.length > 0) {
-            setRefreshUsedToday();
+            await setRefreshUsedToday();
           }
 
           if (newMissions.length > 0) {

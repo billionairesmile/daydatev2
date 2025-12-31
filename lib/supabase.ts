@@ -1422,13 +1422,22 @@ export const db = {
       coupleId: string,
       missions: unknown[],
       answers: unknown,
-      userId: string
+      userId: string,
+      expiresAtISO?: string // Optional: timezone-aware expiration time in ISO format
     ) {
       const client = getSupabase();
-      // Set expiration to next midnight
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 1);
-      expiresAt.setHours(0, 0, 0, 0);
+
+      // Use provided expiration time or fallback to device local time
+      let expiresAtString: string;
+      if (expiresAtISO) {
+        expiresAtString = expiresAtISO;
+      } else {
+        // Fallback: Set expiration to next midnight in device local time
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 1);
+        expiresAt.setHours(0, 0, 0, 0);
+        expiresAtString = expiresAt.toISOString();
+      }
 
       const { data, error } = await client
         .from('couple_missions')
@@ -1437,7 +1446,7 @@ export const db = {
           missions,
           generation_answers: answers,
           generated_by: userId,
-          expires_at: expiresAt.toISOString(),
+          expires_at: expiresAtString,
           status: 'active',
         })
         .select()
@@ -1467,9 +1476,20 @@ export const db = {
       return { error };
     },
 
+    // Mark missions as refreshed (syncs refresh status between users)
+    async setRefreshed(coupleId: string) {
+      const client = getSupabase();
+      const { error } = await client
+        .from('couple_missions')
+        .update({ refreshed_at: new Date().toISOString() })
+        .eq('couple_id', coupleId)
+        .eq('status', 'active');
+      return { error };
+    },
+
     subscribeToMissions(
       coupleId: string,
-      callback: (payload: { missions: unknown[]; generated_by: string; eventType: 'INSERT' | 'DELETE' }) => void
+      callback: (payload: { missions: unknown[]; generated_by: string; eventType: 'INSERT' | 'DELETE' | 'UPDATE'; refreshed_at?: string | null }) => void
     ) {
       const client = getSupabase();
       const channel = client
@@ -1483,8 +1503,23 @@ export const db = {
             filter: `couple_id=eq.${coupleId}`,
           },
           (payload) => {
-            const record = payload.new as { missions: unknown[]; generated_by: string };
-            callback({ missions: record.missions, generated_by: record.generated_by, eventType: 'INSERT' });
+            const record = payload.new as { missions: unknown[]; generated_by: string; refreshed_at?: string | null };
+            callback({ missions: record.missions, generated_by: record.generated_by, eventType: 'INSERT', refreshed_at: record.refreshed_at });
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'couple_missions',
+            filter: `couple_id=eq.${coupleId}`,
+          },
+          (payload) => {
+            // When missions are updated (e.g., refreshed_at is set), sync the state
+            const record = payload.new as { missions: unknown[]; generated_by: string; refreshed_at?: string | null };
+            console.log('[Supabase] couple_missions UPDATE event received, refreshed_at:', record.refreshed_at);
+            callback({ missions: record.missions, generated_by: record.generated_by, eventType: 'UPDATE', refreshed_at: record.refreshed_at });
           }
         )
         .on(

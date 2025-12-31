@@ -460,24 +460,30 @@ type SupportedLanguage = 'ko' | 'en' | 'es' | 'zh-TW' | 'ja';
  */
 async function getUserLanguage(userId: string): Promise<SupportedLanguage> {
   if (isDemoMode || !supabase) {
+    console.log('[Push] getUserLanguage: Demo mode or no supabase, defaulting to ko');
     return 'ko';
   }
 
   try {
+    console.log('[Push] getUserLanguage: Fetching language for user:', userId);
     const { data, error } = await db.profiles.get(userId);
     if (error || !data) {
-      console.log('[Push] Could not fetch user language, using default:', error?.message);
+      console.log('[Push] getUserLanguage: Could not fetch profile, using default ko. Error:', error?.message);
       return 'ko';
     }
 
     const language = (data as { language?: string }).language;
+    console.log('[Push] getUserLanguage: User', userId, 'has language:', language);
+
     if (language && ['ko', 'en', 'es', 'zh-TW', 'ja'].includes(language)) {
+      console.log('[Push] getUserLanguage: Using language from DB:', language);
       return language as SupportedLanguage;
     }
 
+    console.log('[Push] getUserLanguage: Invalid or missing language, defaulting to ko');
     return 'ko';
   } catch (e) {
-    console.error('[Push] Error fetching user language:', e);
+    console.error('[Push] getUserLanguage: Error fetching user language:', e);
     return 'ko';
   }
 }
@@ -524,9 +530,12 @@ export async function notifyPartnerMissionGenerated(
   generatorNickname: string,
   _language?: SupportedLanguage // Deprecated: language is now fetched from recipient's profile
 ): Promise<boolean> {
+  console.log('[Push] notifyPartnerMissionGenerated: Sending to partner:', partnerId);
   // Fetch the recipient's language preference
   const recipientLanguage = await getUserLanguage(partnerId);
+  console.log('[Push] notifyPartnerMissionGenerated: Recipient language:', recipientLanguage);
   const messages = notificationMessages.missionGenerated[recipientLanguage];
+  console.log('[Push] notifyPartnerMissionGenerated: Title:', messages.title);
   return sendPushNotification({
     targetUserId: partnerId,
     type: 'mission_generated',
@@ -718,6 +727,7 @@ export async function scheduleMissionReminderNotification(
       return null;
     }
 
+    console.log('[Push] scheduleMissionReminderNotification: Scheduling with language:', language);
     const messages = notificationMessages.scheduledReminder[language];
     const identifier = await Notifications.scheduleNotificationAsync({
       content: {
