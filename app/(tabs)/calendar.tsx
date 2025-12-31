@@ -531,9 +531,12 @@ export default function CalendarScreen() {
     }
   }, [couple?.id, loadFromDB]);
 
-  // Reset swipe state and reload memories when screen comes into focus
+  // Reset calendar to today, swipe state, and reload memories when screen comes into focus
   useFocusEffect(
     useCallback(() => {
+      // Reset calendar to current date when returning to screen
+      setCurrentDate(new Date());
+      setSelectedDate(null);
       // Increment key to force SwipeableTodoItem components to reset
       setSwipeResetKey((prev) => prev + 1);
       // Also ensure scroll is enabled

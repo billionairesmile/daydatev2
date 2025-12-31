@@ -125,7 +125,8 @@
       "partnerGenerating": "Tu pareja está generando misiones",
       "adLoadingFailed": "Error al Cargar Anuncio",
       "adLoadingFailedMessage": "Error al cargar el anuncio.\nPor favor, inténtalo más tarde.",
-      "generating": "Generando nuevas misiones..."
+      "generating": "Generando nuevas misiones...",
+      "loadingAd": "Cargando anuncio..."
     }
   },
   "missionDetail": {

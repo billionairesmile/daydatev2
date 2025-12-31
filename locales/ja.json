@@ -127,7 +127,8 @@
       "partnerGenerating": "パートナーがミッションを生成中です",
       "adLoadingFailed": "広告の読み込み失敗",
       "adLoadingFailedMessage": "広告の読み込みに失敗しました。\n後でもう一度お試しください。",
-      "generating": "新しいミッションを生成中..."
+      "generating": "新しいミッションを生成中...",
+      "loadingAd": "広告を準備中..."
     }
   },
   "missionDetail": {

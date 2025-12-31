@@ -60,6 +60,33 @@ export async function getNotificationPermissionStatus(): Promise<boolean> {
 }
 
 /**
+ * Request notification permission using native OS dialog
+ * Shows the system permission dialog (like location permission)
+ * Returns true if permission was granted, false otherwise
+ */
+export async function requestNotificationPermission(): Promise<boolean> {
+  if (!Notifications) {
+    console.log('[Push] Notifications not available (running in Expo Go)');
+    return false;
+  }
+
+  try {
+    // Check if already granted
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    if (existingStatus === 'granted') {
+      return true;
+    }
+
+    // Request permission - this shows the native OS dialog
+    const { status } = await Notifications.requestPermissionsAsync();
+    return status === 'granted';
+  } catch (error) {
+    console.error('[Push] Error requesting permission:', error);
+    return false;
+  }
+}
+
+/**
  * Sync marketing_agreed field with OS notification permission status
  */
 export async function syncMarketingAgreedWithPermission(userId: string): Promise<boolean> {

@@ -125,7 +125,8 @@
       "partnerGenerating": "對方正在生成任務",
       "adLoadingFailed": "廣告載入失敗",
       "adLoadingFailedMessage": "廣告載入失敗。\n請稍後再試。",
-      "generating": "正在生成新任務..."
+      "generating": "正在生成新任務...",
+      "loadingAd": "正在準備廣告..."
     }
   },
   "missionDetail": {

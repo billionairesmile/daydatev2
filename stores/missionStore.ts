@@ -13,11 +13,12 @@ import {
   type Constraint,
 } from '@/stores/onboardingStore';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
+import { getTodayInTimezone } from '@/stores/timezoneStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useSubscriptionStore } from '@/stores/subscriptionStore';
 import {
-  checkCoupleLocationStatus,
-  showLocationRequiredAlert,
+  checkLocationPermission,
+  requestLocationPermission,
   updateUserLocationInDB,
   getCurrentLocation,
   type UserLocation,
@@ -297,76 +298,126 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
         const syncStore = useCoupleSyncStore.getState();
         const { user, partner } = useAuthStore.getState();
 
-        // Check if partner has completed onboarding (required for mission generation)
-        if (partner?.id) {
-          const { data: partnerProfile } = await db.profiles.get(partner.id);
+        try {
+          // Check if partner has completed onboarding (required for mission generation)
+          if (partner?.id) {
+            const { data: partnerProfile } = await db.profiles.get(partner.id);
 
-          if (!partnerProfile?.is_onboarding_complete) {
-            // Partner hasn't completed onboarding yet
-            Alert.alert(
-              '파트너 온보딩 필요',
-              '파트너가 온보딩을 완료한 후 미션을 생성할 수 있습니다.',
-              [{ text: '확인' }]
-            );
-            return {
-              status: 'preferences_required' as const,
-              message: '파트너가 온보딩을 완료해야 합니다.',
-            };
-          }
-        }
-
-        // Check location status for both users (required)
-        if (user?.id && partner?.id) {
-          const locationStatus = await checkCoupleLocationStatus(user.id, partner.id);
-
-          if (!locationStatus.bothEnabled) {
-            // Show alert and block mission generation
-            showLocationRequiredAlert(locationStatus.missingUsers);
-            return {
-              status: 'location_required' as const,
-              message: `위치 정보가 필요합니다: ${locationStatus.missingUsers.join(', ')}`,
-            };
+            if (!partnerProfile?.is_onboarding_complete) {
+              // Partner hasn't completed onboarding yet
+              Alert.alert(
+                '파트너 온보딩 필요',
+                '파트너가 온보딩을 완료한 후 미션을 생성할 수 있습니다.',
+                [{ text: '확인' }]
+              );
+              return {
+                status: 'preferences_required' as const,
+                message: '파트너가 온보딩을 완료해야 합니다.',
+              };
+            }
           }
 
-          // Update current user's location in DB
-          if (user.id) {
+          // Check current user's location (only the generating user needs location)
+          if (user?.id) {
+            const hasLocationPermission = await checkLocationPermission();
+            if (!hasLocationPermission) {
+              // Request location permission
+              const granted = await requestLocationPermission();
+              if (!granted) {
+                return {
+                  status: 'location_required' as const,
+                  message: '위치 권한이 필요합니다.',
+                };
+              }
+            }
+
+            // Get current location
+            const currentLocation = await getCurrentLocation();
+            if (!currentLocation) {
+              Alert.alert(
+                '위치 정보 필요',
+                '미션 생성을 위해 위치 정보가 필요합니다. 위치 서비스가 켜져 있는지 확인해주세요.',
+                [{ text: '확인' }]
+              );
+              return {
+                status: 'location_required' as const,
+                message: '위치 정보를 가져올 수 없습니다.',
+              };
+            }
+
+            // Update current user's location in DB
             await updateUserLocationInDB(user.id);
           }
-        }
 
-        // Check if couple sync is initialized
-        if (syncStore.isInitialized && syncStore.coupleId) {
-          // Check if missions already exist from partner
-          const existingMissions = syncStore.sharedMissions;
-          if (existingMissions.length > 0) {
-            // Use existing shared missions
-            set({
-              generatedMissionData: {
-                missions: existingMissions,
-                generatedDate: today,
-                answers,
-              },
-            });
-            return { status: 'exists' as const, message: '이미 생성된 미션이 있습니다.' };
-          }
+          // Check if couple sync is initialized
+          console.log('[MissionStore] Sync initialized:', syncStore.isInitialized, 'CoupleId:', syncStore.coupleId);
+          if (syncStore.isInitialized && syncStore.coupleId) {
+            // Check if missions already exist from partner (must be today's missions)
+            const existingMissions = syncStore.sharedMissions;
+            const existingMissionsDate = syncStore.sharedMissionsDate;
+            const todayTimezone = getTodayInTimezone(); // Use timezone-aware date for comparison
+            console.log('[MissionStore] Existing missions count:', existingMissions.length, 'Date:', existingMissionsDate, 'Today:', todayTimezone);
 
-          // Try to acquire lock for generation
-          const acquired = await syncStore.acquireMissionLock();
-          if (!acquired) {
-            // Partner is generating
-            return { status: 'locked' as const, message: '미션 생성 중입니다...' };
-          }
+            // Only consider existing missions if they are from TODAY
+            if (existingMissions.length > 0 && existingMissionsDate === todayTimezone) {
+              console.log('[MissionStore] Using existing missions from today - returning exists status');
+              // Use existing shared missions
+              set({
+                generatedMissionData: {
+                  missions: existingMissions,
+                  generatedDate: today,
+                  answers,
+                },
+              });
+              return { status: 'exists' as const, message: '이미 생성된 미션이 있습니다.' };
+            }
 
-          // Check subscription limit for mission generation
-          const subscriptionStore = useSubscriptionStore.getState();
-          const canGenerate = await subscriptionStore.canGenerateMissions(syncStore.coupleId);
-          if (!canGenerate) {
-            // Release lock since we can't generate
-            await syncStore.releaseMissionLock();
-            // Don't show alert - just silently return limit_reached status
-            // The UI should handle showing appropriate feedback
-            return { status: 'limit_reached' as const, message: '일일 미션 생성 한도에 도달했습니다.' };
+            // If there are stale missions from a different date, clear them first
+            if (existingMissions.length > 0 && existingMissionsDate !== todayTimezone) {
+              console.log('[MissionStore] Clearing stale missions. Date:', existingMissionsDate, 'Today:', todayTimezone);
+              // Reset the sync store's missions so we generate fresh ones
+              syncStore.checkAndResetSharedMissions();
+            }
+
+            // Try to acquire lock for generation
+            console.log('[MissionStore] Trying to acquire mission lock...');
+            const acquired = await syncStore.acquireMissionLock();
+            console.log('[MissionStore] Lock acquired:', acquired);
+            if (!acquired) {
+              // Partner is generating
+              console.log('[MissionStore] Lock not acquired - partner is generating');
+              return { status: 'locked' as const, message: '미션 생성 중입니다...' };
+            }
+
+            // Skip limit check for refresh mode (excludedMissions indicates refresh)
+            // Refresh mode allows regeneration even if daily limit was reached
+            if (!excludedMissions || excludedMissions.length === 0) {
+              // Check subscription limit for mission generation (only for first generation)
+              const subscriptionStore = useSubscriptionStore.getState();
+              console.log('[MissionStore] Checking generation limit...');
+              const canGenerate = await subscriptionStore.canGenerateMissions(syncStore.coupleId);
+              console.log('[MissionStore] Can generate missions:', canGenerate);
+              if (!canGenerate) {
+                // Release lock since we can't generate
+                await syncStore.releaseMissionLock();
+                console.log('[MissionStore] Generation limit reached');
+                return { status: 'limit_reached' as const, message: '일일 미션 생성 한도에 도달했습니다.' };
+              }
+            } else {
+              console.log('[MissionStore] Refresh mode - skipping generation limit check');
+            }
           }
+        } catch (preCheckError) {
+          console.error('[MissionStore] Pre-generation check failed:', preCheckError);
+          // Release lock if acquired
+          if (syncStore.isInitialized && syncStore.coupleId) {
+            try {
+              await syncStore.releaseMissionLock('idle');
+            } catch (e) {
+              // Ignore lock release error
+            }
+          }
+          throw preCheckError; // Re-throw to be caught by mission.tsx
         }
 
         try {
@@ -483,58 +534,66 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
       },
 
       // Check if today's missions are already generated (local or synced)
+      // IMPORTANT: Check synced state FIRST - it's the source of truth for couples
       hasTodayMissions: () => {
         const { generatedMissionData } = get();
         const syncStore = useCoupleSyncStore.getState();
         const today = getTodayDateString();
+        // Use timezone-aware date for sync store comparison (sync store uses getTodayInTimezone)
+        const todayTimezone = getTodayInTimezone();
 
-        // Check local state first
-        if (generatedMissionData && generatedMissionData.generatedDate === today) {
-          return true;
-        }
-
-        // Check synced state - verify the date matches today
-        if (syncStore.isInitialized && syncStore.sharedMissions.length > 0 && syncStore.sharedMissionsDate === today) {
+        // Check synced state FIRST - this is the source of truth for couples
+        if (syncStore.isInitialized && syncStore.sharedMissions.length > 0 && syncStore.sharedMissionsDate === todayTimezone) {
           return true;
         }
 
         // Defensive: if missions exist but date is null, check mission progress for today
         // This handles edge cases where sharedMissionsDate wasn't properly set
         if (syncStore.isInitialized && syncStore.sharedMissions.length > 0 && syncStore.sharedMissionsDate === null) {
-          const hasTodayProgress = syncStore.allMissionProgress.some(p => p.date === today);
+          const hasTodayProgress = syncStore.allMissionProgress.some(p => p.date === todayTimezone);
           if (hasTodayProgress) {
             // Missions exist and we have today's progress - treat as today's missions
             return true;
           }
         }
 
+        // Fallback to local state only if no synced data available
+        if (generatedMissionData && generatedMissionData.generatedDate === today) {
+          return true;
+        }
+
         return false;
       },
 
       // Get today's generated missions (local or synced)
+      // IMPORTANT: Check synced state FIRST - it's the source of truth for couples
+      // This ensures that when partner refreshes missions, we get the new ones
       getTodayMissions: () => {
         const { generatedMissionData } = get();
         const syncStore = useCoupleSyncStore.getState();
         const today = getTodayDateString();
+        // Use timezone-aware date for sync store comparison (sync store uses getTodayInTimezone)
+        const todayTimezone = getTodayInTimezone();
 
-        // Check local state first
-        if (generatedMissionData && generatedMissionData.generatedDate === today) {
-          return generatedMissionData.missions;
-        }
-
-        // Check synced state - verify the date matches today
-        if (syncStore.isInitialized && syncStore.sharedMissions.length > 0 && syncStore.sharedMissionsDate === today) {
+        // Check synced state FIRST - this is the source of truth for couples
+        // When partner refreshes missions, sharedMissions will have the latest data
+        if (syncStore.isInitialized && syncStore.sharedMissions.length > 0 && syncStore.sharedMissionsDate === todayTimezone) {
           return syncStore.sharedMissions;
         }
 
         // Defensive: if missions exist but date is null, check mission progress for today
         // This handles edge cases where sharedMissionsDate wasn't properly set
         if (syncStore.isInitialized && syncStore.sharedMissions.length > 0 && syncStore.sharedMissionsDate === null) {
-          const hasTodayProgress = syncStore.allMissionProgress.some(p => p.date === today);
+          const hasTodayProgress = syncStore.allMissionProgress.some(p => p.date === todayTimezone);
           if (hasTodayProgress) {
             // Missions exist and we have today's progress - return them
             return syncStore.sharedMissions;
           }
+        }
+
+        // Fallback to local state only if no synced data available
+        if (generatedMissionData && generatedMissionData.generatedDate === today) {
+          return generatedMissionData.missions;
         }
 
         return [];
@@ -668,6 +727,7 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
         generatedMissionData: state.generatedMissionData,
         missionHistory: state.missionHistory,
         inProgressMissions: state.inProgressMissions,
+        refreshUsedDate: state.refreshUsedDate,
       }),
     }
   )

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,7 @@ import MaskedView from '@react-native-masked-view/masked-view';
 import { easeGradient } from 'react-native-easing-gradient';
 import { Bookmark, Sparkles, X } from 'lucide-react-native';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useUIStore } from '@/stores/uiStore';
 import * as Location from 'expo-location';
 
 import { COLORS, SPACING, RADIUS } from '@/constants/design';
@@ -57,10 +58,21 @@ const { colors: blurGradientColors, locations: blurGradientLocations } = easeGra
 export default function MissionScreen() {
   const { t, i18n } = useTranslation();
   const router = useRouter();
+  const setTabBarHidden = useUIStore((s) => s.setTabBarHidden);
   const { showBookmark } = useLocalSearchParams<{ showBookmark?: string }>();
   const { backgroundImage } = useBackground();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showBookmarkedMissions, setShowBookmarkedMissions] = useState(false);
+
+  // Hide tab bar when bookmarked missions page is shown
+  useEffect(() => {
+    setTabBarHidden(showBookmarkedMissions);
+
+    // Cleanup: restore tab bar when component unmounts
+    return () => {
+      setTabBarHidden(false);
+    };
+  }, [showBookmarkedMissions, setTabBarHidden]);
 
   // Get screen dimensions dynamically
   const { width: screenWidth } = useWindowDimensions();
@@ -107,6 +119,7 @@ export default function MissionScreen() {
     setRefreshUsedToday,
     hasUsedRefreshToday,
     generatedMissionData, // Subscribe to this state to trigger re-renders
+    refreshUsedDate, // Subscribe to refreshUsedDate to trigger re-renders when refresh is used
   } = useMissionStore();
 
   // Couple sync state
@@ -213,13 +226,19 @@ export default function MissionScreen() {
     // Add refresh card at the end for ALL users (both free and premium)
     // Only show if missions exist and refresh not used today
     // Refresh is available once per day for everyone
-    if (hasGeneratedMissions && todayMissions.length > 0 && !hasUsedRefreshToday()) {
+    // Use direct date comparison instead of function call for proper reactivity
+    const now = new Date();
+    const todayDateString = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const hasUsedRefresh = refreshUsedDate === todayDateString;
+
+    if (hasGeneratedMissions && todayMissions.length > 0 && !hasUsedRefresh) {
       const refreshPlaceholder: CarouselItem = { type: 'refresh', id: 'refresh-card' };
       missions = [...missions, refreshPlaceholder];
     }
 
     return missions;
-  }, [todayMissions, featuredMissions, hasGeneratedMissions, shouldShowAds, adPosition, hasUsedRefreshToday]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todayMissions, featuredMissions, hasGeneratedMissions, shouldShowAds, adPosition, refreshUsedDate]);
 
   // Force FlatList to render properly when missions change from empty to populated
   // This handles cases where the list mounts before React has finished updating
@@ -408,15 +427,7 @@ export default function MissionScreen() {
             onPress: async () => {
               const granted = await requestLocationPermission();
               if (granted) {
-                // After granting permission, also check partner location
-                if (!checkPartnerHasLocation()) {
-                  Alert.alert(
-                    t('mission.alerts.partnerLocationRequired'),
-                    t('mission.alerts.partnerLocationRequiredMessage'),
-                    [{ text: t('common.confirm') }]
-                  );
-                  return;
-                }
+                // Only generating user's location is required
                 setShowGenerationModal(true);
               } else {
                 Alert.alert(
@@ -435,17 +446,7 @@ export default function MissionScreen() {
       return;
     }
 
-    // Check if partner has location enabled
-    if (!checkPartnerHasLocation()) {
-      Alert.alert(
-        t('mission.alerts.partnerLocationRequired'),
-        t('mission.alerts.partnerLocationRequiredMessage'),
-        [{ text: t('common.confirm') }]
-      );
-      return;
-    }
-
-    // Both users have location enabled, open modal
+    // Only generating user's location is required, open modal
     setShowGenerationModal(true);
   };
 
@@ -485,7 +486,20 @@ export default function MissionScreen() {
         await resetAllMissions();
 
         // Generate new missions with excluded missions to avoid duplicates
-        const result = await generateTodayMissions(answers, excludedMissions);
+        let result;
+        try {
+          result = await generateTodayMissions(answers, excludedMissions);
+        } catch (error) {
+          console.error('[Mission Refresh] Premium user generation error:', error);
+          setIsGenerating(false);
+          setPartnerGeneratingMessage(null);
+          Alert.alert(
+            t('mission.alerts.generationError') || '미션 생성 오류',
+            t('mission.alerts.generationErrorMessage') || '미션을 생성하는 중 오류가 발생했습니다. 다시 시도해주세요.',
+            [{ text: t('common.confirm') || '확인' }]
+          );
+          return;
+        }
 
         if (result && result.status === 'locked') {
           setPartnerGeneratingMessage(t('mission.refresh.partnerGenerating'));
@@ -493,6 +507,13 @@ export default function MissionScreen() {
         }
 
         if (result && result.status === 'exists') {
+          setIsGenerating(false);
+          setPartnerGeneratingMessage(null);
+          return;
+        }
+
+        // Handle error statuses that block generation
+        if (result && (result.status === 'location_required' || result.status === 'preferences_required' || result.status === 'limit_reached')) {
           setIsGenerating(false);
           setPartnerGeneratingMessage(null);
           return;
@@ -546,44 +567,76 @@ export default function MissionScreen() {
         return;
       }
 
-      // Free user - show rewarded ad first
-      // Save original missions before showing ad (for deduplication after ad completes)
+      // Free user - close modal, show rewarded ad, generate missions in PARALLEL
+      // Save original missions before reset (for deduplication)
       const originalMissionsForAd = getTodayMissions();
       const excludedMissionsForAd: ExcludedMission[] = originalMissionsForAd.map(m => ({
         title: m.title,
         category: m.category,
       }));
-      console.log('[Mission Refresh] Free user - saving original missions for deduplication:', excludedMissionsForAd.map(m => m.title).join(', '));
+      console.log('[Mission Refresh] Free user - parallel ad + generation, excluding:', excludedMissionsForAd.map(m => m.title).join(', '));
 
+      // 1. Set loading state FIRST (before closing modal) to prevent "오늘의 미션" button from showing
+      setIsGenerating(true);
+      setPartnerGeneratingMessage(null);
       setIsLoadingAd(true);
 
-      // Load and show rewarded ad
-      const adShown = await rewardedAdManager.loadAndShow({
-        onAdClosed: async () => {
-          // Close modal
-          setShowGenerationModal(false);
-          setIsLoadingAd(false);
-          setIsRefreshMode(false);
+      // 2. Close modal
+      setShowGenerationModal(false);
+      setIsRefreshMode(false);
 
-          // Show loading animation
-          setIsGenerating(true);
-          setPartnerGeneratingMessage(null);
+      // Track generation error for error handling
+      let missionGenerationError: Error | null = null;
+      let generationResult: Awaited<ReturnType<typeof generateTodayMissions>> | null = null;
 
+      // 2. Start mission generation IMMEDIATELY (runs in parallel with ad)
+      const missionGenerationPromise = (async () => {
+        try {
           // Reset existing missions first (both local and shared)
           resetGeneratedMissions();
           await resetAllMissions();
 
           // Generate new missions with excluded missions to avoid duplicates
           const result = await generateTodayMissions(answers, excludedMissionsForAd);
+          console.log('[Mission Refresh] Parallel generation completed:', result?.status);
+          generationResult = result;
+          return result;
+        } catch (error) {
+          console.error('[Mission Refresh] Parallel generation error:', error);
+          missionGenerationError = error as Error;
+          return null;
+        }
+      })();
+
+      // 3. Load and show rewarded ad (runs in parallel with mission generation)
+      const adShown = await rewardedAdManager.loadAndShow({
+        onAdClosed: async () => {
+          setIsLoadingAd(false);
+          // isGenerating is already true from before modal close, keep it showing
+
+          // Wait for mission generation to complete (should already be done or almost done)
+          const result = await missionGenerationPromise;
+
+          // Handle generation error
+          if (missionGenerationError || !result) {
+            setIsGenerating(false);
+            Alert.alert(
+              t('mission.refresh.adLoadingFailed'),
+              t('mission.refresh.adLoadingFailedMessage'),
+              [{ text: t('common.confirm') }]
+            );
+            return;
+          }
 
           // Handle different generation statuses
-          if (result && result.status === 'locked') {
-            // Partner is already generating - show their message
+          if (result.status === 'locked') {
             setPartnerGeneratingMessage(t('mission.refresh.partnerGenerating'));
             return;
           }
 
-          if (result && result.status === 'exists') {
+          if (result.status === 'exists' || result.status === 'success') {
+            // Success - missions are ready
+          } else if (result.status === 'location_required' || result.status === 'preferences_required') {
             setIsGenerating(false);
             setPartnerGeneratingMessage(null);
             return;
@@ -648,33 +701,31 @@ export default function MissionScreen() {
         },
       });
 
-      // If ad loading failed or was not shown (e.g., in Expo Go), show error
+      // If ad loading failed or was not shown (e.g., in Expo Go), handle fallback
       if (!adShown) {
         setIsLoadingAd(false);
-        // For Expo Go / development, skip ad and proceed directly
+        // For Expo Go / development, skip ad and wait for generation to complete
         if (__DEV__) {
-          // Close modal
-          setShowGenerationModal(false);
-          setIsRefreshMode(false);
-
-          // Show loading animation
+          // Modal already closed above, show loading animation
           setIsGenerating(true);
           setPartnerGeneratingMessage(null);
 
-          // Reset existing missions first (both local and shared)
-          resetGeneratedMissions();
-          await resetAllMissions();
+          // Wait for mission generation to complete and get result
+          const devResult = await missionGenerationPromise;
 
-          // Generate new missions with excluded missions to avoid duplicates
-          // Note: excludedMissionsForAd was saved before loading ad, so it's still available
-          const result = await generateTodayMissions(answers, excludedMissionsForAd);
+          if (missionGenerationError || !devResult) {
+            setIsGenerating(false);
+            return;
+          }
 
-          if (result && result.status === 'locked') {
+          if (devResult.status === 'locked') {
             setPartnerGeneratingMessage(t('mission.refresh.partnerGenerating'));
             return;
           }
 
-          if (result && result.status === 'exists') {
+          if (devResult.status === 'exists' || devResult.status === 'success') {
+            // Success - continue to show missions
+          } else if (devResult.status === 'location_required' || devResult.status === 'preferences_required') {
             setIsGenerating(false);
             setPartnerGeneratingMessage(null);
             return;
@@ -739,9 +790,25 @@ export default function MissionScreen() {
     setPartnerGeneratingMessage(null);
 
     // Generate missions (this calls AI API)
-    const result = await generateTodayMissions(answers);
+    console.log('[Mission] Starting mission generation...');
+    let result;
+    try {
+      result = await generateTodayMissions(answers);
+      console.log('[Mission] Generation result:', result);
+    } catch (error) {
+      console.error('[Mission] Error generating missions:', error);
+      setIsGenerating(false);
+      setPartnerGeneratingMessage(null);
+      Alert.alert(
+        t('mission.alerts.generationError') || '미션 생성 오류',
+        t('mission.alerts.generationErrorMessage') || '미션을 생성하는 중 오류가 발생했습니다. 다시 시도해주세요.',
+        [{ text: t('common.confirm') || '확인' }]
+      );
+      return;
+    }
 
     // Handle different generation statuses
+    console.log('[Mission] Handling result status:', result?.status);
     if (result && result.status === 'locked') {
       // Partner is already generating - show their message
       setPartnerGeneratingMessage(t('mission.generatingMessage'));
@@ -756,8 +823,19 @@ export default function MissionScreen() {
       return;
     }
 
+    // Handle error statuses that block generation
+    if (result && (result.status === 'location_required' || result.status === 'preferences_required' || result.status === 'limit_reached')) {
+      // These statuses already showed their own alerts in missionStore
+      console.log('[Mission] Blocking status received:', result.status, '- hiding loading');
+      setIsGenerating(false);
+      setPartnerGeneratingMessage(null);
+      return;
+    }
+
     // Get the newly generated missions
+    console.log('[Mission] Getting generated missions...');
     const newMissions = getTodayMissions();
+    console.log('[Mission] Generated missions count:', newMissions.length);
 
     // Prefetch all mission images before showing cards
     if (newMissions.length > 0) {
@@ -1051,11 +1129,11 @@ export default function MissionScreen() {
         ) : (
           /* Empty State - Generate Button or Loading Animation */
           <View style={styles.emptyStateContainer}>
-            {isGenerating ? (
+            {isGenerating || isLoadingAd ? (
               <View style={styles.loadingAnimationWrapper}>
                 <CircularLoadingAnimation size={100} strokeWidth={6} color={COLORS.white} />
                 <Text style={styles.loadingAnimationText}>
-                  {partnerGeneratingMessage ? t('mission.generating') : t('mission.generatingMessage')}
+                  {isLoadingAd ? t('mission.refresh.loadingAd') : (partnerGeneratingMessage ? t('mission.generating') : t('mission.generatingMessage'))}
                 </Text>
                 <Text style={styles.loadingAnimationSubtext}>
                   {t('mission.pleaseWait')}
@@ -1244,6 +1322,26 @@ interface MissionCardContentProps {
 function MissionCardContent({ mission, onStartPress, onKeepPress, isKept, canStart = true, isCompletedToday = false, isAnotherMissionInProgress = false, onImageLoad }: MissionCardContentProps) {
   const { t } = useTranslation();
   const blurHeight = CARD_HEIGHT * 0.8; // Blur covers bottom 55% of card
+  const [imageError, setImageError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+
+  // Generate image URL with retry support (add timestamp to bust cache on retry)
+  const imageUrl = useMemo(() => {
+    if (!mission.imageUrl) return null;
+    const baseUrl = `${mission.imageUrl}?w=800&h=1000&fit=crop`;
+    return retryCount > 0 ? `${baseUrl}&retry=${retryCount}` : baseUrl;
+  }, [mission.imageUrl, retryCount]);
+
+  // Handle image load error with retry
+  const handleImageError = useCallback(() => {
+    console.warn('[MissionCard] Image failed to load:', mission.imageUrl);
+    if (retryCount < 2) {
+      // Retry up to 2 times
+      setRetryCount(prev => prev + 1);
+    } else {
+      setImageError(true);
+    }
+  }, [mission.imageUrl, retryCount]);
 
   const handleKeepPress = (e: { stopPropagation: () => void }) => {
     e.stopPropagation();
@@ -1313,14 +1411,26 @@ function MissionCardContent({ mission, onStartPress, onKeepPress, isKept, canSta
 
   return (
     <View style={styles.cardContentWrapper}>
-      {/* Background Image */}
-      <ExpoImage
-        source={{ uri: `${mission.imageUrl}?w=800&h=1000&fit=crop` }}
-        style={styles.cardImage}
-        contentFit="cover"
-        cachePolicy="memory-disk"
-        onLoad={onImageLoad}
-      />
+      {/* Background Image with fallback */}
+      {imageUrl && !imageError ? (
+        <ExpoImage
+          source={{ uri: imageUrl }}
+          style={styles.cardImage}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          onLoad={onImageLoad}
+          onError={handleImageError}
+        />
+      ) : (
+        <View style={[styles.cardImage, styles.cardImageFallback]}>
+          <LinearGradient
+            colors={['#667eea', '#764ba2']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+        </View>
+      )}
 
       {/* Blur Container with Masked Gradient */}
       <View style={[styles.blurContainer, { height: blurHeight }]}>
@@ -1426,7 +1536,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: 100,
+    zIndex: 9999,
+    elevation: 9999,
   },
   backgroundImage: {
     position: 'absolute',
@@ -1521,6 +1632,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: '100%',
     height: '100%',
+  },
+  cardImageFallback: {
+    overflow: 'hidden',
   },
   blurContainer: {
     position: 'absolute',

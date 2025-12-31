@@ -18,7 +18,7 @@
       "bundleIdentifier": "com.daydate.app",
       "usesAppleSignIn": true,
       "infoPlist": {
-        "NSCameraUsageDescription": "Daydate needs camera access to capture your special moments together.",
+        "NSCameraUsageDescription": "Allow Daydate to access your camera to capture memories.",
         "NSPhotoLibraryUsageDescription": "Daydate needs photo library access to save and share your memories.",
         "NSLocationWhenInUseUsageDescription": "Daydate needs your location to create personalized date missions based on nearby places and activities.",
         "ITSAppUsesNonExemptEncryption": false,
@@ -104,10 +104,10 @@
     },
     "extra": {
       "eas": {
-        "projectId": "115e6c85-54e5-4c9c-ac72-5714852ef605"
+        "projectId": "112f6544-0d43-4858-9616-e7af8cffba17"
       },
       "router": {}
     },
-    "owner": "usskslsksk"
+    "owner": "mywhink"
   }
 }

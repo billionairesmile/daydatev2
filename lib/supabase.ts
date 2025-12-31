@@ -1452,7 +1452,7 @@ export const db = {
 
     subscribeToMissions(
       coupleId: string,
-      callback: (payload: { missions: unknown[]; generated_by: string }) => void
+      callback: (payload: { missions: unknown[]; generated_by: string; eventType: 'INSERT' | 'DELETE' }) => void
     ) {
       const client = getSupabase();
       const channel = client
@@ -1467,7 +1467,21 @@ export const db = {
           },
           (payload) => {
             const record = payload.new as { missions: unknown[]; generated_by: string };
-            callback({ missions: record.missions, generated_by: record.generated_by });
+            callback({ missions: record.missions, generated_by: record.generated_by, eventType: 'INSERT' });
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'DELETE',
+            schema: 'public',
+            table: 'couple_missions',
+            filter: `couple_id=eq.${coupleId}`,
+          },
+          (payload) => {
+            // When missions are deleted, notify with empty array
+            console.log('[Supabase] couple_missions DELETE event received');
+            callback({ missions: [], generated_by: '', eventType: 'DELETE' });
           }
         )
         .subscribe();

@@ -127,7 +127,8 @@
       "partnerGenerating": "Your partner is generating missions",
       "adLoadingFailed": "Ad Loading Failed",
       "adLoadingFailedMessage": "Failed to load the ad.\nPlease try again later.",
-      "generating": "Generating new missions..."
+      "generating": "Generating new missions...",
+      "loadingAd": "Loading ad..."
     }
   },
   "missionDetail": {

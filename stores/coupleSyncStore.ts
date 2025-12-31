@@ -340,8 +340,22 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     // Setup real-time subscriptions
     // 1. Mission subscription
     missionChannel = db.coupleMissions.subscribeToMissions(coupleId, (payload) => {
-      const missions = payload.missions as Mission[];
       const today = getTodayInTimezone();
+
+      // Handle DELETE event - partner has reset missions
+      if (payload.eventType === 'DELETE') {
+        console.log('[CoupleSyncStore] Received DELETE event - clearing shared missions');
+        set({
+          sharedMissions: [],
+          sharedMissionsDate: null,
+          missionGenerationStatus: 'idle',
+          generatingUserId: null,
+        });
+        return;
+      }
+
+      // Handle INSERT event - new missions generated
+      const missions = payload.missions as Mission[];
       set({
         sharedMissions: missions,
         sharedMissionsDate: today, // Set the date when receiving missions via real-time

@@ -7,6 +7,7 @@ import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useTranslation } from 'react-i18next';
 
 import { COLORS } from '@/constants/design';
+import { useUIStore } from '@/stores/uiStore';
 
 function TabBarIcon({
   Icon,
@@ -41,13 +42,14 @@ const TAB_ICONS: Record<string, React.ComponentType<{ color: string; size: numbe
 
 function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const { t } = useTranslation();
+  const isTabBarHidden = useUIStore((s) => s.isTabBarHidden);
   const [tabWidth, setTabWidth] = useState(0);
   const indicatorPosition = useRef(new Animated.Value(0)).current;
   const indicatorOpacity = useRef(new Animated.Value(0)).current;
 
   // Animate indicator when tab changes
   useEffect(() => {
-    if (tabWidth > 0) {
+    if (tabWidth > 0 && !isTabBarHidden) {
       Animated.parallel([
         Animated.spring(indicatorPosition, {
           toValue: state.index * tabWidth,
@@ -63,7 +65,7 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
         }),
       ]).start();
     }
-  }, [state.index, tabWidth, indicatorPosition, indicatorOpacity]);
+  }, [state.index, tabWidth, indicatorPosition, indicatorOpacity, isTabBarHidden]);
 
   const handleTabsContainerLayout = (event: LayoutChangeEvent) => {
     const { width } = event.nativeEvent.layout;
@@ -72,6 +74,11 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
     // Set initial position without animation
     indicatorPosition.setValue(state.index * singleTabWidth);
   };
+
+  // Don't render tab bar if hidden (must be after all hooks)
+  if (isTabBarHidden) {
+    return null;
+  }
 
   return (
     <View style={styles.tabBarContainer}>

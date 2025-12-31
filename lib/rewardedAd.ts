@@ -7,6 +7,7 @@ const isExpoGo = Constants.appOwnership === 'expo';
 // Only import Google Mobile Ads when NOT in Expo Go
 let RewardedAd: any = null;
 let RewardedAdEventType: any = null;
+let AdEventType: any = null;
 let TestIds: any = null;
 
 if (!isExpoGo) {
@@ -14,6 +15,7 @@ if (!isExpoGo) {
     const ads = require('react-native-google-mobile-ads');
     RewardedAd = ads.RewardedAd;
     RewardedAdEventType = ads.RewardedAdEventType;
+    AdEventType = ads.AdEventType;
     TestIds = ads.TestIds;
   } catch (e) {
     console.log('[RewardedAd] Google Mobile Ads not available');
@@ -101,9 +103,9 @@ class RewardedAdManager {
           }
         );
 
-        // Subscribe to closed event
+        // Subscribe to closed event (CLOSED is in AdEventType, not RewardedAdEventType)
         this.unsubscribeClosed = this.rewardedAd.addAdEventListener(
-          RewardedAdEventType.CLOSED,
+          AdEventType.CLOSED,
           () => {
             console.log('[RewardedAd] Ad closed');
             this.isLoaded = false;

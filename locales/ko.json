@@ -127,7 +127,8 @@
       "partnerGenerating": "상대방이 미션을 생성 중이에요",
       "adLoadingFailed": "광고 로딩 실패",
       "adLoadingFailedMessage": "광고를 불러오는데 실패했어요.\n잠시 후 다시 시도해주세요.",
-      "generating": "새로운 미션 생성 중..."
+      "generating": "새로운 미션 생성 중...",
+      "loadingAd": "광고 준비 중..."
     }
   },
   "missionDetail": {
