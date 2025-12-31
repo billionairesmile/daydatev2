@@ -2631,20 +2631,29 @@ function PairingStep({
                 createdAt: creatorProfile.created_at ? new Date(creatorProfile.created_at) : new Date(),
               });
 
+              // Update pairing code's couple_id to point to the restored couple FIRST
+              // This is critical for creator's realtime/polling handler to find the correct couple
+              // IMPORTANT: Must happen BEFORE cleanup to avoid FK cascade race condition
+              console.log('[PairingStep] Updating pairing code couple_id to restored couple:', restoredCouple.id);
+              const { data: setCoupleIdResult, error: setCoupleIdError } = await db.pairingCodes.setCoupleId(pairingCode, restoredCouple.id);
+              if (setCoupleIdError) {
+                console.error('[PairingStep] Failed to update pairing code couple_id:', setCoupleIdError);
+                // Continue anyway - the pairing will still work, just reconnection detection might fail
+              } else {
+                console.log('[PairingStep] Successfully updated pairing code couple_id:', setCoupleIdResult?.couple_id);
+              }
+
+              // Mark pairing code as used (sets status='connected' which triggers creator's realtime)
+              const { error: joinError } = await db.pairingCodes.join(pairingCode, joinerId);
+              if (joinError) {
+                console.error('[PairingStep] Failed to join pairing code:', joinError);
+              }
+
               // Cleanup orphaned pending couples for PARTNER only (they created the reconnection code)
-              // NOTE: We intentionally do NOT clean up joiner's pending couples here because:
-              // 1. The joiner's pairing code might still be used by someone else (race condition)
-              // 2. FK constraint (ON DELETE SET NULL) would invalidate their code if we delete the couple
-              // 3. Joiner's pending couples will be cleaned up when they create a new code or expire naturally
+              // NOTE: This must happen AFTER setCoupleId and join to avoid FK cascade race condition
+              // The FK cascade (ON DELETE SET NULL) would set couple_id to NULL if we delete first
               console.log('[PairingStep] Reconnection cleanup: removing partner orphaned pending couples');
               await db.couples.cleanupPendingCouples(partnerId, restoredCouple.id);
-
-              // Update pairing code's couple_id to point to the restored couple
-              // This is important for creator's realtime handler to find the correct couple
-              await db.pairingCodes.setCoupleId(pairingCode, restoredCouple.id);
-
-              // Mark pairing code as used
-              await db.pairingCodes.join(pairingCode, joinerId);
 
               // Check if joiner's profile is complete
               const hasCompleteBirthDate = !!joinerProfile.birth_date;
