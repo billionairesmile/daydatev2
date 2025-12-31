@@ -589,6 +589,23 @@ export const db = {
       return { data, error };
     },
 
+    // Find active couple between two specific users (for reconnection detection)
+    // This is used by the pairing code creator to find if there's a restored couple
+    async findActiveCoupleBetweenUsers(userId1: string, userId2: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('couples')
+        .select('*')
+        .eq('status', 'active')
+        .or(
+          `and(user1_id.eq.${userId1},user2_id.eq.${userId2}),and(user1_id.eq.${userId2},user2_id.eq.${userId1})`
+        )
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return { data, error };
+    },
+
     // Get active couple by user ID (excludes disconnected, returns most recent)
     async getActiveByUserId(userId: string) {
       const client = getSupabase();

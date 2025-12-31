@@ -2076,54 +2076,85 @@ function PairingStep({
 
             if (payload.status === 'connected' && payload.joiner_id) {
               console.log('[PairingStep] Creator: Realtime detected partner connection');
+              console.log('[PairingStep] Creator: joiner_id =', payload.joiner_id, 'payload.couple_id =', payload.couple_id);
 
-              // Use couple_id from pairing code payload (not from store - store might have old data)
-              const coupleId = payload.couple_id;
+              const joinerId = payload.joiner_id;
+              const creatorId = currentUser?.id;
+
+              // CRITICAL FIX: Don't rely solely on payload.couple_id
+              // In 30-day reconnection, the joiner might have restored an old couple
+              // but the pairing code's couple_id might still point to a new pending couple.
+              // We need to check if there's an ACTIVE couple between creator and joiner.
+              let actualCoupleData: {
+                id: string;
+                user1_id: string;
+                user2_id: string | null;
+                dating_start_date: string | null;
+                wedding_date: string | null;
+                disconnect_reason: string | null;
+                created_at: string | null;
+              } | null = null;
               let disconnectReason: string | null = null;
 
-              if (coupleId) {
-                // Fetch updated couple data
-                const { data: coupleData } = await db.couples.get(coupleId);
-                if (coupleData) {
-                  disconnectReason = coupleData.disconnect_reason || null;
-
-                  // Update couple with user2Id
-                  setCouple({
-                    id: coupleData.id,
-                    user1Id: coupleData.user1_id,
-                    user2Id: coupleData.user2_id,
-                    anniversaryDate: coupleData.dating_start_date ? parseDateAsLocal(coupleData.dating_start_date) : undefined,
-                    datingStartDate: coupleData.dating_start_date ? parseDateAsLocal(coupleData.dating_start_date) : undefined,
-                    anniversaryType: t('onboarding.anniversary.datingStart'),
-                    status: 'active',
-                    createdAt: coupleData.created_at ? new Date(coupleData.created_at) : new Date(),
-                  });
-
-                  // Fetch joiner's profile
-                  if (coupleData.user2_id) {
-                    const { data: joinerProfile } = await db.profiles.get(coupleData.user2_id);
-                    setPartner({
-                      id: coupleData.user2_id,
-                      email: joinerProfile?.email || '',
-                      nickname: joinerProfile?.nickname || '',
-                      inviteCode: '',
-                      birthDate: joinerProfile?.birth_date ? parseDateAsLocal(joinerProfile.birth_date) : undefined,
-                      preferences: joinerProfile?.preferences || {
-                        weekendActivity: '',
-                        dateEnergy: '',
-                        dateTypes: [],
-                        adventureLevel: '',
-                        photoPreference: '',
-                        dateStyle: '',
-                        planningStyle: '',
-                        foodStyles: [],
-                        preferredTimes: [],
-                        budgetStyle: '',
-                      },
-                      createdAt: joinerProfile?.created_at ? new Date(joinerProfile.created_at) : new Date(),
-                    });
-                  }
+              // First, try to find an active couple between creator and joiner
+              // This handles the case where joiner restored an old couple
+              if (creatorId && joinerId) {
+                console.log('[PairingStep] Creator: Checking for active couple between', creatorId, 'and', joinerId);
+                const { data: activeCouple } = await db.couples.findActiveCoupleBetweenUsers(creatorId, joinerId);
+                if (activeCouple) {
+                  console.log('[PairingStep] Creator: Found active couple:', activeCouple.id, 'disconnect_reason:', activeCouple.disconnect_reason);
+                  actualCoupleData = activeCouple;
+                  disconnectReason = activeCouple.disconnect_reason || null;
                 }
+              }
+
+              // Fallback: Use couple_id from pairing code payload if no active couple found
+              if (!actualCoupleData && payload.couple_id) {
+                console.log('[PairingStep] Creator: No active couple found, using payload.couple_id:', payload.couple_id);
+                const { data: coupleData } = await db.couples.get(payload.couple_id);
+                if (coupleData) {
+                  actualCoupleData = coupleData;
+                  disconnectReason = coupleData.disconnect_reason || null;
+                }
+              }
+
+              if (actualCoupleData) {
+                console.log('[PairingStep] Creator: Using couple:', actualCoupleData.id);
+                // Update couple with user2Id
+                setCouple({
+                  id: actualCoupleData.id,
+                  user1Id: actualCoupleData.user1_id,
+                  user2Id: actualCoupleData.user2_id || undefined,
+                  anniversaryDate: actualCoupleData.dating_start_date ? parseDateAsLocal(actualCoupleData.dating_start_date) : undefined,
+                  datingStartDate: actualCoupleData.dating_start_date ? parseDateAsLocal(actualCoupleData.dating_start_date) : undefined,
+                  weddingDate: actualCoupleData.wedding_date ? parseDateAsLocal(actualCoupleData.wedding_date) : undefined,
+                  anniversaryType: t('onboarding.anniversary.datingStart'),
+                  status: 'active',
+                  createdAt: actualCoupleData.created_at ? new Date(actualCoupleData.created_at) : new Date(),
+                });
+
+                // Fetch joiner's profile
+                const { data: joinerProfile } = await db.profiles.get(joinerId);
+                setPartner({
+                  id: joinerId,
+                  email: joinerProfile?.email || '',
+                  nickname: joinerProfile?.nickname || '',
+                  inviteCode: '',
+                  birthDate: joinerProfile?.birth_date ? parseDateAsLocal(joinerProfile.birth_date) : undefined,
+                  preferences: joinerProfile?.preferences || {
+                    weekendActivity: '',
+                    dateEnergy: '',
+                    dateTypes: [],
+                    adventureLevel: '',
+                    photoPreference: '',
+                    dateStyle: '',
+                    planningStyle: '',
+                    foodStyles: [],
+                    preferredTimes: [],
+                    budgetStyle: '',
+                  },
+                  createdAt: joinerProfile?.created_at ? new Date(joinerProfile.created_at) : new Date(),
+                });
               }
 
               setIsPairingConnected(true);
@@ -2134,15 +2165,52 @@ function PairingStep({
               console.log('[PairingStep] Realtime reconnection check:', {
                 isReconnectionRef: isReconnectionRef.current,
                 disconnectReason,
-                isReconnection
+                isReconnection,
+                actualCoupleId: actualCoupleData?.id
               });
 
-              if (isReconnection) {
+              if (isReconnection && actualCoupleData) {
                 console.log('[PairingStep] Creator: Partner reconnected within 30 days, skipping onboarding');
                 // Clear disconnect_reason since reconnection is complete
-                if (coupleId) {
-                  await db.couples.update(coupleId, { disconnect_reason: null });
+                await db.couples.update(actualCoupleData.id, { disconnect_reason: null });
+
+                // Also update the user's profile couple_id to the restored couple
+                if (creatorId) {
+                  await db.profiles.update(creatorId, { couple_id: actualCoupleData.id });
                 }
+
+                // Restore creator's data to onboardingStore so profile page can display it if needed
+                if (creatorId) {
+                  const { data: creatorProfile } = await db.profiles.get(creatorId);
+                  if (creatorProfile) {
+                    const creatorPrefs = creatorProfile.preferences as Record<string, unknown> | undefined;
+                    setUser({
+                      id: creatorId,
+                      email: creatorProfile.email || '',
+                      nickname: creatorProfile.nickname || '',
+                      coupleId: actualCoupleData.id,
+                      birthDate: creatorProfile.birth_date ? parseDateAsLocal(creatorProfile.birth_date) : undefined,
+                      birthDateCalendarType: (creatorPrefs?.birthDateCalendarType as 'solar' | 'lunar') || 'solar',
+                      preferences: creatorProfile.preferences || {},
+                      createdAt: creatorProfile.created_at ? new Date(creatorProfile.created_at) : new Date(),
+                    });
+
+                    updateData({
+                      nickname: creatorProfile.nickname || '',
+                      birthDate: creatorProfile.birth_date ? parseDateAsLocal(creatorProfile.birth_date) : undefined,
+                      birthDateCalendarType: (creatorProfile.birth_date_calendar_type as CalendarType) || (creatorPrefs?.birthDateCalendarType as CalendarType) || 'solar',
+                      mbti: (creatorPrefs?.mbti as string) || '',
+                      gender: (creatorPrefs?.gender as Gender) || null,
+                      activityTypes: (creatorPrefs?.activityTypes as ActivityType[]) || [],
+                      dateWorries: (creatorPrefs?.dateWorries as DateWorry[]) || [],
+                      constraints: (creatorPrefs?.constraints as Constraint[]) || [],
+                      relationshipType: (creatorPrefs?.relationshipType as RelationshipType) || 'dating',
+                      anniversaryDate: actualCoupleData.dating_start_date ? parseDateAsLocal(actualCoupleData.dating_start_date) : undefined,
+                      isPairingConnected: true,
+                    });
+                  }
+                }
+
                 // Show reconnection alert and go directly to home
                 Alert.alert(
                   t('onboarding.pairing.reconnected'),
