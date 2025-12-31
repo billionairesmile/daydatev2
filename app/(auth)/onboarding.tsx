@@ -42,6 +42,7 @@ import { signInWithGoogle, signInWithKakao, signInWithApple, onAuthStateChange, 
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { Ionicons } from '@expo/vector-icons';
 
+import { GoogleLogo, KakaoLogo } from '@/components/icons/SocialLogos';
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '@/constants/design';
 import { useAuthStore } from '@/stores';
 import { useTimezoneStore } from '@/stores/timezoneStore';
@@ -1019,11 +1020,7 @@ function WelcomeStep({ onSocialLogin }: { onSocialLogin: (provider: 'google' | '
             ) : (
               <>
                 <View style={styles.socialIconContainer}>
-                  <Image
-                    source={require('@/assets/images/google-logo.png')}
-                    style={styles.googleIcon}
-                    contentFit="contain"
-                  />
+                  <GoogleLogo size={18} />
                 </View>
                 <Text style={styles.googleButtonText}>{t('onboarding.login.google')}</Text>
               </>
@@ -1042,11 +1039,7 @@ function WelcomeStep({ onSocialLogin }: { onSocialLogin: (provider: 'google' | '
             ) : (
               <>
                 <View style={styles.socialIconContainer}>
-                  <Image
-                    source={require('@/assets/images/kakao-logo.png')}
-                    style={styles.kakaoIcon}
-                    contentFit="contain"
-                  />
+                  <KakaoLogo size={22} />
                 </View>
                 <Text style={styles.kakaoButtonText}>{t('onboarding.login.kakao')}</Text>
               </>
@@ -4049,15 +4042,6 @@ const styles = StyleSheet.create({
   socialIcon: {
     width: 20,
     height: 20,
-  },
-  googleIcon: {
-    width: 18,
-    height: 18,
-  },
-  kakaoIcon: {
-    width: 22,
-    height: 22,
-    borderRadius: 4,
   },
   googleButton: {
     backgroundColor: '#ffffff',
