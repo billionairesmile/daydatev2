@@ -118,8 +118,8 @@
       "dailyLimitMessage": "You've completed today's mission.\nCome back tomorrow!"
     },
     "refresh": {
-      "questionLine1": "Can't find",
-      "questionLine2": "the right mission?",
+      "questionLine1": "Can't find the",
+      "questionLine2": "right mission?",
       "button": "Get New Missions",
       "hint": "Watch an ad to receive new missions",
       "modalTitle": "New Missions",
@@ -373,8 +373,7 @@
       "title": "Customer Service",
       "faqTitle": "FAQ",
       "inquiryTitle": "Still have questions?",
-      "inquiryDescription": "Send us a 1:1 inquiry via KakaoTalk\nand we'll respond quickly.",
-      "kakaoButton": "Contact Support"
+      "inquiryDescription": "Leave us a message\nand we'll respond quickly."
     },
     "others": {
       "title": "Other",
@@ -823,6 +822,9 @@
     "restoreSuccessMessage": "Your purchase has been restored successfully.",
     "restoreFailed": "Restore Failed",
     "restoreFailedMessage": "No previous purchases found. If you believe this is an error, please contact support.",
+    "restoreNoticeTitle": "Restore Purchase Info",
+    "restoreNotice1": "If you switched to a new device or reinstalled the app, tap Restore Purchase to recover your previous subscription.",
+    "restoreNotice2": "Subscriptions are tied to your Apple ID or Google Account and can be used on multiple devices.",
     "benefitsTitle": "Premium Benefits",
     "comparisonTitle": "Compare Plans",
     "free": "Free",
@@ -894,7 +896,8 @@
     },
     "limitReached": {
       "title": "Daily Limit Reached",
-      "completion": "You've reached your daily mission completion limit. Upgrade to Premium to complete more missions!"
+      "completion": "You've reached your daily mission completion limit. Upgrade to Premium to complete more missions!",
+      "photoStorage": "You've reached the photo storage limit (100 photos). Upgrade to Premium for unlimited storage!"
     },
     "deleteWarning": {
       "title": "Subscription Notice",

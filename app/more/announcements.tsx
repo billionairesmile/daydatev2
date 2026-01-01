@@ -5,11 +5,11 @@ import {
   StyleSheet,
   Pressable,
   ScrollView,
-  SafeAreaView,
   StatusBar,
   ActivityIndicator,
   Modal,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, ChevronDown, ChevronUp, Bell, Check } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';

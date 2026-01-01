@@ -47,6 +47,7 @@ export const SUBSCRIPTION_LIMITS = {
     maxCompletionsPerDay: 1,
     maxBookmarks: 5,
     maxAlbums: 5,
+    maxPhotos: 100, // Maximum photos in monthly album for free users
     missionsPerGeneration: 3,
     showAds: true,
     homeFrameOptions: ['polaroid'] as const,
@@ -56,6 +57,7 @@ export const SUBSCRIPTION_LIMITS = {
     maxCompletionsPerDay: Infinity,
     maxBookmarks: Infinity,
     maxAlbums: Infinity,
+    maxPhotos: Infinity, // Unlimited photos for premium users
     missionsPerGeneration: 5,
     showAds: false,
     homeFrameOptions: ['polaroid', 'calendar'] as const,
@@ -112,6 +114,7 @@ interface SubscriptionActions {
   canCompleteMission: (coupleId: string) => Promise<boolean>;
   canBookmarkMission: (currentBookmarkCount: number) => boolean;
   canCreateAlbum: (currentAlbumCount: number) => boolean;
+  canSavePhoto: (currentPhotoCount: number) => boolean;
   canEditAlbum: (albumIndex: number, totalAlbums: number) => boolean;
   isAlbumReadOnly: (albumIndex: number, totalAlbums: number) => boolean;
   shouldShowAds: () => boolean;
@@ -545,6 +548,14 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
         const limits = isCouplePremium ? SUBSCRIPTION_LIMITS.premium : SUBSCRIPTION_LIMITS.free;
 
         return currentAlbumCount < limits.maxAlbums;
+      },
+
+      canSavePhoto: (currentPhotoCount: number) => {
+        const state = get();
+        const isCouplePremium = state.isPremium || state.partnerIsPremium;
+        const limits = isCouplePremium ? SUBSCRIPTION_LIMITS.premium : SUBSCRIPTION_LIMITS.free;
+
+        return currentPhotoCount < limits.maxPhotos;
       },
 
       canEditAlbum: (albumIndex: number, totalAlbums: number) => {

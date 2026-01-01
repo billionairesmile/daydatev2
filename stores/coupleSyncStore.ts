@@ -2056,7 +2056,22 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       return;
     }
 
-    await db.coupleAlbums.delete(albumId);
+    console.log('[SyncStore] Deleting album:', albumId);
+    const { error } = await db.coupleAlbums.delete(albumId);
+
+    if (error) {
+      console.error('[SyncStore] Album delete error:', error);
+      return;
+    }
+
+    // Update local state after successful deletion
+    const newPhotosMap = { ...albumPhotosMap };
+    delete newPhotosMap[albumId];
+    set({
+      coupleAlbums: coupleAlbums.filter((a) => a.id !== albumId),
+      albumPhotosMap: newPhotosMap,
+    });
+    console.log('[SyncStore] Album deleted successfully, state updated');
   },
 
   loadAlbums: async () => {

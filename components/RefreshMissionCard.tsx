@@ -5,7 +5,6 @@ import {
   StyleSheet,
   Pressable,
 } from 'react-native';
-import { RefreshCw } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 
 import { COLORS, SPACING, RADIUS } from '@/constants/design';
@@ -22,20 +21,15 @@ export default function RefreshMissionCard({ onRefreshPress }: RefreshMissionCar
   return (
     <View style={styles.container}>
       <View style={styles.content}>
-        {/* Icon */}
-        <View style={styles.iconContainer}>
-          <RefreshCw color={COLORS.black} size={32} strokeWidth={1.5} />
+        <View style={styles.textContainer}>
+          <Text style={styles.questionText}>
+            {t('mission.refresh.questionLine1')}
+          </Text>
+          <Text style={styles.questionText}>
+            {t('mission.refresh.questionLine2')}
+          </Text>
         </View>
 
-        {/* Text */}
-        <Text style={styles.questionText}>
-          {t('mission.refresh.questionLine1')}
-        </Text>
-        <Text style={styles.questionText}>
-          {t('mission.refresh.questionLine2')}
-        </Text>
-
-        {/* Button */}
         <Pressable
           style={styles.refreshButton}
           onPress={onRefreshPress}
@@ -45,7 +39,6 @@ export default function RefreshMissionCard({ onRefreshPress }: RefreshMissionCar
           </Text>
         </Pressable>
 
-        {/* Hint text - only show for non-premium users */}
         {!isPremium && (
           <Text style={styles.hintText}>
             {t('mission.refresh.hint')}
@@ -68,25 +61,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: SPACING.xl,
+    paddingTop: 40,
   },
-  iconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#f5f5f5',
+  textContainer: {
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.lg,
+    marginBottom: 140,
   },
   questionText: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 24,
+    fontWeight: '700',
     color: COLORS.black,
     textAlign: 'center',
-    lineHeight: 28,
+    lineHeight: 32,
   },
   refreshButton: {
-    marginTop: SPACING.xl,
     paddingVertical: 16,
     paddingHorizontal: 32,
     backgroundColor: COLORS.black,

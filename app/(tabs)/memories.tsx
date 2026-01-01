@@ -2932,7 +2932,11 @@ function FlipCardItem({
           >
             <View style={styles.flipCardBackContent}>
               <View style={styles.flipCardBackTop}>
-                <Text style={styles.flipCardTitle} allowFontScaling={false}>
+                <Text
+                  style={styles.flipCardTitle}
+                  allowFontScaling={false}
+                  textBreakStrategy="highQuality"
+                >
                   {mission.mission?.title || t('memories.togetherMoment')}
                 </Text>
                 <View style={styles.flipCardInfoSection}>
@@ -4016,6 +4020,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 16,
     lineHeight: 28,
+    flexShrink: 1,
   },
   flipCardInfoSection: {
     gap: 8,

@@ -8,12 +8,12 @@ import {
   Modal,
   TextInput,
   Alert,
-  SafeAreaView,
   StatusBar,
   Animated,
   Keyboard,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ChevronLeft,
   Link2Off,

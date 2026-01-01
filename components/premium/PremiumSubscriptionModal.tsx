@@ -10,8 +10,8 @@ import {
   Linking,
   StatusBar,
   Alert,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Crown,
   Target,
@@ -163,19 +163,23 @@ export default function PremiumSubscriptionModal({
             </Pressable>
           </View>
 
-          {/* Centered Content Container */}
+          {/* Centered Content Container - Plan text at exact center */}
           <View style={styles.managementCenterContainer}>
-            {/* Crown Icon at Top */}
-            <View style={styles.premiumBadgeTop}>
-              <Crown color="#FFD700" size={48} />
+            {/* Top section: Crown + Title (positioned above center) */}
+            <View style={styles.managementTopSection}>
+              <View style={styles.premiumBadgeTop}>
+                <Crown color="#FFD700" size={48} />
+              </View>
+              <Text style={styles.managementTitle}>{t('premium.currentPlan')}</Text>
             </View>
 
-            <View style={styles.managementContent}>
-              <Text style={styles.managementTitle}>{t('premium.currentPlan')}</Text>
-              <Text style={styles.managementPlan}>
-                {plan === 'monthly' ? t('premium.monthlyPlan') : t('premium.annualPlan')}
-              </Text>
+            {/* Center anchor: Plan name */}
+            <Text style={styles.managementPlan}>
+              {plan === 'monthly' ? t('premium.monthlyPlan') : t('premium.annualPlan')}
+            </Text>
 
+            {/* Bottom section: Button (positioned below center) */}
+            <View style={styles.managementBottomSection}>
               <Pressable
                 style={styles.manageButton}
                 onPress={openSubscriptionManagement}
@@ -321,6 +325,13 @@ export default function PremiumSubscriptionModal({
             <Text style={styles.noticeText}>• {t('premium.refundNotice1')}</Text>
             <Text style={styles.noticeText}>• {t('premium.refundNotice2')}</Text>
             <Text style={styles.noticeText}>• {t('premium.refundNotice3')}</Text>
+          </View>
+
+          {/* Restore Purchases Notice */}
+          <View style={styles.noticeSection}>
+            <Text style={styles.noticeSectionTitle}>{t('premium.restoreNoticeTitle')}</Text>
+            <Text style={styles.noticeText}>• {t('premium.restoreNotice1')}</Text>
+            <Text style={styles.noticeText}>• {t('premium.restoreNotice2')}</Text>
           </View>
 
           {/* Restore Purchases & Legal Links */}
@@ -603,6 +614,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
     backgroundColor: '#F5F5F5',
     borderRadius: RADIUS.full,
+    marginTop: -SPACING.md,
     marginBottom: SPACING.md,
   },
   restoreButtonText: {
@@ -636,28 +648,33 @@ const styles = StyleSheet.create({
   // Management view styles
   managementCenterContainer: {
     flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
+  },
+  managementTopSection: {
+    flex: 0.8,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingBottom: SPACING.lg,
   },
   premiumBadgeTop: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: SPACING.lg,
-  },
-  managementContent: {
-    alignItems: 'center',
-    paddingHorizontal: SPACING.xl,
+    marginBottom: SPACING.md,
   },
   managementTitle: {
     fontSize: 14,
     color: '#666',
-    marginBottom: SPACING.sm,
   },
   managementPlan: {
     fontSize: 24,
     fontWeight: '700',
     color: COLORS.black,
-    marginBottom: SPACING.xl,
+  },
+  managementBottomSection: {
+    flex: 1,
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    paddingTop: SPACING.xl,
   },
   manageButton: {
     flexDirection: 'row',

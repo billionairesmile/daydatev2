@@ -118,10 +118,10 @@
     "refresh": {
       "questionLine1": "¿No encuentras",
       "questionLine2": "la misión ideal?",
-      "button": "Obtener Nuevas Misiones",
+      "button": "Nuevas Misiones",
       "hint": "Ve un anuncio para recibir nuevas misiones",
       "modalTitle": "Nuevas Misiones",
-      "modalButton": "Obtener Nuevas Misiones",
+      "modalButton": "Nuevas Misiones",
       "partnerGenerating": "Tu pareja está generando misiones",
       "adLoadingFailed": "Error al Cargar Anuncio",
       "adLoadingFailedMessage": "Error al cargar el anuncio.\nPor favor, inténtalo más tarde.",
@@ -370,8 +370,7 @@
       "title": "Atención al Cliente",
       "faqTitle": "Preguntas Frecuentes",
       "inquiryTitle": "¿Aún tienes preguntas?",
-      "inquiryDescription": "Envíanos una consulta por KakaoTalk\ny te responderemos pronto.",
-      "kakaoButton": "Contactar Soporte"
+      "inquiryDescription": "Déjanos un mensaje\ny te responderemos pronto."
     },
     "others": {
       "title": "Otros",
@@ -820,6 +819,9 @@
     "restoreSuccessMessage": "Tu compra ha sido restaurada exitosamente.",
     "restoreFailed": "Restauración Fallida",
     "restoreFailedMessage": "No se encontraron compras anteriores. Si crees que esto es un error, por favor contacta soporte.",
+    "restoreNoticeTitle": "Info de Restaurar Compra",
+    "restoreNotice1": "Si cambiaste a un nuevo dispositivo o reinstalaste la app, toca Restaurar Compra para recuperar tu suscripción anterior.",
+    "restoreNotice2": "Las suscripciones están vinculadas a tu Apple ID o cuenta de Google y pueden usarse en múltiples dispositivos.",
     "benefitsTitle": "Beneficios Premium",
     "comparisonTitle": "Comparar Planes",
     "free": "Gratis",
@@ -891,7 +893,8 @@
     },
     "limitReached": {
       "title": "Límite Diario Alcanzado",
-      "completion": "¡Has alcanzado tu límite diario de completar misiones. Actualiza a Premium para completar más misiones!"
+      "completion": "¡Has alcanzado tu límite diario de completar misiones. Actualiza a Premium para completar más misiones!",
+      "photoStorage": "¡Has alcanzado el límite de almacenamiento de fotos (100 fotos). Actualiza a Premium para almacenamiento ilimitado!"
     },
     "deleteWarning": {
       "title": "Aviso de Suscripción",

@@ -606,9 +606,28 @@ export const db = {
       return { data, error };
     },
 
-    // Get active couple by user ID (excludes disconnected, returns most recent)
+    // Get active couple by user ID (excludes disconnected, prioritizes fully paired)
     async getActiveByUserId(userId: string) {
       const client = getSupabase();
+
+      // First, try to find a fully paired active couple (both user1_id and user2_id set)
+      // This handles the case where user has multiple couples (pending + active)
+      const { data: pairedCouple, error: pairedError } = await client
+        .from('couples')
+        .select('*')
+        .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
+        .eq('status', 'active')
+        .not('user2_id', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (pairedCouple) {
+        console.log('[DB] getActiveByUserId: Found fully paired couple:', pairedCouple.id);
+        return { data: pairedCouple, error: null };
+      }
+
+      // Fallback: return any non-disconnected couple (including pending)
       const { data, error } = await client
         .from('couples')
         .select('*')
@@ -617,7 +636,11 @@ export const db = {
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
-      return { data, error };
+
+      if (data) {
+        console.log('[DB] getActiveByUserId: Found couple (fallback):', data.id, 'status:', data.status, 'user2_id:', data.user2_id);
+      }
+      return { data, error: error || pairedError };
     },
 
     // Get disconnected couple by user ID (within 30 days, for reconnection)
@@ -2380,13 +2403,20 @@ export const db = {
 
     async delete(albumId: string) {
       const client = getSupabase();
+      console.log('[Album Delete] Starting deletion for album:', albumId);
 
       // Auto-cleanup: Get album data first to delete cover from storage
-      const { data: album } = await client
+      const { data: album, error: fetchError } = await client
         .from('couple_albums')
         .select('cover_photo_url')
         .eq('id', albumId)
         .single();
+
+      if (fetchError) {
+        console.warn('[Album Delete] Failed to fetch album data:', fetchError.message);
+      } else {
+        console.log('[Album Delete] Album cover URL:', album?.cover_photo_url);
+      }
 
       // Delete album record from database
       const { error } = await client
@@ -2394,10 +2424,24 @@ export const db = {
         .delete()
         .eq('id', albumId);
 
+      if (error) {
+        console.error('[Album Delete] DB delete error:', error.message);
+        return { error };
+      }
+
+      console.log('[Album Delete] DB record deleted successfully');
+
       // Delete cover image from storage if exists (after successful DB delete)
-      if (!error && album?.cover_photo_url) {
+      if (album?.cover_photo_url) {
         const coverPath = extractStoragePathFromUrl(album.cover_photo_url);
-        await deleteFromStorage(coverPath);
+        console.log('[Album Delete] Extracted storage path:', coverPath);
+        if (coverPath) {
+          await deleteFromStorage(coverPath);
+        } else {
+          console.warn('[Album Delete] Could not extract storage path from URL');
+        }
+      } else {
+        console.log('[Album Delete] No cover photo to delete');
       }
 
       return { error };

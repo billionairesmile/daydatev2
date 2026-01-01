@@ -520,6 +520,11 @@ export default function OnboardingScreen() {
               });
             }
 
+            // Cleanup any orphaned pending couples for this user
+            // This prevents stale couples from interfering with future logins
+            console.log('[Onboarding] Cleaning up orphaned pending couples for user:', session.user.id);
+            await db.couples.cleanupPendingCouples(session.user.id, existingCouple.id);
+
             if (isProfileComplete) {
               // Profile is complete - go directly to home
               console.log('[Onboarding] Profile complete, going directly to home');

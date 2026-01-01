@@ -373,8 +373,7 @@
       "title": "カスタマーサービス",
       "faqTitle": "よくある質問",
       "inquiryTitle": "ご不明な点はありますか？",
-      "inquiryDescription": "お問い合わせいただければ\n迅速に対応いたします。",
-      "kakaoButton": "お問い合わせ"
+      "inquiryDescription": "お問い合わせいただければ\n迅速に対応いたします。"
     },
     "others": {
       "title": "その他",
@@ -823,6 +822,9 @@
     "restoreSuccessMessage": "購入が正常に復元されました。",
     "restoreFailed": "購入復元失敗",
     "restoreFailedMessage": "以前の購入履歴が見つかりません。問題があると思われる場合はカスタマーサービスにお問い合わせください。",
+    "restoreNoticeTitle": "購入復元について",
+    "restoreNotice1": "新しいデバイスに変更したり、アプリを再インストールした場合は、購入を復元をタップして以前の購読を復元できます。",
+    "restoreNotice2": "購読はApple IDまたはGoogleアカウントに紐づいており、複数のデバイスで使用できます。",
     "benefitsTitle": "プレミアム特典",
     "comparisonTitle": "特典比較",
     "free": "無料",
@@ -894,7 +896,8 @@
     },
     "limitReached": {
       "title": "1日の上限に達しました",
-      "completion": "今日のミッション完了上限に達しました。プレミアムにアップグレードしてもっと多くのミッションを完了しよう！"
+      "completion": "今日のミッション完了上限に達しました。プレミアムにアップグレードしてもっと多くのミッションを完了しよう！",
+      "photoStorage": "写真保存上限（100枚）に達しました。プレミアムにアップグレードで無制限に保存できます！"
     },
     "deleteWarning": {
       "title": "購読確認",

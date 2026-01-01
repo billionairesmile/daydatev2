@@ -11,6 +11,8 @@ import {
   ActivityIndicator,
   Linking,
   useWindowDimensions,
+  AppState,
+  type AppStateStatus,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Image as ExpoImage } from 'expo-image';
@@ -136,6 +138,7 @@ export default function MissionScreen() {
     allMissionProgress,
     coupleId,
     resetAllMissions,
+    loadSharedMissions,
   } = useCoupleSyncStore();
 
   // Get partner info from auth store
@@ -186,10 +189,11 @@ export default function MissionScreen() {
 
   // Get today's missions or empty array
   // Use useMemo to ensure re-calculation when dependencies change
+  // IMPORTANT: isSyncInitialized must be in deps because getTodayMissions() checks it internally
   const todayMissions = React.useMemo(() => {
     return getTodayMissions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [generatedMissionData, sharedMissions, sharedMissionsDate, getTodayMissions]);
+  }, [generatedMissionData, sharedMissions, sharedMissionsDate, isSyncInitialized, getTodayMissions]);
 
   const hasGeneratedMissions = React.useMemo(() => {
     return hasTodayMissions();
@@ -383,6 +387,56 @@ export default function MissionScreen() {
   useEffect(() => {
     loadFeaturedMissions();
   }, [i18n.language, loadFeaturedMissions]);
+
+  // AppState listener to refresh mission data when app comes back to foreground
+  // This prevents missions from disappearing when the screen is kept open for a long time
+  // and the Supabase real-time subscription silently disconnects
+  useEffect(() => {
+    const appStateRef = { current: AppState.currentState };
+
+    const handleAppStateChange = async (nextAppState: AppStateStatus) => {
+      // When app comes back to foreground from background/inactive
+      if (
+        appStateRef.current.match(/inactive|background/) &&
+        nextAppState === 'active' &&
+        isSyncInitialized &&
+        coupleId
+      ) {
+        console.log('[MissionScreen] App came to foreground, refreshing mission data');
+        // Reload shared missions to ensure data is fresh
+        await loadSharedMissions();
+        // Also check for date reset
+        checkAndResetMissions();
+      }
+      appStateRef.current = nextAppState;
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+    return () => {
+      subscription.remove();
+    };
+  }, [isSyncInitialized, coupleId, loadSharedMissions, checkAndResetMissions]);
+
+  // Periodic refresh of mission data every 5 minutes while screen is active
+  // This ensures mission data stays fresh even if real-time subscription disconnects
+  useEffect(() => {
+    if (!isSyncInitialized || !coupleId) return;
+
+    const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
+
+    const intervalId = setInterval(async () => {
+      // Only refresh if app is in foreground
+      if (AppState.currentState === 'active') {
+        console.log('[MissionScreen] Periodic mission data refresh');
+        await loadSharedMissions();
+      }
+    }, REFRESH_INTERVAL);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [isSyncInitialized, coupleId, loadSharedMissions]);
 
   // Watch for partner generating missions (via real-time sync)
   useEffect(() => {

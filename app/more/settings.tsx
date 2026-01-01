@@ -10,13 +10,13 @@ import {
   Modal,
   TextInput,
   Alert,
-  SafeAreaView,
   StatusBar,
   Animated,
   Keyboard,
   Platform,
   Linking,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ChevronLeft,
   ChevronRight,
@@ -208,6 +208,9 @@ export default function SettingsScreen() {
           text: t('settings.account.logout'),
           style: 'destructive',
           onPress: async () => {
+            // Cleanup realtime subscriptions and reset coupleSyncStore state (missions, bookmarks, etc.)
+            const { cleanup: cleanupSync } = useCoupleSyncStore.getState();
+            cleanupSync();
             // Clear all auth data (user, couple, partner)
             signOut();
             // Reset onboarding steps to welcome

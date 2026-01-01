@@ -118,6 +118,22 @@ export default function PairingScreen() {
 
             <View style={styles.codeContainer}>
               <Text style={styles.codeText}>{myCode}</Text>
+              <View style={styles.codeActions}>
+                <TouchableOpacity
+                  onPress={handleCopyCode}
+                  style={styles.codeActionButton}
+                  activeOpacity={0.7}
+                >
+                  <Copy size={20} color="rgba(0, 0, 0, 0.6)" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleShareCode}
+                  style={styles.codeActionButton}
+                  activeOpacity={0.7}
+                >
+                  <Share2 size={20} color="rgba(0, 0, 0, 0.6)" />
+                </TouchableOpacity>
+              </View>
             </View>
 
             <View style={styles.buttonRow}>
@@ -334,9 +350,23 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
     borderRadius: RADIUS.xl,
     paddingVertical: SPACING.lg,
+    paddingHorizontal: SPACING.lg,
     marginBottom: SPACING.xl,
     borderWidth: 1,
     borderColor: '#e0e0e0',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  codeActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: SPACING.md,
+    gap: SPACING.xs,
+  },
+  codeActionButton: {
+    padding: SPACING.sm,
+    borderRadius: RADIUS.sm,
   },
   codeText: {
     fontSize: TYPOGRAPHY.fontSize.hero,

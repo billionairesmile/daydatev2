@@ -1000,7 +1000,7 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-DX602Elliv4${IMAGE_PARAMS}`, // 만들기 데이트
     `${UNSPLASH_BASE}/photo-Y42EeZIDRIw${IMAGE_PARAMS}`, // 함께 DIY
     `${UNSPLASH_BASE}/photo-42O7UpRql24${IMAGE_PARAMS}`, // 커플 크래프트
-    `${UNSPLASH_BASE}/photo-ZhDVAlGxUHM${IMAGE_PARAMS}`, // 창작 활동
+    `${UNSPLASH_BASE}/photo-1460661419201-fd4cecdf8a8b${IMAGE_PARAMS}`, // 창작 활동
     `${UNSPLASH_BASE}/photo-RHvRN9iGZ8Y${IMAGE_PARAMS}`, // 함께 만들기 데이트
     `${UNSPLASH_BASE}/photo-BAsk9EETO3w${IMAGE_PARAMS}`, // 커플 아트 워크샵
     `${UNSPLASH_BASE}/photo-5-TbS3ssIVM${IMAGE_PARAMS}`, // 크리에이티브 시간

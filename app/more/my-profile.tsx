@@ -9,10 +9,10 @@ import {
   TextInput,
   Modal,
   Platform,
-  SafeAreaView,
   StatusBar,
   Animated,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import {
   ChevronLeft,

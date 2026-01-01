@@ -370,8 +370,7 @@
       "title": "客服中心",
       "faqTitle": "常見問題",
       "inquiryTitle": "問題還沒解決嗎？",
-      "inquiryDescription": "透過客服聯繫我們\n我們會盡快回覆您。",
-      "kakaoButton": "1:1 諮詢"
+      "inquiryDescription": "留言給我們\n我們會盡快回覆您。"
     },
     "others": {
       "title": "其他",
@@ -820,6 +819,9 @@
     "restoreSuccessMessage": "已成功恢復您之前的購買。",
     "restoreFailed": "恢復失敗",
     "restoreFailedMessage": "找不到之前的購買記錄。如果問題持續，請聯繫客服。",
+    "restoreNoticeTitle": "恢復購買說明",
+    "restoreNotice1": "如果您更換了新裝置或重新安裝了應用程式，請點擊恢復購買以恢復之前的訂閱。",
+    "restoreNotice2": "訂閱與您的 Apple ID 或 Google 帳戶綁定，可在多個裝置上使用。",
     "benefitsTitle": "Premium 優惠",
     "comparisonTitle": "方案比較",
     "free": "免費",
@@ -893,7 +895,8 @@
     },
     "limitReached": {
       "title": "已達每日限制",
-      "completion": "您已達到今日任務完成上限。升級到Premium可完成更多任務！"
+      "completion": "您已達到今日任務完成上限。升級到Premium可完成更多任務！",
+      "photoStorage": "已達照片儲存上限（100張）。升級至Premium可無限儲存！"
     },
     "deleteWarning": {
       "title": "訂閱確認",

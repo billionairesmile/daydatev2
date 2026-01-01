@@ -637,6 +637,18 @@ export default function MissionDetailScreen() {
 
 
   const handleTakePhoto = async () => {
+    // Check photo storage limit before opening camera
+    const subscriptionStore = useSubscriptionStore.getState();
+    const canSavePhoto = subscriptionStore.canSavePhoto(memories.length);
+    if (!canSavePhoto) {
+      Alert.alert(
+        t('premium.limitReached.title'),
+        t('premium.limitReached.photoStorage'),
+        [{ text: t('common.ok') }]
+      );
+      return;
+    }
+
     if (!hasPermission) {
       const granted = await requestPermission();
       if (!granted) {
@@ -1081,6 +1093,18 @@ export default function MissionDetailScreen() {
           return;
         }
 
+        // Check photo storage limit for free users
+        const canSavePhoto = subscriptionStore.canSavePhoto(memories.length);
+        if (!canSavePhoto) {
+          Alert.alert(
+            t('premium.limitReached.title'),
+            t('premium.limitReached.photoStorage'),
+            [{ text: t('common.ok') }]
+          );
+          memorySavedRef.current = false; // Reset so user can try again after upgrade
+          return;
+        }
+
         try {
           // Check if photo is already a remote URL (synced from partner)
           const isRemoteUrl = capturedPhoto.startsWith('http://') || capturedPhoto.startsWith('https://');
@@ -1176,6 +1200,15 @@ export default function MissionDetailScreen() {
             const canComplete = await subscriptionStore.canCompleteMission(couple.id);
             if (!canComplete) {
               console.log('[MissionComplete] Daily completion limit reached');
+              memorySavedRef.current = false;
+              return;
+            }
+
+            // Check photo storage limit for free users
+            const memoryStore = useMemoryStore.getState();
+            const canSavePhoto = subscriptionStore.canSavePhoto(memoryStore.memories.length);
+            if (!canSavePhoto) {
+              console.log('[MissionComplete] Photo storage limit reached');
               memorySavedRef.current = false;
               return;
             }
