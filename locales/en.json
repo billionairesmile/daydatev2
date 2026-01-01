@@ -708,7 +708,8 @@
       "coupleConnectionError": "An error occurred while connecting couple.",
       "copied": "Copied",
       "reconnected": "Nice to see you again! 💕",
-      "reconnectedMessage": "Your data has been restored from reconnection within 30 days."
+      "reconnectedMessage": "Your data has been restored from reconnection within 30 days.",
+      "shareMessage": "Let's create special dates together on Daydate! 💕\nMy invite code: {{code}}"
     },
     "preferences": {
       "title": "Select your preferred\nactivities",

@@ -705,7 +705,8 @@
       "coupleConnectionError": "Ocurrió un error al conectar pareja.",
       "copied": "Copiado",
       "reconnected": "¡Qué bueno verte de nuevo! 💕",
-      "reconnectedMessage": "Tus datos fueron restaurados desde la reconexión en 30 días."
+      "reconnectedMessage": "Tus datos fueron restaurados desde la reconexión en 30 días.",
+      "shareMessage": "¡Creemos citas especiales juntos en Daydate! 💕\nMi código de invitación: {{code}}"
     },
     "preferences": {
       "title": "Selecciona tus actividades\npreferidas",

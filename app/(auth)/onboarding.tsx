@@ -16,6 +16,7 @@ import {
   Alert,
   ActivityIndicator,
   StatusBar,
+  Share,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -2473,6 +2474,17 @@ function PairingStep({
     }
   };
 
+  // Share code
+  const handleShareCode = async () => {
+    try {
+      await Share.share({
+        message: t('onboarding.pairing.shareMessage', { code: generatedCode }),
+      });
+    } catch (err) {
+      console.error('Failed to share:', err);
+    }
+  };
+
   // Handle join (for code enterer)
   const handleJoin = async () => {
     // Guard: Don't try to join again if already connected or already loading
@@ -3141,19 +3153,18 @@ function PairingStep({
                 {isCodeSaved && <Text style={styles.codeTimer}>({timeRemaining})</Text>}
               </View>
               <View style={styles.codeBoxRow}>
-                <View style={styles.codeBoxSpacer} />
                 {isCodeSaved ? (
                   <Text style={styles.codeText}>{generatedCode}</Text>
                 ) : (
                   <ActivityIndicator size="small" color={COLORS.primary} />
                 )}
                 <Pressable
-                  style={[styles.copyButton, !isCodeSaved && { opacity: 0.3 }]}
-                  onPress={isCodeSaved ? handleCopyCode : undefined}
+                  style={[styles.shareButton, !isCodeSaved && { opacity: 0.3 }]}
+                  onPress={isCodeSaved ? handleShareCode : undefined}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   disabled={!isCodeSaved}
                 >
-                  <Copy size={20} color="rgba(0,0,0,0.5)" />
+                  <Ionicons name="share-outline" size={24} color="rgba(0,0,0,0.5)" />
                 </Pressable>
               </View>
               {isPairingConnected ? (
@@ -4289,21 +4300,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: SPACING.sm,
-  },
-  codeBoxSpacer: {
-    width: 30,
+    position: 'relative',
+    width: '100%',
   },
   codeText: {
     fontSize: 32,
     color: COLORS.black,
     fontWeight: '700',
-    letterSpacing: 8,
+    letterSpacing: 6,
+    textAlign: 'center',
   },
-  copyButton: {
-    width: 30,
+  shareButton: {
+    position: 'absolute',
+    right: 0,
+    padding: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: SPACING.sm,
   },
   logoutButton: {
     position: 'absolute',

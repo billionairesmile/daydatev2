@@ -708,7 +708,8 @@
       "coupleConnectionError": "カップル接続中にエラーが発生しました。",
       "copied": "コピーされました",
       "reconnected": "またお会いできて嬉しいです！",
-      "reconnectedMessage": "30日以内の再接続により既存データが復旧されました。"
+      "reconnectedMessage": "30日以内の再接続により既存データが復旧されました。",
+      "shareMessage": "Daydateで一緒に特別なデートを作りましょう！💕\n招待コード: {{code}}"
     },
     "preferences": {
       "title": "好きな活動を\n選択してください",
