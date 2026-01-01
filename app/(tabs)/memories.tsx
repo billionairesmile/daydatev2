@@ -202,6 +202,7 @@ export default function MemoriesScreen() {
 
   // Prefetch album photos for instant display when opening albums
   useEffect(() => {
+    if (!albumPhotos) return;
     Object.values(albumPhotos).forEach(photos => {
       photos.forEach(photo => {
         if (photo.photoUrl) {
@@ -1100,14 +1101,134 @@ export default function MemoriesScreen() {
 
       {/* Content */}
       {completedMemories.length === 0 ? (
-        <View style={styles.emptyState}>
-          <View style={styles.emptyMissionCard}>
-            <Text style={styles.emptyMissionText}>{t('memories.empty')}</Text>
-            <Text style={styles.emptyMissionHint}>
-              {t('memories.emptyHint')}
-            </Text>
+        <ScrollView
+          style={styles.mainContent}
+          contentContainerStyle={styles.mainContentContainer}
+          showsVerticalScrollIndicator={false}
+          bounces={true}
+          alwaysBounceVertical={true}
+        >
+          {/* Year Section - Current Year */}
+          <View style={styles.yearSection}>
+            <View style={styles.yearHeader}>
+              <View style={styles.yearTitleButton}>
+                <Text style={styles.yearTitle}>
+                  {i18n.language === 'ko' ? `${new Date().getFullYear()}년` : String(new Date().getFullYear())}
+                </Text>
+              </View>
+            </View>
+
+            {/* Empty Mission Card */}
+            <View style={styles.emptyMissionCardContainer}>
+              <View style={styles.emptyMissionCard}>
+                <Text style={styles.emptyMissionText}>{t('memories.empty')}</Text>
+                <Text style={styles.emptyMissionHint}>
+                  {t('memories.emptyHint')}
+                </Text>
+              </View>
+            </View>
           </View>
-        </View>
+
+          {/* Album Section */}
+          <View style={styles.collageSection}>
+            <View style={styles.collageSectionHeader}>
+              <Text style={styles.collageSectionTitle}>{t('memories.album.title')}</Text>
+              <Pressable style={styles.albumIconButton} onPress={openAlbumModal}>
+                <BookHeart color={COLORS.white} size={20} strokeWidth={1.5} />
+              </Pressable>
+            </View>
+            <Text style={styles.collageSectionSubtitle}>{t('memories.album.subtitle')}</Text>
+
+            {/* Created Albums - 5 per row, each row scrollable */}
+            {albums.length > 0 && (
+              <View style={styles.albumsContainer}>
+                {/* Group albums into rows of 5 */}
+                {Array.from({ length: Math.ceil(albums.length / 5) }, (_, rowIndex) => (
+                  <ScrollView
+                    key={`album-row-${rowIndex}`}
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.albumRow}
+                  >
+                    {albums.slice(rowIndex * 5, rowIndex * 5 + 5).map((album) => (
+                      <Pressable
+                        key={album.id}
+                        style={styles.albumItem}
+                        onPress={() => {
+                          setSelectedAlbum(album);
+                          setShowAlbumDetailModal(true);
+                        }}
+                      >
+                        <View style={styles.hardcoverBook}>
+                          {/* Full Photo Background */}
+                          {album.coverPhoto ? (
+                            <ExpoImage source={{ uri: album.coverPhoto }} style={styles.bookFullPhoto} contentFit="cover" cachePolicy="memory-disk" transition={100} />
+                          ) : (
+                            <View style={styles.bookPlaceholder}>
+                              <ImageIcon color="rgba(255,255,255,0.3)" size={24} />
+                            </View>
+                          )}
+
+                          {/* Book Spine - Inward Curve Effect */}
+                          <LinearGradient
+                            colors={['rgba(0, 0, 0, 0.65)', 'rgba(0, 0, 0, 0.35)', 'rgba(0, 0, 0, 0.12)', 'rgba(255, 255, 255, 0.08)', 'transparent']}
+                            locations={[0, 0.25, 0.55, 0.8, 1]}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={styles.bookSpineCurve}
+                          />
+
+                          {/* Main Cover Area */}
+                          <View style={styles.albumCoverWrapper}>
+                            {/* Cover Texture Overlay */}
+                            <View style={styles.coverTextureOverlay} pointerEvents="none" />
+
+                            {/* Cover Edge Highlight */}
+                            <View style={styles.coverEdgeHighlight} pointerEvents="none" />
+
+                            {/* Album Name - Basic or Ransom Style */}
+                            <View style={[
+                              styles.albumNameOverlay,
+                              {
+                                left: (album.namePosition?.x ?? 30) * ALBUM_SCALE_RATIO,
+                                top: (album.namePosition?.y ?? 16) * ALBUM_SCALE_RATIO,
+                              }
+                            ]}>
+                              {album.fontStyle === 'basic' ? (
+                                // Basic Jua Font Style
+                                <Text style={[styles.basicFontTiny, { fontSize: 16 * (album.textScale || 1) * ALBUM_SCALE_RATIO }]}>{album.name}</Text>
+                              ) : (
+                                // Ransom Style - Image-based
+                                <RansomText
+                                  text={album.name}
+                                  seed={album.ransomSeed || 12345}
+                                  characterSize={18 * (album.textScale || 1) * ALBUM_SCALE_RATIO}
+                                  spacing={-4 * ALBUM_SCALE_RATIO}
+                                  enableRotation={true}
+                                  enableYOffset={true}
+                                />
+                              )}
+                            </View>
+
+                            {/* Read-only indicator */}
+                            {isAlbumReadOnly(albums.indexOf(album)) && (
+                              <View style={styles.albumReadOnlyBadge}>
+                                <Lock size={10} color="rgba(255,255,255,0.8)" />
+                              </View>
+                            )}
+                          </View>
+                        </View>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                ))}
+              </View>
+            )}
+          </View>
+
+          {/* Banner Ad */}
+          <BannerAdView />
+        </ScrollView>
       ) : (
         <ScrollView
           style={styles.mainContent}
@@ -3482,6 +3603,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
   },
+  emptyMissionCardContainer: {
+    paddingHorizontal: SPACING.lg,
+    height: ALBUM_CARD_WIDTH, // Match month card height (140px)
+    justifyContent: 'center',
+    marginTop: SPACING.sm, // Match album section spacing
+  },
   emptyMissionCard: {
     padding: 24,
     borderRadius: 20,
@@ -3489,7 +3616,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
+    justifyContent: 'center',
     width: '100%',
+    height: '100%',
   },
   emptyMissionText: {
     fontSize: 16,

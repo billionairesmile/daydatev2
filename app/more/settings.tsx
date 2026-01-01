@@ -122,25 +122,25 @@ export default function SettingsScreen() {
     loadSettings();
   }, [user?.id]);
 
-  // Handlers to sync notification settings to DB
-  const handlePushEnabledChange = async (value: boolean) => {
+  // Handlers to sync notification settings to DB (non-blocking to preserve animation)
+  const handlePushEnabledChange = (value: boolean) => {
     setPushEnabled(value);
     if (user?.id && !isDemoMode) {
-      await db.profiles.update(user.id, { push_enabled: value });
+      db.profiles.update(user.id, { push_enabled: value });
     }
   };
 
-  const handleNewsEnabledChange = async (value: boolean) => {
+  const handleNewsEnabledChange = (value: boolean) => {
     setNewsEnabled(value);
     if (user?.id && !isDemoMode) {
-      await db.profiles.update(user.id, { news_agreed: value });
+      db.profiles.update(user.id, { news_agreed: value });
     }
   };
 
-  const handleMarketingEnabledChange = async (value: boolean) => {
+  const handleMarketingEnabledChange = (value: boolean) => {
     setMarketingEnabled(value);
     if (user?.id && !isDemoMode) {
-      await db.profiles.update(user.id, { marketing_agreed: value });
+      db.profiles.update(user.id, { marketing_agreed: value });
     }
   };
 

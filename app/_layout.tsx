@@ -782,34 +782,54 @@ function RootLayoutNav() {
     };
   }, [isOnboardingComplete, couple?.id, setCouple, setPartner, setIsOnboardingComplete, cleanupSync, router, setOnboardingStep, updateOnboardingData]);
 
-  // Wait for auth hydration and navigation to be ready before redirecting
+  // Wait for auth hydration and onboarding state to be determined before navigation
   useEffect(() => {
-    // Only set navigation ready after auth store is hydrated
-    if (authHydrated) {
+    // Only set navigation ready after auth store is hydrated AND onboarding state is determined (boolean, not undefined)
+    if (authHydrated && typeof isOnboardingComplete === 'boolean') {
       const timer = setTimeout(() => {
         setIsNavigationReady(true);
-      }, 100);
+      }, 50);
       return () => clearTimeout(timer);
     }
-  }, [authHydrated]);
+  }, [authHydrated, isOnboardingComplete]);
+
+  // Calculate navigation state
+  const inAuthGroup = segments?.[0] === '(auth)';
+  const inTabsGroup = segments?.[0] === '(tabs)';
+  const shouldBeInTabs = isOnboardingComplete === true;
+  const shouldBeInAuth = isOnboardingComplete === false;
+
+  // Check if we're in the wrong place and need navigation
+  const needsNavigationToTabs = shouldBeInTabs && inAuthGroup;
+  const needsNavigationToAuth = shouldBeInAuth && inTabsGroup;
 
   useEffect(() => {
     if (!isNavigationReady || !authHydrated) return;
+    // Wait for segments to be populated (prevents flash during error recovery)
+    if (!segments?.[0]) return;
 
-    const inAuthGroup = segments[0] === '(auth)';
-
-    // If onboarding not complete and not in auth group, redirect to onboarding
-    if (!isOnboardingComplete && !inAuthGroup) {
+    // If onboarding not complete and in tabs group, redirect to onboarding
+    if (needsNavigationToAuth) {
       router.replace('/(auth)/onboarding');
     }
     // If onboarding is complete and in auth group, redirect to tabs
-    else if (isOnboardingComplete && inAuthGroup) {
+    else if (needsNavigationToTabs) {
       router.replace('/(tabs)');
     }
-  }, [isNavigationReady, isOnboardingComplete, authHydrated]);
+  }, [isNavigationReady, isOnboardingComplete, authHydrated, segments, needsNavigationToTabs, needsNavigationToAuth]);
 
-  // Don't render Stack until auth state is hydrated to prevent flash of home screen
-  if (!authHydrated) {
+  // Don't render Stack until:
+  // 1. Auth state is hydrated
+  // 2. Onboarding state is determined (boolean, not undefined)
+  // 3. Navigation is ready
+  // 4. We're in the correct location (not needing navigation to a different group)
+  // This prevents flash of wrong screen during navigation transitions
+  if (!authHydrated || typeof isOnboardingComplete !== 'boolean' || !isNavigationReady) {
+    return null;
+  }
+
+  // If we need to navigate to a different group, don't render until navigation completes
+  if (needsNavigationToTabs || needsNavigationToAuth) {
     return null;
   }
 
@@ -831,6 +851,14 @@ function RootLayoutNav() {
             presentation: 'card',
             animation: 'fade',
             animationDuration: 150,
+          }}
+        />
+        <Stack.Screen
+          name="more"
+          options={{
+            animation: 'fade',
+            animationDuration: 100,
+            gestureEnabled: false,
           }}
         />
       </Stack>

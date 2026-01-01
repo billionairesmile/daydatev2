@@ -224,16 +224,16 @@ export default function MoreScreen() {
       </View>
       <View style={styles.overlay} />
 
+      {/* Header - Fixed at top */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>{t('more.title')}</Text>
+      </View>
+
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>{t('more.title')}</Text>
-        </View>
-
         {/* Menu Sections */}
         {menuSections.map((section, sectionIndex) => (
           <React.Fragment key={sectionIndex}>
@@ -324,11 +324,13 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: SPACING.lg,
-    paddingTop: 64,
     paddingBottom: 120,
   },
   header: {
-    marginBottom: SPACING.xl,
+    paddingTop: 64,
+    paddingHorizontal: SPACING.lg,
+    paddingBottom: SPACING.lg,
+    zIndex: 20,
   },
   headerTitle: {
     fontSize: 32,

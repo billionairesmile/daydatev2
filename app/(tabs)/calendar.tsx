@@ -826,8 +826,8 @@ export default function CalendarScreen() {
 
   const periodInfo = calculatePeriodInfo();
 
-  // Todo functions - use synced todos if available
-  const todos: Todo[] = isSyncInitialized ? sharedTodos : localTodos;
+  // Todo functions - use synced todos if available (with null safety)
+  const todos: Todo[] = (isSyncInitialized ? sharedTodos : localTodos) || [];
 
   const getTodosForDate = (day: number) => {
     // Format date as YYYY-MM-DD to match DB format

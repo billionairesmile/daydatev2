@@ -65,8 +65,23 @@ export default function TermsScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Terms Section */}
-        <Text style={styles.sectionTitle}>{t('settings.other.termsAndPolicies')}</Text>
         <View style={styles.termsContainer}>
+          {/* Privacy Policy */}
+          <Pressable
+            style={styles.menuItem}
+            onPress={() => openPolicyModal('https://daydate.my/policy/privacy', t('settings.other.privacyPolicy'))}
+          >
+            <View style={styles.menuItemLeft}>
+              <View style={styles.iconWrapper}>
+                <Shield color={COLORS.black} size={20} />
+              </View>
+              <Text style={styles.menuItemLabel}>{t('settings.other.privacyPolicy')}</Text>
+            </View>
+            <ChevronRight color="#999" size={20} />
+          </Pressable>
+
+          <View style={styles.divider} />
+
           {/* Terms of Service */}
           <Pressable
             style={styles.menuItem}
@@ -93,22 +108,6 @@ export default function TermsScreen() {
                 <MapPin color={COLORS.black} size={20} />
               </View>
               <Text style={styles.menuItemLabel}>{t('settings.other.locationTerms')}</Text>
-            </View>
-            <ChevronRight color="#999" size={20} />
-          </Pressable>
-
-          <View style={styles.divider} />
-
-          {/* Privacy Policy */}
-          <Pressable
-            style={styles.menuItem}
-            onPress={() => openPolicyModal('https://daydate.my/policy/privacy', t('settings.other.privacyPolicy'))}
-          >
-            <View style={styles.menuItemLeft}>
-              <View style={styles.iconWrapper}>
-                <Shield color={COLORS.black} size={20} />
-              </View>
-              <Text style={styles.menuItemLabel}>{t('settings.other.privacyPolicy')}</Text>
             </View>
             <ChevronRight color="#999" size={20} />
           </Pressable>

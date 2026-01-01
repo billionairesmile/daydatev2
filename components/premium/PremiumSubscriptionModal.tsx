@@ -11,7 +11,7 @@ import {
   StatusBar,
   Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Crown,
   Target,
@@ -42,6 +42,7 @@ export default function PremiumSubscriptionModal({
 }: PremiumSubscriptionModalProps) {
   const { t } = useTranslation();
   const { language } = useLanguageStore();
+  const insets = useSafeAreaInsets();
   const {
     isPremium,
     partnerIsPremium,
@@ -147,7 +148,7 @@ export default function PremiumSubscriptionModal({
         transparent
         onRequestClose={onClose}
       >
-        <SafeAreaView style={styles.container}>
+        <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
           <StatusBar barStyle="dark-content" />
 
           {/* Header */}
@@ -189,7 +190,7 @@ export default function PremiumSubscriptionModal({
               </Pressable>
             </View>
           </View>
-        </SafeAreaView>
+        </View>
       </Modal>
     );
   }
@@ -201,7 +202,7 @@ export default function PremiumSubscriptionModal({
       transparent
       onRequestClose={onClose}
     >
-      <SafeAreaView style={styles.container}>
+      <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         <StatusBar barStyle="dark-content" />
 
         {/* Header */}
@@ -209,7 +210,7 @@ export default function PremiumSubscriptionModal({
           <Image
             source={require('@/assets/images/daydate-logo.png')}
             style={styles.headerLogo}
-            resizeMode="contain"
+            contentFit="contain"
           />
           <Pressable onPress={onClose} style={styles.closeButton}>
             <X color={COLORS.black} size={24} />
@@ -388,7 +389,7 @@ export default function PremiumSubscriptionModal({
             )}
           </Pressable>
         </View>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 }

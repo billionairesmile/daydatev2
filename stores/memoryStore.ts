@@ -137,4 +137,7 @@ export const useMemoryStore = create<MemoryState & MemoryActions>()(
   )
 );
 
+// Empty sample memories array (removed for production)
+export const SAMPLE_MEMORIES: CompletedMission[] = [];
+
 export default useMemoryStore;

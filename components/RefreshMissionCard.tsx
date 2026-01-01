@@ -86,9 +86,10 @@ const styles = StyleSheet.create({
     color: COLORS.white,
   },
   hintText: {
-    marginTop: SPACING.md,
+    marginTop: SPACING.xl,
     fontSize: 13,
     color: '#999',
     textAlign: 'center',
+    lineHeight: 20,
   },
 });
