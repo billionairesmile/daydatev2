@@ -74,6 +74,26 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1517959105821-eaf2591984ca${IMAGE_PARAMS}`, // 커피 메이커
     `${UNSPLASH_BASE}/photo-1504753793650-d4a2b783c15e${IMAGE_PARAMS}`, // 커피 잔
     `${UNSPLASH_BASE}/photo-1447933601403-0c6688de566e${IMAGE_PARAMS}`, // 카페 데이트
+    // 추가 카페 이미지 (커플/데이트 테마)
+    `${UNSPLASH_BASE}/photo-c2CWtLRpVcw${IMAGE_PARAMS}`, // 커플 카페
+    `${UNSPLASH_BASE}/photo-v3OH3i4EIoo${IMAGE_PARAMS}`, // 카페 데이트
+    `${UNSPLASH_BASE}/photo-EVoICOUotkg${IMAGE_PARAMS}`, // 커피숍 커플
+    `${UNSPLASH_BASE}/photo-tHHxvuO1BBA${IMAGE_PARAMS}`, // 따뜻한 카페
+    `${UNSPLASH_BASE}/photo-sCTgbjubOuo${IMAGE_PARAMS}`, // 아늑한 카페
+    `${UNSPLASH_BASE}/photo-qcHvXfFs2KQ${IMAGE_PARAMS}`, // 커피 타임
+    `${UNSPLASH_BASE}/photo-5L7tYEcwqB4${IMAGE_PARAMS}`, // 카페 분위기
+    `${UNSPLASH_BASE}/photo-r97j2vykswU${IMAGE_PARAMS}`, // 커플 커피
+    `${UNSPLASH_BASE}/photo-l6e2f4HdyVo${IMAGE_PARAMS}`, // 카페 데이트
+    `${UNSPLASH_BASE}/photo-gVheSU2LTxU${IMAGE_PARAMS}`, // 로맨틱 카페
+    `${UNSPLASH_BASE}/photo-DGt9zA3Fr0g${IMAGE_PARAMS}`, // 커피숍 데이트
+    `${UNSPLASH_BASE}/photo-823CgYIH8Tg${IMAGE_PARAMS}`, // 함께 커피
+    `${UNSPLASH_BASE}/photo-_o8SdNJdQmA${IMAGE_PARAMS}`, // 카페 시간
+    `${UNSPLASH_BASE}/photo-p7-nvdoD238${IMAGE_PARAMS}`, // 커플 브런치
+    `${UNSPLASH_BASE}/photo-DJ_yyldtTEk${IMAGE_PARAMS}`, // 카페 미팅
+    `${UNSPLASH_BASE}/photo-ARLh7m5S4VA${IMAGE_PARAMS}`, // 데이트 카페
+    `${UNSPLASH_BASE}/photo-aJCuqoBpWFk${IMAGE_PARAMS}`, // 커피 데이트
+    `${UNSPLASH_BASE}/photo-mf0Nt4li6v0${IMAGE_PARAMS}`, // 아침 카페
+    `${UNSPLASH_BASE}/photo-dMFcCDcg9fE${IMAGE_PARAMS}`, // 커플 카페 시간
   ],
 
   // 🍴 Food & Drink - 레스토랑
@@ -108,6 +128,26 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1560717789-0ac7c58ac90a${IMAGE_PARAMS}`, // 레스토랑 데이트
     `${UNSPLASH_BASE}/photo-1481931098730-318b6f776db0${IMAGE_PARAMS}`, // 아침 식사
     `${UNSPLASH_BASE}/photo-1490645935967-10de6ba17061${IMAGE_PARAMS}`, // 음식 플레이팅
+    // 추가 레스토랑 이미지 (커플/로맨틱 디너 테마)
+    `${UNSPLASH_BASE}/photo-GFChtWTDlsw${IMAGE_PARAMS}`, // 로맨틱 디너
+    `${UNSPLASH_BASE}/photo-QFc2kxpXVYQ${IMAGE_PARAMS}`, // 커플 디너
+    `${UNSPLASH_BASE}/photo-IAdBcgDP5W4${IMAGE_PARAMS}`, // 레스토랑 데이트
+    `${UNSPLASH_BASE}/photo-XsJJgnWXU-c${IMAGE_PARAMS}`, // 디너 데이트
+    `${UNSPLASH_BASE}/photo-oC4Q7v9sOYE${IMAGE_PARAMS}`, // 와인 디너
+    `${UNSPLASH_BASE}/photo-_JpTjEFqFrI${IMAGE_PARAMS}`, // 레스토랑 분위기
+    `${UNSPLASH_BASE}/photo-DmO662qvWO8${IMAGE_PARAMS}`, // 커플 식사
+    `${UNSPLASH_BASE}/photo-qFn515nfhDs${IMAGE_PARAMS}`, // 고급 레스토랑
+    `${UNSPLASH_BASE}/photo-EiWljFwn4Fs${IMAGE_PARAMS}`, // 로맨틱 저녁
+    `${UNSPLASH_BASE}/photo-5H11I3hYN1g${IMAGE_PARAMS}`, // 디너 테이블
+    `${UNSPLASH_BASE}/photo-7Nyt3uDKKSo${IMAGE_PARAMS}`, // 함께 식사
+    `${UNSPLASH_BASE}/photo-4Ott5vqaPrw${IMAGE_PARAMS}`, // 레스토랑 데이트
+    `${UNSPLASH_BASE}/photo-6Oku7KvYJMY${IMAGE_PARAMS}`, // 커플 디너 데이트
+    `${UNSPLASH_BASE}/photo-GVGBs3oN6pg${IMAGE_PARAMS}`, // 촛불 디너
+    `${UNSPLASH_BASE}/photo-cGZ-X0nAUgY${IMAGE_PARAMS}`, // 특별한 저녁
+    `${UNSPLASH_BASE}/photo-BphG4vLjF2Q${IMAGE_PARAMS}`, // 기념일 디너
+    `${UNSPLASH_BASE}/photo-rH6czT0m1us${IMAGE_PARAMS}`, // 로맨틱 레스토랑
+    `${UNSPLASH_BASE}/photo-xM4wUnvbCKk${IMAGE_PARAMS}`, // 와인 데이트
+    `${UNSPLASH_BASE}/photo-yPMJliKzyc4${IMAGE_PARAMS}`, // 커플 레스토랑
   ],
 
   // 🍴 Food & Drink - 스트릿푸드
@@ -132,6 +172,26 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1481931098730-318b6f776db0${IMAGE_PARAMS}`, // 아침 식사
     `${UNSPLASH_BASE}/photo-1504674900247-0877df9cc836${IMAGE_PARAMS}`, // 고급 요리
     `${UNSPLASH_BASE}/photo-1540189549336-e6e99c3679fe${IMAGE_PARAMS}`, // 플레이팅
+    // 추가 스트릿푸드 이미지
+    `${UNSPLASH_BASE}/photo-gU5loYtSUqY${IMAGE_PARAMS}`, // 길거리 음식
+    `${UNSPLASH_BASE}/photo-QAkqxrH6mvc${IMAGE_PARAMS}`, // 야시장 음식
+    `${UNSPLASH_BASE}/photo-BKUxqc45-y8${IMAGE_PARAMS}`, // 푸드트럭
+    `${UNSPLASH_BASE}/photo-kgjQ1AGDwE0${IMAGE_PARAMS}`, // 먹거리 탐방
+    `${UNSPLASH_BASE}/photo-gNObA4-plDM${IMAGE_PARAMS}`, // 로컬 음식
+    `${UNSPLASH_BASE}/photo-9tuLDya614I${IMAGE_PARAMS}`, // 맛집 투어
+    `${UNSPLASH_BASE}/photo-CeCQP3ouZuw${IMAGE_PARAMS}`, // 먹방 데이트
+    `${UNSPLASH_BASE}/photo-pqcBBLyBZ6A${IMAGE_PARAMS}`, // 거리 음식
+    `${UNSPLASH_BASE}/photo-JCAPLVzdPw8${IMAGE_PARAMS}`, // 야외 음식
+    `${UNSPLASH_BASE}/photo-N18PrG7k35o${IMAGE_PARAMS}`, // 포장마차
+    `${UNSPLASH_BASE}/photo-HLG35jI85V8${IMAGE_PARAMS}`, // 음식 축제
+    `${UNSPLASH_BASE}/photo-z5UMFvTVXZg${IMAGE_PARAMS}`, // 분식
+    `${UNSPLASH_BASE}/photo-aki6GistYnE${IMAGE_PARAMS}`, // 떡볶이
+    `${UNSPLASH_BASE}/photo-6qVskOfkgZY${IMAGE_PARAMS}`, // 간식
+    `${UNSPLASH_BASE}/photo-fgP6qpwQSZQ${IMAGE_PARAMS}`, // 먹거리
+    `${UNSPLASH_BASE}/photo-MrmWoU9QDjs${IMAGE_PARAMS}`, // 야시장 데이트
+    `${UNSPLASH_BASE}/photo-K--dYwfS6qQ${IMAGE_PARAMS}`, // 포장마차 데이트
+    `${UNSPLASH_BASE}/photo-OjVVn2Cpeok${IMAGE_PARAMS}`, // 간식 시간
+    `${UNSPLASH_BASE}/photo-7iRdSsPbuEA${IMAGE_PARAMS}`, // 맛집 탐방
   ],
 
   // 🍴 Food & Drink - 디저트
@@ -156,6 +216,26 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1499636136210-6f4ee915583e${IMAGE_PARAMS}`, // 베이커리
     `${UNSPLASH_BASE}/photo-1486427944299-d1955d23e34d${IMAGE_PARAMS}`, // 쿠키
     `${UNSPLASH_BASE}/photo-1587241321097-72d14a9f75ed${IMAGE_PARAMS}`, // 젤라또
+    // 추가 디저트 이미지 (커플 테마)
+    `${UNSPLASH_BASE}/photo-6O-8bOLG7ss${IMAGE_PARAMS}`, // 커플 디저트
+    `${UNSPLASH_BASE}/photo-TDl55Jwl3jg${IMAGE_PARAMS}`, // 함께 디저트
+    `${UNSPLASH_BASE}/photo-EtHuRBdLOaU${IMAGE_PARAMS}`, // 달달한 시간
+    `${UNSPLASH_BASE}/photo-hLGIWfPsVJs${IMAGE_PARAMS}`, // 디저트 타임
+    `${UNSPLASH_BASE}/photo-cjZoKcmcXvA${IMAGE_PARAMS}`, // 케이크 데이트
+    `${UNSPLASH_BASE}/photo-Yo8gvkz8QhA${IMAGE_PARAMS}`, // 스윗 타임
+    `${UNSPLASH_BASE}/photo-nKn8P1f37kA${IMAGE_PARAMS}`, // 달콤한 데이트
+    `${UNSPLASH_BASE}/photo-0Wn8yXyEYOA${IMAGE_PARAMS}`, // 디저트 카페
+    `${UNSPLASH_BASE}/photo-Gy2Lvuxp8JA${IMAGE_PARAMS}`, // 함께 간식
+    `${UNSPLASH_BASE}/photo-8EQBUBnue0g${IMAGE_PARAMS}`, // 베이커리 데이트
+    `${UNSPLASH_BASE}/photo-VVJnrP1zTX8${IMAGE_PARAMS}`, // 케이크 시간
+    `${UNSPLASH_BASE}/photo-2R7Ua2KMfHU${IMAGE_PARAMS}`, // 디저트 나눔
+    `${UNSPLASH_BASE}/photo-6UZ_fgmMyZQ${IMAGE_PARAMS}`, // 스위트 데이트
+    `${UNSPLASH_BASE}/photo-oQjBkM8kh0c${IMAGE_PARAMS}`, // 디저트 매장
+    `${UNSPLASH_BASE}/photo-WNdyjqizSRQ${IMAGE_PARAMS}`, // 달달한 오후
+    `${UNSPLASH_BASE}/photo-nHaDoTRsQvg${IMAGE_PARAMS}`, // 커플 케이크
+    `${UNSPLASH_BASE}/photo-folNfcGnr8Y${IMAGE_PARAMS}`, // 디저트 연인
+    `${UNSPLASH_BASE}/photo-mT2BX9-XSlg${IMAGE_PARAMS}`, // 피크닉 디저트
+    `${UNSPLASH_BASE}/photo-VsC9m6Tgx6o${IMAGE_PARAMS}`, // 야외 간식
   ],
 
   // 🍴 Food & Drink - 요리
@@ -190,6 +270,26 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1577106263724-2c8e03bfe9cf${IMAGE_PARAMS}`, // 음식 데코
     `${UNSPLASH_BASE}/photo-1583608205776-bfd35f0d9f83${IMAGE_PARAMS}`, // 집에서 요리
     `${UNSPLASH_BASE}/photo-1504674900247-0877df9cc836${IMAGE_PARAMS}`, // 완성 요리
+    // 추가 요리 이미지 (커플 테마)
+    `${UNSPLASH_BASE}/photo-Z-0xmmp8Db4${IMAGE_PARAMS}`, // 커플 요리
+    `${UNSPLASH_BASE}/photo-n4ymhyyFY7A${IMAGE_PARAMS}`, // 함께 쿠킹
+    `${UNSPLASH_BASE}/photo-Mx5kwvzeGC0${IMAGE_PARAMS}`, // 요리 데이트
+    `${UNSPLASH_BASE}/photo-my1mDMraGf0${IMAGE_PARAMS}`, // 홈쿠킹 커플
+    `${UNSPLASH_BASE}/photo-pon57zV5tBE${IMAGE_PARAMS}`, // 쿠킹 클래스
+    `${UNSPLASH_BASE}/photo-O7sK3d3TPWQ${IMAGE_PARAMS}`, // 함께 요리하기
+    `${UNSPLASH_BASE}/photo-kYh-O1Jk7EE${IMAGE_PARAMS}`, // 요리 시간
+    `${UNSPLASH_BASE}/photo-5we-PtvuCyE${IMAGE_PARAMS}`, // 커플 주방
+    `${UNSPLASH_BASE}/photo-_TuqJY-K4HE${IMAGE_PARAMS}`, // 요리 함께
+    `${UNSPLASH_BASE}/photo-zhDREn4OqY8${IMAGE_PARAMS}`, // 홈데이트 요리
+    `${UNSPLASH_BASE}/photo-VBsG1VOgLIU${IMAGE_PARAMS}`, // 주방 데이트
+    `${UNSPLASH_BASE}/photo-QINqBMYEGyc${IMAGE_PARAMS}`, // 함께 만들기
+    `${UNSPLASH_BASE}/photo-ZT2WovUy8L0${IMAGE_PARAMS}`, // 쿠킹 타임
+    `${UNSPLASH_BASE}/photo-bG5rhvRH0JM${IMAGE_PARAMS}`, // 요리 연인
+    `${UNSPLASH_BASE}/photo-UaBIcWSS4FY${IMAGE_PARAMS}`, // 커플 쿠킹
+    `${UNSPLASH_BASE}/photo-um_IzQi1G_Y${IMAGE_PARAMS}`, // 요리 도전
+    `${UNSPLASH_BASE}/photo-zbU_JzLDqWw${IMAGE_PARAMS}`, // 함께 식사 준비
+    `${UNSPLASH_BASE}/photo-65_nbwiD3I4${IMAGE_PARAMS}`, // 커플 베이킹
+    `${UNSPLASH_BASE}/photo-nMB3CKdBeP8${IMAGE_PARAMS}`, // 요리 레슨
   ],
 
   // 🍴 Food & Drink - 바/펍
@@ -214,6 +314,26 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1534353473418-4cfa6c56fd38${IMAGE_PARAMS}`, // 마티니
     `${UNSPLASH_BASE}/photo-1551024709-8f23befc6f87${IMAGE_PARAMS}`, // 블루 칵테일
     `${UNSPLASH_BASE}/photo-1513558161293-cdaf765ed2fd${IMAGE_PARAMS}`, // 샴페인
+    // 추가 바/펍 이미지 (커플 테마)
+    `${UNSPLASH_BASE}/photo-8DtIFGaH6FQ${IMAGE_PARAMS}`, // 커플 바
+    `${UNSPLASH_BASE}/photo-9ty3lIwBBEM${IMAGE_PARAMS}`, // 함께 칵테일
+    `${UNSPLASH_BASE}/photo-aSR0ijyqHrQ${IMAGE_PARAMS}`, // 바 데이트
+    `${UNSPLASH_BASE}/photo-MGnWcibcTYU${IMAGE_PARAMS}`, // 와인 바
+    `${UNSPLASH_BASE}/photo-qPrwlQYnLO4${IMAGE_PARAMS}`, // 펍 데이트
+    `${UNSPLASH_BASE}/photo-3poubzKGTbY${IMAGE_PARAMS}`, // 커플 와인
+    `${UNSPLASH_BASE}/photo-3SJ53OK-s6I${IMAGE_PARAMS}`, // 바 분위기
+    `${UNSPLASH_BASE}/photo-HeluZf5vlzA${IMAGE_PARAMS}`, // 칵테일 데이트
+    `${UNSPLASH_BASE}/photo-qffsEAphJlk${IMAGE_PARAMS}`, // 로맨틱 바
+    `${UNSPLASH_BASE}/photo-7FQCFGcqzbY${IMAGE_PARAMS}`, // 함께 와인
+    `${UNSPLASH_BASE}/photo-JXOTRYDtCzU${IMAGE_PARAMS}`, // 커플 펍
+    `${UNSPLASH_BASE}/photo-BLCJhBiimkQ${IMAGE_PARAMS}`, // 와인 데이트
+    `${UNSPLASH_BASE}/photo-C97JAsR4UdE${IMAGE_PARAMS}`, // 바 시간
+    `${UNSPLASH_BASE}/photo-2ocAV5wWE2Q${IMAGE_PARAMS}`, // 칵테일 타임
+    `${UNSPLASH_BASE}/photo-b_kfVwDCBmY${IMAGE_PARAMS}`, // 로맨틱 펍
+    `${UNSPLASH_BASE}/photo-bapAa1V_fvo${IMAGE_PARAMS}`, // 커플 칵테일
+    `${UNSPLASH_BASE}/photo-Chsrv_7KUdg${IMAGE_PARAMS}`, // 바 연인
+    `${UNSPLASH_BASE}/photo-xdX-qxudOTM${IMAGE_PARAMS}`, // 함께 맥주
+    `${UNSPLASH_BASE}/photo-pfAL0ELwwjQ${IMAGE_PARAMS}`, // 와인 저녁
   ],
 
   // 🍴 Food & Drink - 브런치
@@ -238,6 +358,26 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1460306855393-0410f61241c7${IMAGE_PARAMS}`, // 오렌지 주스
     `${UNSPLASH_BASE}/photo-1476718406336-bb5a9690ee2a${IMAGE_PARAMS}`, // 아침 요리
     `${UNSPLASH_BASE}/photo-1482049016gta-4d5b-z${IMAGE_PARAMS}`, // 아침 카페
+    // 추가 브런치 이미지 (커플 테마)
+    `${UNSPLASH_BASE}/photo-xYQtyJS3TIQ${IMAGE_PARAMS}`, // 커플 브런치
+    `${UNSPLASH_BASE}/photo-cX7A842-y0Y${IMAGE_PARAMS}`, // 함께 아침
+    `${UNSPLASH_BASE}/photo-pJoFyph1BEQ${IMAGE_PARAMS}`, // 브런치 데이트
+    `${UNSPLASH_BASE}/photo-4mwn5E6x4y8${IMAGE_PARAMS}`, // 아침 시간
+    `${UNSPLASH_BASE}/photo-sgaXTJJt6mM${IMAGE_PARAMS}`, // 함께 식사
+    `${UNSPLASH_BASE}/photo-mXSk_gyHIFA${IMAGE_PARAMS}`, // 피크닉 브런치
+    `${UNSPLASH_BASE}/photo-mjrFIC_z5rQ${IMAGE_PARAMS}`, // 야외 브런치
+    `${UNSPLASH_BASE}/photo-OIzB6trHjaY${IMAGE_PARAMS}`, // 커플 아침
+    `${UNSPLASH_BASE}/photo-LcCfCPKKV5w${IMAGE_PARAMS}`, // 브런치 카페
+    `${UNSPLASH_BASE}/photo-oJYUA1g72AQ${IMAGE_PARAMS}`, // 함께 브런치
+    `${UNSPLASH_BASE}/photo-diFtT_Qq8f4${IMAGE_PARAMS}`, // 피크닉 아침
+    `${UNSPLASH_BASE}/photo-MvQuYpgAvU0${IMAGE_PARAMS}`, // 로맨틱 브런치
+    `${UNSPLASH_BASE}/photo-lknTUDivk6c${IMAGE_PARAMS}`, // 야외 아침
+    `${UNSPLASH_BASE}/photo-2oJzC85AXeg${IMAGE_PARAMS}`, // 커플 피크닉
+    `${UNSPLASH_BASE}/photo-mpnvWdpHAnY${IMAGE_PARAMS}`, // 브런치 타임
+    `${UNSPLASH_BASE}/photo-jbbJq1puaYA${IMAGE_PARAMS}`, // 함께 아침 식사
+    `${UNSPLASH_BASE}/photo-Bsyj_GezIQQ${IMAGE_PARAMS}`, // 아침 데이트
+    `${UNSPLASH_BASE}/photo-Kz-8jsYiAno${IMAGE_PARAMS}`, // 주말 브런치
+    `${UNSPLASH_BASE}/photo-zTJV-Bsn9Sg${IMAGE_PARAMS}`, // 커플 주말
   ],
 
   // 🏞️ Place & Environment - 야외
@@ -272,6 +412,26 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1507525428034-b723cf961d3e${IMAGE_PARAMS}`, // 열대 해변
     `${UNSPLASH_BASE}/photo-1458668383970-8ddd3927deed${IMAGE_PARAMS}`, // 스위스 알프스
     `${UNSPLASH_BASE}/photo-1464278533981-50106e6176b1${IMAGE_PARAMS}`, // 북유럽 피오르드
+    // 추가 야외 이미지 (커플 테마)
+    `${UNSPLASH_BASE}/photo-Bk5N7bTXsM0${IMAGE_PARAMS}`, // 커플 야외
+    `${UNSPLASH_BASE}/photo-NVf0KfcHaNY${IMAGE_PARAMS}`, // 함께 산책
+    `${UNSPLASH_BASE}/photo-inGFT0Dapoo${IMAGE_PARAMS}`, // 야외 데이트
+    `${UNSPLASH_BASE}/photo-XuN44TajBGo${IMAGE_PARAMS}`, // 커플 하이킹
+    `${UNSPLASH_BASE}/photo-BUW-6IIkgzI${IMAGE_PARAMS}`, // 자연 속 커플
+    `${UNSPLASH_BASE}/photo-eLlHQ09w4bU${IMAGE_PARAMS}`, // 공원 데이트
+    `${UNSPLASH_BASE}/photo-Qlk6LgBRvJI${IMAGE_PARAMS}`, // 야외 활동
+    `${UNSPLASH_BASE}/photo-tSbrf7WABsQ${IMAGE_PARAMS}`, // 함께 등산
+    `${UNSPLASH_BASE}/photo-EVThSqx_8-w${IMAGE_PARAMS}`, // 커플 캠핑
+    `${UNSPLASH_BASE}/photo-OM4wdXx8iUM${IMAGE_PARAMS}`, // 야외 피크닉
+    `${UNSPLASH_BASE}/photo-6grVO2h65Bg${IMAGE_PARAMS}`, // 자연 산책
+    `${UNSPLASH_BASE}/photo-aCKJmf4sLd4${IMAGE_PARAMS}`, // 커플 트레킹
+    `${UNSPLASH_BASE}/photo-ljpO5NLLAIY${IMAGE_PARAMS}`, // 야외 모험
+    `${UNSPLASH_BASE}/photo-5Vg6Ga6lXY8${IMAGE_PARAMS}`, // 함께 탐험
+    `${UNSPLASH_BASE}/photo-e8y0-TlcAgE${IMAGE_PARAMS}`, // 자연 데이트
+    `${UNSPLASH_BASE}/photo-POo-X_kgi9o${IMAGE_PARAMS}`, // 커플 아웃도어
+    `${UNSPLASH_BASE}/photo-m-IeDmDuI4U${IMAGE_PARAMS}`, // 숲 속 커플
+    `${UNSPLASH_BASE}/photo-22qhIXjU88g${IMAGE_PARAMS}`, // 해변 커플
+    `${UNSPLASH_BASE}/photo-BfhqV_qzb4Q${IMAGE_PARAMS}`, // 야외 행복
   ],
 
   // 🏞️ Place & Environment - 홈
@@ -306,6 +466,26 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1600585154526-990dced4db0d${IMAGE_PARAMS}`, // 침실 전경
     `${UNSPLASH_BASE}/photo-1600596542815-ffad4c1539a9${IMAGE_PARAMS}`, // 모던 집
     `${UNSPLASH_BASE}/photo-1600573472591-ee6b68d14c68${IMAGE_PARAMS}`, // 아늑한 홈
+    // 추가 홈 이미지 (커플 테마)
+    `${UNSPLASH_BASE}/photo-O0LWeqLxuEc${IMAGE_PARAMS}`, // 커플 홈
+    `${UNSPLASH_BASE}/photo-rbBfl8Ls8-c${IMAGE_PARAMS}`, // 함께 집에서
+    `${UNSPLASH_BASE}/photo-e75PYAhhZRY${IMAGE_PARAMS}`, // 홈데이트
+    `${UNSPLASH_BASE}/photo-VxQ4UR5Dt1k${IMAGE_PARAMS}`, // 집에서 데이트
+    `${UNSPLASH_BASE}/photo-qYeVUUISx9g${IMAGE_PARAMS}`, // 커플 소파
+    `${UNSPLASH_BASE}/photo-3058y-H7N9I${IMAGE_PARAMS}`, // 함께 휴식
+    `${UNSPLASH_BASE}/photo-ehe2Wsq3azs${IMAGE_PARAMS}`, // 홈 타임
+    `${UNSPLASH_BASE}/photo-hQocGyy0unQ${IMAGE_PARAMS}`, // 아늑한 시간
+    `${UNSPLASH_BASE}/photo-Uko6cDmpoao${IMAGE_PARAMS}`, // 집에서 함께
+    `${UNSPLASH_BASE}/photo-QzTEUXrntoY${IMAGE_PARAMS}`, // 커플 거실
+    `${UNSPLASH_BASE}/photo-dEiBdBJDnms${IMAGE_PARAMS}`, // 홈 데이트
+    `${UNSPLASH_BASE}/photo-_N-W1ajBbdM${IMAGE_PARAMS}`, // 편안한 시간
+    `${UNSPLASH_BASE}/photo-JHx6WkjlZNE${IMAGE_PARAMS}`, // 함께 영화
+    `${UNSPLASH_BASE}/photo-UsL8durLL1s${IMAGE_PARAMS}`, // 홈 무비
+    `${UNSPLASH_BASE}/photo-JzrRZz5FKOc${IMAGE_PARAMS}`, // 커플 홈 데이트
+    `${UNSPLASH_BASE}/photo-jlVbZxGAyks${IMAGE_PARAMS}`, // 집에서 요리
+    `${UNSPLASH_BASE}/photo-A2eksGREteU${IMAGE_PARAMS}`, // 홈 쿠킹
+    `${UNSPLASH_BASE}/photo-hsRG0sJevwA${IMAGE_PARAMS}`, // 아늑한 저녁
+    `${UNSPLASH_BASE}/photo--vvsPCYYMBc${IMAGE_PARAMS}`, // 함께 집에서
   ],
 
   // 🏞️ Place & Environment - 여행
@@ -340,6 +520,25 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1502602898657-3e91760cbb34${IMAGE_PARAMS}`, // 에펠탑
     `${UNSPLASH_BASE}/photo-1534430480872-3498386e7856${IMAGE_PARAMS}`, // 뉴욕
     `${UNSPLASH_BASE}/photo-1518548419970-58e3b4079ab2${IMAGE_PARAMS}`, // 일본
+    // 추가 여행 이미지 (커플 테마)
+    `${UNSPLASH_BASE}/photo-FAu6xsKzPFE${IMAGE_PARAMS}`, // 커플 여행
+    `${UNSPLASH_BASE}/photo-Aj6mvFNBXAA${IMAGE_PARAMS}`, // 함께 여행
+    `${UNSPLASH_BASE}/photo-B5FwwztMeaQ${IMAGE_PARAMS}`, // 여행 데이트
+    `${UNSPLASH_BASE}/photo-xSI-8hwyUzE${IMAGE_PARAMS}`, // 커플 탐험
+    `${UNSPLASH_BASE}/photo-zOBJFM1z5h4${IMAGE_PARAMS}`, // 여행 모험
+    `${UNSPLASH_BASE}/photo-YtY724tdl7Y${IMAGE_PARAMS}`, // 함께 탐방
+    `${UNSPLASH_BASE}/photo-qXcl3z7_AOc${IMAGE_PARAMS}`, // 커플 관광
+    `${UNSPLASH_BASE}/photo-LlyIkGgfwIM${IMAGE_PARAMS}`, // 여행 커플
+    `${UNSPLASH_BASE}/photo-mL2B7wvsD38${IMAGE_PARAMS}`, // 함께 배낭여행
+    `${UNSPLASH_BASE}/photo-8d-rrSVuQ7U${IMAGE_PARAMS}`, // 커플 여행지
+    `${UNSPLASH_BASE}/photo-A518MdWufvo${IMAGE_PARAMS}`, // 여행 추억
+    `${UNSPLASH_BASE}/photo-6QB2hXsyAzc${IMAGE_PARAMS}`, // 함께 휴가
+    `${UNSPLASH_BASE}/photo-uSFOwYo1qEw${IMAGE_PARAMS}`, // 커플 해외여행
+    `${UNSPLASH_BASE}/photo-OMBqk0omJtA${IMAGE_PARAMS}`, // 여행 사진
+    `${UNSPLASH_BASE}/photo-5irEk8bnj2Q${IMAGE_PARAMS}`, // 함께 관광
+    `${UNSPLASH_BASE}/photo-VZSIm_cNAL8${IMAGE_PARAMS}`, // 커플 리조트
+    `${UNSPLASH_BASE}/photo-_p0OdENA13Y${IMAGE_PARAMS}`, // 여행 낭만
+    `${UNSPLASH_BASE}/photo-n9CAvCxkI9g${IMAGE_PARAMS}`, // 함께 여정
   ],
 
   // 🏞️ Place & Environment - 당일치기
@@ -364,6 +563,27 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1503220317375-aaad61436b1b${IMAGE_PARAMS}`, // 공항
     `${UNSPLASH_BASE}/photo-1496531693211-31c5234a5ea9${IMAGE_PARAMS}`, // 과일 따기
     `${UNSPLASH_BASE}/photo-1519671482749-fd09be7ccebf${IMAGE_PARAMS}`, // 파티
+    // 추가 당일치기 이미지 (커플 피크닉/야외활동 테마)
+    `${UNSPLASH_BASE}/photo-mT2BX9-XSlg${IMAGE_PARAMS}`, // 커플 피크닉
+    `${UNSPLASH_BASE}/photo-VsC9m6Tgx6o${IMAGE_PARAMS}`, // 야외 데이트
+    `${UNSPLASH_BASE}/photo-mXSk_gyHIFA${IMAGE_PARAMS}`, // 피크닉 바구니
+    `${UNSPLASH_BASE}/photo-mjrFIC_z5rQ${IMAGE_PARAMS}`, // 함께 피크닉
+    `${UNSPLASH_BASE}/photo-OIzB6trHjaY${IMAGE_PARAMS}`, // 공원 데이트
+    `${UNSPLASH_BASE}/photo-LcCfCPKKV5w${IMAGE_PARAMS}`, // 잔디밭 피크닉
+    `${UNSPLASH_BASE}/photo-oJYUA1g72AQ${IMAGE_PARAMS}`, // 함께 휴식
+    `${UNSPLASH_BASE}/photo-diFtT_Qq8f4${IMAGE_PARAMS}`, // 야외 시간
+    `${UNSPLASH_BASE}/photo-MvQuYpgAvU0${IMAGE_PARAMS}`, // 피크닉 담요
+    `${UNSPLASH_BASE}/photo-lknTUDivk6c${IMAGE_PARAMS}`, // 커플 야외
+    `${UNSPLASH_BASE}/photo-2oJzC85AXeg${IMAGE_PARAMS}`, // 공원 산책
+    `${UNSPLASH_BASE}/photo-mpnvWdpHAnY${IMAGE_PARAMS}`, // 피크닉 음식
+    `${UNSPLASH_BASE}/photo-jbbJq1puaYA${IMAGE_PARAMS}`, // 함께 점심
+    `${UNSPLASH_BASE}/photo-Bsyj_GezIQQ${IMAGE_PARAMS}`, // 야외 식사
+    `${UNSPLASH_BASE}/photo-Kz-8jsYiAno${IMAGE_PARAMS}`, // 피크닉 시간
+    `${UNSPLASH_BASE}/photo-zTJV-Bsn9Sg${IMAGE_PARAMS}`, // 커플 피크닉 데이트
+    `${UNSPLASH_BASE}/photo-WmibJIKgDQU${IMAGE_PARAMS}`, // 함께 야외 시간
+    `${UNSPLASH_BASE}/photo-A9Q6rhpcbS0${IMAGE_PARAMS}`, // 피크닉 커플
+    `${UNSPLASH_BASE}/photo-C21Oev4MXKk${IMAGE_PARAMS}`, // 야외 활동
+    `${UNSPLASH_BASE}/photo-st_QdhsUUzY${IMAGE_PARAMS}`, // 함께 나들이
   ],
 
   // 🏞️ Place & Environment - 드라이브
@@ -388,6 +608,27 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1471958680802-1345a694ba6d${IMAGE_PARAMS}`, // 도로 풍경
     `${UNSPLASH_BASE}/photo-1485291571150-772bcfc10da5${IMAGE_PARAMS}`, // 야경 드라이브
     `${UNSPLASH_BASE}/photo-1492144534655-ae79c964c9d7${IMAGE_PARAMS}`, // 자동차
+    // 추가 드라이브 이미지 (커플 드라이브 테마)
+    `${UNSPLASH_BASE}/photo-w5vofJLOSrs${IMAGE_PARAMS}`, // 커플 드라이브
+    `${UNSPLASH_BASE}/photo-x-rD6Z8U394${IMAGE_PARAMS}`, // 함께 운전
+    `${UNSPLASH_BASE}/photo-Lifww3JR_uU${IMAGE_PARAMS}`, // 로드트립 커플
+    `${UNSPLASH_BASE}/photo-BbhqDutqJew${IMAGE_PARAMS}`, // 드라이브 데이트
+    `${UNSPLASH_BASE}/photo-DbFmSVJfmb4${IMAGE_PARAMS}`, // 함께 여행
+    `${UNSPLASH_BASE}/photo-u-oQOnBIQSA${IMAGE_PARAMS}`, // 커플 자동차
+    `${UNSPLASH_BASE}/photo-5oaGHpcM8Qs${IMAGE_PARAMS}`, // 드라이브 풍경
+    `${UNSPLASH_BASE}/photo-o-QpJcMBRFI${IMAGE_PARAMS}`, // 함께 드라이브
+    `${UNSPLASH_BASE}/photo-TlOuAmML2pk${IMAGE_PARAMS}`, // 로맨틱 드라이브
+    `${UNSPLASH_BASE}/photo-sMoQAs5-6ZM${IMAGE_PARAMS}`, // 커플 여행
+    `${UNSPLASH_BASE}/photo-jrG1X66M2zY${IMAGE_PARAMS}`, // 드라이브 데이트
+    `${UNSPLASH_BASE}/photo-FUTZUMiYrV8${IMAGE_PARAMS}`, // 함께 달리기
+    `${UNSPLASH_BASE}/photo-wSz-4_qOhIY${IMAGE_PARAMS}`, // 커플 차량
+    `${UNSPLASH_BASE}/photo-a8zAhz1UPwA${IMAGE_PARAMS}`, // 드라이브 시간
+    `${UNSPLASH_BASE}/photo-bq4zxaO0k64${IMAGE_PARAMS}`, // 함께 이동
+    `${UNSPLASH_BASE}/photo-WNDwD55IjxM${IMAGE_PARAMS}`, // 커플 운전
+    `${UNSPLASH_BASE}/photo-_Gn0eDLrybw${IMAGE_PARAMS}`, // 드라이브 모험
+    `${UNSPLASH_BASE}/photo-HOjpumPfmXo${IMAGE_PARAMS}`, // 함께 여정
+    `${UNSPLASH_BASE}/photo-D-IY5w8cZuE${IMAGE_PARAMS}`, // 로맨틱 여행
+    `${UNSPLASH_BASE}/photo-DuQyRN8iw8A${IMAGE_PARAMS}`, // 커플 로드트립
   ],
 
   // 🏞️ Place & Environment - 야경
@@ -422,6 +663,27 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1495616811223-4d98c6e9c869${IMAGE_PARAMS}`, // DJ 파티
     `${UNSPLASH_BASE}/photo-1504898770365-14faca6a7320${IMAGE_PARAMS}`, // 바 분위기
     `${UNSPLASH_BASE}/photo-1470229722913-7c0e2dbbafd3${IMAGE_PARAMS}`, // 야외 공연
+    // 추가 야경 이미지 (커플 야경/밤 데이트 테마)
+    `${UNSPLASH_BASE}/photo-tptOZOtH6bs${IMAGE_PARAMS}`, // 커플 야경
+    `${UNSPLASH_BASE}/photo-8SQKgiGUrNY${IMAGE_PARAMS}`, // 밤 도시 데이트
+    `${UNSPLASH_BASE}/photo-4Bf8AROnJpE${IMAGE_PARAMS}`, // 야경 함께
+    `${UNSPLASH_BASE}/photo-eqmcGmYQ_zc${IMAGE_PARAMS}`, // 밤 산책
+    `${UNSPLASH_BASE}/photo-TIFmzPhLChY${IMAGE_PARAMS}`, // 커플 밤 풍경
+    `${UNSPLASH_BASE}/photo-x31NvkC-t8w${IMAGE_PARAMS}`, // 야경 데이트
+    `${UNSPLASH_BASE}/photo-m6KB0mw6ADw${IMAGE_PARAMS}`, // 도시 불빛
+    `${UNSPLASH_BASE}/photo-mUsnhaJ0STw${IMAGE_PARAMS}`, // 함께 밤 풍경
+    `${UNSPLASH_BASE}/photo-JXju1brZDrQ${IMAGE_PARAMS}`, // 커플 야경 산책
+    `${UNSPLASH_BASE}/photo-XaqoHK_B9n4${IMAGE_PARAMS}`, // 밤 도시
+    `${UNSPLASH_BASE}/photo-cKFNznGYogA${IMAGE_PARAMS}`, // 야경 뷰
+    `${UNSPLASH_BASE}/photo-zxJ3wLEpGOY${IMAGE_PARAMS}`, // 함께 야경
+    `${UNSPLASH_BASE}/photo-gB1Kg99jVsc${IMAGE_PARAMS}`, // 밤 데이트
+    `${UNSPLASH_BASE}/photo-fI6RRUUrb40${IMAGE_PARAMS}`, // 커플 밤
+    `${UNSPLASH_BASE}/photo-eEUzp8jgWh8${IMAGE_PARAMS}`, // 야경 시간
+    `${UNSPLASH_BASE}/photo-VpQYyBOmnUM${IMAGE_PARAMS}`, // 밤 풍경 데이트
+    `${UNSPLASH_BASE}/photo-3HTDLqk9XiE${IMAGE_PARAMS}`, // 함께 밤 시간
+    `${UNSPLASH_BASE}/photo-RsaoVHP7kwQ${IMAGE_PARAMS}`, // 커플 야경 뷰
+    `${UNSPLASH_BASE}/photo-tdaaBeVMaDg${IMAGE_PARAMS}`, // 밤 산책 데이트
+    `${UNSPLASH_BASE}/photo-fZ-16Vxr7XA${IMAGE_PARAMS}`, // 야경 커플
   ],
 
   // 🏞️ Place & Environment - 자연
@@ -446,6 +708,27 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1458668383970-8ddd3927deed${IMAGE_PARAMS}`, // 알프스
     `${UNSPLASH_BASE}/photo-1464278533981-50106e6176b1${IMAGE_PARAMS}`, // 피오르드
     `${UNSPLASH_BASE}/photo-1470071459604-3b5ec3a7fe05${IMAGE_PARAMS}`, // 산책로
+    // 추가 자연 이미지 (커플 하이킹/자연 데이트 테마)
+    `${UNSPLASH_BASE}/photo-BTz9xFmPSUo${IMAGE_PARAMS}`, // 커플 하이킹
+    `${UNSPLASH_BASE}/photo-RsfpMYmGkxI${IMAGE_PARAMS}`, // 함께 등산
+    `${UNSPLASH_BASE}/photo-ddWtn5a6wJA${IMAGE_PARAMS}`, // 자연 데이트
+    `${UNSPLASH_BASE}/photo-Yizrl9N_eDA${IMAGE_PARAMS}`, // 커플 트레킹
+    `${UNSPLASH_BASE}/photo-6s6lw97WvBc${IMAGE_PARAMS}`, // 산책 데이트
+    `${UNSPLASH_BASE}/photo-uTFiFYeQhlI${IMAGE_PARAMS}`, // 함께 자연
+    `${UNSPLASH_BASE}/photo-B4gRfP-zcR0${IMAGE_PARAMS}`, // 커플 야외
+    `${UNSPLASH_BASE}/photo-D6fLQjV-9rE${IMAGE_PARAMS}`, // 자연 탐험
+    `${UNSPLASH_BASE}/photo-GVoDg9WrFWI${IMAGE_PARAMS}`, // 함께 하이킹
+    `${UNSPLASH_BASE}/photo-1SeNChfXU8Q${IMAGE_PARAMS}`, // 커플 등산로
+    `${UNSPLASH_BASE}/photo-pcO74JHlr5s${IMAGE_PARAMS}`, // 자연 속 데이트
+    `${UNSPLASH_BASE}/photo-n9CAvCxkI9g${IMAGE_PARAMS}`, // 함께 산책
+    `${UNSPLASH_BASE}/photo-ylO4SHo3hsg${IMAGE_PARAMS}`, // 커플 자연 탐방
+    `${UNSPLASH_BASE}/photo-mKFrJzlnvoA${IMAGE_PARAMS}`, // 하이킹 데이트
+    `${UNSPLASH_BASE}/photo-VDb0wxbfG6k${IMAGE_PARAMS}`, // 함께 등반
+    `${UNSPLASH_BASE}/photo-wyVFOeO05Sg${IMAGE_PARAMS}`, // 커플 트레일
+    `${UNSPLASH_BASE}/photo-F8F2S6JBE7g${IMAGE_PARAMS}`, // 자연 산책
+    `${UNSPLASH_BASE}/photo-C_qbJYm9Z3U${IMAGE_PARAMS}`, // 함께 탐험
+    `${UNSPLASH_BASE}/photo-5R5AugOeuFU${IMAGE_PARAMS}`, // 커플 야외 활동
+    `${UNSPLASH_BASE}/photo-4CfTteFIDn0${IMAGE_PARAMS}`, // 자연 속 커플
   ],
 
   // 🎯 Activities - 문화생활
@@ -480,6 +763,27 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1516450360452-9312f5e86fc7${IMAGE_PARAMS}`, // 댄서
     `${UNSPLASH_BASE}/photo-1507676184212-d03ab07a01bf${IMAGE_PARAMS}`, // 무용
     `${UNSPLASH_BASE}/photo-1535016120720-40c646be5580${IMAGE_PARAMS}`, // 영화 티켓
+    // 추가 문화생활 이미지 (커플 문화활동 테마)
+    `${UNSPLASH_BASE}/photo-ORJfynDjhpg${IMAGE_PARAMS}`, // 커플 박물관
+    `${UNSPLASH_BASE}/photo-owU_53FaLyM${IMAGE_PARAMS}`, // 함께 전시
+    `${UNSPLASH_BASE}/photo-QCuVJUT8FCk${IMAGE_PARAMS}`, // 갤러리 데이트
+    `${UNSPLASH_BASE}/photo-8BErAIDEsmo${IMAGE_PARAMS}`, // 커플 미술관
+    `${UNSPLASH_BASE}/photo-YaN_ApSBJfg${IMAGE_PARAMS}`, // 문화 탐방
+    `${UNSPLASH_BASE}/photo-dSLtyfI7r8Q${IMAGE_PARAMS}`, // 함께 관람
+    `${UNSPLASH_BASE}/photo-nGMHtcfd_Ds${IMAGE_PARAMS}`, // 커플 전시회
+    `${UNSPLASH_BASE}/photo-B6-517mf0Yk${IMAGE_PARAMS}`, // 아트 데이트
+    `${UNSPLASH_BASE}/photo-Iyb1e_pvNo0${IMAGE_PARAMS}`, // 함께 감상
+    `${UNSPLASH_BASE}/photo-8IKd4pl7hbk${IMAGE_PARAMS}`, // 커플 갤러리
+    `${UNSPLASH_BASE}/photo-eYg8j8JQeRk${IMAGE_PARAMS}`, // 문화 데이트
+    `${UNSPLASH_BASE}/photo-IELyInTGogE${IMAGE_PARAMS}`, // 함께 박물관
+    `${UNSPLASH_BASE}/photo-pC3U9Lgkixs${IMAGE_PARAMS}`, // 커플 관람
+    `${UNSPLASH_BASE}/photo-GyzW1hwXxJc${IMAGE_PARAMS}`, // 전시 데이트
+    `${UNSPLASH_BASE}/photo-WiUBz-nSZSw${IMAGE_PARAMS}`, // 함께 미술
+    `${UNSPLASH_BASE}/photo-BgQEac8bZBM${IMAGE_PARAMS}`, // 커플 문화활동
+    `${UNSPLASH_BASE}/photo-Nq40UAM4EGg${IMAGE_PARAMS}`, // 갤러리 관람
+    `${UNSPLASH_BASE}/photo-VyM5SdcEYJI${IMAGE_PARAMS}`, // 함께 예술
+    `${UNSPLASH_BASE}/photo-Fyzxz-vbcrc${IMAGE_PARAMS}`, // 커플 아트
+    `${UNSPLASH_BASE}/photo-hEVi2i-0uEc${IMAGE_PARAMS}`, // 문화 체험
   ],
 
   // 🎯 Activities - 영화
@@ -504,6 +808,27 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1518998053901-5348d3961a04${IMAGE_PARAMS}`, // 뮤지컬
     `${UNSPLASH_BASE}/photo-1507924538820-ede94a04019d${IMAGE_PARAMS}`, // 연극
     `${UNSPLASH_BASE}/photo-1460723237483-7a6dc9d0b212${IMAGE_PARAMS}`, // 공연장
+    // 추가 영화 이미지 (커플 영화관 테마)
+    `${UNSPLASH_BASE}/photo-k6wNwR_yU5M${IMAGE_PARAMS}`, // 커플 영화
+    `${UNSPLASH_BASE}/photo-J2ywVqqtPI4${IMAGE_PARAMS}`, // 함께 영화관
+    `${UNSPLASH_BASE}/photo-4VDRCoNuvE0${IMAGE_PARAMS}`, // 영화 데이트
+    `${UNSPLASH_BASE}/photo-eohetjfVJ2k${IMAGE_PARAMS}`, // 커플 시네마
+    `${UNSPLASH_BASE}/photo-r9b8Whe5SBI${IMAGE_PARAMS}`, // 영화 시간
+    `${UNSPLASH_BASE}/photo-Sff6gViBubI${IMAGE_PARAMS}`, // 함께 관람
+    `${UNSPLASH_BASE}/photo-ttx_DS346Ws${IMAGE_PARAMS}`, // 커플 극장
+    `${UNSPLASH_BASE}/photo-sSd85nlmy8M${IMAGE_PARAMS}`, // 영화 보기
+    `${UNSPLASH_BASE}/photo-8ZGI9xNHhvo${IMAGE_PARAMS}`, // 함께 시네마
+    `${UNSPLASH_BASE}/photo-K6zoZuBpvoA${IMAGE_PARAMS}`, // 커플 팝콘
+    `${UNSPLASH_BASE}/photo-ulgzDQZQjV0${IMAGE_PARAMS}`, // 영화관 데이트
+    `${UNSPLASH_BASE}/photo-1REw7aYFl_o${IMAGE_PARAMS}`, // 함께 영화
+    `${UNSPLASH_BASE}/photo-Dm8WaFPebW0${IMAGE_PARAMS}`, // 커플 무비
+    `${UNSPLASH_BASE}/photo-oEN6zVhcX9o${IMAGE_PARAMS}`, // 영화 함께
+    `${UNSPLASH_BASE}/photo-mxhWy1td-BE${IMAGE_PARAMS}`, // 극장 데이트
+    `${UNSPLASH_BASE}/photo-UhTrjNGqOsk${IMAGE_PARAMS}`, // 커플 영화 시간
+    `${UNSPLASH_BASE}/photo-JxJ05vSGLBc${IMAGE_PARAMS}`, // 함께 극장
+    `${UNSPLASH_BASE}/photo-5mWY5yUIAVo${IMAGE_PARAMS}`, // 영화 관람
+    `${UNSPLASH_BASE}/photo-23LET4Hxj_U${IMAGE_PARAMS}`, // 커플 시네마 데이트
+    `${UNSPLASH_BASE}/photo-itMai1Ph3RY${IMAGE_PARAMS}`, // 함께 무비 타임
   ],
 
   // 🎯 Activities - 스포츠
@@ -528,6 +853,27 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1431324155629-1a6deb1dec8d${IMAGE_PARAMS}`, // 축구 경기
     `${UNSPLASH_BASE}/photo-1562771379-eafdca7a02f8${IMAGE_PARAMS}`, // 아이스링크
     `${UNSPLASH_BASE}/photo-1552674605-db6ffd4facb5${IMAGE_PARAMS}`, // 러닝
+    // 추가 스포츠 이미지 (커플 스포츠 테마)
+    `${UNSPLASH_BASE}/photo-CxodNxjEpQs${IMAGE_PARAMS}`, // 커플 운동
+    `${UNSPLASH_BASE}/photo-UGpd43MQPBw${IMAGE_PARAMS}`, // 함께 스포츠
+    `${UNSPLASH_BASE}/photo-iIND9RdVU7o${IMAGE_PARAMS}`, // 스포츠 데이트
+    `${UNSPLASH_BASE}/photo-6e9QitLgitY${IMAGE_PARAMS}`, // 커플 피트니스
+    `${UNSPLASH_BASE}/photo-NBL3nn6T-0M${IMAGE_PARAMS}`, // 함께 운동
+    `${UNSPLASH_BASE}/photo-V2MSDpZjlpQ${IMAGE_PARAMS}`, // 커플 트레이닝
+    `${UNSPLASH_BASE}/photo-2_k8XPnnXJQ${IMAGE_PARAMS}`, // 스포츠 함께
+    `${UNSPLASH_BASE}/photo-S0a8f-otYFk${IMAGE_PARAMS}`, // 커플 활동
+    `${UNSPLASH_BASE}/photo-FYwPleO0_Zw${IMAGE_PARAMS}`, // 함께 체육
+    `${UNSPLASH_BASE}/photo-4l8UH4G2_Dg${IMAGE_PARAMS}`, // 커플 스포츠 데이트
+    `${UNSPLASH_BASE}/photo-SwskV_TVOp8${IMAGE_PARAMS}`, // 스포츠 커플
+    `${UNSPLASH_BASE}/photo-yQj76gvTvTA${IMAGE_PARAMS}`, // 함께 운동하기
+    `${UNSPLASH_BASE}/photo-XqZBC6XzKzA${IMAGE_PARAMS}`, // 커플 체력 운동
+    `${UNSPLASH_BASE}/photo-73jkuBb37T8${IMAGE_PARAMS}`, // 스포츠 활동
+    `${UNSPLASH_BASE}/photo-EEHXAxg66eY${IMAGE_PARAMS}`, // 함께 피트니스
+    `${UNSPLASH_BASE}/photo-mH9kQpU503Q${IMAGE_PARAMS}`, // 커플 운동 데이트
+    `${UNSPLASH_BASE}/photo-StxrcQpXYHw${IMAGE_PARAMS}`, // 스포츠 시간
+    `${UNSPLASH_BASE}/photo-nNkm5WUTD18${IMAGE_PARAMS}`, // 함께 스포츠 활동
+    `${UNSPLASH_BASE}/photo-EGcSy5mR7XY${IMAGE_PARAMS}`, // 커플 체력단련
+    `${UNSPLASH_BASE}/photo-zpPCBtLVjyM${IMAGE_PARAMS}`, // 스포츠 데이트
   ],
 
   // 🎯 Activities - 운동/피트니스
@@ -552,6 +898,25 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1574680096145-d05b474e2155${IMAGE_PARAMS}`, // 운동 기구
     `${UNSPLASH_BASE}/photo-1571902943202-507ec2618e8f${IMAGE_PARAMS}`, // 헬스장 기구
     `${UNSPLASH_BASE}/photo-1487956382158-bb926046304a${IMAGE_PARAMS}`, // 로프 운동
+    // 추가 피트니스 이미지 (커플 피트니스 테마)
+    `${UNSPLASH_BASE}/photo-RpV-1AM8eZI${IMAGE_PARAMS}`, // 커플 요가
+    `${UNSPLASH_BASE}/photo-nabpVYNXKRI${IMAGE_PARAMS}`, // 함께 스트레칭
+    `${UNSPLASH_BASE}/photo-C1WHDLVxzfI${IMAGE_PARAMS}`, // 피트니스 데이트
+    `${UNSPLASH_BASE}/photo-wBFWBQhgvfI${IMAGE_PARAMS}`, // 커플 헬스
+    `${UNSPLASH_BASE}/photo-UUfONzJgtHs${IMAGE_PARAMS}`, // 함께 요가
+    `${UNSPLASH_BASE}/photo-TippdOuDEpQ${IMAGE_PARAMS}`, // 커플 운동
+    `${UNSPLASH_BASE}/photo-zEB4urw1dU0${IMAGE_PARAMS}`, // 피트니스 함께
+    `${UNSPLASH_BASE}/photo-c2Y0L31BQNE${IMAGE_PARAMS}`, // 커플 트레이닝
+    `${UNSPLASH_BASE}/photo-QfWfF1q6YOg${IMAGE_PARAMS}`, // 함께 피트니스
+    `${UNSPLASH_BASE}/photo-fbA_qViNdGw${IMAGE_PARAMS}`, // 커플 웰니스
+    `${UNSPLASH_BASE}/photo-4hz3iaHSObQ${IMAGE_PARAMS}`, // 피트니스 커플
+    `${UNSPLASH_BASE}/photo-lWYWhtAf-z4${IMAGE_PARAMS}`, // 함께 헬스
+    `${UNSPLASH_BASE}/photo-w-mzwNrUrMo${IMAGE_PARAMS}`, // 커플 명상
+    `${UNSPLASH_BASE}/photo-s6XeRyp3IQY${IMAGE_PARAMS}`, // 피트니스 시간
+    `${UNSPLASH_BASE}/photo-VOllntO2mok${IMAGE_PARAMS}`, // 함께 운동 데이트
+    `${UNSPLASH_BASE}/photo-dnYWNpUciyE${IMAGE_PARAMS}`, // 커플 요가 클래스
+    `${UNSPLASH_BASE}/photo-YB7KZGZ4olI${IMAGE_PARAMS}`, // 피트니스 함께하기
+    `${UNSPLASH_BASE}/photo-AK57i_BMhFc${IMAGE_PARAMS}`, // 커플 피트니스 데이트
   ],
 
   // 🎯 Activities - 힐링/웰니스
@@ -576,6 +941,25 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1559599101-f09722fb4948${IMAGE_PARAMS}`, // 목욕용품
     `${UNSPLASH_BASE}/photo-1470259078422-826894b933aa${IMAGE_PARAMS}`, // 해먹
     `${UNSPLASH_BASE}/photo-1499678329028-101435549a4e${IMAGE_PARAMS}`, // 바다
+    // 추가 웰니스 이미지 (커플 힐링 테마)
+    `${UNSPLASH_BASE}/photo-RpV-1AM8eZI${IMAGE_PARAMS}`, // 커플 명상
+    `${UNSPLASH_BASE}/photo-nabpVYNXKRI${IMAGE_PARAMS}`, // 함께 요가
+    `${UNSPLASH_BASE}/photo-C1WHDLVxzfI${IMAGE_PARAMS}`, // 웰니스 데이트
+    `${UNSPLASH_BASE}/photo-wBFWBQhgvfI${IMAGE_PARAMS}`, // 커플 스파
+    `${UNSPLASH_BASE}/photo-UUfONzJgtHs${IMAGE_PARAMS}`, // 함께 힐링
+    `${UNSPLASH_BASE}/photo-TippdOuDEpQ${IMAGE_PARAMS}`, // 커플 휴식
+    `${UNSPLASH_BASE}/photo-zEB4urw1dU0${IMAGE_PARAMS}`, // 웰니스 함께
+    `${UNSPLASH_BASE}/photo-c2Y0L31BQNE${IMAGE_PARAMS}`, // 커플 마사지
+    `${UNSPLASH_BASE}/photo-QfWfF1q6YOg${IMAGE_PARAMS}`, // 함께 스파
+    `${UNSPLASH_BASE}/photo-fbA_qViNdGw${IMAGE_PARAMS}`, // 커플 테라피
+    `${UNSPLASH_BASE}/photo-4hz3iaHSObQ${IMAGE_PARAMS}`, // 웰니스 커플
+    `${UNSPLASH_BASE}/photo-lWYWhtAf-z4${IMAGE_PARAMS}`, // 함께 온천
+    `${UNSPLASH_BASE}/photo-w-mzwNrUrMo${IMAGE_PARAMS}`, // 커플 리트릿
+    `${UNSPLASH_BASE}/photo-s6XeRyp3IQY${IMAGE_PARAMS}`, // 웰니스 시간
+    `${UNSPLASH_BASE}/photo-VOllntO2mok${IMAGE_PARAMS}`, // 함께 명상
+    `${UNSPLASH_BASE}/photo-dnYWNpUciyE${IMAGE_PARAMS}`, // 커플 힐링 데이트
+    `${UNSPLASH_BASE}/photo-YB7KZGZ4olI${IMAGE_PARAMS}`, // 웰니스 함께하기
+    `${UNSPLASH_BASE}/photo-AK57i_BMhFc${IMAGE_PARAMS}`, // 커플 릴렉스
   ],
 
   // 🎯 Activities - 만들기/크리에이티브
@@ -600,6 +984,27 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1513364776144-60967b0f800f${IMAGE_PARAMS}`, // 미술
     `${UNSPLASH_BASE}/photo-1461344577544-4e5dc9487184${IMAGE_PARAMS}`, // 팔레트
     `${UNSPLASH_BASE}/photo-1560421683-6856ea585c78${IMAGE_PARAMS}`, // 베이킹
+    // 추가 크리에이티브 이미지 (커플 만들기 테마)
+    `${UNSPLASH_BASE}/photo-eTtth_X2JQQ${IMAGE_PARAMS}`, // 커플 공예
+    `${UNSPLASH_BASE}/photo-FrGQr9eQcVM${IMAGE_PARAMS}`, // 함께 만들기
+    `${UNSPLASH_BASE}/photo-Lf_RvWYKy4U${IMAGE_PARAMS}`, // 크리에이티브 데이트
+    `${UNSPLASH_BASE}/photo-lN1OnTHt7Gs${IMAGE_PARAMS}`, // 커플 아트
+    `${UNSPLASH_BASE}/photo-hOgndH1iZys${IMAGE_PARAMS}`, // 함께 그리기
+    `${UNSPLASH_BASE}/photo-m5s3vdXniWg${IMAGE_PARAMS}`, // 커플 도예
+    `${UNSPLASH_BASE}/photo-wrnirB2jcoc${IMAGE_PARAMS}`, // 만들기 함께
+    `${UNSPLASH_BASE}/photo-1bi3zFpimBs${IMAGE_PARAMS}`, // 커플 워크샵
+    `${UNSPLASH_BASE}/photo-KXE8WndmY-Y${IMAGE_PARAMS}`, // 함께 공예
+    `${UNSPLASH_BASE}/photo-0tP4U55c6DY${IMAGE_PARAMS}`, // 크리에이티브 커플
+    `${UNSPLASH_BASE}/photo-91stDmTERL4${IMAGE_PARAMS}`, // 함께 창작
+    `${UNSPLASH_BASE}/photo-du_H9CcT7Mc${IMAGE_PARAMS}`, // 커플 페인팅
+    `${UNSPLASH_BASE}/photo-DX602Elliv4${IMAGE_PARAMS}`, // 만들기 데이트
+    `${UNSPLASH_BASE}/photo-Y42EeZIDRIw${IMAGE_PARAMS}`, // 함께 DIY
+    `${UNSPLASH_BASE}/photo-42O7UpRql24${IMAGE_PARAMS}`, // 커플 크래프트
+    `${UNSPLASH_BASE}/photo-ZhDVAlGxUHM${IMAGE_PARAMS}`, // 창작 활동
+    `${UNSPLASH_BASE}/photo-RHvRN9iGZ8Y${IMAGE_PARAMS}`, // 함께 만들기 데이트
+    `${UNSPLASH_BASE}/photo-BAsk9EETO3w${IMAGE_PARAMS}`, // 커플 아트 워크샵
+    `${UNSPLASH_BASE}/photo-5-TbS3ssIVM${IMAGE_PARAMS}`, // 크리에이티브 시간
+    `${UNSPLASH_BASE}/photo-x2QHTVg2HqA${IMAGE_PARAMS}`, // 함께 예술 활동
   ],
 
   // 🎯 Activities - 게임
@@ -624,6 +1029,27 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1569017388730-020b5f80a004${IMAGE_PARAMS}`, // 젠가
     `${UNSPLASH_BASE}/photo-1632501641765-e568d28b0015${IMAGE_PARAMS}`, // 스위치
     `${UNSPLASH_BASE}/photo-1509198397868-475647b2a1e5${IMAGE_PARAMS}`, // 다트
+    // 추가 게임 이미지 (커플 게임 테마)
+    `${UNSPLASH_BASE}/photo-imV-AuWNzy4${IMAGE_PARAMS}`, // 커플 게임
+    `${UNSPLASH_BASE}/photo-7XyWhGHNhjc${IMAGE_PARAMS}`, // 함께 플레이
+    `${UNSPLASH_BASE}/photo-NaYrQXXFRfc${IMAGE_PARAMS}`, // 게임 데이트
+    `${UNSPLASH_BASE}/photo-mwENfFVY4M4${IMAGE_PARAMS}`, // 커플 보드게임
+    `${UNSPLASH_BASE}/photo-i8pYfvjo4Sk${IMAGE_PARAMS}`, // 함께 놀기
+    `${UNSPLASH_BASE}/photo-cDg_WTGrw4I${IMAGE_PARAMS}`, // 커플 비디오게임
+    `${UNSPLASH_BASE}/photo-rCMIALepHSU${IMAGE_PARAMS}`, // 게임 함께
+    `${UNSPLASH_BASE}/photo-W2FTknoMIFA${IMAGE_PARAMS}`, // 커플 카드게임
+    `${UNSPLASH_BASE}/photo-NTLxJjNEYoE${IMAGE_PARAMS}`, // 함께 게임 시간
+    `${UNSPLASH_BASE}/photo-nOaJpW_KIZE${IMAGE_PARAMS}`, // 게임 커플
+    `${UNSPLASH_BASE}/photo-dM1UZCFnFTk${IMAGE_PARAMS}`, // 함께 즐기기
+    `${UNSPLASH_BASE}/photo-4jpejCnUAc8${IMAGE_PARAMS}`, // 커플 방탈출
+    `${UNSPLASH_BASE}/photo-odBcdF3FCd0${IMAGE_PARAMS}`, // 게임 데이트 시간
+    `${UNSPLASH_BASE}/photo-J1KJXOthuxs${IMAGE_PARAMS}`, // 함께 게임
+    `${UNSPLASH_BASE}/photo-wMCaiTP4HEA${IMAGE_PARAMS}`, // 커플 아케이드
+    `${UNSPLASH_BASE}/photo-qGnmmOW6qz4${IMAGE_PARAMS}`, // 게임 즐기기
+    `${UNSPLASH_BASE}/photo-KCjRuUD3CQ4${IMAGE_PARAMS}`, // 함께 콘솔 게임
+    `${UNSPLASH_BASE}/photo-kQ9RllVPm38${IMAGE_PARAMS}`, // 커플 게임 데이트
+    `${UNSPLASH_BASE}/photo-VURyS7Kb9H8${IMAGE_PARAMS}`, // 게임 시간
+    `${UNSPLASH_BASE}/photo-eYl0Er05rYI${IMAGE_PARAMS}`, // 함께 플레이 데이트
   ],
 
   // 🎯 Activities - 쇼핑
@@ -648,6 +1074,27 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1601924994987-69e26d50dc26${IMAGE_PARAMS}`, // 매장
     `${UNSPLASH_BASE}/photo-1603400521630-9f2de124b33b${IMAGE_PARAMS}`, // 진열대
     `${UNSPLASH_BASE}/photo-1604719312566-8912e9227c6a${IMAGE_PARAMS}`, // 패션
+    // 추가 쇼핑 이미지 (커플 쇼핑 테마)
+    `${UNSPLASH_BASE}/photo-IwD1q3wCj3g${IMAGE_PARAMS}`, // 커플 쇼핑
+    `${UNSPLASH_BASE}/photo-EsqeXhiVCEo${IMAGE_PARAMS}`, // 함께 쇼핑
+    `${UNSPLASH_BASE}/photo-9VXBaL1RukQ${IMAGE_PARAMS}`, // 쇼핑 데이트
+    `${UNSPLASH_BASE}/photo-f9Kc7I0TE_I${IMAGE_PARAMS}`, // 커플 쇼핑몰
+    `${UNSPLASH_BASE}/photo-NsjElSYEhyY${IMAGE_PARAMS}`, // 함께 구경
+    `${UNSPLASH_BASE}/photo-pwt32loQ510${IMAGE_PARAMS}`, // 커플 패션
+    `${UNSPLASH_BASE}/photo-NGaM3MWn9oQ${IMAGE_PARAMS}`, // 쇼핑 함께
+    `${UNSPLASH_BASE}/photo-nRKfxBaocsI${IMAGE_PARAMS}`, // 커플 마켓
+    `${UNSPLASH_BASE}/photo-AuV0cNNpCs4${IMAGE_PARAMS}`, // 함께 쇼핑 시간
+    `${UNSPLASH_BASE}/photo-WMhHs52Etig${IMAGE_PARAMS}`, // 쇼핑 커플
+    `${UNSPLASH_BASE}/photo-lwnn7H_1RLc${IMAGE_PARAMS}`, // 함께 매장
+    `${UNSPLASH_BASE}/photo-ctlALs9Pkk0${IMAGE_PARAMS}`, // 커플 백화점
+    `${UNSPLASH_BASE}/photo-xR2G6SeG7wA${IMAGE_PARAMS}`, // 쇼핑 데이트 시간
+    `${UNSPLASH_BASE}/photo-46iJW9LjmP4${IMAGE_PARAMS}`, // 함께 쇼핑하기
+    `${UNSPLASH_BASE}/photo-mrmEsXLd84s${IMAGE_PARAMS}`, // 커플 아울렛
+    `${UNSPLASH_BASE}/photo-WwsZgF4zRBY${IMAGE_PARAMS}`, // 쇼핑 즐기기
+    `${UNSPLASH_BASE}/photo-QK4Aoyp28eY${IMAGE_PARAMS}`, // 함께 구매
+    `${UNSPLASH_BASE}/photo-Jm2Z8tiCvg4${IMAGE_PARAMS}`, // 커플 쇼핑 데이트
+    `${UNSPLASH_BASE}/photo-TD7B1jcCg08${IMAGE_PARAMS}`, // 쇼핑 시간
+    `${UNSPLASH_BASE}/photo-Yu4B6lqnDxE${IMAGE_PARAMS}`, // 함께 패션 쇼핑
   ],
 
   // 🎯 Activities - 사진
@@ -671,6 +1118,27 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1581591524425-c7e0978865fc${IMAGE_PARAMS}`, // 사진 촬영
     `${UNSPLASH_BASE}/photo-1517633220927-9b84d4098b40${IMAGE_PARAMS}`, // 스마트폰 사진
     `${UNSPLASH_BASE}/photo-1484154218962-a197022b5858${IMAGE_PARAMS}`, // 인테리어 사진
+    // 추가 사진 이미지 (커플 사진 테마)
+    `${UNSPLASH_BASE}/photo-LF8XLjRSG7w${IMAGE_PARAMS}`, // 커플 사진
+    `${UNSPLASH_BASE}/photo-hkBBLC1UqJw${IMAGE_PARAMS}`, // 함께 촬영
+    `${UNSPLASH_BASE}/photo-Ms1a_CD-CPo${IMAGE_PARAMS}`, // 사진 데이트
+    `${UNSPLASH_BASE}/photo-if1EYvUc-JA${IMAGE_PARAMS}`, // 커플 포즈
+    `${UNSPLASH_BASE}/photo-4MT8iAt9iMI${IMAGE_PARAMS}`, // 함께 카메라
+    `${UNSPLASH_BASE}/photo-jKzMleC3px8${IMAGE_PARAMS}`, // 커플 셀카
+    `${UNSPLASH_BASE}/photo-iauNBPA5uRY${IMAGE_PARAMS}`, // 사진 함께
+    `${UNSPLASH_BASE}/photo-FXxSwEYF1VQ${IMAGE_PARAMS}`, // 커플 포토
+    `${UNSPLASH_BASE}/photo-Co0gKVJ_R88${IMAGE_PARAMS}`, // 함께 사진 시간
+    `${UNSPLASH_BASE}/photo-PUgiPPb0SW8${IMAGE_PARAMS}`, // 사진 커플
+    `${UNSPLASH_BASE}/photo-xdwRdA4BF3I${IMAGE_PARAMS}`, // 함께 찍기
+    `${UNSPLASH_BASE}/photo-GO0JmBnPHKM${IMAGE_PARAMS}`, // 커플 네컷
+    `${UNSPLASH_BASE}/photo-0xBvA3xqP0E${IMAGE_PARAMS}`, // 사진 데이트 시간
+    `${UNSPLASH_BASE}/photo-89oUvqSLki0${IMAGE_PARAMS}`, // 함께 포즈
+    `${UNSPLASH_BASE}/photo-zrYCP2Hcs_4${IMAGE_PARAMS}`, // 커플 촬영 데이트
+    `${UNSPLASH_BASE}/photo-LjHTH--1g-A${IMAGE_PARAMS}`, // 사진 즐기기
+    `${UNSPLASH_BASE}/photo-NixdcLDX_oQ${IMAGE_PARAMS}`, // 함께 포토 시간
+    `${UNSPLASH_BASE}/photo-J5blzFda4Lg${IMAGE_PARAMS}`, // 커플 사진 데이트
+    `${UNSPLASH_BASE}/photo-rvpM5fHYcKY${IMAGE_PARAMS}`, // 사진 시간
+    `${UNSPLASH_BASE}/photo-ctQa8NL0Gls${IMAGE_PARAMS}`, // 함께 포토 데이트
   ],
 
   // 🎯 Activities - 함께 배우기
@@ -695,6 +1163,27 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1456406644174-8ddd4cd52a06${IMAGE_PARAMS}`, // 언어 공부
     `${UNSPLASH_BASE}/photo-1544531586-fde5298cdd40${IMAGE_PARAMS}`, // 악기 배우기
     `${UNSPLASH_BASE}/photo-1549923746-c502d488b3ea${IMAGE_PARAMS}`, // 요리 클래스
+    // 추가 학습 이미지 (커플 학습 테마)
+    `${UNSPLASH_BASE}/photo-F7cQlYLmpAE${IMAGE_PARAMS}`, // 커플 공부
+    `${UNSPLASH_BASE}/photo-iav5LXMItFA${IMAGE_PARAMS}`, // 함께 학습
+    `${UNSPLASH_BASE}/photo-TUpA8KS9SKw${IMAGE_PARAMS}`, // 학습 데이트
+    `${UNSPLASH_BASE}/photo-Us3MwKolPmg${IMAGE_PARAMS}`, // 커플 스터디
+    `${UNSPLASH_BASE}/photo-M6vJ-eaQSF8${IMAGE_PARAMS}`, // 함께 배우기
+    `${UNSPLASH_BASE}/photo-CX6Eb2IDe2c${IMAGE_PARAMS}`, // 커플 교육
+    `${UNSPLASH_BASE}/photo-TfF9it7bidc${IMAGE_PARAMS}`, // 학습 함께
+    `${UNSPLASH_BASE}/photo-zezw9q2bc9E${IMAGE_PARAMS}`, // 커플 클래스
+    `${UNSPLASH_BASE}/photo-RLVWpAUmJMk${IMAGE_PARAMS}`, // 함께 공부 시간
+    `${UNSPLASH_BASE}/photo-nFrp4u2Pkxw${IMAGE_PARAMS}`, // 학습 커플
+    `${UNSPLASH_BASE}/photo-NCjXWqUDZXs${IMAGE_PARAMS}`, // 함께 배움
+    `${UNSPLASH_BASE}/photo-la6C554Ev_o${IMAGE_PARAMS}`, // 커플 책 읽기
+    `${UNSPLASH_BASE}/photo-hMAkTAx373M${IMAGE_PARAMS}`, // 학습 데이트 시간
+    `${UNSPLASH_BASE}/photo-aawzgWHBhfE${IMAGE_PARAMS}`, // 함께 스터디
+    `${UNSPLASH_BASE}/photo-L_6POsyK4Fs${IMAGE_PARAMS}`, // 커플 학습 데이트
+    `${UNSPLASH_BASE}/photo-mfW6CofzRCM${IMAGE_PARAMS}`, // 함께 독서
+    `${UNSPLASH_BASE}/photo-Vz40HmBcVgA${IMAGE_PARAMS}`, // 커플 배움
+    `${UNSPLASH_BASE}/photo-1vgq00w7-kI${IMAGE_PARAMS}`, // 학습 시간
+    `${UNSPLASH_BASE}/photo-g27vS8rxOzs${IMAGE_PARAMS}`, // 함께 학습 데이트
+    `${UNSPLASH_BASE}/photo-9fBrSOO76Ic${IMAGE_PARAMS}`, // 커플 공부 시간
   ],
 
   // 💝 Special & Romantic - 로맨틱
@@ -729,6 +1218,27 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1499578124509-1f0f27f7fa66${IMAGE_PARAMS}`, // 커플 사진
     `${UNSPLASH_BASE}/photo-1529634806980-85c3dd6d34ac${IMAGE_PARAMS}`, // 해변 일몰
     `${UNSPLASH_BASE}/photo-1545396395-da3161d2f1fc${IMAGE_PARAMS}`, // 핑크 하트
+    // 추가 로맨틱 이미지 (커플 로맨스 테마)
+    `${UNSPLASH_BASE}/photo-Gel2g5-l-70${IMAGE_PARAMS}`, // 로맨틱 커플
+    `${UNSPLASH_BASE}/photo-5WYIlL-LS2s${IMAGE_PARAMS}`, // 함께 로맨스
+    `${UNSPLASH_BASE}/photo-y_GZeVrdl-o${IMAGE_PARAMS}`, // 로맨틱 데이트
+    `${UNSPLASH_BASE}/photo-T2ZrjNEg6kI${IMAGE_PARAMS}`, // 커플 사랑
+    `${UNSPLASH_BASE}/photo-iBXf7bjDpwk${IMAGE_PARAMS}`, // 함께 로맨틱
+    `${UNSPLASH_BASE}/photo-6TZaogOgn1I${IMAGE_PARAMS}`, // 커플 낭만
+    `${UNSPLASH_BASE}/photo-XuN44TajBGo${IMAGE_PARAMS}`, // 로맨스 함께
+    `${UNSPLASH_BASE}/photo-wOrzkPUaj5o${IMAGE_PARAMS}`, // 커플 로맨틱 시간
+    `${UNSPLASH_BASE}/photo-F79AWmkQFgg${IMAGE_PARAMS}`, // 함께 사랑
+    `${UNSPLASH_BASE}/photo-uPQQYaJhNqI${IMAGE_PARAMS}`, // 로맨틱 커플
+    `${UNSPLASH_BASE}/photo-xRIX5f7FlAI${IMAGE_PARAMS}`, // 함께 낭만
+    `${UNSPLASH_BASE}/photo-Q4pjMYQtXzE${IMAGE_PARAMS}`, // 커플 로맨스 데이트
+    `${UNSPLASH_BASE}/photo-DU36Enqyfic${IMAGE_PARAMS}`, // 로맨틱 시간
+    `${UNSPLASH_BASE}/photo-NMc0TcigPYM${IMAGE_PARAMS}`, // 함께 로맨스 데이트
+    `${UNSPLASH_BASE}/photo-PNKwIhMyK3s${IMAGE_PARAMS}`, // 커플 사랑 시간
+    `${UNSPLASH_BASE}/photo-ZxmDMXPC7Yc${IMAGE_PARAMS}`, // 로맨틱 낭만
+    `${UNSPLASH_BASE}/photo-z0VU8Nc05aU${IMAGE_PARAMS}`, // 함께 사랑 데이트
+    `${UNSPLASH_BASE}/photo-lP5AIt2cldc${IMAGE_PARAMS}`, // 커플 로맨틱 낭만
+    `${UNSPLASH_BASE}/photo-pv6f509rKec${IMAGE_PARAMS}`, // 로맨스 시간
+    `${UNSPLASH_BASE}/photo-CQDCjcz8BgM${IMAGE_PARAMS}`, // 함께 로맨틱 데이트
   ],
 
   // 💝 Special - 기념일
@@ -753,6 +1263,27 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1464047736614-af63643285bf${IMAGE_PARAMS}`, // 장미 꽃다발
     `${UNSPLASH_BASE}/photo-1518568403628-df55701ade9e${IMAGE_PARAMS}`, // 레스토랑 디너
     `${UNSPLASH_BASE}/photo-1537907690979-ee8e01276184${IMAGE_PARAMS}`, // 캔들라이트
+    // 추가 기념일 이미지 (커플 기념일 테마)
+    `${UNSPLASH_BASE}/photo-xxFn_ZKPd48${IMAGE_PARAMS}`, // 기념일 커플
+    `${UNSPLASH_BASE}/photo-n1-eu1M7V7k${IMAGE_PARAMS}`, // 함께 축하
+    `${UNSPLASH_BASE}/photo-JCFSlOJQUdE${IMAGE_PARAMS}`, // 커플 기념
+    `${UNSPLASH_BASE}/photo-wOrzkPUaj5o${IMAGE_PARAMS}`, // 기념일 데이트
+    `${UNSPLASH_BASE}/photo-xdRmX8GC0P0${IMAGE_PARAMS}`, // 함께 기념일
+    `${UNSPLASH_BASE}/photo-7BUNpnq7xqg${IMAGE_PARAMS}`, // 커플 축하
+    `${UNSPLASH_BASE}/photo-4NiW28K5V04${IMAGE_PARAMS}`, // 기념 시간
+    `${UNSPLASH_BASE}/photo-hMTfSfYT6qA${IMAGE_PARAMS}`, // 함께 특별한 날
+    `${UNSPLASH_BASE}/photo-N-Jd9B_cXOY${IMAGE_PARAMS}`, // 커플 기념일 축하
+    `${UNSPLASH_BASE}/photo-fRedfuUhJPI${IMAGE_PARAMS}`, // 로맨틱 기념일
+    `${UNSPLASH_BASE}/photo-VPN628EBYjY${IMAGE_PARAMS}`, // 함께 사랑 기념
+    `${UNSPLASH_BASE}/photo-ndG1g0w-cIw${IMAGE_PARAMS}`, // 커플 특별한 날
+    `${UNSPLASH_BASE}/photo-3FM19gJ2nkM${IMAGE_PARAMS}`, // 기념일 함께
+    `${UNSPLASH_BASE}/photo-0bN-9dlCaeE${IMAGE_PARAMS}`, // 축하 시간
+    `${UNSPLASH_BASE}/photo-mV-ENMfm5JI${IMAGE_PARAMS}`, // 커플 기념 데이트
+    `${UNSPLASH_BASE}/photo-k99ouu-RVMo${IMAGE_PARAMS}`, // 함께 기념 축하
+    `${UNSPLASH_BASE}/photo-MrIlvv6Tb-k${IMAGE_PARAMS}`, // 기념일 로맨스
+    `${UNSPLASH_BASE}/photo-2hR6GJCVtks${IMAGE_PARAMS}`, // 커플 특별 시간
+    `${UNSPLASH_BASE}/photo-xV_7_SP6HVk${IMAGE_PARAMS}`, // 함께 기념일 데이트
+    `${UNSPLASH_BASE}/photo--lQphbrigKI${IMAGE_PARAMS}`, // 사랑 기념
   ],
 
   // 🎁 Special - 깜짝 이벤트
@@ -777,6 +1308,27 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1602631985686-1bb0e6a8696e${IMAGE_PARAMS}`, // 반짝이 장식
     `${UNSPLASH_BASE}/photo-1513885535751-8b9238bd345a${IMAGE_PARAMS}`, // 핑크 풍선
     `${UNSPLASH_BASE}/photo-1484665754804-74b091211472${IMAGE_PARAMS}`, // 파티 테이블
+    // 추가 깜짝 이벤트 이미지 (커플 서프라이즈 테마)
+    `${UNSPLASH_BASE}/photo-oxe2vlvgHZI${IMAGE_PARAMS}`, // 깜짝 선물
+    `${UNSPLASH_BASE}/photo-VtRXNeBpknA${IMAGE_PARAMS}`, // 함께 서프라이즈
+    `${UNSPLASH_BASE}/photo-lqrKWLev7Zs${IMAGE_PARAMS}`, // 커플 이벤트
+    `${UNSPLASH_BASE}/photo-F6shDB7LO0o${IMAGE_PARAMS}`, // 깜짝 파티
+    `${UNSPLASH_BASE}/photo-m9a1ZkFHyyQ${IMAGE_PARAMS}`, // 함께 축하
+    `${UNSPLASH_BASE}/photo-KbWItdg5DWg${IMAGE_PARAMS}`, // 서프라이즈 선물
+    `${UNSPLASH_BASE}/photo-v1vijninZLc${IMAGE_PARAMS}`, // 커플 깜짝
+    `${UNSPLASH_BASE}/photo-23Zra4t_UuI${IMAGE_PARAMS}`, // 이벤트 시간
+    `${UNSPLASH_BASE}/photo-41H3wfiFo_0${IMAGE_PARAMS}`, // 함께 서프라이즈 파티
+    `${UNSPLASH_BASE}/photo-RF92O0I3yUg${IMAGE_PARAMS}`, // 깜짝 축하
+    `${UNSPLASH_BASE}/photo-YWyKcSN3MmI${IMAGE_PARAMS}`, // 커플 이벤트 시간
+    `${UNSPLASH_BASE}/photo-0X3416CNi4c${IMAGE_PARAMS}`, // 서프라이즈 함께
+    `${UNSPLASH_BASE}/photo-tv2whuRIoH0${IMAGE_PARAMS}`, // 깜짝 선물 주기
+    `${UNSPLASH_BASE}/photo-Gk50lvCBWYY${IMAGE_PARAMS}`, // 커플 서프라이즈 시간
+    `${UNSPLASH_BASE}/photo-1Duek8IiP9w${IMAGE_PARAMS}`, // 함께 이벤트 축하
+    `${UNSPLASH_BASE}/photo-ToLu5wFF2b8${IMAGE_PARAMS}`, // 깜짝 파티 함께
+    `${UNSPLASH_BASE}/photo-GMD4xSjofHw${IMAGE_PARAMS}`, // 서프라이즈 커플
+    `${UNSPLASH_BASE}/photo-lRS01-TVG_Y${IMAGE_PARAMS}`, // 이벤트 선물
+    `${UNSPLASH_BASE}/photo-FDTlWHmwIz8${IMAGE_PARAMS}`, // 함께 깜짝 시간
+    `${UNSPLASH_BASE}/photo-ek6sBFcXQWw${IMAGE_PARAMS}`, // 커플 서프라이즈 축하
   ],
 
   // 📸 Special - 추억 만들기
@@ -801,6 +1353,27 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1517457373958-b7bdd4587205${IMAGE_PARAMS}`, // 파티 순간
     `${UNSPLASH_BASE}/photo-1528605248644-14dd04022da1${IMAGE_PARAMS}`, // 함께하는 순간
     `${UNSPLASH_BASE}/photo-1517841905240-472988babdf9${IMAGE_PARAMS}`, // 행복한 표정
+    // 추가 추억 만들기 이미지 (커플 메모리 테마)
+    `${UNSPLASH_BASE}/photo-T68IMQs6uTY${IMAGE_PARAMS}`, // 함께 추억
+    `${UNSPLASH_BASE}/photo-a6xtGaKvMQE${IMAGE_PARAMS}`, // 커플 사진
+    `${UNSPLASH_BASE}/photo-MipMRfJ_a_U${IMAGE_PARAMS}`, // 추억 만들기
+    `${UNSPLASH_BASE}/photo-1EYYQTWctIw${IMAGE_PARAMS}`, // 함께 기록
+    `${UNSPLASH_BASE}/photo-X8YiDR62LKc${IMAGE_PARAMS}`, // 커플 추억 시간
+    `${UNSPLASH_BASE}/photo-A3UpneUkLHo${IMAGE_PARAMS}`, // 메모리 함께
+    `${UNSPLASH_BASE}/photo-2fp4OMFUHBk${IMAGE_PARAMS}`, // 사진 추억
+    `${UNSPLASH_BASE}/photo-52h5WwFi8mc${IMAGE_PARAMS}`, // 함께 특별한 순간
+    `${UNSPLASH_BASE}/photo-pW-T-wQuc8o${IMAGE_PARAMS}`, // 커플 기록 시간
+    `${UNSPLASH_BASE}/photo-x8GIS3YHqQk${IMAGE_PARAMS}`, // 추억 사진 함께
+    `${UNSPLASH_BASE}/photo-Vzo-xfERrec${IMAGE_PARAMS}`, // 메모리 커플
+    `${UNSPLASH_BASE}/photo-sCmidhusJZo${IMAGE_PARAMS}`, // 함께 추억 만들기
+    `${UNSPLASH_BASE}/photo-jHTlbkf8Ywc${IMAGE_PARAMS}`, // 커플 특별 기록
+    `${UNSPLASH_BASE}/photo-B9G67h07KK0${IMAGE_PARAMS}`, // 사진 함께 시간
+    `${UNSPLASH_BASE}/photo-AxXKIh1jAt8${IMAGE_PARAMS}`, // 추억 커플 데이트
+    `${UNSPLASH_BASE}/photo-1_XO8aDK2O4${IMAGE_PARAMS}`, // 함께 메모리 기록
+    `${UNSPLASH_BASE}/photo-hATVnkcIRTQ${IMAGE_PARAMS}`, // 커플 사진 추억
+    `${UNSPLASH_BASE}/photo-0RkOByqm6QY${IMAGE_PARAMS}`, // 특별한 순간 함께
+    `${UNSPLASH_BASE}/photo-wwzYax3CHnk${IMAGE_PARAMS}`, // 추억 시간 커플
+    `${UNSPLASH_BASE}/photo-O1nk9l_kK1o${IMAGE_PARAMS}`, // 함께 기록 메모리
   ],
 
   // 🌐 Online - 비대면 데이트 (편지쓰기, 책읽기, 영화보기, 그림그리기 등)
@@ -868,6 +1441,27 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1487530811176-3780de880c2d${IMAGE_PARAMS}`, // 선물 포장
     `${UNSPLASH_BASE}/photo-1549488344-1f9b8d2bd1f3${IMAGE_PARAMS}`, // 로맨틱 장미
     `${UNSPLASH_BASE}/photo-1518621736915-f3b1c41bfd00${IMAGE_PARAMS}`, // 꽃과 카드
+    // 추가 비대면 데이트 이미지 (커플 온라인 테마)
+    `${UNSPLASH_BASE}/photo-Kx62X3Wj0pw${IMAGE_PARAMS}`, // 영상통화 커플
+    `${UNSPLASH_BASE}/photo-ucR8qh4BwuA${IMAGE_PARAMS}`, // 함께 온라인
+    `${UNSPLASH_BASE}/photo-FMnL6Dhn_RY${IMAGE_PARAMS}`, // 비대면 데이트
+    `${UNSPLASH_BASE}/photo-B4FpuTmasuw${IMAGE_PARAMS}`, // 화상 통화
+    `${UNSPLASH_BASE}/photo-D5Z78Dx9Eew${IMAGE_PARAMS}`, // 온라인 함께
+    `${UNSPLASH_BASE}/photo-Fj3IBo0R2rI${IMAGE_PARAMS}`, // 영상 데이트
+    `${UNSPLASH_BASE}/photo-QsH5-_aaA74${IMAGE_PARAMS}`, // 커플 온라인 시간
+    `${UNSPLASH_BASE}/photo-dPr5Q763cXc${IMAGE_PARAMS}`, // 비대면 함께
+    `${UNSPLASH_BASE}/photo-z-qfURI9-ng${IMAGE_PARAMS}`, // 화상 커플
+    `${UNSPLASH_BASE}/photo-5vYG7SZtf2I${IMAGE_PARAMS}`, // 온라인 데이트 시간
+    `${UNSPLASH_BASE}/photo-H-n8347I6P0${IMAGE_PARAMS}`, // 함께 영상 통화
+    `${UNSPLASH_BASE}/photo-I76j4hf0ZhY${IMAGE_PARAMS}`, // 비대면 커플 데이트
+    `${UNSPLASH_BASE}/photo-fOdPTWnxJrU${IMAGE_PARAMS}`, // 온라인 함께 시간
+    `${UNSPLASH_BASE}/photo-IKgk1W-DuBU${IMAGE_PARAMS}`, // 영상 데이트 커플
+    `${UNSPLASH_BASE}/photo-I5e-dmKXFp0${IMAGE_PARAMS}`, // 화상 함께
+    `${UNSPLASH_BASE}/photo-alMsjtGJnAE${IMAGE_PARAMS}`, // 비대면 시간
+    `${UNSPLASH_BASE}/photo-FNedNa2rdLQ${IMAGE_PARAMS}`, // 온라인 커플 데이트
+    `${UNSPLASH_BASE}/photo-CNGOUhr9kMc${IMAGE_PARAMS}`, // 함께 비대면 시간
+    `${UNSPLASH_BASE}/photo-wNEiroUZdmA${IMAGE_PARAMS}`, // 영상 커플
+    `${UNSPLASH_BASE}/photo-91oGFaZEbe0${IMAGE_PARAMS}`, // 온라인 데이트 함께
   ],
 
   // 🎯 Special - 챌린지
@@ -892,6 +1486,27 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1513151233558-d860c5398176${IMAGE_PARAMS}`, // 선물 챌린지
     `${UNSPLASH_BASE}/photo-1502014822147-1aedfb0676e0${IMAGE_PARAMS}`, // 음악 챌린지
     `${UNSPLASH_BASE}/photo-1515169067868-5387ec356754${IMAGE_PARAMS}`, // 농구 챌린지
+    // 추가 챌린지 이미지 (커플 도전 테마)
+    `${UNSPLASH_BASE}/photo-badxuFC1qIw${IMAGE_PARAMS}`, // 커플 챌린지
+    `${UNSPLASH_BASE}/photo-eA-KzGnq1mI${IMAGE_PARAMS}`, // 함께 도전
+    `${UNSPLASH_BASE}/photo-LFFS_vf8hjk${IMAGE_PARAMS}`, // 도전 커플
+    `${UNSPLASH_BASE}/photo-OTELLziRE6M${IMAGE_PARAMS}`, // 챌린지 함께
+    `${UNSPLASH_BASE}/photo-2jnckB7ls4U${IMAGE_PARAMS}`, // 커플 도전 시간
+    `${UNSPLASH_BASE}/photo-R2nA8OvL3nI${IMAGE_PARAMS}`, // 함께 챌린지 도전
+    `${UNSPLASH_BASE}/photo-5GH4bLrZnKQ${IMAGE_PARAMS}`, // 도전 시간
+    `${UNSPLASH_BASE}/photo-XEi0bV5oXqY${IMAGE_PARAMS}`, // 커플 함께 챌린지
+    `${UNSPLASH_BASE}/photo-QZxRgeDgqpM${IMAGE_PARAMS}`, // 챌린지 커플 도전
+    `${UNSPLASH_BASE}/photo-lifwZ2ON7LM${IMAGE_PARAMS}`, // 함께 도전 시간
+    `${UNSPLASH_BASE}/photo-7mADs-yAkNs${IMAGE_PARAMS}`, // 커플 챌린지 함께
+    `${UNSPLASH_BASE}/photo-NWsyFPuhh88${IMAGE_PARAMS}`, // 도전 함께 커플
+    `${UNSPLASH_BASE}/photo-c6RzuiJuk_A${IMAGE_PARAMS}`, // 챌린지 시간 함께
+    `${UNSPLASH_BASE}/photo-6-64-6UZb2o${IMAGE_PARAMS}`, // 커플 도전 데이트
+    `${UNSPLASH_BASE}/photo-qAOTMXLHm0Y${IMAGE_PARAMS}`, // 함께 챌린지 시간
+    `${UNSPLASH_BASE}/photo-lqyAwxBQcJ4${IMAGE_PARAMS}`, // 도전 커플 함께
+    `${UNSPLASH_BASE}/photo-KErPqy-qfZg${IMAGE_PARAMS}`, // 챌린지 도전 커플
+    `${UNSPLASH_BASE}/photo-jrG1X66M2zY${IMAGE_PARAMS}`, // 함께 도전 챌린지
+    `${UNSPLASH_BASE}/photo-dTr94H5Rq0I${IMAGE_PARAMS}`, // 커플 챌린지 시간
+    `${UNSPLASH_BASE}/photo-MyFTSzaZeXs${IMAGE_PARAMS}`, // 도전 시간 함께
   ],
 };
 
@@ -935,6 +1550,50 @@ export const getRandomImageFromAll = (): string => {
   );
   const randomCategory = categoriesWithImages[Math.floor(Math.random() * categoriesWithImages.length)];
   return getRandomImage(randomCategory);
+};
+
+// 여러 카테고리에서 중복 없이 랜덤 이미지 가져오기 (미션 카드용)
+export const getUniqueRandomImages = (categories: MissionCategory[]): string[] => {
+  const usedImages = new Set<string>();
+  const results: string[] = [];
+
+  for (const category of categories) {
+    const categoryImages = MISSION_IMAGES[category];
+
+    if (!categoryImages || categoryImages.length === 0) {
+      // 카테고리가 없으면 전체에서 중복 없이 선택
+      let fallbackImage = getRandomImageFromAll();
+      let attempts = 0;
+      while (usedImages.has(fallbackImage) && attempts < 50) {
+        fallbackImage = getRandomImageFromAll();
+        attempts++;
+      }
+      usedImages.add(fallbackImage);
+      results.push(fallbackImage);
+      continue;
+    }
+
+    // 해당 카테고리에서 중복 없는 이미지 선택
+    const availableImages = categoryImages.filter(img => !usedImages.has(img));
+
+    if (availableImages.length > 0) {
+      const selectedImage = availableImages[Math.floor(Math.random() * availableImages.length)];
+      usedImages.add(selectedImage);
+      results.push(selectedImage);
+    } else {
+      // 모든 이미지가 이미 사용된 경우, 다른 카테고리에서 선택
+      let fallbackImage = getRandomImageFromAll();
+      let attempts = 0;
+      while (usedImages.has(fallbackImage) && attempts < 50) {
+        fallbackImage = getRandomImageFromAll();
+        attempts++;
+      }
+      usedImages.add(fallbackImage);
+      results.push(fallbackImage);
+    }
+  }
+
+  return results;
 };
 
 // 카테고리 한글 이름

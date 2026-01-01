@@ -2,7 +2,7 @@ import OpenAI from 'openai';
 import type { Mission, MissionCategory } from '@/types';
 import type { OnboardingData, DateWorry } from '@/stores/onboardingStore';
 import type { MissionGenerationAnswers } from '@/stores/missionStore';
-import { getRandomImage } from '@/constants/missionImages';
+import { getRandomImage, getUniqueRandomImages } from '@/constants/missionImages';
 // Import directly from individual store files to avoid require cycle
 import { useLanguageStore, type SupportedLanguage, type CountryCode } from '@/stores/languageStore';
 import { useSubscriptionStore, SUBSCRIPTION_LIMITS } from '@/stores/subscriptionStore';
@@ -1335,17 +1335,22 @@ export async function generateMissionsWithAI(input: MissionGenerationInput): Pro
     }
 
     // Convert to Mission format with category validation
-    const missions: Mission[] = missionsData.slice(0, missionCount).map((data, index) => {
-      // Validate and normalize category to ensure image loading works
-      const validatedCategory = validateCategory(data.category);
+    const slicedData = missionsData.slice(0, missionCount);
 
+    // First, collect all validated categories
+    const validatedCategories = slicedData.map((data) => validateCategory(data.category));
+
+    // Get unique images for all missions at once (prevents duplicates)
+    const uniqueImages = getUniqueRandomImages(validatedCategories);
+
+    const missions: Mission[] = slicedData.map((data, index) => {
       return {
         id: `ai-${Date.now()}-${index}`,
         title: data.title,
         description: data.description,
-        category: validatedCategory,
+        category: validatedCategories[index],
         tags: data.tags || [],
-        imageUrl: getRandomImage(validatedCategory),
+        imageUrl: uniqueImages[index],
         isPremium: false,
         moodTags: todayMoods,
       };
@@ -1372,133 +1377,43 @@ export function generateMissionsFallback(todayMoods: string[]): Mission[] {
     ? SUBSCRIPTION_LIMITS.premium.missionsPerGeneration
     : SUBSCRIPTION_LIMITS.free.missionsPerGeneration;
 
-  // Language-specific fallback missions (5 missions for premium, 3 for free)
-  const allFallbackMissions: Mission[] = language === 'ko'
-    ? [
-        {
-          id: `fallback-${Date.now()}-1`,
-          title: '네컷사진 챌린지',
-          description: '포토부스에서 다양한 포즈로 네컷사진 찍기',
-          category: 'photo' as MissionCategory,
-          tags: ['네컷사진', '포토부스', '추억'],
-          imageUrl: getRandomImage('photo'),
-          isPremium: false,
-          moodTags: todayMoods as any,
-        },
-        {
-          id: `fallback-${Date.now()}-2`,
-          title: '방탈출 카페 도전',
-          description: '협동해서 방탈출 게임 클리어하기',
-          category: 'game' as MissionCategory,
-          tags: ['방탈출', '게임', '협동'],
-          imageUrl: getRandomImage('game'),
-          isPremium: false,
-          moodTags: todayMoods as any,
-        },
-        {
-          id: `fallback-${Date.now()}-3`,
-          title: '분위기 좋은 카페 탐방',
-          description: '인스타 감성 카페에서 음료 마시며 수다 떨기',
-          category: 'cafe' as MissionCategory,
-          tags: ['카페', '감성', '데이트'],
-          imageUrl: getRandomImage('cafe'),
-          isPremium: false,
-          moodTags: todayMoods as any,
-        },
-        {
-          id: `fallback-${Date.now()}-4`,
-          title: '야경 드라이브',
-          description: '밤에 예쁜 야경 보며 드라이브하기',
-          category: 'outdoor' as MissionCategory,
-          tags: ['드라이브', '야경', '로맨틱'],
-          imageUrl: getRandomImage('outdoor'),
-          isPremium: false,
-          moodTags: todayMoods as any,
-        },
-        {
-          id: `fallback-${Date.now()}-5`,
-          title: '함께 요리하기',
-          description: '새로운 레시피로 함께 요리 만들어보기',
-          category: 'home' as MissionCategory,
-          tags: ['요리', '홈쿠킹', '협동'],
-          imageUrl: getRandomImage('home'),
-          isPremium: false,
-          moodTags: todayMoods as any,
-        },
-        {
-          id: `fallback-${Date.now()}-6`,
-          title: '영화관 데이트',
-          description: '최신 영화 보고 감상 나누기',
-          category: 'movie' as MissionCategory,
-          tags: ['영화', '데이트', '문화'],
-          imageUrl: getRandomImage('movie'),
-          isPremium: false,
-          moodTags: todayMoods as any,
-        },
-      ]
-    : [
-        {
-          id: `fallback-${Date.now()}-1`,
-          title: 'Photo Booth Adventure',
-          description: 'Strike fun poses at a photo booth and collect memories',
-          category: 'photo' as MissionCategory,
-          tags: ['photobooth', 'photos', 'memories'],
-          imageUrl: getRandomImage('photo'),
-          isPremium: false,
-          moodTags: todayMoods as any,
-        },
-        {
-          id: `fallback-${Date.now()}-2`,
-          title: 'Escape Room Challenge',
-          description: 'Team up to solve puzzles and escape together',
-          category: 'game' as MissionCategory,
-          tags: ['escaperoom', 'game', 'teamwork'],
-          imageUrl: getRandomImage('game'),
-          isPremium: false,
-          moodTags: todayMoods as any,
-        },
-        {
-          id: `fallback-${Date.now()}-3`,
-          title: 'Cozy Cafe Exploration',
-          description: 'Find a charming cafe and enjoy drinks together',
-          category: 'cafe' as MissionCategory,
-          tags: ['cafe', 'cozy', 'date'],
-          imageUrl: getRandomImage('cafe'),
-          isPremium: false,
-          moodTags: todayMoods as any,
-        },
-        {
-          id: `fallback-${Date.now()}-4`,
-          title: 'Night Drive Adventure',
-          description: 'Take a scenic night drive and enjoy the city lights',
-          category: 'outdoor' as MissionCategory,
-          tags: ['drive', 'nightview', 'romantic'],
-          imageUrl: getRandomImage('outdoor'),
-          isPremium: false,
-          moodTags: todayMoods as any,
-        },
-        {
-          id: `fallback-${Date.now()}-5`,
-          title: 'Cook Together',
-          description: 'Try a new recipe and cook a meal together',
-          category: 'home' as MissionCategory,
-          tags: ['cooking', 'homemade', 'teamwork'],
-          imageUrl: getRandomImage('home'),
-          isPremium: false,
-          moodTags: todayMoods as any,
-        },
-        {
-          id: `fallback-${Date.now()}-6`,
-          title: 'Movie Date Night',
-          description: 'Watch a new movie and share your thoughts',
-          category: 'movie' as MissionCategory,
-          tags: ['movie', 'date', 'culture'],
-          imageUrl: getRandomImage('movie'),
-          isPremium: false,
-          moodTags: todayMoods as any,
-        },
-      ];
+  // Define fallback mission data (without images - images assigned later to prevent duplicates)
+  const fallbackMissionsKo = [
+    { title: '네컷사진 챌린지', description: '포토부스에서 다양한 포즈로 네컷사진 찍기', category: 'photo' as MissionCategory, tags: ['네컷사진', '포토부스', '추억'] },
+    { title: '방탈출 카페 도전', description: '협동해서 방탈출 게임 클리어하기', category: 'game' as MissionCategory, tags: ['방탈출', '게임', '협동'] },
+    { title: '분위기 좋은 카페 탐방', description: '인스타 감성 카페에서 음료 마시며 수다 떨기', category: 'cafe' as MissionCategory, tags: ['카페', '감성', '데이트'] },
+    { title: '야경 드라이브', description: '밤에 예쁜 야경 보며 드라이브하기', category: 'outdoor' as MissionCategory, tags: ['드라이브', '야경', '로맨틱'] },
+    { title: '함께 요리하기', description: '새로운 레시피로 함께 요리 만들어보기', category: 'home' as MissionCategory, tags: ['요리', '홈쿠킹', '협동'] },
+    { title: '영화관 데이트', description: '최신 영화 보고 감상 나누기', category: 'movie' as MissionCategory, tags: ['영화', '데이트', '문화'] },
+  ];
 
-  // Return the appropriate number of missions based on subscription
-  return allFallbackMissions.slice(0, missionCount);
+  const fallbackMissionsEn = [
+    { title: 'Photo Booth Adventure', description: 'Strike fun poses at a photo booth and collect memories', category: 'photo' as MissionCategory, tags: ['photobooth', 'photos', 'memories'] },
+    { title: 'Escape Room Challenge', description: 'Team up to solve puzzles and escape together', category: 'game' as MissionCategory, tags: ['escaperoom', 'game', 'teamwork'] },
+    { title: 'Cozy Cafe Exploration', description: 'Find a charming cafe and enjoy drinks together', category: 'cafe' as MissionCategory, tags: ['cafe', 'cozy', 'date'] },
+    { title: 'Night Drive Adventure', description: 'Take a scenic night drive and enjoy the city lights', category: 'outdoor' as MissionCategory, tags: ['drive', 'nightview', 'romantic'] },
+    { title: 'Cook Together', description: 'Try a new recipe and cook a meal together', category: 'home' as MissionCategory, tags: ['cooking', 'homemade', 'teamwork'] },
+    { title: 'Movie Date Night', description: 'Watch a new movie and share your thoughts', category: 'movie' as MissionCategory, tags: ['movie', 'date', 'culture'] },
+  ];
+
+  const fallbackData = language === 'ko' ? fallbackMissionsKo : fallbackMissionsEn;
+  const slicedData = fallbackData.slice(0, missionCount);
+
+  // Get unique images for all missions at once (prevents duplicates)
+  const categories = slicedData.map((m) => m.category);
+  const uniqueImages = getUniqueRandomImages(categories);
+
+  // Build missions with unique images
+  const allFallbackMissions: Mission[] = slicedData.map((data, index) => ({
+    id: `fallback-${Date.now()}-${index + 1}`,
+    title: data.title,
+    description: data.description,
+    category: data.category,
+    tags: data.tags,
+    imageUrl: uniqueImages[index],
+    isPremium: false,
+    moodTags: todayMoods as any,
+  }));
+
+  return allFallbackMissions;
 }
