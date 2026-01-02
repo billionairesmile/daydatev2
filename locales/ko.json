@@ -373,7 +373,8 @@
       "title": "고객센터",
       "faqTitle": "자주 묻는 질문",
       "inquiryTitle": "궁금한 점이 해소되지 않으셨나요?",
-      "inquiryDescription": "문의를 남겨주시면\n빠르게 답변 드리겠습니다."
+      "inquiryDescription": "문의를 남겨주시면\n빠르게 답변 드리겠습니다.",
+      "comingSoon": "준비중입니다"
     },
     "others": {
       "title": "기타",

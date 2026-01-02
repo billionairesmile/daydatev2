@@ -370,7 +370,8 @@
       "title": "Atención al Cliente",
       "faqTitle": "Preguntas Frecuentes",
       "inquiryTitle": "¿Aún tienes preguntas?",
-      "inquiryDescription": "Déjanos un mensaje\ny te responderemos pronto."
+      "inquiryDescription": "Déjanos un mensaje\ny te responderemos pronto.",
+      "comingSoon": "Próximamente"
     },
     "others": {
       "title": "Otros",
@@ -757,12 +758,12 @@
       "learning": "Aprender"
     },
     "dateWorries": {
-      "no_idea": "Sin ideas",
-      "same_pattern": "Rutina",
-      "budget": "Dinero",
-      "time": "Sin tiempo",
-      "talk": "Conversar",
-      "none": "¡Ninguna!"
+      "no_idea": "No sé qué hacer",
+      "same_pattern": "Siempre las mismas citas",
+      "budget": "Preocupado por el dinero",
+      "time": "No tenemos tiempo",
+      "talk": "Necesitamos hablar más",
+      "none": "¡Sin preocupaciones!"
     },
     "preferencesIntro": {
       "title": "Cuéntanos tus preferencias\npara misiones personalizadas",

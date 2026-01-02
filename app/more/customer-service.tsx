@@ -7,6 +7,7 @@ import {
   ScrollView,
   StatusBar,
   Linking,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -61,8 +62,7 @@ export default function CustomerServiceScreen() {
   };
 
   const handleKakaoTalk = () => {
-    // TODO: 카카오톡 링크 추가 예정
-    // Linking.openURL('https://pf.kakao.com/_example');
+    Alert.alert(t('more.customerService.comingSoon'));
   };
 
   const handleEmail = () => {

@@ -373,7 +373,8 @@
       "title": "カスタマーサービス",
       "faqTitle": "よくある質問",
       "inquiryTitle": "ご不明な点はありますか？",
-      "inquiryDescription": "お問い合わせいただければ\n迅速に対応いたします。"
+      "inquiryDescription": "お問い合わせいただければ\n迅速に対応いたします。",
+      "comingSoon": "準備中です"
     },
     "others": {
       "title": "その他",

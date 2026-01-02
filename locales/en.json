@@ -373,7 +373,8 @@
       "title": "Customer Service",
       "faqTitle": "FAQ",
       "inquiryTitle": "Still have questions?",
-      "inquiryDescription": "Leave us a message\nand we'll respond quickly."
+      "inquiryDescription": "Leave us a message\nand we'll respond quickly.",
+      "comingSoon": "Coming soon"
     },
     "others": {
       "title": "Other",
@@ -760,12 +761,12 @@
       "learning": "Learning"
     },
     "dateWorries": {
-      "no_idea": "No ideas",
-      "same_pattern": "Routine",
-      "budget": "Budget",
-      "time": "No time",
-      "talk": "Need talk",
-      "none": "None!"
+      "no_idea": "Don't know what to do",
+      "same_pattern": "Always the same dates",
+      "budget": "Worried about budget",
+      "time": "Not enough time",
+      "talk": "Need deeper conversations",
+      "none": "No worries at all!"
     },
     "preferencesIntro": {
       "title": "Tell us your preferences\nfor personalized missions",
