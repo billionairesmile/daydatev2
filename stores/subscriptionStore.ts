@@ -792,11 +792,12 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
 
           // Query couples table directly for is_premium status
           // This is more reliable than the RPC which may have different logic
+          // Use maybeSingle() to handle case when couple doesn't exist (returns null instead of error)
           const { data: coupleData, error: coupleError } = await supabase
             .from('couples')
             .select('is_premium, premium_user_id, premium_expires_at')
             .eq('id', coupleId)
-            .single();
+            .maybeSingle();
 
           if (coupleError) {
             console.error('[Subscription] Check couple premium error:', coupleError);
@@ -809,6 +810,12 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
               return get().isPremium;
             }
             return data === true;
+          }
+
+          // If couple doesn't exist, return false (no premium)
+          if (!coupleData) {
+            console.log('[Subscription] Couple not found, returning false');
+            return false;
           }
 
           console.log('[Subscription] Couple premium data:', coupleData);
@@ -852,14 +859,21 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
           });
 
           // Get current profile to check subscription_started_at
+          // Use maybeSingle() to handle case when profile doesn't exist yet (returns null instead of error)
           const { data: profile, error: profileFetchError } = await supabase
             .from('profiles')
             .select('subscription_started_at, couple_id')
             .eq('id', user.id)
-            .single();
+            .maybeSingle();
 
           if (profileFetchError) {
             console.error('[Subscription] Profile fetch error:', profileFetchError);
+            return;
+          }
+
+          // If profile doesn't exist, skip sync (user hasn't completed onboarding yet)
+          if (!profile) {
+            console.log('[Subscription] No profile found for premium check');
             return;
           }
 

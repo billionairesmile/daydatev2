@@ -663,27 +663,64 @@ export const db = {
 
     // Cleanup orphaned pending couples for a user
     // Call this when user successfully connects to a new couple
+    // This function handles FK constraints by nullifying pairing_codes first
     async cleanupPendingCouples(userId: string, excludeCoupleId?: string) {
       const client = getSupabase();
-      let query = client
+
+      // Step 1: Find all pending couples to delete (for logging and FK handling)
+      let findQuery = client
         .from('couples')
-        .delete()
+        .select('id')
         .eq('user1_id', userId)
         .eq('status', 'pending')
         .is('user2_id', null);
 
-      // Exclude the current active couple if provided
       if (excludeCoupleId) {
-        query = query.neq('id', excludeCoupleId);
+        findQuery = findQuery.neq('id', excludeCoupleId);
       }
 
-      const { error } = await query;
-      if (error) {
-        console.warn('[couples.cleanupPendingCouples] Error:', error.message);
-      } else {
-        console.log('[couples.cleanupPendingCouples] Cleaned up pending couples for user:', userId);
+      const { data: pendingCouples, error: findError } = await findQuery;
+
+      if (findError) {
+        console.warn('[couples.cleanupPendingCouples] Error finding pending couples:', findError.message);
+        return { error: findError };
       }
-      return { error };
+
+      if (!pendingCouples || pendingCouples.length === 0) {
+        console.log('[couples.cleanupPendingCouples] No pending couples to clean up for user:', userId);
+        return { error: null };
+      }
+
+      const coupleIds = pendingCouples.map(c => c.id);
+      console.log('[couples.cleanupPendingCouples] Found pending couples to delete:', coupleIds);
+
+      // Step 2: Nullify couple_id in pairing_codes that reference these pending couples
+      // This prevents FK constraint violations when deleting couples
+      const { error: nullifyError } = await client
+        .from('pairing_codes')
+        .update({ couple_id: null })
+        .in('couple_id', coupleIds);
+
+      if (nullifyError) {
+        console.warn('[couples.cleanupPendingCouples] Error nullifying pairing_codes:', nullifyError.message);
+        // Continue anyway - the couple delete might still work if no codes reference it
+      } else {
+        console.log('[couples.cleanupPendingCouples] Nullified pairing_codes referencing pending couples');
+      }
+
+      // Step 3: Delete the pending couples
+      const { error: deleteError } = await client
+        .from('couples')
+        .delete()
+        .in('id', coupleIds);
+
+      if (deleteError) {
+        console.warn('[couples.cleanupPendingCouples] Error deleting pending couples:', deleteError.message);
+      } else {
+        console.log('[couples.cleanupPendingCouples] Successfully deleted pending couples for user:', userId);
+      }
+
+      return { error: deleteError };
     },
   },
 

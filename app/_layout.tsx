@@ -208,6 +208,8 @@ function RootLayoutNav() {
   const lastFetchTime = useRef<number>(0);
   const subscriptionInitialized = useRef(false);
   const languageSynced = useRef(false);
+  // Prevent duplicate disconnect alerts (push notification, realtime, and fetch can all trigger)
+  const disconnectAlertShownRef = useRef(false);
 
   // Initialize push notifications
   usePushNotifications();
@@ -396,6 +398,13 @@ function RootLayoutNav() {
       if (!coupleData) {
         console.log('[Layout] Couple record not found - partner may have deleted their account');
 
+        // Prevent duplicate alerts (push notification, realtime, and fetch can all trigger)
+        if (disconnectAlertShownRef.current) {
+          console.log('[Layout] Disconnect alert already shown, skipping duplicate');
+          return;
+        }
+        disconnectAlertShownRef.current = true;
+
         // Show alert FIRST, then handle state changes on confirm
         // This prevents navigation from happening before alert is shown
         Alert.alert(
@@ -417,6 +426,9 @@ function RootLayoutNav() {
                 if (user?.id) {
                   console.log('[Layout] Deleting pending pairing codes for user:', user.id);
                   await db.pairingCodes.deleteByCreatorId(user.id);
+                  // Clear profile.couple_id in database (partner's unpair cleared theirs, we clear ours)
+                  console.log('[Layout] Clearing profile couple_id for user:', user.id);
+                  await db.profiles.update(user.id, { couple_id: null });
                 }
 
                 // IMPORTANT: Set onboarding step to pairing FIRST
@@ -448,7 +460,21 @@ function RootLayoutNav() {
       // Check if couple was disconnected (soft delete from unpair)
       console.log('[Layout] Checking couple status:', coupleData?.status);
       if (coupleData && coupleData.status === 'disconnected') {
+        // Check if disconnected by self - if so, unpair.tsx already handled notification
+        const wasDisconnectedBySelf = coupleData.disconnected_by === user?.id;
+        if (wasDisconnectedBySelf) {
+          console.log('[Layout] Couple disconnected by self, skipping alert (handled by unpair.tsx)');
+          return;
+        }
+
         console.log('[Layout] Couple is disconnected - partner unpaired, showing alert');
+
+        // Prevent duplicate alerts (push notification, realtime, and fetch can all trigger)
+        if (disconnectAlertShownRef.current) {
+          console.log('[Layout] Disconnect alert already shown, skipping duplicate');
+          return;
+        }
+        disconnectAlertShownRef.current = true;
 
         // Get disconnected_by to show appropriate message
         const wasDisconnectedByPartner = coupleData.disconnected_by && coupleData.disconnected_by !== user?.id;
@@ -475,6 +501,9 @@ function RootLayoutNav() {
                 if (user?.id) {
                   console.log('[Layout] Deleting pending pairing codes for user:', user.id);
                   await db.pairingCodes.deleteByCreatorId(user.id);
+                  // Clear profile.couple_id in database (partner's unpair cleared theirs, we clear ours)
+                  console.log('[Layout] Clearing profile couple_id for user:', user.id);
+                  await db.profiles.update(user.id, { couple_id: null });
                 }
 
                 // IMPORTANT: Set onboarding step to pairing FIRST
@@ -621,6 +650,13 @@ function RootLayoutNav() {
       return () => clearInterval(pollInterval);
     }
   }, [isOnboardingComplete, partner?.nickname, fetchCoupleAndPartnerData]);
+
+  // Reset disconnect alert ref when couple changes (new pairing or logout)
+  useEffect(() => {
+    if (couple?.id) {
+      disconnectAlertShownRef.current = false;
+    }
+  }, [couple?.id]);
 
   // Initialize couple sync when user and couple are available
   useEffect(() => {
@@ -795,6 +831,13 @@ function RootLayoutNav() {
                 return;
               }
 
+              // Prevent duplicate alerts (push notification, realtime, and fetch can all trigger)
+              if (disconnectAlertShownRef.current) {
+                console.log('[Layout] Disconnect alert already shown, skipping duplicate');
+                return;
+              }
+              disconnectAlertShownRef.current = true;
+
               // Show alert FIRST, then handle state changes and navigation on confirm
               // This prevents the navigation effect from triggering before the alert is shown
               console.log('[Layout] Partner disconnected, reason:', coupleData.disconnect_reason);
@@ -806,6 +849,15 @@ function RootLayoutNav() {
                 // Clear couple and partner from local state
                 setCouple(null);
                 setPartner(null);
+
+                // Delete pending pairing codes and clear profile.couple_id
+                if (currentUser?.id) {
+                  console.log('[Layout] Deleting pending pairing codes for user:', currentUser.id);
+                  await db.pairingCodes.deleteByCreatorId(currentUser.id);
+                  // Clear profile.couple_id in database (partner's unpair cleared theirs, we clear ours)
+                  console.log('[Layout] Clearing profile couple_id for user:', currentUser.id);
+                  await db.profiles.update(currentUser.id, { couple_id: null });
+                }
 
                 // IMPORTANT: Set onboarding step to pairing FIRST
                 setOnboardingStep('pairing');

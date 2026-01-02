@@ -1662,6 +1662,7 @@ function PairingStep({
   const setupInProgressRef = React.useRef<boolean>(false); // Mutex to prevent concurrent setup calls
   const coupleCreationInProgressRef = React.useRef<boolean>(false); // Mutex to prevent duplicate couple creation
   const isReconnectionRef = React.useRef<boolean>(false); // Track if this is a 30-day reconnection scenario
+  const pairingCompletedRef = React.useRef<boolean>(false); // Signals pairing completed to prevent race condition
 
   // Reset isPairingConnected on mount based on actual DB state
   React.useEffect(() => {
@@ -1789,6 +1790,37 @@ function PairingStep({
 
           console.log('[PairingStep] Creator setup:', { creatorUserId, isExistingUser });
 
+          // CRITICAL: First check if user is already part of an ACTIVE fully-paired couple
+          // If so, they shouldn't be creating a new pairing code - they should go to home
+          const { data: fullyPairedCouple } = await db.couples.getActiveByUserId(creatorUserId);
+          if (fullyPairedCouple && fullyPairedCouple.user2_id && fullyPairedCouple.status === 'active') {
+            console.log('[PairingStep] User already has active couple, skipping pairing setup:', fullyPairedCouple.id);
+
+            // Ensure profile.couple_id is set correctly
+            await db.profiles.update(creatorUserId, { couple_id: fullyPairedCouple.id });
+
+            // Set couple in authStore
+            setCouple({
+              id: fullyPairedCouple.id,
+              user1Id: fullyPairedCouple.user1_id,
+              user2Id: fullyPairedCouple.user2_id,
+              anniversaryDate: fullyPairedCouple.dating_start_date ? parseDateAsLocal(fullyPairedCouple.dating_start_date) : undefined,
+              datingStartDate: fullyPairedCouple.dating_start_date ? parseDateAsLocal(fullyPairedCouple.dating_start_date) : undefined,
+              weddingDate: fullyPairedCouple.wedding_date ? parseDateAsLocal(fullyPairedCouple.wedding_date) : undefined,
+              anniversaryType: t('onboarding.anniversary.datingStart'),
+              status: 'active',
+              createdAt: fullyPairedCouple.created_at ? new Date(fullyPairedCouple.created_at) : new Date(),
+            });
+
+            // Cleanup any orphan pending couples
+            await db.couples.cleanupPendingCouples(creatorUserId, fullyPairedCouple.id);
+
+            // Navigate directly to home
+            setIsOnboardingComplete(true);
+            router.replace('/(tabs)');
+            return;
+          }
+
           // First, check if there's an existing valid pending code for this user
           const { data: existingCode } = await db.pairingCodes.getValidPendingCode(creatorUserId);
 
@@ -1896,13 +1928,13 @@ function PairingStep({
               }
             } else {
               // Partner exists but couple was unpaired (by either user)
-              // Don't auto-restore and don't delete - leave disconnected couple for partner to see
-              // Partner will see 'disconnected' status and get the correct alert when they open app
-              // Disconnected couples auto-expire after 30 days
-              console.log('[PairingStep] Couple was unpaired, leaving disconnected for partner to see:', disconnectedCouple.id);
-              // Just clear local couple state so user can create new pairing
-              setCouple(null);
-              setPartner(null);
+              // DON'T link the pairing code to the disconnected couple here
+              // The 30-day reconnection logic is handled in the JOINER flow (handleJoinCode)
+              // This allows the creator to pair with a NEW partner if desired
+              // If the original partner enters the code, the joiner flow will restore the couple
+              console.log('[PairingStep] Found disconnected couple with partner, but not linking to it');
+              console.log('[PairingStep] 30-day reconnection will be handled if original partner enters the code');
+              // Continue to create a new couple below - joiner flow will handle reconnection if applicable
             }
           }
 
@@ -2001,9 +2033,90 @@ function PairingStep({
                 status: doubleCheckCouple.user2_id ? 'active' : 'pending',
                 createdAt: doubleCheckCouple.created_at ? new Date(doubleCheckCouple.created_at) : new Date(),
               });
+
+              // CRITICAL: Update creator's profile with couple_id
+              // This ensures profile.couple_id is set even when reusing existing pending couple
+              console.log('[PairingStep] Updating creator profile with existing couple_id:', doubleCheckCouple.id);
+              await db.profiles.update(creatorUserId, { couple_id: doubleCheckCouple.id });
+
               setIsCodeSaved(true);
               return;
             }
+
+            // DOUBLE-CHECK: Before creating a new couple, verify user doesn't already have an active one
+            // This handles race conditions where pairing completed while this code was running
+            const { data: lastMinuteActiveCouple } = await db.couples.getActiveByUserId(creatorUserId);
+            if (lastMinuteActiveCouple && lastMinuteActiveCouple.user2_id && lastMinuteActiveCouple.status === 'active') {
+              console.log('[PairingStep] RACE CONDITION PREVENTED: User already has active couple:', lastMinuteActiveCouple.id);
+
+              // Update profile and navigate to home
+              await db.profiles.update(creatorUserId, { couple_id: lastMinuteActiveCouple.id });
+              setCouple({
+                id: lastMinuteActiveCouple.id,
+                user1Id: lastMinuteActiveCouple.user1_id,
+                user2Id: lastMinuteActiveCouple.user2_id,
+                anniversaryDate: lastMinuteActiveCouple.dating_start_date ? parseDateAsLocal(lastMinuteActiveCouple.dating_start_date) : undefined,
+                datingStartDate: lastMinuteActiveCouple.dating_start_date ? parseDateAsLocal(lastMinuteActiveCouple.dating_start_date) : undefined,
+                weddingDate: lastMinuteActiveCouple.wedding_date ? parseDateAsLocal(lastMinuteActiveCouple.wedding_date) : undefined,
+                anniversaryType: t('onboarding.anniversary.datingStart'),
+                status: 'active',
+                createdAt: lastMinuteActiveCouple.created_at ? new Date(lastMinuteActiveCouple.created_at) : new Date(),
+              });
+              await db.couples.cleanupPendingCouples(creatorUserId, lastMinuteActiveCouple.id);
+              setIsOnboardingComplete(true);
+              router.replace('/(tabs)');
+              return;
+            }
+
+            // === RACE CONDITION PREVENTION (Layer 1 & 2) ===
+            // Layer 1: Check if realtime/polling already detected pairing completion
+            if (pairingCompletedRef.current) {
+              console.log('[PairingStep] RACE PREVENTED (Layer 1): pairingCompletedRef is true');
+              const { data: activeViaRef } = await db.couples.getActiveByUserId(creatorUserId);
+              if (activeViaRef?.status === 'active' && activeViaRef.user2_id) {
+                await db.profiles.update(creatorUserId, { couple_id: activeViaRef.id });
+                setCouple({
+                  id: activeViaRef.id,
+                  user1Id: activeViaRef.user1_id,
+                  user2Id: activeViaRef.user2_id,
+                  anniversaryDate: activeViaRef.dating_start_date ? parseDateAsLocal(activeViaRef.dating_start_date) : undefined,
+                  datingStartDate: activeViaRef.dating_start_date ? parseDateAsLocal(activeViaRef.dating_start_date) : undefined,
+                  weddingDate: activeViaRef.wedding_date ? parseDateAsLocal(activeViaRef.wedding_date) : undefined,
+                  anniversaryType: t('onboarding.anniversary.datingStart'),
+                  status: 'active',
+                  createdAt: activeViaRef.created_at ? new Date(activeViaRef.created_at) : new Date(),
+                });
+                await db.couples.cleanupPendingCouples(creatorUserId, activeViaRef.id);
+                setIsOnboardingComplete(true);
+                router.replace('/(tabs)');
+              }
+              return;
+            }
+
+            // Layer 2: Check if profile already has active couple_id (handles remount scenario)
+            const { data: profileForRaceCheck } = await db.profiles.get(creatorUserId);
+            if (profileForRaceCheck?.couple_id) {
+              const { data: coupleFromProfile } = await db.couples.get(profileForRaceCheck.couple_id);
+              if (coupleFromProfile?.status === 'active' && coupleFromProfile.user2_id) {
+                console.log('[PairingStep] RACE PREVENTED (Layer 2): Profile has active couple_id:', profileForRaceCheck.couple_id);
+                setCouple({
+                  id: coupleFromProfile.id,
+                  user1Id: coupleFromProfile.user1_id,
+                  user2Id: coupleFromProfile.user2_id,
+                  anniversaryDate: coupleFromProfile.dating_start_date ? parseDateAsLocal(coupleFromProfile.dating_start_date) : undefined,
+                  datingStartDate: coupleFromProfile.dating_start_date ? parseDateAsLocal(coupleFromProfile.dating_start_date) : undefined,
+                  weddingDate: coupleFromProfile.wedding_date ? parseDateAsLocal(coupleFromProfile.wedding_date) : undefined,
+                  anniversaryType: t('onboarding.anniversary.datingStart'),
+                  status: 'active',
+                  createdAt: coupleFromProfile.created_at ? new Date(coupleFromProfile.created_at) : new Date(),
+                });
+                await db.couples.cleanupPendingCouples(creatorUserId, coupleFromProfile.id);
+                setIsOnboardingComplete(true);
+                router.replace('/(tabs)');
+                return;
+              }
+            }
+            // === END RACE CONDITION PREVENTION ===
 
             // Get device timezone for the couple (creator's timezone)
             let deviceTimezone = 'Asia/Seoul'; // fallback
@@ -2056,8 +2169,37 @@ function PairingStep({
                 timezone: deviceTimezone,
               });
 
-              // CRITICAL: Update creator's profile with couple_id immediately
-              // This ensures the profile has the couple_id even if onboarding is interrupted
+              // === LAYER 3: Final validation before profile update ===
+              // Verify profile doesn't already have active couple before updating
+              const { data: finalProfileCheck } = await db.profiles.get(creatorUserId);
+              if (finalProfileCheck?.couple_id && finalProfileCheck.couple_id !== newCouple.id) {
+                const { data: finalCoupleCheck } = await db.couples.get(finalProfileCheck.couple_id);
+                if (finalCoupleCheck?.status === 'active' && finalCoupleCheck.user2_id) {
+                  console.log('[PairingStep] RACE DETECTED (Layer 3): Active couple exists, rolling back pending couple');
+                  // Delete the pending couple we just created
+                  if (supabase) {
+                    await supabase.from('couples').delete().eq('id', newCouple.id);
+                  }
+                  // Use the active couple instead
+                  setCouple({
+                    id: finalCoupleCheck.id,
+                    user1Id: finalCoupleCheck.user1_id,
+                    user2Id: finalCoupleCheck.user2_id,
+                    anniversaryDate: finalCoupleCheck.dating_start_date ? parseDateAsLocal(finalCoupleCheck.dating_start_date) : undefined,
+                    datingStartDate: finalCoupleCheck.dating_start_date ? parseDateAsLocal(finalCoupleCheck.dating_start_date) : undefined,
+                    weddingDate: finalCoupleCheck.wedding_date ? parseDateAsLocal(finalCoupleCheck.wedding_date) : undefined,
+                    anniversaryType: t('onboarding.anniversary.datingStart'),
+                    status: 'active',
+                    createdAt: finalCoupleCheck.created_at ? new Date(finalCoupleCheck.created_at) : new Date(),
+                  });
+                  await db.couples.cleanupPendingCouples(creatorUserId, finalCoupleCheck.id);
+                  setIsOnboardingComplete(true);
+                  router.replace('/(tabs)');
+                  return;
+                }
+              }
+
+              // Safe to update profile.couple_id
               console.log('[PairingStep] Updating creator profile with couple_id:', newCouple.id);
               const { error: profileCoupleError } = await db.profiles.update(creatorUserId, {
                 couple_id: newCouple.id,
@@ -2067,6 +2209,7 @@ function PairingStep({
               } else {
                 console.log('[PairingStep] Successfully updated creator profile with couple_id');
               }
+              // === END LAYER 3 ===
 
               // Sync timezone to timezoneStore so it's immediately effective
               useTimezoneStore.getState().syncFromCouple(deviceTimezone);
@@ -2116,6 +2259,8 @@ function PairingStep({
             }
 
             if (payload.status === 'connected' && payload.joiner_id) {
+              // CRITICAL: Set immediately to prevent race condition with setupPairing
+              pairingCompletedRef.current = true;
               console.log('[PairingStep] Creator: Realtime detected partner connection');
               console.log('[PairingStep] Creator: joiner_id =', payload.joiner_id, 'payload.couple_id =', payload.couple_id);
 
@@ -2275,6 +2420,18 @@ function PairingStep({
                 );
               } else {
                 console.log('[PairingStep] Creator: Partner connected, navigating to next screen');
+
+                // CRITICAL: Update creator's profile.couple_id to the active couple
+                // The pending couple was created during code generation, but now we have an active couple
+                if (creatorId && actualCoupleData?.id) {
+                  console.log('[PairingStep] Updating creator profile couple_id to active couple:', actualCoupleData.id);
+                  await db.profiles.update(creatorId, { couple_id: actualCoupleData.id });
+
+                  // Cleanup orphaned pending couples for creator
+                  console.log('[PairingStep] Cleaning up creator orphaned pending couples');
+                  await db.couples.cleanupPendingCouples(creatorId, actualCoupleData.id);
+                }
+
                 onNext(); // Auto-navigate when partner joins (normal new pairing)
               }
             }
@@ -2414,6 +2571,8 @@ function PairingStep({
               .single();
 
             if (checkData?.status === 'connected' && checkData.joiner_id) {
+              // CRITICAL: Set immediately to prevent race condition with setupPairing
+              pairingCompletedRef.current = true;
               console.log('[PairingStep] Polling detected partner connection');
 
               // Use couple_id from pairing code (not from store - store might have old data)
@@ -2448,6 +2607,18 @@ function PairingStep({
                       preferences: joinerProfile?.preferences || {},
                       createdAt: joinerProfile?.created_at ? new Date(joinerProfile.created_at) : new Date(),
                     });
+                  }
+
+                  // CRITICAL: Update creator's profile.couple_id and cleanup pending couples
+                  // This mirrors the realtime handler logic to ensure consistency
+                  const pollingCreatorId = currentUser?.id;
+                  if (pollingCreatorId) {
+                    console.log('[PairingStep] Polling: Updating creator profile couple_id:', coupleData.id);
+                    await db.profiles.update(pollingCreatorId, { couple_id: coupleData.id });
+
+                    // Cleanup orphaned pending couples for creator
+                    console.log('[PairingStep] Polling: Cleaning up creator orphaned pending couples');
+                    await db.couples.cleanupPendingCouples(pollingCreatorId, coupleData.id);
                   }
                 }
               }
@@ -2790,11 +2961,19 @@ function PairingStep({
                 console.error('[PairingStep] Failed to join pairing code:', joinError);
               }
 
-              // Cleanup orphaned pending couples for PARTNER only (they created the reconnection code)
-              // NOTE: This must happen AFTER setCoupleId and join to avoid FK cascade race condition
-              // The FK cascade (ON DELETE SET NULL) would set couple_id to NULL if we delete first
+              // CRITICAL: Update both joiner's and partner's profile.couple_id to restored couple
+              // This ensures both profiles point to the active couple in DB
+              console.log('[PairingStep] Updating joiner profile couple_id to restored couple:', restoredCouple.id);
+              await db.profiles.update(joinerId, { couple_id: restoredCouple.id });
+              console.log('[PairingStep] Updating partner profile couple_id to restored couple:', restoredCouple.id);
+              await db.profiles.update(partnerId, { couple_id: restoredCouple.id });
+
+              // Cleanup orphaned pending couples for both PARTNER and JOINER
+              // NOTE: This must happen AFTER profile updates to avoid stale couple_id references
               console.log('[PairingStep] Reconnection cleanup: removing partner orphaned pending couples');
               await db.couples.cleanupPendingCouples(partnerId, restoredCouple.id);
+              console.log('[PairingStep] Reconnection cleanup: removing joiner orphaned pending couples');
+              await db.couples.cleanupPendingCouples(joinerId, restoredCouple.id);
 
               // Check if joiner's profile is complete
               const hasCompleteBirthDate = !!joinerProfile.birth_date;
@@ -2940,8 +3119,8 @@ function PairingStep({
           createdAt: updatedCouple.created_at ? new Date(updatedCouple.created_at) : new Date(),
         });
 
-        // CRITICAL: Update joiner's profile with couple_id immediately
-        // This ensures the profile has the couple_id even if onboarding is interrupted
+        // CRITICAL: Update BOTH joiner's AND creator's profile with couple_id immediately
+        // This ensures both profiles have the correct couple_id even if onboarding is interrupted
         console.log('[PairingStep] Updating joiner profile with couple_id:', updatedCouple.id);
         const { error: joinerProfileCoupleError } = await db.profiles.update(joinerId, {
           couple_id: updatedCouple.id,
@@ -2950,6 +3129,18 @@ function PairingStep({
           console.error('[PairingStep] Error updating joiner profile couple_id:', joinerProfileCoupleError);
         } else {
           console.log('[PairingStep] Successfully updated joiner profile with couple_id');
+        }
+
+        // CRITICAL: Also update creator's profile.couple_id to the active couple
+        // The creator might have profile.couple_id pointing to the old pending couple
+        console.log('[PairingStep] Updating creator profile with couple_id:', updatedCouple.id);
+        const { error: creatorProfileCoupleError } = await db.profiles.update(updatedCouple.user1_id, {
+          couple_id: updatedCouple.id,
+        });
+        if (creatorProfileCoupleError) {
+          console.error('[PairingStep] Error updating creator profile couple_id:', creatorProfileCoupleError);
+        } else {
+          console.log('[PairingStep] Successfully updated creator profile with couple_id');
         }
 
         // Fetch partner (creator) profile from DB to get their nickname and birthDate
@@ -2976,14 +3167,14 @@ function PairingStep({
           createdAt: creatorProfile?.created_at ? new Date(creatorProfile.created_at) : new Date(),
         });
 
-        // Cleanup orphaned pending couples for CREATOR only
+        // Cleanup orphaned pending couples for both CREATOR and JOINER
         // - Creator might have old pending couples from previous pairing attempts
-        // NOTE: We intentionally do NOT clean up joiner's pending couples here because:
-        // 1. The joiner's pairing code might still be used by someone else (race condition)
-        // 2. FK constraint (ON DELETE SET NULL) would invalidate their code if we delete the couple
-        // 3. Joiner's pending couples will be cleaned up when they create a new code or expire naturally
+        // - Joiner might have created their own code/couple before joining someone else's
+        // Note: Joiner's pairing codes are already deleted above (line 2872), so FK cascade is not a concern
         console.log('[PairingStep] Cleaning up creator orphaned pending couples');
         await db.couples.cleanupPendingCouples(updatedCouple.user1_id, updatedCouple.id);
+        console.log('[PairingStep] Cleaning up joiner orphaned pending couples');
+        await db.couples.cleanupPendingCouples(joinerId, updatedCouple.id);
       }
 
       console.log('[PairingStep] Setting isPairingConnected to true');

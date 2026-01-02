@@ -1172,8 +1172,12 @@ export default function MissionDetailScreen() {
       completeTodayMission(mission.id);
 
       // Auto-save to memory when completed via realtime sync
-      // Only photo taker (isPhotoTaker) saves to avoid duplicates
-      if (!memorySavedRef.current && capturedPhoto && user1Message && user2Message && isPhotoTaker) {
+      // Both users can trigger auto-save, but we check for duplicates before saving to DB
+      // Previously only photo taker could save, but this caused issues when photo taker wasn't on page
+      if (!memorySavedRef.current && capturedPhoto && user1Message && user2Message) {
+        // Prefer photo taker to save, but allow partner to save if photo taker hasn't
+        // This ensures memory is saved even if photo taker leaves the page
+        console.log('[MissionComplete] Auto-save triggered:', { isPhotoTaker, capturedPhoto: !!capturedPhoto });
         memorySavedRef.current = true;
 
         const autoSave = async () => {
@@ -1195,6 +1199,28 @@ export default function MissionDetailScreen() {
           };
 
           if (!isDemoMode && couple?.id) {
+            // Check if memory already exists for this mission today (prevent duplicates from both users)
+            const today = new Date().toISOString().split('T')[0];
+            const { data: existingMemories } = await db.completedMissions.getAll(couple.id);
+            const alreadyExists = existingMemories?.some((m: { mission_data: unknown; completed_at: string | null }) => {
+              const missionData = m.mission_data as { id?: string } | null;
+              const completedDate = m.completed_at ? new Date(m.completed_at).toISOString().split('T')[0] : null;
+              return missionData?.id === mission.id && completedDate === today;
+            });
+
+            if (alreadyExists) {
+              console.log('[MissionComplete] Memory already exists for this mission today, skipping duplicate save');
+              // Still add to local store if not present
+              const localMemoryStore = useMemoryStore.getState();
+              const localExists = localMemoryStore.memories.some(m => m.missionId === mission.id &&
+                new Date(m.completedAt).toISOString().split('T')[0] === today);
+              if (!localExists) {
+                addMemory(newMemory);
+              }
+              clearInProgressMission(mission.id);
+              return;
+            }
+
             // Check subscription limit for mission completion
             const subscriptionStore = useSubscriptionStore.getState();
             const canComplete = await subscriptionStore.canCompleteMission(couple.id);
