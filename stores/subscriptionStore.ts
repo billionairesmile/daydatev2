@@ -790,16 +790,43 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
         try {
           if (!supabase) return get().isPremium;
 
-          const { data, error } = await supabase.rpc('is_couple_premium', {
-            p_couple_id: coupleId,
-          });
+          // Query couples table directly for is_premium status
+          // This is more reliable than the RPC which may have different logic
+          const { data: coupleData, error: coupleError } = await supabase
+            .from('couples')
+            .select('is_premium, premium_user_id, premium_expires_at')
+            .eq('id', coupleId)
+            .single();
 
-          if (error) {
-            console.error('[Subscription] Check couple premium error:', error);
-            return get().isPremium;
+          if (coupleError) {
+            console.error('[Subscription] Check couple premium error:', coupleError);
+            // Fallback to RPC
+            const { data, error } = await supabase.rpc('is_couple_premium', {
+              p_couple_id: coupleId,
+            });
+            if (error) {
+              console.error('[Subscription] RPC fallback error:', error);
+              return get().isPremium;
+            }
+            return data === true;
           }
 
-          return data === true;
+          console.log('[Subscription] Couple premium data:', coupleData);
+
+          // Check if couple has premium and it hasn't expired
+          if (coupleData?.is_premium) {
+            // If there's an expiry date, check if it's still valid
+            if (coupleData.premium_expires_at) {
+              const expiryDate = new Date(coupleData.premium_expires_at);
+              const isValid = expiryDate > new Date();
+              console.log('[Subscription] Premium expiry check:', { expiryDate, isValid });
+              return isValid;
+            }
+            // No expiry date means lifetime/admin-granted premium
+            return true;
+          }
+
+          return false;
         } catch (error) {
           console.error('[Subscription] Check couple premium error:', error);
           return get().isPremium;
@@ -836,8 +863,15 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
             return;
           }
 
+          // Get couple_id from profile or authStore (fallback for newly paired users)
+          const { useAuthStore } = await import('./authStore');
+          const authCouple = useAuthStore.getState().couple;
+          const coupleId = profile?.couple_id || authCouple?.id;
+
           console.log('[Subscription] Profile data:', {
-            couple_id: profile?.couple_id,
+            profile_couple_id: profile?.couple_id,
+            authStore_couple_id: authCouple?.id,
+            effective_couple_id: coupleId,
             subscription_started_at: profile?.subscription_started_at,
           });
 
@@ -872,7 +906,7 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
           }
 
           // Update couples table if user has a couple
-          if (profile?.couple_id) {
+          if (coupleId) {
             const coupleUpdate: Record<string, unknown> = {
               is_premium: state.isPremium,
               premium_expires_at: state.expiryDate?.toISOString() || null,
@@ -887,7 +921,7 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
               const { data: coupleData } = await supabase
                 .from('couples')
                 .select('premium_user_id')
-                .eq('id', profile.couple_id)
+                .eq('id', coupleId)
                 .single();
 
               // Only clear if this user was the premium user
@@ -896,12 +930,12 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
               }
             }
 
-            console.log('[Subscription] Updating couple with:', coupleUpdate, 'for couple_id:', profile.couple_id);
+            console.log('[Subscription] Updating couple with:', coupleUpdate, 'for couple_id:', coupleId);
 
             const { error: coupleError, data: coupleResult } = await supabase
               .from('couples')
               .update(coupleUpdate)
-              .eq('id', profile.couple_id)
+              .eq('id', coupleId)
               .select();
 
             if (coupleError) {
