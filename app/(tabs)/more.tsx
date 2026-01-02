@@ -6,7 +6,6 @@ import {
   Dimensions,
   Pressable,
   ScrollView,
-  Alert,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Image as ExpoImage } from 'expo-image';
@@ -15,21 +14,17 @@ import {
   Heart,
   Settings,
   ChevronRight,
-  RotateCcw,
   Megaphone,
   Headphones,
   FileText,
-  Trash2,
   Crown,
 } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { COLORS, SPACING } from '@/constants/design';
 import { useBackground } from '@/contexts';
-import { useAuthStore, useOnboardingStore, useMissionStore, useSubscriptionStore } from '@/stores';
-import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
+import { useSubscriptionStore } from '@/stores';
 import { PremiumSubscriptionModal } from '@/components/premium';
 
 const { width, height } = Dimensions.get('window');
@@ -50,106 +45,12 @@ export default function MoreScreen() {
   const { t } = useTranslation();
   const { backgroundImage } = useBackground();
   const router = useRouter();
-  const resetOnboarding = useOnboardingStore((state) => state.reset);
-  const setIsOnboardingComplete = useAuthStore((state) => state.setIsOnboardingComplete);
-  const resetAllTodayMissions = useMissionStore((state) => state.resetAllTodayMissions);
-  const resetAuth = useAuthStore((state) => state.reset);
-  const coupleSyncCleanup = useCoupleSyncStore((state) => state.cleanup);
-  const resetAllMissions = useCoupleSyncStore((state) => state.resetAllMissions);
-  const { isPremium, partnerIsPremium, plan, resetDailyUsage } = useSubscriptionStore();
+  const { isPremium, partnerIsPremium, plan } = useSubscriptionStore();
   // Combined premium status - user has premium benefits if they OR their partner has premium
   const hasPremiumAccess = isPremium || partnerIsPremium;
-  const couple = useAuthStore((state) => state.couple);
 
   // Premium modal state
   const [showPremiumModal, setShowPremiumModal] = React.useState(false);
-
-  const handleDevReset = () => {
-    Alert.alert(
-      t('more.alerts.devReset'),
-      t('more.alerts.devResetMessage'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('common.reset'),
-          style: 'destructive',
-          onPress: async () => {
-            resetOnboarding();
-            setIsOnboardingComplete(false);
-            // Reset home tutorial so it shows again after onboarding
-            await AsyncStorage.removeItem('hasSeenHomeTutorial');
-            router.replace('/(auth)/onboarding');
-          },
-        },
-      ]
-    );
-  };
-
-  const handleMissionReset = () => {
-    Alert.alert(
-      t('more.alerts.missionReset'),
-      t('more.alerts.missionResetMessage'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('common.reset'),
-          style: 'destructive',
-          onPress: async () => {
-            // Reset local mission store
-            resetAllTodayMissions();
-            // Reset synced missions (coupleSyncStore + database)
-            await resetAllMissions();
-            // Reset daily usage (generation count) so missions can be generated again
-            if (couple?.id) {
-              await resetDailyUsage(couple.id);
-            }
-            Alert.alert(
-              t('more.alerts.missionResetComplete'),
-              t('more.alerts.missionResetCompleteMessage'),
-              [{ text: t('common.confirm') }]
-            );
-          },
-        },
-      ]
-    );
-  };
-
-  const handleFullReset = () => {
-    Alert.alert(
-      t('more.alerts.fullReset'),
-      t('more.alerts.fullResetMessage'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('common.reset'),
-          style: 'destructive',
-          onPress: async () => {
-            // 1. 커플 동기화 정리
-            coupleSyncCleanup();
-            // 2. 온보딩 리셋
-            resetOnboarding();
-            // 3. 미션 리셋
-            resetAllTodayMissions();
-            // 4. Auth 리셋
-            resetAuth();
-            // 5. AsyncStorage 완전 삭제
-            await AsyncStorage.clear();
-
-            Alert.alert(
-              t('more.alerts.fullResetComplete'),
-              t('more.alerts.fullResetCompleteMessage'),
-              [
-                {
-                  text: t('common.confirm'),
-                  onPress: () => router.replace('/(auth)/onboarding'),
-                },
-              ]
-            );
-          },
-        },
-      ]
-    );
-  };
 
   const menuSections: MenuSectionType[] = [
     {
@@ -171,14 +72,6 @@ export default function MoreScreen() {
         { icon: Megaphone, label: t('more.menu.announcements'), onPress: () => router.push('/more/announcements') },
         { icon: Headphones, label: t('more.menu.customerService'), onPress: () => router.push('/more/customer-service') },
         { icon: FileText, label: t('settings.other.termsAndPolicies'), onPress: () => router.push('/more/terms') },
-      ],
-    },
-    {
-      title: t('more.sections.developer'),
-      items: [
-        { icon: RotateCcw, label: t('more.menu.onboardingReset'), onPress: handleDevReset },
-        { icon: RotateCcw, label: t('more.menu.missionReset'), onPress: handleMissionReset },
-        { icon: Trash2, label: t('more.menu.fullReset'), onPress: handleFullReset },
       ],
     },
   ];

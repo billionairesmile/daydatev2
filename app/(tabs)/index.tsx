@@ -183,13 +183,26 @@ function SwipeableAnniversaryCard({ anniversary, onEdit, onDelete, isCustom, t }
     );
   };
 
+  // Calculate dynamic font size for long labels (EN, ES tend to be longer)
+  const getLabelFontSize = (label: string) => {
+    const length = label.length;
+    if (length > 25) return 12;
+    if (length > 20) return 13;
+    if (length > 15) return 14;
+    return 15;
+  };
+
+  const labelFontSize = getLabelFontSize(anniversary.label);
+
   const cardContent = (
     <View style={[swipeStyles.card, { backgroundColor: anniversary.bgColor }]}>
       <View style={swipeStyles.cardContent}>
         <View style={swipeStyles.cardLeft}>
           <Text style={swipeStyles.icon}>{anniversary.icon}</Text>
-          <View>
-            <Text style={swipeStyles.label}>{anniversary.label}</Text>
+          <View style={swipeStyles.labelContainer}>
+            <Text style={[swipeStyles.label, { fontSize: labelFontSize }]} numberOfLines={1}>
+              {anniversary.label}
+            </Text>
             <Text style={swipeStyles.date}>{anniversary.date}</Text>
           </View>
         </View>
@@ -289,6 +302,11 @@ const swipeStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    flex: 1,
+    marginRight: 8,
+  },
+  labelContainer: {
+    flex: 1,
   },
   icon: {
     fontSize: 28,
