@@ -32,12 +32,12 @@ import type {
 // RevenueCat configuration
 const REVENUECAT_API_KEY_IOS = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY_IOS || '';
 const REVENUECAT_API_KEY_ANDROID = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID || '';
-const ENTITLEMENT_ID = 'premium';
+const ENTITLEMENT_ID = 'daydate Premium';
 
-// Product identifiers
+// Product identifiers (must match RevenueCat dashboard)
 export const PRODUCT_IDS = {
-  MONTHLY: 'daydate_monthly',
-  ANNUAL: 'daydate_annual',
+  MONTHLY: 'monthly',
+  ANNUAL: 'yearly',
 } as const;
 
 // Subscription limits
@@ -353,12 +353,30 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
           set({ isLoading: true, error: null });
 
           const offerings = get().offerings || (await Purchases.getOfferings());
-          const monthlyPackage = offerings.current?.availablePackages.find(
+
+          // Debug: Log available packages
+          console.log('[Subscription] Current offering:', offerings.current?.identifier);
+          console.log('[Subscription] Available packages:', offerings.current?.availablePackages.map(
+            (pkg: PurchasesPackage) => `${pkg.identifier}: ${pkg.product.identifier}`
+          ));
+
+          // Try to find monthly package by product ID first, then by package type
+          let monthlyPackage = offerings.current?.availablePackages.find(
             (pkg: PurchasesPackage) => pkg.product.identifier === PRODUCT_IDS.MONTHLY
           );
 
+          // Fallback: try to find by package identifier (e.g., '$rc_monthly')
           if (!monthlyPackage) {
-            throw new Error('Monthly package not found');
+            monthlyPackage = offerings.current?.availablePackages.find(
+              (pkg: PurchasesPackage) => pkg.identifier === '$rc_monthly' || pkg.identifier.toLowerCase().includes('monthly')
+            );
+          }
+
+          if (!monthlyPackage) {
+            const availableIds = offerings.current?.availablePackages.map(
+              (pkg: PurchasesPackage) => pkg.product.identifier
+            ).join(', ') || 'none';
+            throw new Error(`Monthly package not found. Available products: ${availableIds}`);
           }
 
           const { customerInfo } = await Purchases.purchasePackage(monthlyPackage);
@@ -405,12 +423,30 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
           set({ isLoading: true, error: null });
 
           const offerings = get().offerings || (await Purchases.getOfferings());
-          const annualPackage = offerings.current?.availablePackages.find(
+
+          // Debug: Log available packages
+          console.log('[Subscription] Current offering:', offerings.current?.identifier);
+          console.log('[Subscription] Available packages:', offerings.current?.availablePackages.map(
+            (pkg: PurchasesPackage) => `${pkg.identifier}: ${pkg.product.identifier}`
+          ));
+
+          // Try to find annual package by product ID first, then by package type
+          let annualPackage = offerings.current?.availablePackages.find(
             (pkg: PurchasesPackage) => pkg.product.identifier === PRODUCT_IDS.ANNUAL
           );
 
+          // Fallback: try to find by package identifier (e.g., '$rc_annual')
           if (!annualPackage) {
-            throw new Error('Annual package not found');
+            annualPackage = offerings.current?.availablePackages.find(
+              (pkg: PurchasesPackage) => pkg.identifier === '$rc_annual' || pkg.identifier.toLowerCase().includes('annual')
+            );
+          }
+
+          if (!annualPackage) {
+            const availableIds = offerings.current?.availablePackages.map(
+              (pkg: PurchasesPackage) => pkg.product.identifier
+            ).join(', ') || 'none';
+            throw new Error(`Annual package not found. Available products: ${availableIds}`);
           }
 
           const { customerInfo } = await Purchases.purchasePackage(annualPackage);
@@ -775,23 +811,109 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
           if (!supabase) return;
 
           const { data: { user } } = await supabase.auth.getUser();
-          if (!user) return;
+          if (!user) {
+            console.log('[Subscription] No user found, skipping sync');
+            return;
+          }
 
           const state = get();
-          const { error } = await supabase
+          console.log('[Subscription] Syncing to database:', {
+            isPremium: state.isPremium,
+            plan: state.plan,
+            expiryDate: state.expiryDate?.toISOString(),
+            customerId: state.customerInfo?.originalAppUserId,
+          });
+
+          // Get current profile to check subscription_started_at
+          const { data: profile, error: profileFetchError } = await supabase
             .from('profiles')
-            .update({
-              subscription_plan: state.plan,
-              subscription_expires_at: state.expiryDate?.toISOString() || null,
-              subscription_started_at: state.isPremium && !state.expiryDate
-                ? new Date().toISOString()
-                : undefined,
-            })
+            .select('subscription_started_at, couple_id')
+            .eq('id', user.id)
+            .single();
+
+          if (profileFetchError) {
+            console.error('[Subscription] Profile fetch error:', profileFetchError);
+            return;
+          }
+
+          console.log('[Subscription] Profile data:', {
+            couple_id: profile?.couple_id,
+            subscription_started_at: profile?.subscription_started_at,
+          });
+
+          // Prepare profile update data
+          const profileUpdate: Record<string, unknown> = {
+            subscription_plan: state.plan,
+            subscription_expires_at: state.expiryDate?.toISOString() || null,
+          };
+
+          // Set subscription_started_at only if premium and not already set
+          if (state.isPremium && !profile?.subscription_started_at) {
+            profileUpdate.subscription_started_at = new Date().toISOString();
+          }
+
+          // Set revenuecat_customer_id from customer info
+          if (state.customerInfo?.originalAppUserId) {
+            profileUpdate.revenuecat_customer_id = state.customerInfo.originalAppUserId;
+          }
+
+          console.log('[Subscription] Updating profile with:', profileUpdate);
+
+          // Update profiles table
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .update(profileUpdate)
             .eq('id', user.id);
 
-          if (error) {
-            console.error('[Subscription] Sync error:', error);
+          if (profileError) {
+            console.error('[Subscription] Profile sync error:', profileError);
+          } else {
+            console.log('[Subscription] Profile updated successfully');
           }
+
+          // Update couples table if user has a couple
+          if (profile?.couple_id) {
+            const coupleUpdate: Record<string, unknown> = {
+              is_premium: state.isPremium,
+              premium_expires_at: state.expiryDate?.toISOString() || null,
+            };
+
+            // Set premium_user_id only if user is premium
+            if (state.isPremium) {
+              coupleUpdate.premium_user_id = user.id;
+            } else {
+              // If user is no longer premium, check if partner is premium
+              // before clearing premium_user_id
+              const { data: coupleData } = await supabase
+                .from('couples')
+                .select('premium_user_id')
+                .eq('id', profile.couple_id)
+                .single();
+
+              // Only clear if this user was the premium user
+              if (coupleData?.premium_user_id === user.id) {
+                coupleUpdate.premium_user_id = null;
+              }
+            }
+
+            console.log('[Subscription] Updating couple with:', coupleUpdate, 'for couple_id:', profile.couple_id);
+
+            const { error: coupleError, data: coupleResult } = await supabase
+              .from('couples')
+              .update(coupleUpdate)
+              .eq('id', profile.couple_id)
+              .select();
+
+            if (coupleError) {
+              console.error('[Subscription] Couple sync error:', coupleError);
+            } else {
+              console.log('[Subscription] Couple updated successfully:', coupleResult);
+            }
+          } else {
+            console.log('[Subscription] No couple_id found, skipping couple sync');
+          }
+
+          console.log('[Subscription] Database sync completed successfully');
         } catch (error) {
           console.error('[Subscription] Sync error:', error);
         }
@@ -837,30 +959,27 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
               });
             }
           } else if (dbPlan === 'free' && state.isPremium) {
-            // Database says free but local state says premium
-            // This can happen if premium expired or was revoked
-            // Check if we should trust RevenueCat or database
-            if (!state.isRevenueCatConfigured) {
-              // RevenueCat not configured, trust database
-              console.log('[Subscription] Downgrading to free based on database (RevenueCat not configured)');
-              set({
-                isPremium: false,
-                plan: 'free',
-                expiryDate: null,
-              });
-            } else {
-              // RevenueCat is configured - check if it also says free
-              // If RevenueCat has no active entitlement, trust database
-              const hasActiveEntitlement = state.customerInfo?.entitlements?.active?.[ENTITLEMENT_ID];
-              if (!hasActiveEntitlement) {
-                console.log('[Subscription] Downgrading to free based on database (RevenueCat also shows no active entitlement)');
-                set({
-                  isPremium: false,
-                  plan: 'free',
-                  expiryDate: null,
-                });
-              }
-            }
+            // Database explicitly says "free" but local state says premium
+            // This can happen if:
+            // 1. Premium expired or was revoked
+            // 2. Admin manually set to free for testing
+            // 3. Subscription was cancelled
+            // IMPORTANT: Trust database when it explicitly says "free" - this is an admin decision
+            // This ensures testing/admin overrides work even with sandbox RevenueCat
+            console.log('[Subscription] Downgrading to free based on database (DB explicitly says free)');
+            set({
+              isPremium: false,
+              plan: 'free',
+              expiryDate: null,
+            });
+          } else if (state.isPremium && dbExpiryDate && dbExpiryDate <= new Date()) {
+            // Database shows expired subscription
+            console.log('[Subscription] Downgrading to free - subscription expired in database');
+            set({
+              isPremium: false,
+              plan: 'free',
+              expiryDate: null,
+            });
           }
         } catch (error) {
           console.error('[Subscription] Load from database error:', error);

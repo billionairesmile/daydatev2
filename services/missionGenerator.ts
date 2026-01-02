@@ -49,6 +49,13 @@ export interface ExcludedMission {
   category: string;
 }
 
+// Custom anniversary type for mission generation
+export interface CustomAnniversaryForMission {
+  label: string;
+  targetDate: Date;
+  isYearly?: boolean;
+}
+
 interface MissionGenerationInput {
   userAPreferences?: OnboardingData;
   userBPreferences?: OnboardingData;
@@ -56,6 +63,7 @@ interface MissionGenerationInput {
   location?: { latitude: number; longitude: number };
   missionHistory?: MissionHistorySummary;  // For deduplication
   excludedMissions?: ExcludedMission[];  // Missions to exclude (for refresh - original missions)
+  customAnniversaries?: CustomAnniversaryForMission[];  // User-created anniversaries
 }
 
 interface GeneratedMissionData {
@@ -404,6 +412,51 @@ function getAnniversaryInfo(
   return { upcoming: upcomingAnniversaries, isToday, todayLabel };
 }
 
+// Check custom (user-created) anniversaries within D-7
+function getCustomAnniversaryInfo(
+  customAnniversaries?: CustomAnniversaryForMission[]
+): AnniversaryInfo {
+  if (!customAnniversaries || customAnniversaries.length === 0) {
+    return { upcoming: [], isToday: false, todayLabel: null };
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const upcomingAnniversaries: string[] = [];
+  let isToday = false;
+  let todayLabel: string | null = null;
+
+  for (const anniversary of customAnniversaries) {
+    let targetDate = new Date(anniversary.targetDate);
+    targetDate.setHours(0, 0, 0, 0);
+
+    // For yearly anniversaries, find the next occurrence
+    if (anniversary.isYearly) {
+      const thisYear = today.getFullYear();
+      targetDate.setFullYear(thisYear);
+
+      // If the date has passed this year, check next year
+      if (targetDate < today) {
+        targetDate.setFullYear(thisYear + 1);
+      }
+    }
+
+    const daysUntil = Math.ceil((targetDate.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+
+    if (daysUntil === 0) {
+      // Today is the anniversary!
+      isToday = true;
+      todayLabel = anniversary.label;
+    } else if (daysUntil > 0 && daysUntil <= 7) {
+      // Within D-7
+      upcomingAnniversaries.push(`${anniversary.label} (D-${daysUntil})`);
+    }
+  }
+
+  return { upcoming: upcomingAnniversaries, isToday, todayLabel };
+}
+
 // ============================================
 // Context Builder (Priority-based)
 // ============================================
@@ -525,14 +578,23 @@ function buildContext(
     input.userAPreferences?.anniversaryDate
   );
 
-  if (anniversaryInfo.isToday && anniversaryInfo.todayLabel) {
+  // Check custom anniversaries (user-created) within D-7
+  const customAnniversaryInfo = getCustomAnniversaryInfo(input.customAnniversaries);
+
+  // Combine all anniversary information
+  const allUpcoming = [...anniversaryInfo.upcoming, ...customAnniversaryInfo.upcoming];
+  const isAnyAnniversaryToday = anniversaryInfo.isToday || customAnniversaryInfo.isToday;
+  const todayLabels = [anniversaryInfo.todayLabel, customAnniversaryInfo.todayLabel].filter(Boolean);
+
+  if (isAnyAnniversaryToday && todayLabels.length > 0) {
     // 기념일 당일! 3개 모두 기념일 관련 미션
-    parts.push(`\n🎊🎊🎊 [오늘은 ${anniversaryInfo.todayLabel}!!!] 🎊🎊🎊`);
+    parts.push(`\n🎊🎊🎊 [오늘은 ${todayLabels.join(', ')}!!!] 🎊🎊🎊`);
     parts.push(`→ 오늘은 특별한 날! 3개 미션 전부 기념일/특별한 날 테마로 생성!`);
     parts.push(`→ 로맨틱하고 기억에 남을 특별한 데이트 미션만!`);
     parts.push(`→ 카테고리: romantic, anniversary, surprise, memory 위주`);
-  } else if (anniversaryInfo.upcoming.length > 0) {
-    parts.push(`\n🎉 [다가오는 기념일] ${anniversaryInfo.upcoming.join(', ')} → 기념일 관련 미션 1개 이상 포함!`);
+  } else if (allUpcoming.length > 0) {
+    parts.push(`\n🎉 [다가오는 기념일] ${allUpcoming.join(', ')} → 기념일 관련 미션 1개 이상 반드시 포함!`);
+    parts.push(`→ 기념일 준비를 위한 미션 (선물 준비, 데이트 계획, 서프라이즈 등) 필수!`);
   }
 
   // === 미성년자 체크 ===

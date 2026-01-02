@@ -4,7 +4,6 @@ import { useFonts } from 'expo-font';
 import { Jua_400Regular } from '@expo-google-fonts/jua';
 import { JustMeAgainDownHere_400Regular } from '@expo-google-fonts/just-me-again-down-here';
 import { BricolageGrotesque_800ExtraBold } from '@expo-google-fonts/bricolage-grotesque';
-import { Chewy_400Regular } from '@expo-google-fonts/chewy';
 import { MochiyPopOne_400Regular } from '@expo-google-fonts/mochiy-pop-one';
 import { ChironGoRoundTC_400Regular } from '@expo-google-fonts/chiron-goround-tc';
 import { PoetsenOne_400Regular } from '@expo-google-fonts/poetsen-one';
@@ -104,7 +103,6 @@ export default function RootLayout() {
     Jua: Jua_400Regular,
     JustMeAgainDownHere: JustMeAgainDownHere_400Regular,
     BricolageGrotesque: BricolageGrotesque_800ExtraBold,
-    Chewy: Chewy_400Regular,
     MochiyPopOne: MochiyPopOne_400Regular,
     ChironGoRoundTC: ChironGoRoundTC_400Regular,
     PoetsenOne: PoetsenOne_400Regular,
@@ -233,12 +231,13 @@ function RootLayoutNav() {
   }, [user?.id, syncLanguageToDatabase]);
 
   // Check couple premium status to determine if partner has premium (for shared premium benefits)
+  // Also subscribe to realtime changes in partner's subscription status
   useEffect(() => {
-    const checkPartnerPremium = async () => {
-      if (!couple?.id || !user?.id || isDemoMode) {
-        return;
-      }
+    if (!couple?.id || !user?.id || isDemoMode || !supabase) {
+      return;
+    }
 
+    const checkPartnerPremium = async () => {
       try {
         console.log('[Layout] Checking couple premium status for couple:', couple.id);
         const isCouplePremium = await checkCouplePremium(couple.id);
@@ -256,8 +255,55 @@ function RootLayoutNav() {
       }
     };
 
+    // Initial check
     checkPartnerPremium();
-  }, [couple?.id, user?.id, checkCouplePremium, setPartnerIsPremium]);
+
+    // Subscribe to realtime changes in partner's subscription status
+    // This ensures premium status syncs between partners immediately
+    const partnerId = couple.user1Id === user.id ? couple.user2Id : couple.user1Id;
+    if (!partnerId) {
+      console.log('[Layout] No partner ID found, skipping subscription sync');
+      return;
+    }
+
+    console.log('[Layout] Setting up realtime subscription for partner premium:', partnerId);
+    const channel = supabase
+      .channel(`partner_premium:${partnerId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${partnerId}`,
+        },
+        (payload) => {
+          console.log('[Layout] Partner profile updated:', payload);
+          const newProfile = payload.new as { subscription_plan?: string; subscription_expires_at?: string };
+
+          // Check if partner became premium or lost premium
+          const isPremiumPlan = newProfile.subscription_plan && newProfile.subscription_plan !== 'free';
+          const hasValidExpiry = newProfile.subscription_expires_at && new Date(newProfile.subscription_expires_at) > new Date();
+          const partnerHasPremium = isPremiumPlan && hasValidExpiry;
+
+          const { isPremium: myPremium } = useSubscriptionStore.getState();
+
+          if (partnerHasPremium && !myPremium) {
+            console.log('[Layout] Partner gained premium - enabling shared benefits');
+            setPartnerIsPremium(true);
+          } else if (!partnerHasPremium) {
+            console.log('[Layout] Partner lost premium - disabling shared benefits');
+            setPartnerIsPremium(false);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log('[Layout] Cleaning up partner premium subscription');
+      supabase?.removeChannel(channel);
+    };
+  }, [couple?.id, couple?.user1Id, couple?.user2Id, user?.id, checkCouplePremium, setPartnerIsPremium]);
 
   // Initialize network monitoring and handle reconnection sync
   useEffect(() => {
@@ -803,34 +849,40 @@ function RootLayoutNav() {
   const needsNavigationToTabs = shouldBeInTabs && inAuthGroup;
   const needsNavigationToAuth = shouldBeInAuth && inTabsGroup;
 
+  // Track if navigation has been performed to prevent re-navigation
+  const [hasNavigated, setHasNavigated] = useState(false);
+
   useEffect(() => {
     if (!isNavigationReady || !authHydrated) return;
     // Wait for segments to be populated (prevents flash during error recovery)
     if (!segments?.[0]) return;
+    // Prevent re-navigation
+    if (hasNavigated) return;
 
     // If onboarding not complete and in tabs group, redirect to onboarding
     if (needsNavigationToAuth) {
+      setHasNavigated(true);
       router.replace('/(auth)/onboarding');
     }
     // If onboarding is complete and in auth group, redirect to tabs
     else if (needsNavigationToTabs) {
+      setHasNavigated(true);
       router.replace('/(tabs)');
     }
-  }, [isNavigationReady, isOnboardingComplete, authHydrated, segments, needsNavigationToTabs, needsNavigationToAuth]);
+  }, [isNavigationReady, isOnboardingComplete, authHydrated, segments, needsNavigationToTabs, needsNavigationToAuth, hasNavigated]);
+
+  // Reset navigation flag when onboarding state changes
+  useEffect(() => {
+    setHasNavigated(false);
+  }, [isOnboardingComplete]);
 
   // Don't render Stack until:
   // 1. Auth state is hydrated
   // 2. Onboarding state is determined (boolean, not undefined)
   // 3. Navigation is ready
-  // 4. We're in the correct location (not needing navigation to a different group)
-  // This prevents flash of wrong screen during navigation transitions
+  // Always render StatusBar to maintain light style even during loading
   if (!authHydrated || typeof isOnboardingComplete !== 'boolean' || !isNavigationReady) {
-    return null;
-  }
-
-  // If we need to navigate to a different group, don't render until navigation completes
-  if (needsNavigationToTabs || needsNavigationToAuth) {
-    return null;
+    return <StatusBar style="light" />;
   }
 
   return (

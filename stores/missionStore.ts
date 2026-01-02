@@ -3,7 +3,8 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
 import type { DailyMission, Mission, MissionState, KeptMission, TodayCompletedMission } from '@/types';
-import { generateMissionsWithAI, generateMissionsFallback, type MissionHistorySummary, type ExcludedMission } from '@/services/missionGenerator';
+import { generateMissionsWithAI, generateMissionsFallback, type MissionHistorySummary, type ExcludedMission, type CustomAnniversaryForMission } from '@/services/missionGenerator';
+import { anniversaryService } from '@/services/anniversaryService';
 import { db, isDemoMode } from '@/lib/supabase';
 import {
   useOnboardingStore,
@@ -461,6 +462,23 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
           console.log('[MissionStore] Current location:', currentLocation ?
             `${currentLocation.latitude.toFixed(4)}, ${currentLocation.longitude.toFixed(4)}` : 'Not available');
 
+          // Fetch custom anniversaries for anniversary-related mission generation
+          let customAnniversaries: CustomAnniversaryForMission[] = [];
+          if (couple?.id) {
+            try {
+              const anniversaries = await anniversaryService.load(couple.id);
+              customAnniversaries = anniversaries.map(a => ({
+                label: a.label,
+                targetDate: a.targetDate,
+                isYearly: a.isYearly,
+              }));
+              console.log(`[MissionStore] Loaded ${customAnniversaries.length} custom anniversaries for mission generation`);
+            } catch (anniversaryError) {
+              console.warn('[MissionStore] Failed to load custom anniversaries:', anniversaryError);
+              // Continue without custom anniversaries
+            }
+          }
+
           // Try to generate missions with AI
           const aiMissions = await generateMissionsWithAI({
             userAPreferences: onboardingData,
@@ -468,6 +486,7 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
             todayAnswers: answers,
             missionHistory, // Pass history for deduplication
             excludedMissions, // Pass excluded missions for refresh (to avoid duplicates)
+            customAnniversaries, // Pass custom anniversaries for anniversary-related missions
             location: currentLocation ? {
               latitude: currentLocation.latitude,
               longitude: currentLocation.longitude,

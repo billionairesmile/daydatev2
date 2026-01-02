@@ -81,15 +81,12 @@ export default function PremiumSubscriptionModal({
   const handlePurchase = async () => {
     if (!selectedPlan) return;
 
-    let success = false;
     if (selectedPlan === 'monthly') {
-      success = await purchaseMonthly();
+      await purchaseMonthly();
     } else {
-      success = await purchaseAnnual();
+      await purchaseAnnual();
     }
-    if (success) {
-      onClose();
-    }
+    // Don't close modal - it will re-render with premium management view if purchase succeeds
   };
 
   const handleRestore = async () => {

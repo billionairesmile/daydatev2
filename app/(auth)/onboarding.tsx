@@ -2033,6 +2033,18 @@ function PairingStep({
                 timezone: deviceTimezone,
               });
 
+              // CRITICAL: Update creator's profile with couple_id immediately
+              // This ensures the profile has the couple_id even if onboarding is interrupted
+              console.log('[PairingStep] Updating creator profile with couple_id:', newCouple.id);
+              const { error: profileCoupleError } = await db.profiles.update(creatorUserId, {
+                couple_id: newCouple.id,
+              });
+              if (profileCoupleError) {
+                console.error('[PairingStep] Error updating creator profile couple_id:', profileCoupleError);
+              } else {
+                console.log('[PairingStep] Successfully updated creator profile with couple_id');
+              }
+
               // Sync timezone to timezoneStore so it's immediately effective
               useTimezoneStore.getState().syncFromCouple(deviceTimezone);
 
@@ -2883,6 +2895,18 @@ function PairingStep({
           status: 'active',
           createdAt: updatedCouple.created_at ? new Date(updatedCouple.created_at) : new Date(),
         });
+
+        // CRITICAL: Update joiner's profile with couple_id immediately
+        // This ensures the profile has the couple_id even if onboarding is interrupted
+        console.log('[PairingStep] Updating joiner profile with couple_id:', updatedCouple.id);
+        const { error: joinerProfileCoupleError } = await db.profiles.update(joinerId, {
+          couple_id: updatedCouple.id,
+        });
+        if (joinerProfileCoupleError) {
+          console.error('[PairingStep] Error updating joiner profile couple_id:', joinerProfileCoupleError);
+        } else {
+          console.log('[PairingStep] Successfully updated joiner profile with couple_id');
+        }
 
         // Fetch partner (creator) profile from DB to get their nickname and birthDate
         const { data: creatorProfile } = await db.profiles.get(updatedCouple.user1_id);

@@ -1211,8 +1211,8 @@ export default function MemoriesScreen() {
                             </View>
 
                             {/* Read-only indicator */}
-                            {isAlbumReadOnly(albums.indexOf(album)) && (
-                              <View style={styles.albumReadOnlyBadge}>
+                            {isAlbumReadOnly(albums.indexOf(album), albums.length) && (
+                              <View style={styles.readOnlyBadge}>
                                 <Lock size={10} color="rgba(255,255,255,0.8)" />
                               </View>
                             )}
@@ -1225,9 +1225,6 @@ export default function MemoriesScreen() {
               </View>
             )}
           </View>
-
-          {/* Banner Ad */}
-          <BannerAdView />
         </ScrollView>
       ) : (
         <ScrollView
