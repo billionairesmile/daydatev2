@@ -355,6 +355,25 @@ interface AnniversaryInfo {
   todayLabel: string | null;
 }
 
+// Parse date string as local date (not UTC) to avoid timezone issues
+// Handles both simple date strings and ISO timestamps
+function parseDateAsLocal(dateString: string | Date): Date {
+  if (dateString instanceof Date) {
+    return new Date(dateString.getFullYear(), dateString.getMonth(), dateString.getDate());
+  }
+
+  // If it's an ISO timestamp (contains T), parse as Date first to get correct local time
+  // e.g., "1990-01-02T15:00:00.000Z" represents Jan 3 00:00 in KST (UTC+9)
+  if (dateString.includes('T')) {
+    const d = new Date(dateString);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+
+  // If it's a simple date string like "1990-01-03", parse as local
+  const [year, month, day] = dateString.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
 function getAnniversaryInfo(
   relationshipType: string | undefined,
   anniversaryDate: Date | string | null | undefined
@@ -363,7 +382,7 @@ function getAnniversaryInfo(
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const annDate = new Date(anniversaryDate);
+  const annDate = parseDateAsLocal(anniversaryDate);
   annDate.setHours(0, 0, 0, 0);
 
   const upcomingAnniversaries: string[] = [];
@@ -393,7 +412,8 @@ function getAnniversaryInfo(
     yearlyDate.setFullYear(annDate.getFullYear() + year);
     yearlyDate.setHours(0, 0, 0, 0);
 
-    const daysUntil = Math.ceil((yearlyDate.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+    // Use Math.round for accurate day calculation (avoids floating-point issues)
+    const daysUntil = Math.round((yearlyDate.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
 
     if (daysUntil === 0) {
       // Today is the yearly anniversary!

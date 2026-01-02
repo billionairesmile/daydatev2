@@ -198,7 +198,7 @@ function RootLayoutNav() {
   const segments = useSegments();
   const { t } = useTranslation();
   const { isAuthenticated, isOnboardingComplete, setIsOnboardingComplete, couple, user, setCouple, setPartner, partner, _hasHydrated: authHydrated } = useAuthStore();
-  const { initializeSync, cleanup: cleanupSync, processPendingOperations, loadMissionProgress, loadSharedMissions } = useCoupleSyncStore();
+  const { initializeSync, cleanup: cleanupSync, processPendingOperations, loadMissionProgress, loadSharedMissions, loadAlbums, loadTodos, loadMenstrualSettings } = useCoupleSyncStore();
   const { setStep: setOnboardingStep, updateData: updateOnboardingData } = useOnboardingStore();
   const { syncFromCouple } = useTimezoneStore();
   const { initializeRevenueCat, loadFromDatabase, checkCouplePremium, setPartnerIsPremium, _hasHydrated: subscriptionHydrated } = useSubscriptionStore();
@@ -547,16 +547,21 @@ function RootLayoutNav() {
     updateUserLocation();
   }, [updateUserLocation]);
 
-  // Refresh partner data, location, mission progress, and subscription when app comes to foreground
+  // Refresh partner data, location, mission progress, albums, and subscription when app comes to foreground
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
       if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
-        // App has come to the foreground, refresh partner data, location, and mission progress
+        // App has come to the foreground, refresh all synced data
         fetchCoupleAndPartnerData();
         updateUserLocation();
         // Refresh mission data to sync any changes from partner
         loadMissionProgress();
         loadSharedMissions();
+        // Refresh albums to sync any changes from partner
+        loadAlbums();
+        // Refresh calendar data (todos and menstrual settings) to sync any changes from partner
+        loadTodos();
+        loadMenstrualSettings();
         // Refresh subscription/premium status from database
         loadFromDatabase();
       }
@@ -566,7 +571,7 @@ function RootLayoutNav() {
     return () => {
       subscription.remove();
     };
-  }, [fetchCoupleAndPartnerData, updateUserLocation, loadMissionProgress, loadSharedMissions, loadFromDatabase]);
+  }, [fetchCoupleAndPartnerData, updateUserLocation, loadMissionProgress, loadSharedMissions, loadAlbums, loadTodos, loadMenstrualSettings, loadFromDatabase]);
 
   // Also refresh if partner data is incomplete (partner might have completed onboarding)
   useEffect(() => {

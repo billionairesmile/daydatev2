@@ -345,7 +345,8 @@ export default function CalendarScreen() {
   const { couple } = useAuthStore();
   const { getEffectiveTimezone } = useTimezoneStore();
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState<number | null>(null);
+  // Store full date to keep selection when navigating months
+  const [selectedDate, setSelectedDate] = useState<{ year: number; month: number; day: number } | null>(null);
   const [localTodos, setLocalTodos] = useState<LocalTodo[]>([]); // Fallback for non-synced mode
   const [scrollEnabled, setScrollEnabled] = useState(true); // For disabling scroll during swipe
   const [swipeResetKey, setSwipeResetKey] = useState(0); // For resetting swipe state on screen focus
@@ -693,12 +694,18 @@ export default function CalendarScreen() {
   };
 
   const handleDateClick = (day: number) => {
-    if (selectedDate === day) {
+    // Check if this day is already selected (same year, month, day)
+    const isAlreadySelected = selectedDate &&
+      selectedDate.year === year &&
+      selectedDate.month === month &&
+      selectedDate.day === day;
+
+    if (isAlreadySelected) {
       setSelectedDate(null);
     } else if (isToday(day)) {
       setSelectedDate(null);
     } else {
-      setSelectedDate(day);
+      setSelectedDate({ year, month, day });
     }
   };
 
@@ -838,8 +845,8 @@ export default function CalendarScreen() {
   const getCurrentDateTodos = () => {
     const today = getTodayInTimezone();
     if (selectedDate) {
-      // Use selected date with current displayed month/year
-      const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(selectedDate).padStart(2, '0')}`;
+      // Use the stored selected date (full year/month/day)
+      const dateKey = `${selectedDate.year}-${String(selectedDate.month + 1).padStart(2, '0')}-${String(selectedDate.day).padStart(2, '0')}`;
       return todos.filter((todo) => todo.date === dateKey);
     } else {
       // Use actual today's date (not the displayed month)
@@ -861,8 +868,8 @@ export default function CalendarScreen() {
       let dateKey: string;
 
       if (selectedDate) {
-        // User selected a specific date - use displayed month/year with selected day
-        dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(selectedDate).padStart(2, '0')}`;
+        // User selected a specific date - use the stored full date
+        dateKey = `${selectedDate.year}-${String(selectedDate.month + 1).padStart(2, '0')}-${String(selectedDate.day).padStart(2, '0')}`;
       } else {
         // No date selected - use actual today's date (not displayed month/year)
         dateKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -1061,7 +1068,10 @@ export default function CalendarScreen() {
             const mission = getMissionForDate(day);
             const isRedDay = isHolidayOrWeekend(day);
             const isTodayDay = isToday(day);
-            const isSelectedDay = selectedDate === day;
+            const isSelectedDay = selectedDate &&
+              selectedDate.year === year &&
+              selectedDate.month === month &&
+              selectedDate.day === day;
             const hasTodos = getTodosForDate(day).length > 0;
 
             const showPeriod = !mission && isPeriodDay(day);
@@ -1164,8 +1174,8 @@ export default function CalendarScreen() {
             <Text style={styles.todaySectionTitle}>
               {selectedDate
                 ? (i18n.language === 'ko'
-                    ? `${month + 1}월 ${selectedDate}일`
-                    : new Date(year, month, selectedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))
+                    ? `${selectedDate.month + 1}월 ${selectedDate.day}일`
+                    : new Date(selectedDate.year, selectedDate.month, selectedDate.day).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))
                 : t('common.today')}
             </Text>
             <Pressable

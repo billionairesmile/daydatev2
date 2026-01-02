@@ -1196,7 +1196,7 @@ export default function MemoriesScreen() {
                             ]}>
                               {album.fontStyle === 'basic' ? (
                                 // Basic Jua Font Style
-                                <Text style={[styles.basicFontTiny, { fontSize: 16 * (album.textScale || 1) * ALBUM_SCALE_RATIO }]}>{album.name}</Text>
+                                <Text style={[styles.basicFontTiny, { fontSize: 16 * (album.textScale || 1) * ALBUM_SCALE_RATIO, lineHeight: 16 * (album.textScale || 1) * ALBUM_SCALE_RATIO * 1.3 }]}>{album.name}</Text>
                               ) : (
                                 // Ransom Style - Image-based
                                 <RansomText
@@ -1416,7 +1416,7 @@ export default function MemoriesScreen() {
                             ]}>
                               {album.fontStyle === 'basic' ? (
                                 // Basic Jua Font Style
-                                <Text style={[styles.basicFontTiny, { fontSize: 16 * (album.textScale || 1) * ALBUM_SCALE_RATIO }]}>{album.name}</Text>
+                                <Text style={[styles.basicFontTiny, { fontSize: 16 * (album.textScale || 1) * ALBUM_SCALE_RATIO, lineHeight: 16 * (album.textScale || 1) * ALBUM_SCALE_RATIO * 1.3 }]}>{album.name}</Text>
                               ) : (
                                 // Ransom Style - Image-based
                                 <RansomText
@@ -1631,7 +1631,11 @@ export default function MemoriesScreen() {
                             styles.fontStyleOption,
                             fontStyle === 'basic' && styles.fontStyleOptionSelected,
                           ]}
-                          onPress={() => setFontStyle('basic')}
+                          onPress={() => {
+                            setFontStyle('basic');
+                            // Reset to medium size for basic font style [1.5, 2.25, 3.0]
+                            setTextScale(2.25);
+                          }}
                         >
                           <View style={styles.fontStylePreviewContainer}>
                             <Text style={styles.fontStylePreviewBasic}>{t('memories.album.basicFont')}</Text>
@@ -1647,6 +1651,8 @@ export default function MemoriesScreen() {
                           ]}
                           onPress={() => {
                             setFontStyle('ransom');
+                            // Reset to medium size for ransom font style [1.0, 1.5, 2.0]
+                            setTextScale(1.5);
                             // Clear text if it contains Korean characters (not supported in ransom style)
                             if (/[가-힣ㄱ-ㅎㅏ-ㅣ]/.test(albumName)) {
                               setAlbumName('');
@@ -2191,7 +2197,7 @@ export default function MemoriesScreen() {
                         }
                       ]}>
                         {selectedAlbum.fontStyle === 'basic' ? (
-                          <Text style={[styles.basicFontOverlay, { fontSize: 16 * selectedAlbum.textScale * ALBUM_DETAIL_SCALE_RATIO }]}>
+                          <Text style={[styles.basicFontOverlay, { fontSize: 16 * selectedAlbum.textScale * ALBUM_DETAIL_SCALE_RATIO, lineHeight: 16 * selectedAlbum.textScale * ALBUM_DETAIL_SCALE_RATIO * 1.3 }]}>
                             {selectedAlbum.name}
                           </Text>
                         ) : (
@@ -2492,34 +2498,49 @@ export default function MemoriesScreen() {
                   <Text style={styles.missionPickerTitle}>{t('memories.album.selectPhoto')}</Text>
                   <Pressable
                     style={styles.missionPickerHeaderButton}
-                    onPress={async () => {
-                      if (selectedAlbum && selectedMissionPhotos.size > 0) {
-                        const photosToAdd = completedMemories.filter(m => selectedMissionPhotos.has(m.id));
+                    onPress={() => {
+                      // Capture data before closing modal
+                      const photosToAdd = selectedAlbum && selectedMissionPhotos.size > 0
+                        ? completedMemories.filter(m => selectedMissionPhotos.has(m.id))
+                        : [];
+                      const albumId = selectedAlbum?.id;
 
-                        // Add photos via sync or locally
+                      // Start slide-down animation immediately
+                      Animated.timing(missionPickerSlideAnim, {
+                        toValue: height,
+                        duration: 300,
+                        useNativeDriver: true,
+                      }).start(() => {
+                        setShowMissionPhotosPicker(false);
+                        setSelectedMissionPhotos(new Set());
+                      });
+
+                      // Add photos in background (don't block animation)
+                      if (albumId && photosToAdd.length > 0) {
                         if (isSyncInitialized && !isDemoMode) {
-                          try {
-                            // Add each photo to the album in sync store
-                            for (const photo of photosToAdd) {
-                              await syncAddPhotoToAlbum(selectedAlbum.id, photo.id);
+                          // Sync mode: add photos asynchronously
+                          (async () => {
+                            try {
+                              for (const photo of photosToAdd) {
+                                await syncAddPhotoToAlbum(albumId, photo.id);
+                              }
+                            } catch (error) {
+                              console.error('Error syncing photo addition:', error);
+                              // Fallback to local on error
+                              setLocalAlbumPhotos(prev => ({
+                                ...prev,
+                                [albumId]: [...(prev[albumId] || []), ...photosToAdd]
+                              }));
                             }
-                          } catch (error) {
-                            console.error('Error syncing photo addition:', error);
-                            // Fallback to local
-                            setLocalAlbumPhotos(prev => ({
-                              ...prev,
-                              [selectedAlbum.id]: [...(prev[selectedAlbum.id] || []), ...photosToAdd]
-                            }));
-                          }
+                          })();
                         } else {
                           // Demo mode: add locally
                           setLocalAlbumPhotos(prev => ({
                             ...prev,
-                            [selectedAlbum.id]: [...(prev[selectedAlbum.id] || []), ...photosToAdd]
+                            [albumId]: [...(prev[albumId] || []), ...photosToAdd]
                           }));
                         }
                       }
-                      closeMissionPicker();
                     }}
                   >
                     <Text style={[
@@ -2633,7 +2654,11 @@ export default function MemoriesScreen() {
                               styles.fontStyleOption,
                               editFontStyle === 'basic' && styles.fontStyleOptionSelected,
                             ]}
-                            onPress={() => setEditFontStyle('basic')}
+                            onPress={() => {
+                              setEditFontStyle('basic');
+                              // Reset to medium size for basic font style [1.5, 2.25, 3.0]
+                              setEditTextScale(2.25);
+                            }}
                           >
                             <View style={styles.fontStylePreviewContainer}>
                               <Text style={styles.fontStylePreviewBasic}>{t('memories.album.basicFont')}</Text>
@@ -2649,6 +2674,8 @@ export default function MemoriesScreen() {
                             ]}
                             onPress={() => {
                               setEditFontStyle('ransom');
+                              // Reset to medium size for ransom font style [1.0, 1.5, 2.0]
+                              setEditTextScale(1.5);
                               // Clear text if it contains Korean characters (not supported in ransom style)
                               if (/[가-힣ㄱ-ㅎㅏ-ㅣ]/.test(editAlbumName)) {
                                 setEditAlbumName('');
@@ -2656,22 +2683,16 @@ export default function MemoriesScreen() {
                             }}
                           >
                             <View style={styles.fontStylePreviewContainer}>
-                              <View style={styles.fontStylePreviewRansom}>
-                                <View style={[styles.ransomMiniBox, { backgroundColor: '#FFE4E1', transform: [{ rotate: '-5deg' }] }]}>
-                                  <Text style={[styles.ransomMiniText, { fontFamily: 'PermanentMarker_400Regular' }]}>F</Text>
-                                </View>
-                                <View style={[styles.ransomMiniBox, { backgroundColor: '#E6F3FF', transform: [{ rotate: '3deg' }], borderRadius: 12 }]}>
-                                  <Text style={[styles.ransomMiniText, { fontFamily: 'Pacifico_400Regular' }]}>O</Text>
-                                </View>
-                                <View style={[styles.ransomMiniBox, { backgroundColor: '#FFFACD', transform: [{ rotate: '-2deg' }] }]}>
-                                  <Text style={[styles.ransomMiniText, { fontFamily: 'SpecialElite_400Regular' }]}>N</Text>
-                                </View>
-                                <View style={[styles.ransomMiniBox, { backgroundColor: '#E8F5E9', transform: [{ rotate: '4deg' }] }]}>
-                                  <Text style={[styles.ransomMiniText, { fontFamily: 'RockSalt_400Regular' }]}>T</Text>
-                                </View>
-                              </View>
-                            </View>
-                            <Text style={styles.fontStyleLabel}>{t('memories.album.ransomStyle')}</Text>
+                            <RansomText
+                              text="FONT"
+                              seed={12345}
+                              characterSize={28}
+                              spacing={-4}
+                              enableRotation={true}
+                              enableYOffset={true}
+                            />
+                          </View>
+                          <Text style={styles.fontStyleLabel}>{t('memories.album.ransomStyle')}</Text>
                           </Pressable>
                         </View>
 
@@ -4255,7 +4276,7 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
-    width: 20,
+    width: 24 * ALBUM_SCALE_RATIO, // Match modal spine ratio (24px in modal)
     zIndex: 10,
   },
   albumCoverWrapper: {
@@ -4685,6 +4706,8 @@ const styles = StyleSheet.create({
   },
   draggableTextOverlay: {
     position: 'absolute',
+    top: 0,
+    left: 0,
     maxWidth: '80%',
     zIndex: 20,
   },
@@ -5419,7 +5442,7 @@ const styles = StyleSheet.create({
   albumDetailCoverWrapper: {
     width: 180,
     height: 240,
-    borderRadius: 12,
+    borderRadius: 4, // Match memories preview (hardcoverBook) border radius
     overflow: 'hidden',
     position: 'relative',
     backgroundColor: 'rgba(60, 60, 60, 0.5)',
@@ -5429,7 +5452,7 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
-    width: 16,
+    width: 24 * ALBUM_DETAIL_SCALE_RATIO, // Match modal spine ratio (24px in modal)
     zIndex: 10,
   },
   albumDetailCoverImage: {

@@ -106,6 +106,9 @@ export default function MissionScreen() {
   const isWaitingForImagesRef = useRef(false);
   const scrollX = useRef(new Animated.Value(0)).current;
   const scrollViewRef = useRef<Animated.FlatList<CarouselItem>>(null);
+  // Track if carousel has been initialized to prevent reset during background sync
+  const hasInitializedCarousel = useRef(false);
+  const previousMissionsLength = useRef(0);
 
   const {
     keptMissions,
@@ -260,9 +263,25 @@ export default function MissionScreen() {
 
   // Force FlatList to render properly when missions change from empty to populated
   // This handles cases where the list mounts before React has finished updating
+  // IMPORTANT: Only reset scroll on initial load or explicit refresh, not on background sync updates
   useEffect(() => {
-    if (allMissions.length > 0 && !isGenerating && !isWaitingForImages) {
-      // Reset scroll initialization state when missions change
+    const hasNow = allMissions.length > 0;
+
+    // If missions become empty (e.g., day changed or refresh started), mark for re-initialization
+    if (!hasNow && previousMissionsLength.current > 0) {
+      hasInitializedCarousel.current = false;
+    }
+
+    previousMissionsLength.current = allMissions.length;
+
+    // Only initialize carousel when:
+    // 1. We have missions now
+    // 2. Not currently generating/loading
+    // 3. Carousel hasn't been initialized yet (prevents reset during background sync)
+    const shouldInitialize = hasNow && !isGenerating && !isWaitingForImages && !hasInitializedCarousel.current;
+
+    if (shouldInitialize) {
+      hasInitializedCarousel.current = true;
       setIsScrollInitialized(false);
       setCurrentIndex(0);
       scrollX.setValue(0);
