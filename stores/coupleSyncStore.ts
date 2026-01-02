@@ -741,9 +741,24 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       }
     });
 
-    // 11. Couple updates subscription (for timezone sync between partners)
+    // 11. Couple updates subscription (for timezone sync and disconnection detection)
     coupleUpdatesChannel = db.couples.subscribeToCoupleUpdates(coupleId, (payload) => {
-      console.log('[CoupleSyncStore] Received couple update - timezone:', payload.timezone);
+      console.log('[CoupleSyncStore] Received couple update - status:', payload.status, 'timezone:', payload.timezone);
+
+      // Check if couple was disconnected (partner deleted account or unpaired)
+      if (payload.status === 'disconnected') {
+        console.log('[CoupleSyncStore] Couple disconnected - triggering logout flow');
+        // Import dynamically to avoid circular dependency
+        const { useOnboardingStore } = require('./onboardingStore');
+        const { useAuthStore } = require('./authStore');
+
+        // Reset stores and redirect to onboarding
+        get().cleanup();
+        useAuthStore.getState().reset();
+        useOnboardingStore.getState().reset();
+        return;
+      }
+
       // Sync timezone to timezoneStore when partner changes it
       useTimezoneStore.getState().syncFromCouple(payload.timezone);
     });

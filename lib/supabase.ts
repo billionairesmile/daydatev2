@@ -498,10 +498,10 @@ export const db = {
       return { data, error };
     },
 
-    // Subscribe to couple updates (for timezone sync, etc.)
+    // Subscribe to couple updates (for timezone sync, status changes, etc.)
     subscribeToCoupleUpdates(
       coupleId: string,
-      callback: (payload: { timezone: string | null }) => void
+      callback: (payload: { timezone: string | null; status: string }) => void
     ) {
       const client = getSupabase();
       const channel = client
@@ -515,8 +515,8 @@ export const db = {
             filter: `id=eq.${coupleId}`,
           },
           (payload) => {
-            const record = payload.new as { timezone: string | null };
-            callback({ timezone: record.timezone });
+            const record = payload.new as { timezone: string | null; status: string };
+            callback({ timezone: record.timezone, status: record.status });
           }
         )
         .subscribe();
