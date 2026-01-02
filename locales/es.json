@@ -733,9 +733,9 @@
     "constraints": {
       "title": "¿Alguna restricción\npara las misiones?",
       "subtitle": "Selecciona todas las que apliquen",
-      "pet": "Mascota",
-      "child": "Niños",
-      "long_distance": "Distancia",
+      "pet": "Tengo mascota",
+      "child": "Tengo un hijo",
+      "long_distance": "Larga distancia",
       "no_car": "Sin auto",
       "no_alcohol": "Sin alcohol",
       "none": "Ninguna"

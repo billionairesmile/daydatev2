@@ -736,9 +736,9 @@
     "constraints": {
       "title": "Any constraints\nfor missions?",
       "subtitle": "Select all that apply",
-      "pet": "Pet",
-      "child": "Child",
-      "long_distance": "Distance",
+      "pet": "Have pet",
+      "child": "Have a child",
+      "long_distance": "Long Distance",
       "no_car": "No car",
       "no_alcohol": "No alcohol",
       "none": "None"
