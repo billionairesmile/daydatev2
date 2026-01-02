@@ -144,6 +144,10 @@ export default function UnpairScreen() {
           return;
         }
 
+        // Clear this user's profile couple_id since the couple is disconnected
+        console.log('[Unpair] Clearing profile couple_id for user:', user.id);
+        await db.profiles.update(user.id, { couple_id: null });
+
         // Send push notification to partner
         if (partnerId) {
           await notifyPartnerUnpaired(

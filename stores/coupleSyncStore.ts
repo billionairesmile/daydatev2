@@ -752,6 +752,15 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
         const { useOnboardingStore } = require('./onboardingStore');
         const { useAuthStore } = require('./authStore');
 
+        // Clear this user's profile couple_id since the couple is disconnected
+        const currentUserId = get().userId;
+        if (currentUserId) {
+          console.log('[CoupleSyncStore] Clearing profile couple_id for user:', currentUserId);
+          db.profiles.update(currentUserId, { couple_id: null }).catch((err) => {
+            console.error('[CoupleSyncStore] Failed to clear profile couple_id:', err);
+          });
+        }
+
         // Reset stores and redirect to onboarding
         get().cleanup();
         useAuthStore.getState().reset();
