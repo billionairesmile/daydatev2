@@ -231,7 +231,7 @@ function RootLayoutNav() {
   }, [user?.id, syncLanguageToDatabase]);
 
   // Check couple premium status to determine if partner has premium (for shared premium benefits)
-  // Also subscribe to realtime changes in partner's subscription status
+  // Also subscribe to realtime changes in partner's subscription status AND couple premium status
   useEffect(() => {
     if (!couple?.id || !user?.id || isDemoMode || !supabase) {
       return;
@@ -267,7 +267,9 @@ function RootLayoutNav() {
     }
 
     console.log('[Layout] Setting up realtime subscription for partner premium:', partnerId);
-    const channel = supabase
+
+    // Channel for partner's profile changes
+    const profileChannel = supabase
       .channel(`partner_premium:${partnerId}`)
       .on(
         'postgres_changes',
@@ -299,9 +301,41 @@ function RootLayoutNav() {
       )
       .subscribe();
 
+    // Channel for couple's is_premium changes (more reliable than profile subscription)
+    // This handles cases where syncWithDatabase updates the couples table directly
+    console.log('[Layout] Setting up realtime subscription for couple premium:', couple.id);
+    const coupleChannel = supabase
+      .channel(`couple_premium:${couple.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'couples',
+          filter: `id=eq.${couple.id}`,
+        },
+        (payload) => {
+          console.log('[Layout] Couple premium updated:', payload);
+          const coupleData = payload.new as { is_premium?: boolean; premium_user_id?: string };
+
+          const { isPremium: myPremium } = useSubscriptionStore.getState();
+
+          // If couple has premium and it's not from this user, partner must have premium
+          if (coupleData.is_premium && coupleData.premium_user_id !== user?.id && !myPremium) {
+            console.log('[Layout] Couple gained premium from partner - enabling shared benefits');
+            setPartnerIsPremium(true);
+          } else if (!coupleData.is_premium) {
+            console.log('[Layout] Couple lost premium - disabling shared benefits');
+            setPartnerIsPremium(false);
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
-      console.log('[Layout] Cleaning up partner premium subscription');
-      supabase?.removeChannel(channel);
+      console.log('[Layout] Cleaning up partner premium subscriptions');
+      supabase?.removeChannel(profileChannel);
+      supabase?.removeChannel(coupleChannel);
     };
   }, [couple?.id, couple?.user1Id, couple?.user2Id, user?.id, checkCouplePremium, setPartnerIsPremium]);
 
@@ -385,8 +419,7 @@ function RootLayoutNav() {
                   await db.pairingCodes.deleteByCreatorId(user.id);
                 }
 
-                // Set onboarding incomplete and go directly to pairing screen
-                setIsOnboardingComplete(false);
+                // IMPORTANT: Set onboarding step to pairing FIRST
                 setOnboardingStep('pairing');
                 // Reset all pairing state so user can pair with a new partner
                 // Clear anniversaryDate to prevent old date from being applied to new couple
@@ -397,8 +430,9 @@ function RootLayoutNav() {
                   anniversaryDate: null, // Clear old anniversary date
                   relationshipType: 'dating', // Reset relationship type
                 });
-                // Navigation is handled by the useEffect that watches isOnboardingComplete
-                // Don't navigate here to avoid duplicate navigation
+                // Set onboarding incomplete - this triggers navigation via the navigation effect
+                // DO NOT call router.replace here as it would cause duplicate navigation
+                setIsOnboardingComplete(false);
               },
             },
           ],
@@ -443,8 +477,7 @@ function RootLayoutNav() {
                   await db.pairingCodes.deleteByCreatorId(user.id);
                 }
 
-                // Set onboarding incomplete and go directly to pairing screen
-                setIsOnboardingComplete(false);
+                // IMPORTANT: Set onboarding step to pairing FIRST
                 setOnboardingStep('pairing');
                 // Clear anniversaryDate to prevent old date from being applied to new couple
                 updateOnboardingData({
@@ -454,8 +487,9 @@ function RootLayoutNav() {
                   anniversaryDate: null, // Clear old anniversary date
                   relationshipType: 'dating', // Reset relationship type
                 });
-                // Navigation is handled by the useEffect that watches isOnboardingComplete
-                // Don't navigate here to avoid duplicate navigation
+                // Set onboarding incomplete - this triggers navigation via the navigation effect
+                // DO NOT call router.replace here as it would cause duplicate navigation
+                setIsOnboardingComplete(false);
               },
             },
           ],
@@ -520,7 +554,7 @@ function RootLayoutNav() {
     } catch (error) {
       console.error('Error fetching couple/partner data:', error);
     }
-  }, [isOnboardingComplete, couple, user?.id, setCouple, setPartner, cleanupSync, setIsOnboardingComplete, setOnboardingStep, updateOnboardingData, syncFromCouple, t, router]);
+  }, [isOnboardingComplete, couple, user?.id, setCouple, setPartner, cleanupSync, setIsOnboardingComplete, setOnboardingStep, updateOnboardingData, syncFromCouple, t]);
 
   // Update user location in DB (silently, no alerts)
   const updateUserLocation = useCallback(async () => {
@@ -598,6 +632,22 @@ function RootLayoutNav() {
       cleanupSync();
     };
   }, [couple?.id, user?.id, initializeSync, cleanupSync]);
+
+  // Check premium status when couple is formed or changed (e.g., after pairing)
+  useEffect(() => {
+    if (!isOnboardingComplete || !couple?.id || isDemoMode) return;
+
+    // Check if either partner has premium
+    (async () => {
+      console.log('[Layout] Checking couple premium status for coupleId:', couple.id);
+      const hasPremium = await checkCouplePremium(couple.id);
+      if (hasPremium) {
+        console.log('[Layout] Couple has premium access');
+        // Also refresh from database to get full subscription details
+        loadFromDatabase();
+      }
+    })();
+  }, [isOnboardingComplete, couple?.id, checkCouplePremium, loadFromDatabase]);
 
   // Subscribe to partner profile changes for real-time sync
   useEffect(() => {
@@ -723,9 +773,19 @@ function RootLayoutNav() {
           if (coupleData) {
             // Check if couple was disconnected by partner
             if (coupleData.status === 'disconnected') {
+              // Get CURRENT user state - don't rely on closure which may be stale
+              // This is critical for account deletion flow where user becomes null
+              const currentUser = useAuthStore.getState().user;
+
+              // If user is null/undefined, skip redirect - user is being logged out/deleted
+              if (!currentUser?.id) {
+                console.log('[Layout] User is null/undefined, skipping disconnect redirect');
+                return;
+              }
+
               // Check if disconnected by partner (not by self)
-              const disconnectedByPartner = coupleData.disconnected_by && coupleData.disconnected_by !== user?.id;
-              console.log('[Layout] Couple disconnected', { disconnectedByPartner, disconnectedBy: coupleData.disconnected_by, userId: user?.id });
+              const disconnectedByPartner = coupleData.disconnected_by && coupleData.disconnected_by !== currentUser.id;
+              console.log('[Layout] Couple disconnected', { disconnectedByPartner, disconnectedBy: coupleData.disconnected_by, userId: currentUser.id });
 
               // If disconnect was initiated by current user (e.g., during account deletion or self-unpair),
               // don't redirect to pairing here - let the initiating flow handle navigation
@@ -735,59 +795,62 @@ function RootLayoutNav() {
                 return;
               }
 
-              // Cleanup realtime subscriptions
-              cleanupSync();
+              // Show alert FIRST, then handle state changes and navigation on confirm
+              // This prevents the navigation effect from triggering before the alert is shown
+              console.log('[Layout] Partner disconnected, reason:', coupleData.disconnect_reason);
 
-              // Clear couple and partner from local state
-              setCouple(null);
-              setPartner(null);
+              const handleDisconnectConfirm = async () => {
+                // Cleanup realtime subscriptions
+                cleanupSync();
 
-              // Set onboarding incomplete and go directly to pairing screen
-              setIsOnboardingComplete(false);
-              setOnboardingStep('pairing');
-              // Reset all pairing state so user can pair with a new partner
-              // Clear anniversaryDate to prevent old date from being applied to new couple
-              updateOnboardingData({
-                isPairingConnected: false,
-                isCreatingCode: true,
-                pairingCode: '', // Clear any previously entered code
-                anniversaryDate: null, // Clear old anniversary date
-                relationshipType: 'dating', // Reset relationship type
-              });
+                // Clear couple and partner from local state
+                setCouple(null);
+                setPartner(null);
 
-              // Show alert if disconnected by partner (always true at this point since we returned above otherwise)
-              if (disconnectedByPartner) {
-                // Check disconnect_reason to determine the appropriate message
-                console.log('[Layout] Partner disconnected, reason:', coupleData.disconnect_reason);
+                // IMPORTANT: Set onboarding step to pairing FIRST
+                setOnboardingStep('pairing');
 
-                if (coupleData.disconnect_reason === 'account_deleted') {
-                  // Partner deleted their account - no reconnection possible
-                  Alert.alert(
-                    t('settings.unpair.partnerDeletedAccountTitle'),
-                    t('settings.unpair.partnerDeletedAccountMessage'),
-                    [
-                      {
-                        text: t('common.confirm'),
-                        // Navigation is handled by the useEffect that watches isOnboardingComplete
-                      },
-                    ]
-                  );
-                } else {
-                  // Partner unpaired but still has account - can reconnect within 30 days
-                  Alert.alert(
-                    t('settings.unpair.partnerDisconnectedTitle'),
-                    t('settings.unpair.partnerDisconnectedMessage'),
-                    [
-                      {
-                        text: t('common.confirm'),
-                        // Navigation is handled by the useEffect that watches isOnboardingComplete
-                      },
-                    ]
-                  );
-                }
+                // Reset all pairing state so user can pair with a new partner
+                updateOnboardingData({
+                  isPairingConnected: false,
+                  isCreatingCode: true,
+                  pairingCode: '',
+                  anniversaryDate: null,
+                  relationshipType: 'dating',
+                });
+
+                // Set onboarding incomplete - this triggers navigation via the navigation effect
+                // DO NOT call router.replace here as it would cause duplicate navigation
+                setIsOnboardingComplete(false);
+              };
+
+              if (coupleData.disconnect_reason === 'account_deleted') {
+                // Partner deleted their account - no reconnection possible
+                Alert.alert(
+                  t('settings.unpair.partnerDeletedAccountTitle'),
+                  t('settings.unpair.partnerDeletedAccountMessage'),
+                  [
+                    {
+                      text: t('common.confirm'),
+                      onPress: handleDisconnectConfirm,
+                    },
+                  ],
+                  { cancelable: false }
+                );
+              } else {
+                // Partner unpaired but still has account - can reconnect within 30 days
+                Alert.alert(
+                  t('settings.unpair.partnerDisconnectedTitle'),
+                  t('settings.unpair.partnerDisconnectedMessage'),
+                  [
+                    {
+                      text: t('common.confirm'),
+                      onPress: handleDisconnectConfirm,
+                    },
+                  ],
+                  { cancelable: false }
+                );
               }
-              // Navigation is handled by the useEffect that watches isOnboardingComplete
-              // Don't navigate here to avoid duplicate navigation
               return;
             }
 
@@ -831,7 +894,7 @@ function RootLayoutNav() {
       console.log('[Layout] Cleaning up couple subscription for coupleId:', couple.id);
       supabase?.removeChannel(channel);
     };
-  }, [isOnboardingComplete, couple?.id, setCouple, setPartner, setIsOnboardingComplete, cleanupSync, router, setOnboardingStep, updateOnboardingData]);
+  }, [isOnboardingComplete, couple?.id, setCouple, setPartner, setIsOnboardingComplete, cleanupSync, setOnboardingStep, updateOnboardingData]);
 
   // Wait for auth hydration and onboarding state to be determined before navigation
   useEffect(() => {
@@ -846,13 +909,14 @@ function RootLayoutNav() {
 
   // Calculate navigation state
   const inAuthGroup = segments?.[0] === '(auth)';
-  const inTabsGroup = segments?.[0] === '(tabs)';
   const shouldBeInTabs = isOnboardingComplete === true;
   const shouldBeInAuth = isOnboardingComplete === false;
 
   // Check if we're in the wrong place and need navigation
   const needsNavigationToTabs = shouldBeInTabs && inAuthGroup;
-  const needsNavigationToAuth = shouldBeInAuth && inTabsGroup;
+  // Need to redirect to auth if onboarding incomplete AND user is NOT already in auth group
+  // This covers tabs, more, mission, and any other top-level routes
+  const needsNavigationToAuth = shouldBeInAuth && !inAuthGroup;
 
   // Track if navigation has been performed to prevent re-navigation
   const [hasNavigated, setHasNavigated] = useState(false);
@@ -864,7 +928,7 @@ function RootLayoutNav() {
     // Prevent re-navigation
     if (hasNavigated) return;
 
-    // If onboarding not complete and in tabs group, redirect to onboarding
+    // If onboarding not complete and not in auth group, redirect to onboarding
     if (needsNavigationToAuth) {
       setHasNavigated(true);
       router.replace('/(auth)/onboarding');

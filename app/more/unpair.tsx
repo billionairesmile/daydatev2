@@ -171,8 +171,7 @@ export default function UnpairScreen() {
       setCouple(null);
       setPartner(null);
 
-      // Set onboarding incomplete and go directly to pairing screen
-      setIsOnboardingComplete(false);
+      // Set onboarding step first (before changing isOnboardingComplete)
       setOnboardingStep('pairing');
       // Reset all pairing state so user can pair with a new partner
       // Clear anniversaryDate to prevent old date from being applied to new couple
@@ -184,14 +183,31 @@ export default function UnpairScreen() {
         relationshipType: 'dating', // Reset relationship type
       });
 
+      // Show success alert first, then set state on dismiss
+      // Navigation will be handled automatically by _layout.tsx's navigation effect
+      // when isOnboardingComplete becomes false
       Alert.alert(
         t('settings.unpair.success'),
         t('settings.unpair.successMessage'),
         [
           {
             text: t('common.confirm'),
-            // Navigation is handled by _layout.tsx when isOnboardingComplete becomes false
-            // Don't navigate here to avoid duplicate navigation
+            onPress: () => {
+              // Set onboarding step to pairing AGAIN right before state change
+              // This ensures the step is set correctly before navigation effect runs
+              setOnboardingStep('pairing');
+              updateOnboardingData({
+                isPairingConnected: false,
+                isCreatingCode: true,
+                pairingCode: '',
+                anniversaryDate: null,
+                relationshipType: 'dating',
+              });
+
+              // Set onboarding incomplete - this triggers navigation via _layout.tsx effect
+              // DO NOT call router.replace here as it would cause duplicate navigation
+              setIsOnboardingComplete(false);
+            },
           },
         ]
       );

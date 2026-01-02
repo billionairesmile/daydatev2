@@ -141,6 +141,18 @@ export default function OnboardingScreen() {
     ? 'welcome'
     : (shouldShowWelcome ? 'welcome' : currentStep);
 
+  // Debug logging to trace the step calculation
+  console.log('[Onboarding] Step Debug:', {
+    currentStep,
+    effectiveStep,
+    isFullyHydrated,
+    _hasHydrated,
+    onboardingHydrated,
+    isAuthenticated,
+    currentUserId: currentUser?.id,
+    shouldShowWelcome,
+  });
+
   // Also update the store to match (for consistency and future renders)
   // This useEffect ensures the store state is corrected after the synchronous render fix
   useEffect(() => {
@@ -227,8 +239,15 @@ export default function OnboardingScreen() {
 
   // Animation
   const fadeAnim = useRef(new Animated.Value(1)).current;
+  const isTransitioning = useRef(false);
 
   const animateTransition = useCallback((callback: () => void) => {
+    // Prevent rapid tapping - ignore if already transitioning
+    if (isTransitioning.current) {
+      return;
+    }
+    isTransitioning.current = true;
+
     Animated.timing(fadeAnim, {
       toValue: 0,
       duration: 200,
@@ -241,7 +260,10 @@ export default function OnboardingScreen() {
         duration: 250,
         easing: Easing.in(Easing.ease),
         useNativeDriver: true,
-      }).start();
+      }).start(() => {
+        // Only allow next transition after animation completes
+        isTransitioning.current = false;
+      });
     });
   }, [fadeAnim]);
 

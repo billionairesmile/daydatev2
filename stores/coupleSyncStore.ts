@@ -747,12 +747,15 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
 
       // Check if couple was disconnected (partner deleted account or unpaired)
       if (payload.status === 'disconnected') {
-        console.log('[CoupleSyncStore] Couple disconnected - triggering logout flow');
-        // Import dynamically to avoid circular dependency
-        const { useOnboardingStore } = require('./onboardingStore');
-        const { useAuthStore } = require('./authStore');
+        // IMPORTANT: DO NOT modify authStore (couple, partner, isOnboardingComplete) here!
+        // The _layout.tsx realtime handler will:
+        // 1. Show the Alert to the user
+        // 2. On confirm, clear couple/partner and set isOnboardingComplete to false
+        // If we modify authStore here, it causes a race condition where _layout.tsx
+        // subscription gets cleaned up before it can show the Alert
+        console.log('[CoupleSyncStore] Couple disconnected - letting _layout.tsx handle navigation');
 
-        // Clear this user's profile couple_id since the couple is disconnected
+        // Only clear profile couple_id in DB (doesn't affect local state)
         const currentUserId = get().userId;
         if (currentUserId) {
           console.log('[CoupleSyncStore] Clearing profile couple_id for user:', currentUserId);
@@ -761,10 +764,9 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
           });
         }
 
-        // Reset stores and redirect to onboarding
-        get().cleanup();
-        useAuthStore.getState().reset();
-        useOnboardingStore.getState().reset();
+        // DO NOT call get().cleanup() here - it would remove subscriptions before
+        // _layout.tsx can show the Alert. The cleanup will be called by _layout.tsx
+        // in handleDisconnectConfirm after user confirms the Alert.
         return;
       }
 

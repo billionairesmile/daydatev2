@@ -248,9 +248,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: COLORS.black,
+    marginLeft: 8,
   },
   policyModalCloseButton: {
     padding: SPACING.xs,
+    marginRight: 8,
   },
   webView: {
     flex: 1,

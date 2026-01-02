@@ -318,14 +318,14 @@ export default function SettingsScreen() {
           // Continue with deletion even if disconnect fails
         }
 
-        // Send push notification to partner about account deletion
+        // Send push notification to partner about account deletion (fire-and-forget, don't block)
         if (partnerId) {
-          await notifyPartnerUnpaired(
+          notifyPartnerUnpaired(
             partnerId,
             userNickname,
             t('settings.deleteAccount.partnerNotificationTitle'),
             t('settings.deleteAccount.partnerNotificationBody', { nickname: userNickname })
-          );
+          ).catch(err => console.error('[Settings] Push notification error:', err));
         }
       }
 
@@ -346,36 +346,29 @@ export default function SettingsScreen() {
       // 1. Sign out from Supabase FIRST to invalidate the session
       // 2. Clear AsyncStorage so persist middleware can't restore old state
       // 3. Reset in-memory stores to 'welcome'
-      // 4. Wait for React to process state changes
-      // 5. Finally signOut from Zustand (which triggers navigation)
+      // 4. Clear Zustand auth stores (which triggers navigation)
       // This ensures that when onboarding screen mounts, user is definitely not authenticated
 
       // Step 1: Sign out from Supabase to invalidate the session
       // This prevents any auth listeners from detecting an active session
+      // Step 2: Clear all AsyncStorage (run in parallel with Supabase signOut)
       if (!isDemoMode) {
-        try {
-          await supabaseSignOut();
-        } catch (supabaseError) {
-          console.error('[Settings] Supabase signOut error:', supabaseError);
-          // Continue even if Supabase signOut fails
-        }
+        await Promise.all([
+          supabaseSignOut().catch(err => console.error('[Settings] Supabase signOut error:', err)),
+          db.account.clearLocalStorage(),
+        ]);
+      } else {
+        await db.account.clearLocalStorage();
       }
 
-      // Step 2: Clear all AsyncStorage
-      await db.account.clearLocalStorage();
-
-      // Step 3: Reset onboarding state to 'welcome' (in-memory)
+      // Step 3: Reset onboarding state to 'welcome' (in-memory) - synchronous, no delay needed
       setOnboardingStep('welcome');
       resetOnboarding();
 
-      // Step 4: Wait for React to process the state changes before triggering navigation
-      // This ensures the 'welcome' step is fully committed to the store
-      await new Promise(resolve => setTimeout(resolve, 50));
-
-      // Step 5: Clear Zustand auth stores - this sets isOnboardingComplete to false
+      // Step 4: Clear Zustand auth stores - this sets isOnboardingComplete to false
       signOut();
 
-      // Step 6: Explicitly navigate to onboarding screen immediately
+      // Step 5: Explicitly navigate to onboarding screen immediately
       // This prevents the brief flash of intermediate screens that would occur
       // if we relied on _layout.tsx useEffect to handle navigation
       router.replace('/(auth)/onboarding');
