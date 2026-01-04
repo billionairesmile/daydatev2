@@ -125,6 +125,7 @@ export default function MissionScreen() {
     hasUsedRefreshToday,
     generatedMissionData, // Subscribe to this state to trigger re-renders
     refreshUsedDate, // Subscribe to refreshUsedDate to trigger re-renders when refresh is used
+    todayCompletedMission, // Subscribe to trigger re-renders when mission is completed (disables other Start buttons)
   } = useMissionStore();
 
   // Couple sync state
@@ -1227,7 +1228,7 @@ export default function MissionScreen() {
                 offset: SNAP_INTERVAL * index,
                 index,
               })}
-              extraData={[hasGeneratedMissions, allMissions.map(m => m.id).join(','), lockedMissionId]}
+              extraData={[hasGeneratedMissions, allMissions.map(m => m.id).join(','), lockedMissionId, todayCompletedMission]}
               initialNumToRender={3}
               maxToRenderPerBatch={3}
               windowSize={5}

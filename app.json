@@ -16,6 +16,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.daydate.app",
+      "buildNumber": "13",
       "usesAppleSignIn": true,
       "infoPlist": {
         "NSCameraUsageDescription": "Allow Daydate to access your camera to capture memories.",
@@ -104,10 +105,10 @@
     },
     "extra": {
       "eas": {
-        "projectId": "112f6544-0d43-4858-9616-e7af8cffba17"
+        "projectId": "e1dc011d-d759-445f-8686-a08fe4981c53"
       },
       "router": {}
     },
-    "owner": "mywhink"
+    "owner": "daydate_official"
   }
 }

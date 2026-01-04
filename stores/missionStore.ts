@@ -261,6 +261,10 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
       canStartMission: (missionId) => {
         const { todayCompletedMission } = get();
         const syncStore = useCoupleSyncStore.getState();
+        const subscriptionStore = useSubscriptionStore.getState();
+
+        // Premium users (or partner is premium) can start unlimited missions
+        const isCouplePremium = subscriptionStore.isPremium || subscriptionStore.partnerIsPremium;
 
         // Check if another mission is already locked (message written)
         if (syncStore.isInitialized && syncStore.lockedMissionId) {
@@ -276,6 +280,11 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
               return false;
             }
           }
+        }
+
+        // Premium users can start new missions even after completing one today
+        if (isCouplePremium) {
+          return true;
         }
 
         if (!todayCompletedMission) return true;

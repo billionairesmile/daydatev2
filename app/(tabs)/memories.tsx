@@ -783,6 +783,11 @@ export default function MemoriesScreen() {
         setLocalAlbums([...localAlbums, newAlbum]);
       }
 
+      // Prefetch cover photo before showing in list for instant display
+      if (finalCoverPhotoUrl) {
+        ExpoImage.prefetch(finalCoverPhotoUrl).catch(() => {});
+      }
+
       // Animate out then reset modal state
       Animated.parallel([
         Animated.timing(albumModalScaleAnim, {
@@ -1162,7 +1167,7 @@ export default function MemoriesScreen() {
                         <View style={styles.hardcoverBook}>
                           {/* Full Photo Background */}
                           {album.coverPhoto ? (
-                            <ExpoImage source={{ uri: album.coverPhoto }} style={styles.bookFullPhoto} contentFit="cover" cachePolicy="memory-disk" transition={100} />
+                            <ExpoImage source={{ uri: album.coverPhoto }} style={styles.bookFullPhoto} contentFit="cover" cachePolicy="memory-disk" transition={100} priority="high" />
                           ) : (
                             <View style={styles.bookPlaceholder}>
                               <ImageIcon color="rgba(255,255,255,0.3)" size={24} />
@@ -1382,7 +1387,7 @@ export default function MemoriesScreen() {
                         <View style={styles.hardcoverBook}>
                           {/* Full Photo Background */}
                           {album.coverPhoto ? (
-                            <ExpoImage source={{ uri: album.coverPhoto }} style={styles.bookFullPhoto} contentFit="cover" cachePolicy="memory-disk" transition={100} />
+                            <ExpoImage source={{ uri: album.coverPhoto }} style={styles.bookFullPhoto} contentFit="cover" cachePolicy="memory-disk" transition={100} priority="high" />
                           ) : (
                             <View style={styles.bookPlaceholder}>
                               <ImageIcon color="rgba(255,255,255,0.3)" size={24} />

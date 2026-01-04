@@ -29,7 +29,9 @@ type BookmarkItem = KeptMission | SyncedBookmark;
 export function BookmarkedMissionsPage({ onBack }: BookmarkedMissionsPageProps) {
   const { t } = useTranslation();
   const router = useRouter();
-  const { keptMissions, removeKeptMissionByKeptId, canStartMission, isTodayCompletedMission } = useMissionStore();
+  // Subscribe to todayCompletedMission to trigger re-render when a mission is completed
+  // This ensures Start buttons are properly disabled after completing any mission
+  const { keptMissions, removeKeptMissionByKeptId, canStartMission, isTodayCompletedMission, todayCompletedMission } = useMissionStore();
   const { sharedBookmarks, removeBookmark, isInitialized: isSyncInitialized } = useCoupleSyncStore();
 
   // Use synced bookmarks if initialized, otherwise fall back to local
