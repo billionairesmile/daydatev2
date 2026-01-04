@@ -860,8 +860,9 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       return;
     }
 
-    // Expire old missions first
+    // Expire old missions first, then delete expired ones to prevent data bloat
     await db.coupleMissions.expireOld(coupleId);
+    await db.coupleMissions.deleteExpired(coupleId);
 
     // Calculate expiration time based on couple's timezone setting
     const expiresAt = getNextMidnightInTimezone();
@@ -1739,6 +1740,11 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
         ]).catch((err) => {
           console.error('[CoupleSyncStore] Failed to cancel reminder notifications:', err);
         });
+
+        // Auto-remove from bookmarks when mission is completed
+        get().removeBookmark(targetProgress.mission_id).catch((err) => {
+          console.warn('[CoupleSyncStore] Failed to auto-remove bookmark on mission complete:', err);
+        });
       } else {
         updates.status = 'waiting_partner';
       }
@@ -1769,6 +1775,11 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
         cancelHourlyReminders(),
       ]).catch((err) => {
         console.error('[CoupleSyncStore] Failed to cancel reminder notifications:', err);
+      });
+
+      // Auto-remove from bookmarks when mission is completed
+      get().removeBookmark(targetProgress.mission_id).catch((err) => {
+        console.warn('[CoupleSyncStore] Failed to auto-remove bookmark on mission complete:', err);
       });
     } else if (partnerId) {
       // Mission not complete yet - notify partner that message was written
@@ -1810,6 +1821,12 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     if (!coupleId || isInTestMode()) return;
 
     set({ isLoadingProgress: true });
+
+    // First, cleanup expired incomplete missions and their photos from storage
+    // This runs on app startup to prevent orphaned files from accumulating
+    db.missionProgress.deleteExpiredIncomplete(coupleId).catch((err) => {
+      console.warn('[CoupleSyncStore] Failed to cleanup expired missions:', err);
+    });
 
     // Load all mission progress for today
     const { data: allData, error } = await db.missionProgress.getTodayAll(coupleId);

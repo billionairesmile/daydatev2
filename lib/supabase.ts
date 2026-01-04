@@ -1536,6 +1536,19 @@ export const db = {
       return { error };
     },
 
+    // Delete all expired missions for a couple (cleanup old data)
+    // This prevents data bloat - expired missions are no longer needed
+    // Note: couple_bookmarks is independent and won't be affected
+    async deleteExpired(coupleId: string) {
+      const client = getSupabase();
+      const { error } = await client
+        .from('couple_missions')
+        .delete()
+        .eq('couple_id', coupleId)
+        .eq('status', 'expired');
+      return { error };
+    },
+
     // Mark missions as refreshed (syncs refresh status between users)
     async setRefreshed(coupleId: string) {
       const client = getSupabase();
@@ -2319,6 +2332,61 @@ export const db = {
       return { error };
     },
 
+    // Delete all expired (past date) mission progress that wasn't completed
+    // Also deletes associated photos from storage to prevent orphaned files
+    async deleteExpiredIncomplete(coupleId: string) {
+      const client = getSupabase();
+      const today = formatDateToLocal(new Date());
+
+      // First, get all incomplete missions from past dates to retrieve their photo URLs
+      const { data: expiredMissions, error: fetchError } = await client
+        .from('mission_progress')
+        .select('id, photo_url')
+        .eq('couple_id', coupleId)
+        .lt('date', today)
+        .neq('status', 'completed');
+
+      if (fetchError) {
+        console.error('[MissionProgress] Error fetching expired incomplete missions:', fetchError);
+        return { error: fetchError };
+      }
+
+      // Delete photos from storage if they exist
+      if (expiredMissions && expiredMissions.length > 0) {
+        const photoUrls = expiredMissions
+          .map(m => m.photo_url)
+          .filter((url): url is string => !!url);
+
+        if (photoUrls.length > 0) {
+          const storagePaths = photoUrls
+            .map(url => extractStoragePathFromUrl(url))
+            .filter((path): path is string => !!path);
+
+          if (storagePaths.length > 0) {
+            const { error: storageError } = await client.storage
+              .from('memories')
+              .remove(storagePaths);
+
+            if (storageError) {
+              console.warn('[MissionProgress] Error deleting expired photos from storage:', storageError);
+            } else {
+              console.log('[MissionProgress] Deleted', storagePaths.length, 'expired mission photos from storage');
+            }
+          }
+        }
+      }
+
+      // Delete the expired incomplete mission progress records
+      const { error } = await client
+        .from('mission_progress')
+        .delete()
+        .eq('couple_id', coupleId)
+        .lt('date', today)
+        .neq('status', 'completed');
+
+      return { error };
+    },
+
     subscribeToProgress(
       coupleId: string,
       callback: (payload: { eventType: string; progress: unknown }) => void
@@ -2455,6 +2523,11 @@ export const db = {
         console.log('[Album Delete] Album cover URL:', album?.cover_photo_url);
       }
 
+      // Store cover URL before deletion (in case we need it after DB delete)
+      const coverUrl = album?.cover_photo_url;
+      const coverPath = coverUrl ? extractStoragePathFromUrl(coverUrl) : null;
+      console.log('[Album Delete] Will delete storage path:', coverPath);
+
       // Delete album record from database
       const { error } = await client
         .from('couple_albums')
@@ -2469,16 +2542,22 @@ export const db = {
       console.log('[Album Delete] DB record deleted successfully');
 
       // Delete cover image from storage if exists (after successful DB delete)
-      if (album?.cover_photo_url) {
-        const coverPath = extractStoragePathFromUrl(album.cover_photo_url);
-        console.log('[Album Delete] Extracted storage path:', coverPath);
-        if (coverPath) {
-          await deleteFromStorage(coverPath);
-        } else {
-          console.warn('[Album Delete] Could not extract storage path from URL');
+      if (coverPath) {
+        try {
+          const { error: storageError } = await client.storage
+            .from('memories')
+            .remove([coverPath]);
+
+          if (storageError) {
+            console.error('[Album Delete] Storage delete FAILED:', storageError.message, 'Path:', coverPath);
+          } else {
+            console.log('[Album Delete] Storage file deleted successfully:', coverPath);
+          }
+        } catch (e) {
+          console.error('[Album Delete] Storage delete exception:', e, 'Path:', coverPath);
         }
       } else {
-        console.log('[Album Delete] No cover photo to delete');
+        console.log('[Album Delete] No cover photo to delete (no valid path)');
       }
 
       return { error };
@@ -2989,10 +3068,28 @@ export const db = {
 
     /**
      * Run cleanup manually (deletes couples disconnected > 30 days)
+     * Also cleans up storage files for each couple before DB deletion
      * @param trigger - Source of cleanup: 'manual' or 'user_request'
      */
     async runCleanup(trigger: 'manual' | 'user_request' = 'manual') {
       const client = getSupabase();
+
+      // First, get list of couples that will be deleted
+      const { data: previewData } = await client.rpc('preview_cleanup_disconnected_couples');
+
+      // Clean up storage for each couple that will be deleted (30+ days disconnected)
+      if (previewData && Array.isArray(previewData)) {
+        const couplesToDelete = previewData.filter(
+          (c: { days_since_disconnect: number }) => c.days_since_disconnect >= 30
+        );
+
+        for (const couple of couplesToDelete) {
+          console.log('[Cleanup] Cleaning storage for couple:', couple.couple_id);
+          await this.cleanupCoupleStorage(couple.couple_id);
+        }
+      }
+
+      // Then run DB cleanup (CASCADE deletes related records)
       const { data, error } = await client.rpc('cleanup_disconnected_couples_with_log', {
         p_trigger: trigger,
       });

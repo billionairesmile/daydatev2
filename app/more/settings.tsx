@@ -42,6 +42,7 @@ import { COLORS, SPACING, RADIUS } from '@/constants/design';
 import { useOnboardingStore, useAuthStore, useMemoryStore, useLanguageStore, getLanguageDisplayName, useSubscriptionStore, useTimezoneStore, getTimezoneDisplayName, getDeviceTimezoneLabel, COMMON_TIMEZONES } from '@/stores';
 import type { SupportedLanguage, TimezoneId } from '@/stores';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
+import { useMissionStore } from '@/stores/missionStore';
 import { db, isDemoMode } from '@/lib/supabase';
 import { signOut as supabaseSignOut } from '@/lib/socialAuth';
 import { notifyPartnerUnpaired, getNotificationPermissionStatus } from '@/lib/pushNotifications';
@@ -211,6 +212,15 @@ export default function SettingsScreen() {
             // Cleanup realtime subscriptions and reset coupleSyncStore state (missions, bookmarks, etc.)
             const { cleanup: cleanupSync } = useCoupleSyncStore.getState();
             cleanupSync();
+
+            // Reset all user-specific stores to prevent data leaking to next user
+            const { reset: resetMission } = useMissionStore.getState();
+            const { reset: resetMemory } = useMemoryStore.getState();
+            const { reset: resetSubscription } = useSubscriptionStore.getState();
+            resetMission();
+            resetMemory();
+            resetSubscription();
+
             // Clear all auth data (user, couple, partner)
             signOut();
             // Reset onboarding steps to welcome

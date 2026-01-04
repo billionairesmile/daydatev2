@@ -664,6 +664,102 @@ function analyzeMBTICombination(mbtiA?: string, mbtiB?: string): string {
 }
 
 // ============================================
+// Keyword Extraction for Deduplication (v4)
+// ============================================
+
+// Common activity/theme keywords to extract and blacklist
+const ACTIVITY_KEYWORDS = {
+  // Activity types (EN)
+  activities_en: [
+    'stroll', 'walk', 'hike', 'hiking', 'explore', 'exploring', 'visit', 'watch', 'watching',
+    'photography', 'photo', 'photos', 'picture', 'pictures', 'shoot', 'shooting',
+    'workshop', 'class', 'lesson', 'cooking', 'baking', 'crafting', 'making',
+    'market', 'shopping', 'hunt', 'hunting', 'tour', 'touring', 'adventure',
+    'picnic', 'brunch', 'dinner', 'lunch', 'breakfast', 'tasting', 'sampling',
+    'game', 'games', 'puzzle', 'escape', 'challenge', 'competition',
+    'movie', 'film', 'cinema', 'marathon', 'binge',
+    'yoga', 'meditation', 'spa', 'massage', 'wellness', 'relaxation',
+    'running', 'jogging', 'cycling', 'biking', 'swimming', 'workout',
+    'dance', 'dancing', 'singing', 'karaoke', 'concert', 'performance',
+    'reading', 'book', 'books', 'study', 'learning', 'museum', 'gallery', 'exhibition',
+    'drive', 'driving', 'road trip', 'stargazing', 'sunrise', 'sunset',
+  ],
+  // Place/theme keywords (EN)
+  places_en: [
+    'park', 'beach', 'mountain', 'hill', 'river', 'lake', 'ocean', 'sea', 'forest', 'garden',
+    'cafe', 'coffee', 'bakery', 'restaurant', 'bar', 'pub', 'rooftop',
+    'street', 'alley', 'neighborhood', 'downtown', 'old town', 'plaza',
+    'night', 'evening', 'morning', 'dawn', 'dusk', 'golden hour',
+    'winter', 'summer', 'spring', 'fall', 'autumn', 'seasonal', 'holiday',
+    'art', 'artisan', 'craft', 'diy', 'handmade', 'creative',
+    'lights', 'illumination', 'lantern', 'candle', 'bonfire',
+    'temple', 'shrine', 'church', 'cathedral', 'palace', 'castle',
+    'local', 'hidden', 'secret', 'cozy', 'vintage', 'retro',
+  ],
+  // Activity types (KO)
+  activities_ko: [
+    '산책', '걷기', '하이킹', '등산', '탐방', '탐험', '방문', '구경', '감상',
+    '사진', '촬영', '포토', '스냅', '찍기',
+    '워크샵', '클래스', '수업', '요리', '베이킹', '만들기', '공예', 'DIY',
+    '시장', '마켓', '장보기', '쇼핑', '투어', '어드벤처', '모험',
+    '피크닉', '브런치', '저녁', '점심', '아침', '맛집', '먹방', '시식',
+    '게임', '퍼즐', '방탈출', '챌린지', '대결', '시합',
+    '영화', '넷플릭스', '시네마', '마라톤', '정주행',
+    '요가', '명상', '스파', '마사지', '힐링', '휴식',
+    '러닝', '조깅', '자전거', '수영', '운동', '헬스',
+    '춤', '댄스', '노래', '노래방', '콘서트', '공연',
+    '독서', '책', '공부', '학습', '미술관', '갤러리', '전시',
+    '드라이브', '별보기', '일출', '일몰', '노을',
+  ],
+  // Place/theme keywords (KO)
+  places_ko: [
+    '공원', '해변', '바다', '산', '강', '호수', '숲', '정원', '뷰',
+    '카페', '커피', '빵집', '레스토랑', '맛집', '바', '루프탑',
+    '거리', '골목', '동네', '시내', '구시가', '광장',
+    '밤', '야경', '저녁', '아침', '새벽', '황혼',
+    '겨울', '여름', '봄', '가을', '계절', '명절',
+    '예술', '아트', '공예', '수공예', '핸드메이드', '창작',
+    '조명', '불빛', '등불', '캔들', '모닥불',
+    '절', '성당', '교회', '사찰', '궁', '성',
+    '로컬', '숨은', '비밀', '아늑한', '빈티지', '레트로',
+    '야시장', '푸드', '스트릿',
+  ],
+};
+
+/**
+ * Extract keywords from recent mission titles and descriptions
+ * These keywords will be blacklisted to prevent similar missions
+ */
+function extractKeywordsFromHistory(
+  titles: string[],
+  descriptions: string[] = []
+): { activityKeywords: string[]; themeKeywords: string[] } {
+  const allText = [...titles, ...descriptions].join(' ').toLowerCase();
+
+  const activityKeywords = new Set<string>();
+  const themeKeywords = new Set<string>();
+
+  // Extract activity keywords
+  [...ACTIVITY_KEYWORDS.activities_en, ...ACTIVITY_KEYWORDS.activities_ko].forEach(keyword => {
+    if (allText.includes(keyword.toLowerCase())) {
+      activityKeywords.add(keyword);
+    }
+  });
+
+  // Extract theme/place keywords
+  [...ACTIVITY_KEYWORDS.places_en, ...ACTIVITY_KEYWORDS.places_ko].forEach(keyword => {
+    if (allText.includes(keyword.toLowerCase())) {
+      themeKeywords.add(keyword);
+    }
+  });
+
+  return {
+    activityKeywords: Array.from(activityKeywords).slice(0, 15), // Limit to prevent token bloat
+    themeKeywords: Array.from(themeKeywords).slice(0, 15),
+  };
+}
+
+// ============================================
 // Deduplication Context Builder (Token-Efficient)
 // ============================================
 
@@ -686,14 +782,52 @@ function buildDeduplicationContext(history: MissionHistorySummary | undefined, l
     }
   }
 
-  // 2. Category statistics (very token efficient, ~30-50 tokens)
+  // 2. Extract and blacklist keywords from recent missions (NEW in v4)
+  if (history.recentTitles.length > 0) {
+    const { activityKeywords, themeKeywords } = extractKeywordsFromHistory(history.recentTitles);
+
+    if (activityKeywords.length > 0 || themeKeywords.length > 0) {
+      if (language === 'ko') {
+        parts.push(`\n🚨🚨🚨 [금지 키워드 - 이 단어가 포함된 미션 생성 절대 금지!] 🚨🚨🚨`);
+        if (activityKeywords.length > 0) {
+          parts.push(`  ❌ 금지 활동: ${activityKeywords.join(', ')}`);
+        }
+        if (themeKeywords.length > 0) {
+          parts.push(`  ❌ 금지 테마/장소: ${themeKeywords.join(', ')}`);
+        }
+        parts.push(`  ⚠️ 위 키워드와 유사한 표현도 금지! (예: stroll ≈ walk ≈ 산책)`);
+        parts.push(`  ✅ 완전히 새로운 활동과 장소 유형만 추천하세요!`);
+      } else {
+        parts.push(`\n🚨🚨🚨 [BLACKLISTED KEYWORDS - NEVER use these in missions!] 🚨🚨🚨`);
+        if (activityKeywords.length > 0) {
+          parts.push(`  ❌ Forbidden activities: ${activityKeywords.join(', ')}`);
+        }
+        if (themeKeywords.length > 0) {
+          parts.push(`  ❌ Forbidden themes/places: ${themeKeywords.join(', ')}`);
+        }
+        parts.push(`  ⚠️ Similar expressions are also forbidden! (e.g., stroll ≈ walk ≈ wander)`);
+        parts.push(`  ✅ Only recommend completely NEW activities and place types!`);
+      }
+    }
+  }
+
+  // 3. Category statistics (very token efficient, ~30-50 tokens)
   if (Object.keys(history.categoryStats).length > 0) {
     // Sort by count (descending) to show most used categories
     const sortedCategories = Object.entries(history.categoryStats)
       .sort((a, b) => b[1] - a[1]);
 
-    // Find underutilized categories
-    const allCategories = ['cafe', 'restaurant', 'outdoor', 'home', 'game', 'creative', 'culture', 'photo', 'romantic', 'online'];
+    // Find overused categories (3+ times)
+    const overusedCategories = sortedCategories
+      .filter(([_, count]) => count >= 3)
+      .map(([cat]) => cat);
+
+    // Find underutilized categories - expanded list for more diversity
+    const allCategories = [
+      'cafe', 'restaurant', 'outdoor', 'home', 'game', 'creative', 'culture',
+      'photo', 'romantic', 'online', 'fitness', 'sports', 'wellness',
+      'learning', 'cooking', 'challenge', 'movie', 'night', 'nature'
+    ];
     const underusedCategories = allCategories.filter(cat =>
       !history.categoryStats[cat] || history.categoryStats[cat] <= 1
     );
@@ -703,16 +837,24 @@ function buildDeduplicationContext(history: MissionHistorySummary | undefined, l
       parts.push(`\n📊 [카테고리별 완료 현황]`);
       parts.push(`  ${statsStr}`);
 
+      if (overusedCategories.length > 0) {
+        parts.push(`  🚫 과다 사용 카테고리 (피하세요!): ${overusedCategories.join(', ')}`);
+      }
+
       if (underusedCategories.length > 0) {
-        parts.push(`  💡 덜 해본 카테고리: ${underusedCategories.slice(0, 5).join(', ')} → 우선 추천!`);
+        parts.push(`  💡 덜 해본 카테고리 (우선 추천!): ${underusedCategories.slice(0, 7).join(', ')}`);
       }
     } else {
       const statsStr = sortedCategories.map(([cat, count]) => `${cat}(${count})`).join(', ');
       parts.push(`\n📊 [Category Completion Stats]`);
       parts.push(`  ${statsStr}`);
 
+      if (overusedCategories.length > 0) {
+        parts.push(`  🚫 Overused categories (AVOID!): ${overusedCategories.join(', ')}`);
+      }
+
       if (underusedCategories.length > 0) {
-        parts.push(`  💡 Less explored: ${underusedCategories.slice(0, 5).join(', ')} → Prioritize these!`);
+        parts.push(`  💡 Less explored (PRIORITIZE!): ${underusedCategories.slice(0, 7).join(', ')}`);
       }
     }
   }
@@ -1050,63 +1192,75 @@ function getOutputLanguageInstruction(language: SupportedLanguage): string {
 
 const REGION_FEW_SHOTS: Record<RegionCode, string> = {
   EAST_ASIA: `[
-  {"title":"노을 지는 강변, 우리의 시간","description":"강변 산책하며 일몰 감상하기","category":"outdoor","difficulty":1},
-  {"title":"별빛 아래 드라이브","description":"야경 드라이브하며 좋아하는 음악 듣기","category":"drive","difficulty":1},
-  {"title":"동네 한 바퀴, 손잡고","description":"집 근처 골목 산책하며 수다 떨기","category":"outdoor","difficulty":1},
-  {"title":"편의점 미식회","description":"편의점 음식 조합해서 나만의 메뉴 만들기","category":"streetfood","difficulty":1},
-  {"title":"우리 집 영화관","description":"넷플릭스 보며 집에서 팝콘 파티","category":"home","difficulty":1},
-  {"title":"단서를 찾아서","description":"방탈출 카페에서 협동 미션 클리어","category":"game","difficulty":3},
-  {"title":"오늘의 카페 탐험","description":"새로운 감성 카페에서 시그니처 메뉴 도전","category":"cafe","difficulty":2}
+  {"title":"퍼즐 한 조각씩, 완성되는 우리","description":"1000피스 직소 퍼즐을 함께 맞추며 대화하기","category":"game","difficulty":1},
+  {"title":"땀 흘린 후의 달콤함","description":"30분 같이 조깅하고 근처 맛집에서 보상 식사","category":"fitness","difficulty":1},
+  {"title":"우리만의 플레이리스트","description":"서로 추천 노래 5곡씩 공유하고 감상평 나누기","category":"online","difficulty":1},
+  {"title":"보드게임 챔피언십","description":"3가지 보드게임으로 진지한 토너먼트 대결","category":"game","difficulty":1},
+  {"title":"새로운 레시피 도전기","description":"한 번도 안 만들어본 요리 함께 도전","category":"cooking","difficulty":2},
+  {"title":"우리동네 사진관","description":"스마트폰으로 동네 숨은 명소 10곳 촬영 미션","category":"photo","difficulty":1},
+  {"title":"독서 데이트","description":"같은 공간에서 각자 책 읽고 30분 후 감상 공유","category":"learning","difficulty":1},
+  {"title":"홈트 챌린지","description":"유튜브 운동 영상 따라하며 함께 스트레칭","category":"fitness","difficulty":1},
+  {"title":"추억의 게임 대결","description":"레트로 게임이나 모바일 게임으로 대결하기","category":"game","difficulty":1}
 ]`,
 
   SOUTHEAST_ASIA: `[
-  {"title":"Sunset Beach Stroll","description":"Walk barefoot on the beach as the sun sets","category":"outdoor","difficulty":1},
-  {"title":"Night Market Adventure","description":"Explore the local night market and try 3 different snacks","category":"streetfood","difficulty":1},
-  {"title":"Temple Morning","description":"Visit a nearby temple and make wishes together","category":"culture","difficulty":1},
-  {"title":"Street Food Hunt","description":"Find the best pad thai or pho in the neighborhood","category":"streetfood","difficulty":1},
-  {"title":"Motorbike Sunset","description":"Ride together and catch the sunset at a scenic spot","category":"outdoor","difficulty":1},
-  {"title":"Spa Day Together","description":"Relax with a couples massage at a local spa","category":"wellness","difficulty":3},
-  {"title":"Cooking Class Date","description":"Learn to cook local dishes together","category":"cooking","difficulty":3}
+  {"title":"Couple's Yoga Morning","description":"Follow a beginner yoga video together and stretch","category":"fitness","difficulty":1},
+  {"title":"Recipe Roulette","description":"Pick a random local recipe and cook it together","category":"cooking","difficulty":1},
+  {"title":"Board Game Battle","description":"Challenge each other to 3 rounds of card or board games","category":"game","difficulty":1},
+  {"title":"Photo Scavenger Hunt","description":"Take 10 creative photos based on a theme you choose","category":"photo","difficulty":1},
+  {"title":"Language Exchange","description":"Teach each other 10 words in your native languages","category":"learning","difficulty":1},
+  {"title":"Smoothie Challenge","description":"Create unique fruit smoothies and rate each other's","category":"cooking","difficulty":1},
+  {"title":"DIY Spa Night","description":"Face masks, foot soaks, and relaxation at home","category":"wellness","difficulty":1},
+  {"title":"Puzzle Partners","description":"Complete a jigsaw puzzle together while chatting","category":"game","difficulty":1},
+  {"title":"Dance Tutorial Date","description":"Learn a TikTok dance or simple choreography together","category":"creative","difficulty":1}
 ]`,
 
   NORTH_AMERICA: `[
-  {"title":"Chasing the Golden Hour","description":"Watch sunset together at a scenic viewpoint","category":"outdoor","difficulty":1},
-  {"title":"Trail Tales","description":"Hike a local trail and pack simple snacks","category":"nature","difficulty":1},
-  {"title":"Starlit Conversations","description":"Find a dark spot and stargaze together","category":"outdoor","difficulty":1},
-  {"title":"Neighborhood Wander","description":"Walk around the neighborhood and discover new spots","category":"outdoor","difficulty":1},
-  {"title":"Couch Cinema","description":"Movie marathon at home with homemade popcorn","category":"home","difficulty":1},
-  {"title":"Escape Together","description":"Team up to beat an escape room challenge","category":"game","difficulty":3},
-  {"title":"Brunch Vibes","description":"Try a new brunch spot and share plates","category":"brunch","difficulty":2}
+  {"title":"Puzzle Night In","description":"Work on a 500+ piece puzzle together over snacks","category":"game","difficulty":1},
+  {"title":"Workout Buddies","description":"Complete a 30-min home workout video together","category":"fitness","difficulty":1},
+  {"title":"Recipe Challenge","description":"Each pick an ingredient, create a dish using both","category":"cooking","difficulty":1},
+  {"title":"Board Game Tournament","description":"Play best of 3 board games with bragging rights","category":"game","difficulty":1},
+  {"title":"Photo Walk Challenge","description":"Take 15 photos each on a theme, compare favorites","category":"photo","difficulty":1},
+  {"title":"Book Club for Two","description":"Read the same chapter and discuss over tea","category":"learning","difficulty":1},
+  {"title":"DIY Craft Night","description":"Follow a YouTube craft tutorial and create together","category":"creative","difficulty":2},
+  {"title":"Playlist Swap","description":"Create playlists for each other and listen together","category":"online","difficulty":1},
+  {"title":"Trivia Night at Home","description":"Quiz each other on random topics, keep score","category":"game","difficulty":1}
 ]`,
 
   EUROPE: `[
-  {"title":"Canal-side Wander","description":"Walk along the canal as the sun sets","category":"outdoor","difficulty":1},
-  {"title":"Plaza People-watching","description":"Grab takeaway coffee, sit in a plaza, watch the world","category":"outdoor","difficulty":1},
-  {"title":"Sunset Picnic","description":"Simple picnic in the park with bread and cheese","category":"outdoor","difficulty":1},
-  {"title":"Old Town Stroll","description":"Explore cobblestone streets hand in hand","category":"outdoor","difficulty":1},
-  {"title":"Cook Together Night","description":"Make a simple pasta dinner at home together","category":"home","difficulty":1},
-  {"title":"Terrace Wine Hour","description":"Share a bottle at a cozy terrace bar","category":"drink","difficulty":2},
-  {"title":"Gallery Afternoon","description":"Wander through a gallery and discuss favorite pieces","category":"culture","difficulty":2}
+  {"title":"Puzzle & Wine Evening","description":"Work on a puzzle while sharing a bottle of wine","category":"game","difficulty":1},
+  {"title":"Morning Yoga Together","description":"Follow a yoga video and start the day refreshed","category":"fitness","difficulty":1},
+  {"title":"Recipe from Scratch","description":"Cook a traditional dish neither has made before","category":"cooking","difficulty":2},
+  {"title":"Card Game Marathon","description":"Learn a new card game and play multiple rounds","category":"game","difficulty":1},
+  {"title":"Photo Journal","description":"Document your day in photos and create a mini album","category":"photo","difficulty":1},
+  {"title":"Language Lesson","description":"Teach each other phrases in different languages","category":"learning","difficulty":1},
+  {"title":"Pottery or Craft Class","description":"Take a beginner crafting workshop together","category":"creative","difficulty":3},
+  {"title":"Music Discovery Session","description":"Share 5 songs each that defined your youth","category":"online","difficulty":1},
+  {"title":"Documentary & Discussion","description":"Watch a documentary and debate the topic after","category":"learning","difficulty":1}
 ]`,
 
   LATIN_AMERICA: `[
-  {"title":"Beach Sunset Walk","description":"Walk barefoot on the beach as the sun sets","category":"outdoor","difficulty":1},
-  {"title":"Plaza Dancing","description":"Dance to street musicians in the plaza","category":"outdoor","difficulty":1},
-  {"title":"Malecon Stroll","description":"Evening walk along the waterfront","category":"outdoor","difficulty":1},
-  {"title":"Street Food Adventure","description":"Try cheap street tacos from a local stand","category":"food","difficulty":1},
-  {"title":"Home Salsa Night","description":"Put on music and dance together at home","category":"home","difficulty":1},
-  {"title":"Salsa Class Date","description":"Take a beginner salsa class together","category":"activity","difficulty":3},
-  {"title":"Ceviche by the Sea","description":"Fresh ceviche at a beachside spot","category":"food","difficulty":2}
+  {"title":"Salsa at Home","description":"Learn basic salsa steps from YouTube in your living room","category":"fitness","difficulty":1},
+  {"title":"Recipe Adventure","description":"Cook a dish from a country neither has visited","category":"cooking","difficulty":2},
+  {"title":"Card Game Night","description":"Play traditional card games with homemade snacks","category":"game","difficulty":1},
+  {"title":"Photo Story","description":"Create a photo story of your neighborhood together","category":"photo","difficulty":1},
+  {"title":"Puzzle Party","description":"Complete a colorful puzzle while listening to music","category":"game","difficulty":1},
+  {"title":"Craft Project","description":"Make friendship bracelets or simple crafts together","category":"creative","difficulty":1},
+  {"title":"Music Exchange","description":"Introduce each other to your favorite artists","category":"online","difficulty":1},
+  {"title":"Workout Challenge","description":"Do a fitness challenge video and cheer each other on","category":"fitness","difficulty":1},
+  {"title":"Trivia Battle","description":"Create trivia questions about each other and compete","category":"game","difficulty":1}
 ]`,
 
   DEFAULT: `[
-  {"title":"Sunset Watch","description":"Find a nice spot and watch the sunset together","category":"outdoor","difficulty":1},
-  {"title":"Park Picnic","description":"Pack simple snacks and enjoy a picnic in the park","category":"outdoor","difficulty":1},
-  {"title":"Neighborhood Walk","description":"Explore your neighborhood and find hidden gems","category":"outdoor","difficulty":1},
-  {"title":"Home Movie Night","description":"Pick a movie and make popcorn at home","category":"home","difficulty":1},
-  {"title":"Cook Together","description":"Try a new recipe and cook dinner together","category":"home","difficulty":1},
-  {"title":"Cafe Hopping","description":"Visit a new cafe and try their signature drink","category":"cafe","difficulty":2},
-  {"title":"Local Attraction","description":"Visit a local attraction you haven't been to","category":"culture","difficulty":2}
+  {"title":"Puzzle Time","description":"Start a jigsaw puzzle together and chat","category":"game","difficulty":1},
+  {"title":"Home Workout","description":"Follow a workout video together at home","category":"fitness","difficulty":1},
+  {"title":"Cooking Challenge","description":"Each choose an ingredient, cook something with both","category":"cooking","difficulty":1},
+  {"title":"Board Game Night","description":"Play 2-3 board games and keep a running score","category":"game","difficulty":1},
+  {"title":"Photo Mission","description":"Take 10 creative photos around your area","category":"photo","difficulty":1},
+  {"title":"Learning Together","description":"Watch an educational video and discuss","category":"learning","difficulty":1},
+  {"title":"DIY Project","description":"Create something together following a tutorial","category":"creative","difficulty":2},
+  {"title":"Music Sharing","description":"Create playlists for each other to enjoy","category":"online","difficulty":1},
+  {"title":"Quiz Night","description":"Take personality quizzes together and compare","category":"game","difficulty":1}
 ]`,
 };
 
@@ -1116,43 +1270,53 @@ const REGION_FEW_SHOTS: Record<RegionCode, string> = {
 
 const LANGUAGE_FEW_SHOTS: Record<SupportedLanguage, string> = {
   ko: `[
-  {"title":"노을 지는 강변, 우리의 시간","description":"강변 산책하며 일몰 감상하기","category":"outdoor","difficulty":1},
-  {"title":"별빛 아래 드라이브","description":"야경 드라이브하며 좋아하는 음악 듣기","category":"drive","difficulty":1},
-  {"title":"편의점 미식회","description":"편의점 음식 조합해서 나만의 메뉴 만들기","category":"streetfood","difficulty":1},
-  {"title":"우리 집 영화관","description":"넷플릭스 보며 집에서 팝콘 파티","category":"home","difficulty":1},
-  {"title":"오늘의 카페 탐험","description":"새로운 감성 카페에서 시그니처 메뉴 도전","category":"cafe","difficulty":2}
+  {"title":"퍼즐 한 조각씩, 완성되는 우리","description":"1000피스 직소 퍼즐을 함께 맞추며 대화하기","category":"game","difficulty":1},
+  {"title":"땀 흘린 후의 달콤함","description":"30분 같이 조깅하고 근처 맛집에서 보상 식사","category":"fitness","difficulty":1},
+  {"title":"보드게임 챔피언십","description":"3가지 보드게임으로 진지한 토너먼트 대결","category":"game","difficulty":1},
+  {"title":"새로운 레시피 도전기","description":"한 번도 안 만들어본 요리 함께 도전","category":"cooking","difficulty":2},
+  {"title":"독서 데이트","description":"같은 공간에서 각자 책 읽고 30분 후 감상 공유","category":"learning","difficulty":1},
+  {"title":"우리동네 사진관","description":"스마트폰으로 동네 숨은 명소 10곳 촬영 미션","category":"photo","difficulty":1},
+  {"title":"홈트 챌린지","description":"유튜브 운동 영상 따라하며 함께 스트레칭","category":"fitness","difficulty":1}
 ]`,
 
   en: `[
-  {"title":"Chasing the Golden Hour","description":"Watch sunset together at a scenic spot","category":"outdoor","difficulty":1},
-  {"title":"Starlit Drive","description":"Night drive while listening to favorite songs","category":"drive","difficulty":1},
-  {"title":"Convenience Store Challenge","description":"Create combo meals and rate each other's picks","category":"streetfood","difficulty":1},
-  {"title":"Couch Cinema","description":"Movie marathon at home with homemade popcorn","category":"home","difficulty":1},
-  {"title":"Cafe Discovery","description":"Find a new cafe and try their signature menu","category":"cafe","difficulty":2}
+  {"title":"Puzzle Night In","description":"Work on a 500+ piece puzzle together over snacks","category":"game","difficulty":1},
+  {"title":"Workout Buddies","description":"Complete a 30-min home workout video together","category":"fitness","difficulty":1},
+  {"title":"Board Game Tournament","description":"Play best of 3 board games with bragging rights","category":"game","difficulty":1},
+  {"title":"Recipe Challenge","description":"Each pick an ingredient, create a dish using both","category":"cooking","difficulty":1},
+  {"title":"Book Club for Two","description":"Read the same chapter and discuss over tea","category":"learning","difficulty":1},
+  {"title":"Photo Walk Challenge","description":"Take 15 photos each on a theme, compare favorites","category":"photo","difficulty":1},
+  {"title":"DIY Craft Night","description":"Follow a YouTube craft tutorial and create together","category":"creative","difficulty":2}
 ]`,
 
   es: `[
-  {"title":"Persiguiendo la Hora Dorada","description":"Ver el atardecer juntos en un lugar bonito","category":"outdoor","difficulty":1},
-  {"title":"Paseo Bajo las Estrellas","description":"Conducir de noche escuchando música favorita","category":"drive","difficulty":1},
-  {"title":"Aventura en la Tienda","description":"Crear combos de comida y probar las elecciones del otro","category":"streetfood","difficulty":1},
-  {"title":"Cine en Casa","description":"Maratón de películas en casa con palomitas caseras","category":"home","difficulty":1},
-  {"title":"Descubriendo Cafés","description":"Encontrar un café nuevo y probar su menú especial","category":"cafe","difficulty":2}
+  {"title":"Noche de Rompecabezas","description":"Armar un puzzle juntos mientras conversan","category":"game","difficulty":1},
+  {"title":"Compañeros de Ejercicio","description":"Completar un video de ejercicios juntos en casa","category":"fitness","difficulty":1},
+  {"title":"Torneo de Juegos","description":"Jugar 3 juegos de mesa y competir por el título","category":"game","difficulty":1},
+  {"title":"Desafío Culinario","description":"Cada uno elige un ingrediente y cocinan juntos","category":"cooking","difficulty":1},
+  {"title":"Club de Lectura para Dos","description":"Leer el mismo capítulo y discutirlo después","category":"learning","difficulty":1},
+  {"title":"Misión Fotográfica","description":"Tomar 10 fotos creativas de su vecindario","category":"photo","difficulty":1},
+  {"title":"Noche de Manualidades","description":"Seguir un tutorial y crear algo juntos","category":"creative","difficulty":2}
 ]`,
 
   'zh-TW': `[
-  {"title":"追逐金色時光","description":"一起在美麗的地方看日落","category":"outdoor","difficulty":1},
-  {"title":"星光下的兜風","description":"夜間開車兜風，聽喜歡的音樂","category":"drive","difficulty":1},
-  {"title":"便利店美食挑戰","description":"組合便利店食物，品嚐對方的選擇","category":"streetfood","difficulty":1},
-  {"title":"家庭電影院","description":"在家看電影馬拉松，配上自製爆米花","category":"home","difficulty":1},
-  {"title":"探索新咖啡館","description":"發現新咖啡館，嚐試他們的招牌菜單","category":"cafe","difficulty":2}
+  {"title":"拼圖之夜","description":"一起完成一幅拼圖，邊聊天邊進行","category":"game","difficulty":1},
+  {"title":"運動夥伴","description":"一起跟著健身影片運動30分鐘","category":"fitness","difficulty":1},
+  {"title":"桌遊錦標賽","description":"玩三局桌遊，爭奪冠軍頭銜","category":"game","difficulty":1},
+  {"title":"料理挑戰","description":"各選一種食材，一起創作新料理","category":"cooking","difficulty":1},
+  {"title":"二人讀書會","description":"閱讀同一章節，之後一起討論","category":"learning","difficulty":1},
+  {"title":"攝影任務","description":"拍攝10張創意照片，比較彼此的作品","category":"photo","difficulty":1},
+  {"title":"手作之夜","description":"跟著教學影片一起做手工藝","category":"creative","difficulty":2}
 ]`,
 
   ja: `[
-  {"title":"夕焼けを追いかけて","description":"景色の良い場所で一緒に夕日を見る","category":"outdoor","difficulty":1},
-  {"title":"星空ドライブ","description":"好きな音楽を聴きながら夜のドライブ","category":"drive","difficulty":1},
-  {"title":"コンビニグルメチャレンジ","description":"コンビニ食品を組み合わせて、お互いの選択を試す","category":"streetfood","difficulty":1},
-  {"title":"おうち映画館","description":"ポップコーンを作って家で映画マラソン","category":"home","difficulty":1},
-  {"title":"カフェ探検","description":"新しいカフェを見つけて、シグネチャーメニューを試す","category":"cafe","difficulty":2}
+  {"title":"パズルナイト","description":"ジグソーパズルを一緒に完成させながらおしゃべり","category":"game","difficulty":1},
+  {"title":"ワークアウトバディ","description":"30分間のホームワークアウト動画を一緒にやる","category":"fitness","difficulty":1},
+  {"title":"ボードゲーム大会","description":"3つのボードゲームで真剣勝負","category":"game","difficulty":1},
+  {"title":"レシピチャレンジ","description":"それぞれ材料を選んで、一緒に料理を作る","category":"cooking","difficulty":1},
+  {"title":"二人読書会","description":"同じ章を読んで、感想を共有する","category":"learning","difficulty":1},
+  {"title":"フォトミッション","description":"テーマを決めて10枚の写真を撮る","category":"photo","difficulty":1},
+  {"title":"DIYクラフトナイト","description":"チュートリアルを見ながら一緒に作る","category":"creative","difficulty":2}
 ]`,
 };
 
@@ -1206,15 +1370,27 @@ ${excludedMissionsContext}
 ${deduplicationContext}
 
 ---
-💡 [미션 다양성 유지 - 중요!]
-${excludedMissionsContext ? '- 🚨 위 "절대 금지" 미션들과 완전히 다른 미션만 생성! 동일/유사 미션 = 실패!' : ''}
-- 🚫 위 "최근 완료한 미션"과 비슷한 미션 절대 금지
-- 💡 "덜 해본 카테고리" 위주로 새로운 경험 추천
-- 창의적이고 신선한 아이디어 우선
-- 같은 장소/활동 유형 반복 금지
+🚨🚨🚨 [미션 다양성 - 필수 준수 규칙!] 🚨🚨🚨
+
+❌ 절대 금지 (위반 시 생성 실패):
+${excludedMissionsContext ? '1. 위 "절대 금지" 미션들과 동일/유사한 미션 = 실패' : ''}
+${deduplicationContext ? '2. 위 "금지 키워드"가 포함된 미션 = 실패' : ''}
+3. 최근 7일 내 생성된 미션과 유사한 활동 유형 = 실패
+4. 매일 똑같은 패턴(산책, 카페, 야시장 등) 반복 = 실패
+
+✅ 필수 준수 규칙:
+1. ${missionCount}개 미션은 반드시 서로 완전히 다른 활동 유형이어야 함
+2. "덜 해본 카테고리"에서 최소 ${Math.ceil(missionCount * 0.6)}개 이상 선택
+3. 일반적인 "산책/카페/맛집" 대신 독특하고 창의적인 활동 제안
+4. 예시: 보드게임 대결, 같이 운동 후 브런치, 직소 퍼즐 도전, 플리마켓 구경, 쿠킹 클래스
+
+💡 창의성 우선:
+- 흔한 데이트 코스가 아닌, 이 커플만을 위한 특별한 경험
+- "이런 데이트도 있구나!" 싶은 신선한 아이디어
+- 커플이 함께 성장하거나 새로운 것을 배울 수 있는 활동
 
 ---
-참고할 좋은 예시들:
+참고할 좋은 예시들 (스타일 참고용, 그대로 복사 금지!):
 ${fewShotExamples}
 
 ---
@@ -1230,15 +1406,27 @@ ${excludedMissionsContext}
 ${deduplicationContext}
 
 ---
-💡 [Mission Diversity - Important!]
-${excludedMissionsContext ? '- 🚨 Generate COMPLETELY different missions from "STRICTLY FORBIDDEN" above! Same/similar = FAIL!' : ''}
-- 🚫 NEVER suggest missions similar to "Recently Completed" above
-- 💡 Prioritize "Less explored" categories for new experiences
-- Focus on creative and fresh ideas
-- Avoid repeating same places/activity types
+🚨🚨🚨 [MISSION DIVERSITY - MANDATORY RULES!] 🚨🚨🚨
+
+❌ STRICTLY FORBIDDEN (Violation = Generation Failure):
+${excludedMissionsContext ? '1. Missions similar to "STRICTLY FORBIDDEN" above = FAIL' : ''}
+${deduplicationContext ? '2. Missions containing "BLACKLISTED KEYWORDS" = FAIL' : ''}
+3. Activities similar to those generated in the last 7 days = FAIL
+4. Repeating the same patterns daily (walks, cafes, markets) = FAIL
+
+✅ MANDATORY REQUIREMENTS:
+1. All ${missionCount} missions MUST be completely different activity types
+2. Select at least ${Math.ceil(missionCount * 0.6)} from "Less explored" categories
+3. Suggest unique, creative activities instead of generic "walk/cafe/restaurant"
+4. Examples: board game tournament, workout then brunch, jigsaw puzzle challenge, flea market visit, cooking class
+
+💡 CREATIVITY FIRST:
+- Special experiences unique to THIS couple, not generic date ideas
+- Fresh ideas that make them think "I never thought of this for a date!"
+- Activities where the couple can grow together or learn something new
 
 ---
-Reference examples:
+Reference examples (for style only, DO NOT copy directly!):
 ${fewShotExamples}
 
 ---
