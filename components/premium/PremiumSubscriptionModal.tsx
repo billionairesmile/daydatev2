@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -26,10 +26,10 @@ import {
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
+import { getLocales } from 'expo-localization';
 
 import { COLORS, SPACING, RADIUS } from '@/constants/design';
 import { useSubscriptionStore } from '@/stores/subscriptionStore';
-import { useLanguageStore } from '@/stores';
 
 interface PremiumSubscriptionModalProps {
   visible: boolean;
@@ -41,7 +41,6 @@ export default function PremiumSubscriptionModal({
   onClose,
 }: PremiumSubscriptionModalProps) {
   const { t } = useTranslation();
-  const { language } = useLanguageStore();
   const insets = useSafeAreaInsets();
   const {
     isPremium,
@@ -59,6 +58,27 @@ export default function PremiumSubscriptionModal({
   const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'annual' | null>(null);
   const [restoreLoading, setRestoreLoading] = useState(false);
 
+  // Get device locale/region (not app language) for pricing
+  const isKoreanLocale = useMemo(() => {
+    const locales = getLocales();
+    // Check if device region is Korea (KR) - this is independent of app language
+    return locales.some(locale => locale.regionCode === 'KR');
+  }, []);
+
+  // Locale-based fallback prices (device region, not app language)
+  const localeFallbackPrices = useMemo(() => {
+    if (isKoreanLocale) {
+      return {
+        monthly: '₩4,900',
+        annual: '₩45,000',
+      };
+    }
+    return {
+      monthly: '$3.99',
+      annual: '$34.99',
+    };
+  }, [isKoreanLocale]);
+
   useEffect(() => {
     if (visible && !offerings) {
       loadOfferings();
@@ -73,10 +93,34 @@ export default function PremiumSubscriptionModal({
     (pkg) => pkg.product.identifier.includes('annual')
   );
 
-  // Use RevenueCat prices if available, otherwise use locale-based defaults from translations
-  const monthlyPrice = monthlyPackage?.product.priceString || t('premium.monthlyPrice');
-  const annualPrice = annualPackage?.product.priceString || t('premium.annualPrice');
-  const annualMonthlyEquivalent = t('premium.annualMonthlyEquivalent');
+  // Check if RevenueCat price matches expected currency for locale
+  // If Korean locale but RevenueCat returns USD (sandbox issue), use fallback
+  const shouldUseLocaleFallback = useMemo(() => {
+    if (!monthlyPackage?.product.priceString && !annualPackage?.product.priceString) {
+      return true; // No RevenueCat prices, use fallback
+    }
+
+    const priceString = monthlyPackage?.product.priceString || annualPackage?.product.priceString || '';
+
+    if (isKoreanLocale) {
+      // Korean locale should have ₩ or 원, not $ or US$
+      const hasKoreanCurrency = priceString.includes('₩') || priceString.includes('원');
+      return !hasKoreanCurrency;
+    } else {
+      // Non-Korean locale should have $ (USD)
+      const hasUSDCurrency = priceString.includes('$');
+      return !hasUSDCurrency;
+    }
+  }, [isKoreanLocale, monthlyPackage, annualPackage]);
+
+  // Use locale-based fallback if RevenueCat currency doesn't match device locale
+  // This prevents showing wrong prices in sandbox or misconfigured environments
+  const monthlyPrice = shouldUseLocaleFallback
+    ? localeFallbackPrices.monthly
+    : (monthlyPackage?.product.priceString || localeFallbackPrices.monthly);
+  const annualPrice = shouldUseLocaleFallback
+    ? localeFallbackPrices.annual
+    : (annualPackage?.product.priceString || localeFallbackPrices.annual);
 
   const handlePurchase = async () => {
     if (!selectedPlan) return;

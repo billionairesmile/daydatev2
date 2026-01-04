@@ -457,6 +457,41 @@ export default function MissionScreen() {
     };
   }, [isSyncInitialized, coupleId, loadSharedMissions]);
 
+  // Midnight reset timer - Reset missions exactly at 12:00 AM
+  // This ensures missions reset even while the user is actively using the app
+  useEffect(() => {
+    const scheduleNextMidnightReset = () => {
+      const now = new Date();
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+
+      const msUntilMidnight = tomorrow.getTime() - now.getTime();
+      console.log('[MissionScreen] Scheduling midnight reset in', Math.round(msUntilMidnight / 1000 / 60), 'minutes');
+
+      return setTimeout(() => {
+        console.log('[MissionScreen] Midnight reset triggered!');
+
+        // Reset missions
+        checkAndResetMissions();
+
+        // Reset carousel state so it shows the empty state / generate button
+        hasInitializedCarousel.current = false;
+        setIsScrollInitialized(false);
+        setCurrentIndex(0);
+
+        // Schedule next midnight reset
+        scheduleNextMidnightReset();
+      }, msUntilMidnight);
+    };
+
+    const midnightTimeoutId = scheduleNextMidnightReset();
+
+    return () => {
+      clearTimeout(midnightTimeoutId);
+    };
+  }, [checkAndResetMissions]);
+
   // Watch for partner generating missions (via real-time sync)
   useEffect(() => {
     if (isSyncInitialized && missionGenerationStatus === 'generating') {
