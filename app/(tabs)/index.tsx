@@ -1810,7 +1810,7 @@ const styles = StyleSheet.create({
   },
   bannerAd: {
     position: 'absolute',
-    bottom: 90,
+    bottom: 94,
     left: 0,
     right: 0,
     alignItems: 'center',
