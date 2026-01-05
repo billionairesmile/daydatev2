@@ -69,11 +69,16 @@ export const useMemoryStore = create<MemoryState & MemoryActions>()(
 
       addMemory: (memory) =>
         set((state) => {
+          console.log('[MemoryStore] addMemory called with id:', memory.id, 'photoUrl:', memory.photoUrl?.substring(0, 50));
+          console.log('[MemoryStore] Current memories count:', state.memories.length);
+
           // Check for duplicates - skip if memory with same ID already exists
           if (state.memories.some((m) => m.id === memory.id)) {
             console.log('[MemoryStore] Skipping duplicate memory:', memory.id);
             return state;
           }
+
+          console.log('[MemoryStore] Adding new memory, new count will be:', state.memories.length + 1);
           return {
             memories: [memory, ...state.memories],
           };

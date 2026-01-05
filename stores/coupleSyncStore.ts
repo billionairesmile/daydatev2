@@ -708,16 +708,20 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     });
 
     // 10. Completed missions subscription (for memory sync between devices)
+    console.log('[CoupleSyncStore] Setting up completed missions subscription for coupleId:', coupleId);
     // Track processed events to prevent duplicates
     const processedMemoryEvents = new Set<string>();
 
     completedMissionsChannel = db.completedMissions.subscribeToCompletedMissions(coupleId, (payload) => {
+      console.log('[CompletedMissions Realtime] Event received:', payload.eventType);
       const memoryData = payload.memory as Record<string, unknown>;
       const memoryId = memoryData?.id as string;
+      console.log('[CompletedMissions Realtime] Memory ID:', memoryId);
 
       // Deduplicate events
       const eventKey = `${payload.eventType}-${memoryId}`;
       if (processedMemoryEvents.has(eventKey)) {
+        console.log('[CompletedMissions Realtime] Skipping duplicate event:', eventKey);
         return;
       }
       processedMemoryEvents.add(eventKey);
@@ -728,13 +732,22 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       if (payload.eventType === 'INSERT') {
         // Convert DB format to CompletedMission format using shared converter
         const newMemory = dbToCompletedMission(memoryData);
+        console.log('[CompletedMissions Realtime] Converted memory:', newMemory.id, 'photoUrl:', newMemory.photoUrl?.substring(0, 50));
 
         // Check if memory already exists (avoid duplicates)
         const existingMemories = memoryStore.memories;
-        if (!existingMemories.some(m => m.id === newMemory.id)) {
+        const alreadyExists = existingMemories.some(m => m.id === newMemory.id);
+        console.log('[CompletedMissions Realtime] Already exists in store:', alreadyExists, 'Current memories count:', existingMemories.length);
+
+        if (!alreadyExists) {
+          console.log('[CompletedMissions Realtime] Adding new memory to store');
           memoryStore.addMemory(newMemory);
+          // Verify the memory was added
+          const updatedMemories = useMemoryStore.getState().memories;
+          console.log('[CompletedMissions Realtime] After addMemory - memories count:', updatedMemories.length);
         }
       } else if (payload.eventType === 'DELETE') {
+        console.log('[CompletedMissions Realtime] Deleting memory:', memoryId);
         if (memoryId) {
           memoryStore.deleteMemory(memoryId);
         }

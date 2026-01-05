@@ -1301,9 +1301,13 @@ export default function MissionDetailScreen() {
             }
           }
 
+          console.log('[MissionComplete] Calling addMemory with id:', newMemory.id, 'photoUrl:', newMemory.photoUrl?.substring(0, 50));
           addMemory(newMemory);
           clearInProgressMission(mission.id);
-          console.log('[MissionComplete] Auto-saved memory on completion');
+          console.log('[MissionComplete] Auto-saved memory on completion, checking store state...');
+          // Verify memory was added
+          const storeState = useMemoryStore.getState();
+          console.log('[MissionComplete] Store now has', storeState.memories.length, 'memories');
         };
 
         autoSave();

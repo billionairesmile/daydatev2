@@ -982,6 +982,7 @@ export const db = {
       callback: (payload: { eventType: string; memory: unknown }) => void
     ) {
       const client = getSupabase();
+      console.log('[Supabase] Creating completed_missions subscription for couple:', coupleId);
       const channel = client
         .channel(`completed_missions:${coupleId}`)
         .on(
@@ -993,13 +994,16 @@ export const db = {
             filter: `couple_id=eq.${coupleId}`,
           },
           (payload) => {
+            console.log('[Supabase] completed_missions event received:', payload.eventType, 'id:', (payload.new as Record<string, unknown>)?.id || (payload.old as Record<string, unknown>)?.id);
             callback({
               eventType: payload.eventType,
               memory: payload.eventType === 'DELETE' ? payload.old : payload.new,
             });
           }
         )
-        .subscribe();
+        .subscribe((status) => {
+          console.log('[Supabase] completed_missions subscription status:', status);
+        });
       return channel;
     },
 
