@@ -28,6 +28,7 @@ import { useTranslation } from 'react-i18next';
 import { COLORS, SPACING, RADIUS } from '@/constants/design';
 import { useAuthStore, useMemoryStore, useOnboardingStore } from '@/stores';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
+import { cancelHourlyReminders, cancelMissionReminderNotification } from '@/lib/pushNotifications';
 import { useMissionStore } from '@/stores/missionStore';
 import { db, isDemoMode } from '@/lib/supabase';
 import { notifyPartnerUnpaired } from '@/lib/pushNotifications';
@@ -164,6 +165,12 @@ export default function UnpairScreen() {
         console.log('[Unpair] Deleting pending pairing codes for user:', user.id);
         await db.pairingCodes.deleteByCreatorId(user.id);
       }
+
+      // Cancel any scheduled mission notifications (hourly reminders, daily reminder)
+      // These are local scheduled notifications that should stop when unpaired
+      await cancelHourlyReminders();
+      await cancelMissionReminderNotification();
+      console.log('[Unpair] Cancelled scheduled notifications');
 
       // Cleanup realtime subscriptions
       cleanupSync();

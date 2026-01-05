@@ -62,6 +62,13 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
       const data = typedResponse?.notification?.request?.content?.data || {};
       console.log('[usePushNotifications] Notification tapped:', data);
 
+      // Check if user is authenticated before navigating
+      // If logged out or account deleted, don't navigate to app screens
+      if (!user?.id) {
+        console.log('[usePushNotifications] User not authenticated, ignoring notification tap');
+        return;
+      }
+
       // Custom handler
       if (options.onNotificationResponse) {
         options.onNotificationResponse(data);
@@ -75,7 +82,7 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
         router.push('/(tabs)/memories');
       }
     },
-    [router, options.onNotificationResponse]
+    [router, user?.id, options.onNotificationResponse]
   );
 
   // Handle notification received in foreground

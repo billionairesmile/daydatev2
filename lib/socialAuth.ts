@@ -3,6 +3,7 @@ import * as WebBrowser from 'expo-web-browser';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { Platform } from 'react-native';
 import { supabase, isDemoMode } from './supabase';
+import { removePushToken, cancelAllScheduledNotifications } from './pushNotifications';
 
 // Required for web only
 WebBrowser.maybeCompleteAuthSession();
@@ -346,6 +347,19 @@ export const signOut = async () => {
   if (!supabase) return;
 
   try {
+    // Get current user ID before signing out to remove push token
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (user?.id) {
+      // Remove push token from database to prevent notifications after logout
+      await removePushToken(user.id);
+      console.log('[SocialAuth] Push token removed for user:', user.id);
+    }
+
+    // Cancel all scheduled local notifications
+    await cancelAllScheduledNotifications();
+    console.log('[SocialAuth] Scheduled notifications cancelled');
+
     const { error } = await supabase.auth.signOut();
     if (error) {
       console.error('Error signing out:', error);

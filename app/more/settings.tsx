@@ -221,6 +221,11 @@ export default function SettingsScreen() {
             resetMemory();
             resetSubscription();
 
+            // Sign out from Supabase (removes push token, cancels scheduled notifications)
+            if (!isDemoMode) {
+              await supabaseSignOut().catch(err => console.error('[Settings] Supabase signOut error:', err));
+            }
+
             // Clear all auth data (user, couple, partner)
             signOut();
             // Reset onboarding steps to welcome

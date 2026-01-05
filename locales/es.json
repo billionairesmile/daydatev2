@@ -237,7 +237,7 @@
       "nextDate": "Próxima Fecha Esperada",
       "currentPeriod": "En Período",
       "lastDate": "Última Fecha de Inicio",
-      "daysUnit": "días",
+      "daysUnit": " días",
       "legend": {
         "period": "Período",
         "fertile": "Ventana Fértil",
@@ -525,7 +525,7 @@
       "warningText": "Desemparejarte te desconectará de tu pareja,\ny algunos datos podrían ser inaccesibles.",
       "checkTitle": "Por favor revisa antes de desconectarte",
       "daysTogether": "Días Juntos",
-      "daysUnit": "días",
+      "daysUnit": " días",
       "completedMissions": "Misiones Completadas",
       "missionsUnit": "",
       "recoveryPeriod": "Período de Recuperación",

@@ -47,7 +47,7 @@ export const SUBSCRIPTION_LIMITS = {
     maxCompletionsPerDay: 1,
     maxBookmarks: 5,
     maxAlbums: 5,
-    maxPhotos: 50, // Maximum photos in monthly album for free users
+    maxPhotos: 100, // Maximum photos in monthly album for free users
     missionsPerGeneration: 3,
     showAds: true,
     homeFrameOptions: ['polaroid'] as const,
@@ -742,15 +742,15 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
           set({
             dailyUsage: data
               ? {
-                  generationCount: data.generation_count,
-                  completionCount: data.completion_count,
-                  usageDate: data.usage_date,
-                }
+                generationCount: data.generation_count,
+                completionCount: data.completion_count,
+                usageDate: data.usage_date,
+              }
               : {
-                  generationCount: 0,
-                  completionCount: 0,
-                  usageDate: today,
-                },
+                generationCount: 0,
+                completionCount: 0,
+                usageDate: today,
+              },
           });
         } catch (error) {
           console.error('[Subscription] Load daily usage error:', error);

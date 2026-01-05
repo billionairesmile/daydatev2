@@ -240,7 +240,7 @@
       "nextDate": "Next Expected Date",
       "currentPeriod": "In Period",
       "lastDate": "Last Start Date",
-      "daysUnit": "days",
+      "daysUnit": " days",
       "legend": {
         "period": "Period",
         "fertile": "Fertile Window",
@@ -528,7 +528,7 @@
       "warningText": "Unpairing will disconnect you from your partner,\nand some data may become inaccessible.",
       "checkTitle": "Please check before disconnecting",
       "daysTogether": "Days Together",
-      "daysUnit": "days",
+      "daysUnit": " days",
       "completedMissions": "Completed Missions",
       "missionsUnit": "",
       "recoveryPeriod": "Recovery Period",
