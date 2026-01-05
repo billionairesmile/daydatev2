@@ -489,7 +489,7 @@ function buildContext(
   const parts: string[] = [];
   const { canMeetToday, availableTime, todayMoods } = input.todayAnswers;
 
-  // === 1순위: 제약사항 (MUST HAVE) ===
+  // === Priority 1: Constraints (MUST HAVE) ===
   const allConstraints: string[] = [];
   if (input.userAPreferences?.constraints) {
     allConstraints.push(...input.userAPreferences.constraints);
@@ -501,98 +501,87 @@ function buildContext(
 
   if (uniqueConstraints.length > 0) {
     const constraintDescriptions: Record<string, string> = {
-      pet: '반려동물 동반 → 펫 프렌들리 장소만',
-      child: '아이 동반 → 가족친화 장소/활동',
-      long_distance: '장거리 연애 → 온라인/비대면 활동 위주',
-      far_distance: '원거리 연애 → 온라인/비대면 활동 위주',
-      no_car: '차 없음 → 대중교통/도보 접근 가능한 곳만',
-      no_alcohol: '술 안함 → 카페/디저트/비주류 장소만',
-      avoid_crowd: '인파 기피 → 한적한 장소, 비인기 시간대, 예약제',
+      pet: 'With pet -> pet-friendly places only',
+      child: 'With child -> family-friendly places/activities',
+      long_distance: 'Long distance -> online/remote activities',
+      far_distance: 'Far distance -> online/remote activities',
+      no_car: 'No car -> public transit/walking accessible only',
+      no_alcohol: 'No alcohol -> cafes/desserts/non-alcoholic venues only',
+      avoid_crowd: 'Avoid crowds -> quiet places, off-peak hours, reservations',
     };
-    const constraintList = uniqueConstraints.map(c => constraintDescriptions[c] || c).join('\n  - ');
-    parts.push(`🚨 [필수 제약 - 위반 시 미션 무효]\n  - ${constraintList}`);
+    const constraintList = uniqueConstraints.map(c => constraintDescriptions[c] || c).join(', ');
+    parts.push(`### CONSTRAINTS (Violation = Invalid Mission)\n${constraintList}`);
   }
 
-  // === 2순위: MBTI 조합 (25%) ===
+  // === Priority 2: MBTI Combination ===
   const mbtiA = input.userAPreferences?.mbti;
   const mbtiB = input.userBPreferences?.mbti;
   if (mbtiA || mbtiB) {
     const mbtiContext = analyzeMBTICombination(mbtiA, mbtiB);
-    parts.push(`[MBTI] ${mbtiA || '?'} + ${mbtiB || '?'} → ${mbtiContext}`);
+    parts.push(`\n[MBTI] ${mbtiA || '?'} + ${mbtiB || '?'} -> ${mbtiContext}`);
   }
 
-  // === 3순위: 데이트 고민 (25%) - 양쪽 고민 종합 ===
-  const worryDescriptions: Record<DateWorry, { emoji: string; short: string; detail: string }> = {
-    'no_idea': { emoji: '🤷', short: '뭐할지 모름', detail: '쉬운 입문용~특별한 경험 다양하게' },
-    'same_pattern': { emoji: '🔄', short: '맨날 똑같음', detail: '새롭고 신선한 경험, 트렌드/핫플/이색 데이트' },
-    'budget': { emoji: '💵', short: '돈 부담', detail: '무료~저예산 활동, 집/공원/동네 활용' },
-    'time': { emoji: '⏰', short: '시간 부족', detail: '30분~1시간 완료, 이동 최소화' },
-    'talk': { emoji: '💬', short: '대화 필요', detail: '자연스럽게 대화 유도, 서로 알아가는 활동' },
-    'none': { emoji: '✨', short: '그냥 재밌게', detail: 'FUN 최우선, 활동적이고 신나는 미션' },
+  // === Priority 3: Date Worries ===
+  const worryDescriptions: Record<DateWorry, { short: string; detail: string }> = {
+    'no_idea': { short: 'No ideas', detail: 'Mix of easy and special experiences' },
+    'same_pattern': { short: 'Same routine', detail: 'Fresh, trendy, unique date ideas' },
+    'budget': { short: 'Budget concerns', detail: 'Free or low-cost activities, home/park/neighborhood' },
+    'time': { short: 'Limited time', detail: '30min-1hour activities, minimal travel' },
+    'talk': { short: 'Need conversation', detail: 'Activities that naturally encourage talking' },
+    'none': { short: 'Just fun', detail: 'FUN first! Active and exciting missions' },
   };
 
-  // 공통 고민 (둘 다 같은 고민)
+  // Shared worries (both have same concern)
   if (combinedDateWorries.shared.length > 0) {
-    const sharedList = combinedDateWorries.shared
-      .map(w => `${worryDescriptions[w].emoji} ${worryDescriptions[w].short}`)
-      .join(', ');
-    parts.push(`\n🎯 [둘 다 공통 고민 - 최우선 반영!]`);
-    parts.push(`  ${sharedList}`);
+    const sharedList = combinedDateWorries.shared.map(w => worryDescriptions[w].short).join(', ');
+    parts.push(`\n### SHARED CONCERNS (Top Priority)`);
+    parts.push(`${sharedList}`);
     combinedDateWorries.shared.forEach(w => {
-      parts.push(`  → ${worryDescriptions[w].detail}`);
+      parts.push(`-> ${worryDescriptions[w].detail}`);
     });
   }
 
-  // 한쪽만 있는 고민 (보조 반영)
+  // One-side worries
   const oneSideWorries = [...combinedDateWorries.userAOnly, ...combinedDateWorries.userBOnly];
   if (oneSideWorries.length > 0) {
     const uniqueOneSide = [...new Set(oneSideWorries)];
-    const oneSideList = uniqueOneSide
-      .map(w => `${worryDescriptions[w].emoji} ${worryDescriptions[w].short}`)
-      .join(', ');
-    parts.push(`\n💭 [한쪽 고민 - 가능하면 반영]`);
-    parts.push(`  ${oneSideList}`);
+    const oneSideList = uniqueOneSide.map(w => worryDescriptions[w].short).join(', ');
+    parts.push(`\n[One-side concerns] ${oneSideList}`);
   }
 
-  // 고민이 없으면 기본 전략
+  // No worries = fun first
   if (combinedDateWorries.shared.length === 0 && oneSideWorries.length === 0) {
-    parts.push(`\n💡 특별한 고민 없음 → FUN 최우선! 웃음 포인트 필수, 활동적이고 신나는 미션`);
+    parts.push(`\n[No specific concerns] -> FUN first! Active and exciting missions`);
   }
 
-  // === 4순위: 오늘 기분 + 만남여부 + 시간 (15%) ===
+  // === Priority 4: Today's Situation ===
   const moodMap: Record<string, string> = {
-    fun: '웃음가득', deep_talk: '깊은대화', active: '활동적',
-    healing: '힐링', culture: '문화감성', adventure: '모험도전', romantic: '로맨틱',
+    fun: 'Fun', deep_talk: 'Deep talk', active: 'Active',
+    healing: 'Healing', culture: 'Culture', adventure: 'Adventure', romantic: 'Romantic',
   };
   const timeMap: Record<string, string> = {
-    '30min': '30분', '1hour': '1시간', '2hour': '2시간+', 'allday': '하루종일',
+    '30min': '30min', '1hour': '1hour', '2hour': '2hours+', 'allday': 'All day',
   };
   const moodStr = todayMoods.map(m => moodMap[m] || m).join(', ');
-  parts.push(`\n[오늘 상황]`);
-  parts.push(`  - 만남: ${canMeetToday ? '⭕ 만날 수 있음' : '❌ 못 만남 (한 명이 현장 인증)'}`);
-  parts.push(`  - 시간: ${timeMap[availableTime]}`);
-  parts.push(`  - 기분: ${moodStr}`);
+  parts.push(`\n[TODAY]`);
+  parts.push(`- Meeting: ${canMeetToday ? 'Yes' : 'No (one person does mission alone)'}`);
+  parts.push(`- Time: ${timeMap[availableTime]}`);
+  parts.push(`- Mood: ${moodStr}`);
 
-  // === 5순위: 날씨/계절 (10%) ===
-  const seasonEmoji: Record<string, string> = {
-    spring: '🌸', summer: '☀️', fall: '🍂', winter: '❄️',
-  };
-  const seasonKor: Record<string, string> = {
-    spring: '봄', summer: '여름', fall: '가을', winter: '겨울',
-  };
-  parts.push(`\n[날씨] ${seasonEmoji[weather.season]} ${seasonKor[weather.season]} | ${weather.condition} ${weather.temperature}°C | 야외활동: ${weather.isOutdoorFriendly ? '적합' : '부적합'}`);
+  // === Priority 5: Weather/Season ===
+  parts.push(`\n[WEATHER] ${weather.seasonLabel} | ${weather.condition} ${weather.temperature}C | Outdoor: ${weather.isOutdoorFriendly ? 'OK' : 'Not ideal'}`);
 
-  // === 6순위: 선호 활동 (5%) ===
+  // === Priority 6: Preferred Activities ===
   const allActivities = [
     ...(input.userAPreferences?.activityTypes || []),
     ...(input.userBPreferences?.activityTypes || []),
   ];
   if (allActivities.length > 0) {
     const uniqueActivities = [...new Set(allActivities)];
-    parts.push(`[선호 활동] ${uniqueActivities.join(', ')}`);
+    parts.push(`[Preferred activities] ${uniqueActivities.join(', ')}`);
   }
 
-  // === 기념일 (있으면 반영) ===
+  // === Anniversary ===
   const anniversaryInfo = getAnniversaryInfo(
     input.userAPreferences?.relationshipType,
     input.userAPreferences?.anniversaryDate
@@ -607,17 +596,15 @@ function buildContext(
   const todayLabels = [anniversaryInfo.todayLabel, customAnniversaryInfo.todayLabel].filter(Boolean);
 
   if (isAnyAnniversaryToday && todayLabels.length > 0) {
-    // 기념일 당일! 3개 모두 기념일 관련 미션
-    parts.push(`\n🎊🎊🎊 [오늘은 ${todayLabels.join(', ')}!!!] 🎊🎊🎊`);
-    parts.push(`→ 오늘은 특별한 날! 3개 미션 전부 기념일/특별한 날 테마로 생성!`);
-    parts.push(`→ 로맨틱하고 기억에 남을 특별한 데이트 미션만!`);
-    parts.push(`→ 카테고리: romantic, anniversary, surprise, memory 위주`);
+    // Anniversary TODAY! All missions should be anniversary-themed
+    parts.push(`\n### TODAY IS ${todayLabels.join(', ')}!`);
+    parts.push(`-> ALL missions must be anniversary/celebration themed!`);
+    parts.push(`-> Categories: romantic, anniversary, surprise, memory`);
   } else if (allUpcoming.length > 0) {
-    parts.push(`\n🎉 [다가오는 기념일] ${allUpcoming.join(', ')} → 기념일 관련 미션 1개 이상 반드시 포함!`);
-    parts.push(`→ 기념일 준비를 위한 미션 (선물 준비, 데이트 계획, 서프라이즈 등) 필수!`);
+    parts.push(`\n[Upcoming anniversary] ${allUpcoming.join(', ')} -> Include at least 1 anniversary-prep mission!`);
   }
 
-  // === 미성년자 체크 ===
+  // === Minor Check ===
   let isAnyUserUnder19 = false;
   if (input.userAPreferences?.birthDate) {
     if (calculateAge(new Date(input.userAPreferences.birthDate)) < 19) isAnyUserUnder19 = true;
@@ -626,7 +613,7 @@ function buildContext(
     if (calculateAge(new Date(input.userBPreferences.birthDate)) < 19) isAnyUserUnder19 = true;
   }
   if (isAnyUserUnder19) {
-    parts.push(`\n⚠️ [미성년자 포함] drink 카테고리 절대 금지`);
+    parts.push(`\n[MINOR PRESENT] drink category FORBIDDEN`);
   }
 
   return parts.join('\n');
@@ -639,161 +626,61 @@ function analyzeMBTICombination(mbtiA?: string, mbtiB?: string): string {
   const a = mbtiA || '';
   const b = mbtiB || '';
 
-  // E/I 분석
+  // E/I analysis
   const eCount = (a.includes('E') ? 1 : 0) + (b.includes('E') ? 1 : 0);
-  if (eCount === 2) hints.push('활발한 사교활동 OK');
-  else if (eCount === 0) hints.push('조용하고 프라이빗한 공간 선호');
-  else hints.push('둘만의 시간 + 약간의 외부 자극');
+  if (eCount === 2) hints.push('Social activities OK');
+  else if (eCount === 0) hints.push('Quiet, private spaces preferred');
+  else hints.push('Mix of private time + some social');
 
-  // N/S 분석
+  // N/S analysis
   const nCount = (a.includes('N') ? 1 : 0) + (b.includes('N') ? 1 : 0);
-  if (nCount === 2) hints.push('창의적/예술적 활동');
-  else if (nCount === 0) hints.push('현실적/맛집탐방');
+  if (nCount === 2) hints.push('Creative/artistic activities');
+  else if (nCount === 0) hints.push('Practical/food exploration');
 
-  // F/T 분석
+  // F/T analysis
   const fCount = (a.includes('F') ? 1 : 0) + (b.includes('F') ? 1 : 0);
-  if (fCount === 2) hints.push('감성/로맨틱');
-  else if (fCount === 0) hints.push('게임/퀴즈/분석적');
+  if (fCount === 2) hints.push('Emotional/romantic');
+  else if (fCount === 0) hints.push('Games/puzzles/analytical');
 
-  // J/P 분석
+  // J/P analysis
   const jCount = (a.includes('J') ? 1 : 0) + (b.includes('J') ? 1 : 0);
-  if (jCount === 2) hints.push('계획적 데이트, 예약 필수');
-  else if (jCount === 0) hints.push('즉흥적/자유로운 동선');
+  if (jCount === 2) hints.push('Planned dates, reservations');
+  else if (jCount === 0) hints.push('Spontaneous/flexible');
 
   return hints.join(', ');
 }
 
 // ============================================
-// Keyword Extraction for Deduplication (v4)
-// ============================================
-
-// Common activity/theme keywords to extract and blacklist
-const ACTIVITY_KEYWORDS = {
-  // Activity types (EN)
-  activities_en: [
-    'stroll', 'walk', 'hike', 'hiking', 'explore', 'exploring', 'visit', 'watch', 'watching',
-    'photography', 'photo', 'photos', 'picture', 'pictures', 'shoot', 'shooting',
-    'workshop', 'class', 'lesson', 'cooking', 'baking', 'crafting', 'making',
-    'market', 'shopping', 'hunt', 'hunting', 'tour', 'touring', 'adventure',
-    'picnic', 'brunch', 'dinner', 'lunch', 'breakfast', 'tasting', 'sampling',
-    'game', 'games', 'puzzle', 'escape', 'challenge', 'competition',
-    'movie', 'film', 'cinema', 'marathon', 'binge',
-    'yoga', 'meditation', 'spa', 'massage', 'wellness', 'relaxation',
-    'running', 'jogging', 'cycling', 'biking', 'swimming', 'workout',
-    'dance', 'dancing', 'singing', 'karaoke', 'concert', 'performance',
-    'reading', 'book', 'books', 'study', 'learning', 'museum', 'gallery', 'exhibition',
-    'drive', 'driving', 'road trip', 'stargazing', 'sunrise', 'sunset',
-  ],
-  // Place/theme keywords (EN)
-  places_en: [
-    'park', 'beach', 'mountain', 'hill', 'river', 'lake', 'ocean', 'sea', 'forest', 'garden',
-    'cafe', 'coffee', 'bakery', 'restaurant', 'bar', 'pub', 'rooftop',
-    'street', 'alley', 'neighborhood', 'downtown', 'old town', 'plaza',
-    'night', 'evening', 'morning', 'dawn', 'dusk', 'golden hour',
-    'winter', 'summer', 'spring', 'fall', 'autumn', 'seasonal', 'holiday',
-    'art', 'artisan', 'craft', 'diy', 'handmade', 'creative',
-    'lights', 'illumination', 'lantern', 'candle', 'bonfire',
-    'temple', 'shrine', 'church', 'cathedral', 'palace', 'castle',
-    'local', 'hidden', 'secret', 'cozy', 'vintage', 'retro',
-  ],
-  // Activity types (KO)
-  activities_ko: [
-    '산책', '걷기', '하이킹', '등산', '탐방', '탐험', '방문', '구경', '감상',
-    '사진', '촬영', '포토', '스냅', '찍기',
-    '워크샵', '클래스', '수업', '요리', '베이킹', '만들기', '공예', 'DIY',
-    '시장', '마켓', '장보기', '쇼핑', '투어', '어드벤처', '모험',
-    '피크닉', '브런치', '저녁', '점심', '아침', '맛집', '먹방', '시식',
-    '게임', '퍼즐', '방탈출', '챌린지', '대결', '시합',
-    '영화', '넷플릭스', '시네마', '마라톤', '정주행',
-    '요가', '명상', '스파', '마사지', '힐링', '휴식',
-    '러닝', '조깅', '자전거', '수영', '운동', '헬스',
-    '춤', '댄스', '노래', '노래방', '콘서트', '공연',
-    '독서', '책', '공부', '학습', '미술관', '갤러리', '전시',
-    '드라이브', '별보기', '일출', '일몰', '노을',
-  ],
-  // Place/theme keywords (KO)
-  places_ko: [
-    '공원', '해변', '바다', '산', '강', '호수', '숲', '정원', '뷰',
-    '카페', '커피', '빵집', '레스토랑', '맛집', '바', '루프탑',
-    '거리', '골목', '동네', '시내', '구시가', '광장',
-    '밤', '야경', '저녁', '아침', '새벽', '황혼',
-    '겨울', '여름', '봄', '가을', '계절', '명절',
-    '예술', '아트', '공예', '수공예', '핸드메이드', '창작',
-    '조명', '불빛', '등불', '캔들', '모닥불',
-    '절', '성당', '교회', '사찰', '궁', '성',
-    '로컬', '숨은', '비밀', '아늑한', '빈티지', '레트로',
-    '야시장', '푸드', '스트릿',
-  ],
-};
-
-/**
- * Extract keywords from recent mission titles and descriptions
- * These keywords will be blacklisted to prevent similar missions
- */
-function extractKeywordsFromHistory(
-  titles: string[],
-  descriptions: string[] = []
-): { activityKeywords: string[]; themeKeywords: string[] } {
-  const allText = [...titles, ...descriptions].join(' ').toLowerCase();
-
-  const activityKeywords = new Set<string>();
-  const themeKeywords = new Set<string>();
-
-  // Extract activity keywords
-  [...ACTIVITY_KEYWORDS.activities_en, ...ACTIVITY_KEYWORDS.activities_ko].forEach(keyword => {
-    if (allText.includes(keyword.toLowerCase())) {
-      activityKeywords.add(keyword);
-    }
-  });
-
-  // Extract theme/place keywords
-  [...ACTIVITY_KEYWORDS.places_en, ...ACTIVITY_KEYWORDS.places_ko].forEach(keyword => {
-    if (allText.includes(keyword.toLowerCase())) {
-      themeKeywords.add(keyword);
-    }
-  });
-
-  return {
-    activityKeywords: Array.from(activityKeywords).slice(0, 15), // Limit to prevent token bloat
-    themeKeywords: Array.from(themeKeywords).slice(0, 15),
-  };
-}
-
-// ============================================
 // Deduplication Context Builder (Token-Efficient)
+// GPT understands all languages - no keyword mapping needed
 // ============================================
 
-function buildDeduplicationContext(history: MissionHistorySummary | undefined): string {
+function buildDeduplicationContext(history: MissionHistorySummary | undefined, _language: SupportedLanguage): string {
   if (!history || history.totalCompleted === 0) {
     return '';
   }
 
   const parts: string[] = [];
 
-  // 1. Recent titles (max 15 for token efficiency)
+  // 1. Recent titles - GPT understands all languages and can avoid similar activities
   if (history.recentTitles.length > 0) {
-    const titlesToInclude = history.recentTitles.slice(0, 15);
-    parts.push(`RECENT (avoid): ${titlesToInclude.join(', ')}`);
+    const titlesToInclude = history.recentTitles.slice(0, 20);
+    parts.push(`\n### RECENTLY COMPLETED MISSIONS (Avoid similar activities)`);
+    parts.push(`${titlesToInclude.join(' | ')}`);
+    parts.push(`Generate COMPLETELY different activities from the above.`);
   }
 
-  // 2. Extract and blacklist keywords (combined, max 10)
-  if (history.recentTitles.length > 0) {
-    const { activityKeywords, themeKeywords } = extractKeywordsFromHistory(history.recentTitles);
-    const allKeywords = [...activityKeywords, ...themeKeywords].slice(0, 10);
-    if (allKeywords.length > 0) {
-      parts.push(`FORBIDDEN: ${allKeywords.join(', ')}`);
-    }
-  }
-
-  // 3. Category guidance (overused/underused)
+  // 2. Category statistics (very token efficient, ~30-50 tokens)
   if (Object.keys(history.categoryStats).length > 0) {
     const sortedCategories = Object.entries(history.categoryStats)
       .sort((a, b) => b[1] - a[1]);
 
+    // Find overused categories (3+ times)
     const overusedCategories = sortedCategories
       .filter(([_, count]) => count >= 3)
       .map(([cat]) => cat);
 
+    // Find underutilized categories
     const allCategories = [
       'cafe', 'restaurant', 'outdoor', 'home', 'game', 'creative', 'culture',
       'photo', 'romantic', 'online', 'fitness', 'sports', 'wellness',
@@ -803,15 +690,20 @@ function buildDeduplicationContext(history: MissionHistorySummary | undefined): 
       !history.categoryStats[cat] || history.categoryStats[cat] <= 1
     );
 
+    const statsStr = sortedCategories.map(([cat, count]) => `${cat}(${count})`).join(', ');
+    parts.push(`\n### CATEGORY STATS`);
+    parts.push(`Completed: ${statsStr}`);
+
     if (overusedCategories.length > 0) {
-      parts.push(`OVERUSED: ${overusedCategories.join(', ')}`);
+      parts.push(`AVOID (overused): ${overusedCategories.join(', ')}`);
     }
+
     if (underusedCategories.length > 0) {
-      parts.push(`PRIORITIZE: ${underusedCategories.slice(0, 5).join(', ')}`);
+      parts.push(`PRIORITIZE (underused): ${underusedCategories.slice(0, 7).join(', ')}`);
     }
   }
 
-  return parts.length > 0 ? `\n[HISTORY]\n${parts.join('\n')}` : '';
+  return parts.join('\n');
 }
 
 // ============================================
@@ -827,21 +719,11 @@ function buildExcludedMissionsContext(excludedMissions: ExcludedMission[] | unde
   const titles = excludedMissions.map(m => m.title);
   const categories = [...new Set(excludedMissions.map(m => m.category))];
 
-  if (language === 'ko') {
-    parts.push(`\n🚨🚨🚨 [절대 금지 - 오늘 이미 받은 미션! 100% 다른 미션 생성 필수!] 🚨🚨🚨`);
-    parts.push(`❌ 금지된 미션 제목: ${titles.join(' | ')}`);
-    parts.push(`❌ 금지된 카테고리: ${categories.join(', ')} - 이 카테고리들은 사용 금지!`);
-    parts.push(`\n⚠️ 위 미션들과 유사하거나 같은 활동, 같은 장소 유형도 금지!`);
-    parts.push(`✅ 완전히 다른 카테고리, 완전히 새로운 활동만 생성하세요!`);
-    parts.push(`✅ 예: 카페→야외활동, 게임→문화체험, 사진→요리 등 완전히 다른 방향으로!`);
-  } else {
-    parts.push(`\n🚨🚨🚨 [STRICTLY FORBIDDEN - Already received today! MUST generate 100% different missions!] 🚨🚨🚨`);
-    parts.push(`❌ Forbidden mission titles: ${titles.join(' | ')}`);
-    parts.push(`❌ Forbidden categories: ${categories.join(', ')} - DO NOT use these categories!`);
-    parts.push(`\n⚠️ Similar activities, same activity types, and same place types are also FORBIDDEN!`);
-    parts.push(`✅ Generate COMPLETELY different categories and ENTIRELY new activities!`);
-    parts.push(`✅ Example: cafe→outdoor, game→culture, photo→cooking - completely different direction!`);
-  }
+  // Language-agnostic format for token efficiency
+  parts.push(`\n### EXCLUDED MISSIONS (DO NOT USE)`);
+  parts.push(`Forbidden titles: ${titles.join(' | ')}`);
+  parts.push(`Forbidden categories: ${categories.join(', ')}`);
+  parts.push(`Generate COMPLETELY different categories and activities.`);
 
   return parts.join('\n');
 }
@@ -1017,6 +899,7 @@ const CULTURE_PROMPTS: Record<RegionCode, CulturePrompt> = {
   },
 };
 
+
 // ============================================
 // System Prompt Generator (Region-based v3)
 // ============================================
@@ -1024,56 +907,143 @@ const CULTURE_PROMPTS: Record<RegionCode, CulturePrompt> = {
 function getSystemPrompt(
   regionCode: RegionCode,
   language: SupportedLanguage,
-  season: SeasonType
+  season: SeasonType,
+  _missionCount: number,
+  canMeetToday: boolean = true
 ): string {
   const culture = CULTURE_PROMPTS[regionCode];
   const seasonalActivities = culture.seasonal[season] || culture.seasonal['mild'] || '';
-
-  // Language mapping for output
   const languageNames: Record<SupportedLanguage, string> = {
-    ko: 'Korean', en: 'English', es: 'Spanish', 'zh-TW': 'Traditional Chinese', ja: 'Japanese'
+    ko: 'Korean',
+    en: 'English',
+    es: 'Spanish',
+    'zh-TW': 'Traditional Chinese',
+    ja: 'Japanese',
   };
 
-  // Optimized system prompt - focused on role/tone/format only
-  return `Couple date mission generator. Respond in JSON format.
+  // CRITICAL: Meeting constraint is the TOP PRIORITY
+  const meetingConstraint = canMeetToday
+    ? ''
+    : `
+### CRITICAL: COUPLE CANNOT MEET TODAY ###
+This is the HIGHEST PRIORITY rule. ALL missions MUST be:
+- Activities each person can do ALONE at their own home/location
+- OR online/remote activities together (video call, same movie, same game)
+- NEVER suggest going somewhere together or meeting in person
+- Description must NOT imply meeting (no "together at", "go to", "visit")
 
-OUTPUT: {"missions":[{title, description(<80chars), category, difficulty:1-3, tags:[]}]}
-LANGUAGE: ${languageNames[language] || 'English'} - All output MUST be in this language
-CATEGORIES: cafe,restaurant,streetfood,dessert,cooking,drink,brunch,outdoor,home,travel,daytrip,drive,night,nature,culture,movie,sports,fitness,wellness,creative,game,shopping,photo,learning,romantic,anniversary,surprise,memory,online,challenge
-DIFFICULTY: 1=FREE 2=LOW(<$10) 3=PAID($10+)
+ALLOWED categories ONLY: online, home, creative, game, photo, learning, challenge, cooking, movie
+FORBIDDEN categories: cafe, restaurant, streetfood, outdoor, travel, daytrip, drive, nature, sports, fitness, night, brunch, dessert, drink, shopping, wellness
+`;
+
+  // Filter categories based on meeting status
+  const categories = canMeetToday
+    ? 'cafe,restaurant,streetfood,dessert,cooking,drink,brunch,outdoor,home,travel,daytrip,drive,night,nature,culture,movie,sports,fitness,wellness,creative,game,shopping,photo,learning,romantic,anniversary,surprise,memory,online,challenge'
+    : 'online,home,creative,game,photo,learning,challenge,cooking,movie,romantic,anniversary,surprise,memory';
+
+  return `Couple date mission generator. Respond ONLY in valid JSON.
+${meetingConstraint}
+OUTPUT: {"missions":[{"title":"string","description":"string(50-80chars)","category":"string","difficulty":1|2|3,"tags":["string"]}]}
+
+LANGUAGE: ${languageNames[language]} - ALL output MUST be in this language
+
+CATEGORIES (EXACTLY one per mission):
+${categories}
+
+DIFFICULTY (MUST include at least 1 free mission):
+1 = FREE: ${canMeetToday ? 'walks, cycling, parks, stargazing, home activities, sunrise/sunset' : 'home activities, online games, video calls, same recipe cooking'}
+2 = LOW (<$10): ${canMeetToday ? 'photo booth, street food, convenience store date, takeout picnic' : 'online movie rental, delivery food while on video call'}
+3 = PAID ($10+): ${canMeetToday ? 'restaurants, cafes, classes, entertainment' : 'online classes together, subscription services'}
 
 STYLE:
-- title: Poetic/emotional phrase (not literal like "Go to cafe")
-- description: Specific action under 80 characters
-- Each mission MUST have different category
-- At least 1 difficulty:1 (free) mission required
+- title: Emotional, poetic phrase (not direct like "Go to cafe")
+  Good: "Under the Sparkling Lights, Our Winter Story"
+  Bad: "Visit a cafe", "Do escape room"
+- description: Specific action, MUST be 50-80 chars (not shorter, not longer)${canMeetToday ? '' : '\n- description: Must NOT imply physical meeting'}
+- Never mention prices
+- Activities should naturally lend themselves to photo verification
+- Each mission: DIFFERENT category
 
 CONTEXT (${regionCode}, ${season}):
 Tone: ${culture.toneGuide}
-Season activities: ${seasonalActivities}
-Free options: ${culture.freeActivities.slice(0, 5).join(', ')}`;
+Season: ${seasonalActivities}
+${canMeetToday ? `Free: ${culture.freeActivities.slice(0, 5).join(', ')}
+Paid: ${culture.paidActivities}` : `Remote activities: Video call dates, same movie watch party, online games, cooking same recipe apart, photo challenges`}`;
 }
 
 // ============================================
-// Few-shot Examples Generator (Simplified)
+// Region-specific Few-shot Examples (Cultural context)
 // ============================================
 
-function getFewShotExamples(language: SupportedLanguage): string {
-  // Select only 3 examples based on language (reduced from 19)
-  const examples = language === 'ko'
-    ? [
-        {"title":"퍼즐 한 조각씩, 완성되는 우리","description":"1000피스 직소 퍼즐을 함께 맞추며 대화하기","category":"game","difficulty":1},
-        {"title":"새로운 레시피 도전기","description":"한 번도 안 만들어본 요리 함께 도전","category":"cooking","difficulty":2},
-        {"title":"우리동네 사진관","description":"스마트폰으로 동네 숨은 명소 10곳 촬영","category":"photo","difficulty":1}
-      ]
-    : [
-        {"title":"Puzzle Night In","description":"Work on a 500+ piece puzzle together over snacks","category":"game","difficulty":1},
-        {"title":"Recipe Challenge","description":"Each pick an ingredient, create a dish using both","category":"cooking","difficulty":1},
-        {"title":"Photo Walk Challenge","description":"Take 15 photos each on a theme, compare favorites","category":"photo","difficulty":1}
-      ];
+// Reduced to 3-4 examples per region (style reference only, not for copying)
+const REGION_FEW_SHOTS: Record<RegionCode, string> = {
+  EAST_ASIA: `[
+  {"title":"퍼즐 한 조각씩, 완성되는 우리","description":"1000피스 직소 퍼즐을 함께 맞추며 대화하기","category":"game","difficulty":1},
+  {"title":"땀 흘린 후의 달콤함","description":"30분 같이 조깅하고 근처 맛집에서 보상 식사","category":"fitness","difficulty":2},
+  {"title":"새로운 레시피 도전기","description":"한 번도 안 만들어본 요리 함께 도전","category":"cooking","difficulty":2}
+]`,
 
-  return `STYLE EXAMPLES (reference only, do NOT copy):
-${examples.map(e => JSON.stringify(e)).join('\n')}`;
+  SOUTHEAST_ASIA: `[
+  {"title":"Couple's Yoga Morning","description":"Follow a beginner yoga video together and stretch","category":"fitness","difficulty":1},
+  {"title":"Recipe Roulette","description":"Pick a random local recipe and cook it together","category":"cooking","difficulty":2},
+  {"title":"Photo Scavenger Hunt","description":"Take 10 creative photos based on a theme you choose","category":"photo","difficulty":1}
+]`,
+
+  NORTH_AMERICA: `[
+  {"title":"Puzzle Night In","description":"Work on a 500+ piece puzzle together over snacks","category":"game","difficulty":1},
+  {"title":"Recipe Challenge","description":"Each pick an ingredient, create a dish using both","category":"cooking","difficulty":2},
+  {"title":"Photo Walk Challenge","description":"Take 15 photos each on a theme, compare favorites","category":"photo","difficulty":1}
+]`,
+
+  EUROPE: `[
+  {"title":"Puzzle & Wine Evening","description":"Work on a puzzle while sharing a bottle of wine","category":"game","difficulty":2},
+  {"title":"Recipe from Scratch","description":"Cook a traditional dish neither has made before","category":"cooking","difficulty":2},
+  {"title":"Photo Journal","description":"Document your day in photos and create a mini album","category":"photo","difficulty":1}
+]`,
+
+  LATIN_AMERICA: `[
+  {"title":"Salsa at Home","description":"Learn basic salsa steps from YouTube in your living room","category":"fitness","difficulty":1},
+  {"title":"Recipe Adventure","description":"Cook a dish from a country neither has visited","category":"cooking","difficulty":2},
+  {"title":"Photo Story","description":"Create a photo story of your neighborhood together","category":"photo","difficulty":1}
+]`,
+
+  DEFAULT: `[
+  {"title":"Puzzle Time","description":"Start a jigsaw puzzle together and chat","category":"game","difficulty":1},
+  {"title":"Cooking Challenge","description":"Each choose an ingredient, cook something with both","category":"cooking","difficulty":2},
+  {"title":"Photo Mission","description":"Take 10 creative photos around your area","category":"photo","difficulty":1}
+]`,
+};
+
+// ============================================
+// Few-shot Examples Generator (Region + Online)
+// ============================================
+
+function getFewShotExamples(regionCode: RegionCode, _language: SupportedLanguage, canMeetToday: boolean = true): string {
+  // If couple can't meet, ONLY show remote/solo examples
+  if (!canMeetToday) {
+    return `
+### REMOTE-ONLY Examples (couple CANNOT meet today)
+[
+  {"title":"같은 영화, 다른 공간에서","description":"각자 집에서 영상통화 켜놓고 같은 영화 동시 재생하며 실시간 리액션 공유하기","category":"online","difficulty":1},
+  {"title":"우리만의 요리 대결","description":"똑같은 레시피 골라서 각자 집에서 요리 완성 후 사진 찍어 결과물 비교하고 점수 매기기","category":"cooking","difficulty":2},
+  {"title":"Dreams for Tomorrow","description":"Video call and write a shared bucket list of activities to do when you finally meet again","category":"online","difficulty":1},
+  {"title":"Photo Theme Challenge","description":"Pick a theme together then each take 5 creative photos at your own location and compare results","category":"photo","difficulty":1},
+  {"title":"Online Game Night","description":"Choose an online multiplayer game and compete against each other while chatting on video call","category":"game","difficulty":1}
+]
+
+CRITICAL REMINDER: All missions must be doable WITHOUT meeting in person.
+`;
+  }
+
+  const regionExamples = REGION_FEW_SHOTS[regionCode] || REGION_FEW_SHOTS.DEFAULT;
+
+  return `
+### Style Reference (DO NOT copy - style only)
+${regionExamples}
+
+### Online Examples (when can't meet)
+[{"title":"Dreams for Tomorrow","description":"Write bucket list of things to do next year","category":"online","difficulty":1},{"title":"Same Taste Apart","description":"Cook same recipe separately, share photos","category":"online","difficulty":1}]
+`;
 }
 
 // ============================================
@@ -1083,34 +1053,57 @@ ${examples.map(e => JSON.stringify(e)).join('\n')}`;
 function getUserPrompt(
   contextString: string,
   fewShotExamples: string,
-  language: SupportedLanguage,
+  _language: SupportedLanguage,
   deduplicationContext: string,
   excludedMissionsContext: string,
-  missionCount: number = 3
+  missionCount: number = 3,
+  canMeetToday: boolean = true
 ): string {
-  // Build constraints section (only if there are exclusions)
-  const constraints: string[] = [];
+  // Build forbidden rules based on available context
+  const forbiddenRules: string[] = [];
   if (excludedMissionsContext) {
-    constraints.push(excludedMissionsContext);
+    forbiddenRules.push('- Missions listed in EXCLUDED MISSIONS above');
   }
   if (deduplicationContext) {
-    constraints.push(deduplicationContext);
+    forbiddenRules.push('- Activities similar to RECENTLY COMPLETED MISSIONS');
   }
-  const constraintsSection = constraints.length > 0 ? constraints.join('\n') : '';
+  forbiddenRules.push('- Repeating same patterns (walks, cafes, markets)');
 
-  // Simplified prompt - rules already in system prompt, only context-specific here
-  const creativityHint = language === 'ko'
-    ? '창의적이고 독특한 활동 우선'
-    : 'Prioritize creative, unique activities';
+  // CRITICAL: Add remote-only rules when couple can't meet today
+  let remoteOnlyRules = '';
+  if (!canMeetToday) {
+    forbiddenRules.push('- ANY activity requiring physical meeting (cafes, restaurants, outdoor dates, walks, drives)');
+    remoteOnlyRules = `
+### IMPORTANT: COUPLE CANNOT MEET TODAY
+ALL missions MUST be doable ALONE or REMOTELY:
+- Online activities (video call, watch party, online games)
+- Solo activities to share later (cooking same recipe, photo challenges)
+- Home activities each person does separately
+- Categories allowed: online, home, creative, game, photo, learning, challenge
+- Categories FORBIDDEN: cafe, restaurant, streetfood, outdoor, travel, daytrip, drive, nature, sports, fitness
+`;
+  }
 
-  return `Generate ${missionCount} missions:
+  return `Generate ${missionCount} date missions for this couple.
 
 ${contextString}
-${constraintsSection}
+${excludedMissionsContext}
+${deduplicationContext}
+${remoteOnlyRules}
 
-${creativityHint}
+### RULES
+FORBIDDEN:
+${forbiddenRules.join('\n')}
 
-${fewShotExamples}`;
+REQUIRED:
+- All ${missionCount} missions: DIFFERENT activity types
+- At least 1 FREE mission (difficulty:1)
+- Unique, creative ideas (not generic "walk/cafe/restaurant")
+${canMeetToday ? '- Examples: puzzle challenge, workout+brunch, flea market, cooking together' : '- Examples: video call game night, same recipe cooking apart, online movie watch party'}
+
+${fewShotExamples}
+
+Generate ${missionCount} missions in JSON format only.`;
 }
 
 // ============================================
@@ -1185,7 +1178,7 @@ function validateCategory(category: string): MissionCategory {
 
 export async function generateMissionsWithAI(input: MissionGenerationInput): Promise<Mission[]> {
   const openai = getOpenAIClient();
-  const { todayMoods } = input.todayAnswers;
+  const { todayMoods, canMeetToday } = input.todayAnswers;
 
   // Get user's language preference
   const language = useLanguageStore.getState().language;
@@ -1213,7 +1206,7 @@ export async function generateMissionsWithAI(input: MissionGenerationInput): Pro
   const contextString = buildContext(input, weather, combinedDateWorries);
 
   // Build deduplication context from mission history (token-efficient)
-  const deduplicationContext = buildDeduplicationContext(input.missionHistory);
+  const deduplicationContext = buildDeduplicationContext(input.missionHistory, language);
 
   // Build excluded missions context for refresh (CRITICAL - avoid duplicates)
   const excludedMissionsContext = buildExcludedMissionsContext(input.excludedMissions, language);
@@ -1231,14 +1224,14 @@ export async function generateMissionsWithAI(input: MissionGenerationInput): Pro
     ? SUBSCRIPTION_LIMITS.premium.missionsPerGeneration
     : SUBSCRIPTION_LIMITS.free.missionsPerGeneration;
 
-  // Get region and language-specific prompts
-  const systemPrompt = getSystemPrompt(weather.regionCode, language, weather.season);
-  const fewShotExamples = getFewShotExamples(language);
-  const userPrompt = getUserPrompt(contextString, fewShotExamples, language, deduplicationContext, excludedMissionsContext, missionCount);
+  // Get region and language-specific prompts (canMeetToday is TOP PRIORITY)
+  const systemPrompt = getSystemPrompt(weather.regionCode, language, weather.season, missionCount, canMeetToday);
+  const fewShotExamples = getFewShotExamples(weather.regionCode, language, canMeetToday);
+  const userPrompt = getUserPrompt(contextString, fewShotExamples, language, deduplicationContext, excludedMissionsContext, missionCount, canMeetToday);
 
   try {
-    // Reduced max_tokens due to optimized prompts (40% smaller)
-    const maxTokens = missionCount > 3 ? 3000 : 1500;
+    // Increase max_tokens for premium users (6 missions need more tokens)
+    const maxTokens = missionCount > 3 ? 4500 : 2500;
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
@@ -1246,10 +1239,10 @@ export async function generateMissionsWithAI(input: MissionGenerationInput): Pro
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
-      temperature: 0.75,  // Reduced from 0.9 for better JSON stability
+      temperature: 0.8,
       max_tokens: maxTokens,
-      presence_penalty: 0.5,  // Reduced from 0.7
-      frequency_penalty: 0.3,  // Reduced from 0.4
+      presence_penalty: 0.7,
+      frequency_penalty: 0.4,
       response_format: { type: 'json_object' },
     });
 

@@ -1545,7 +1545,7 @@ export default function MissionDetailScreen() {
           <BlurView intensity={30} tint="light" style={styles.cardBlur}>
             <View style={styles.missionContent}>
               {/* Title */}
-              <Text style={styles.missionTitle}>{mission.title}</Text>
+              <Text style={styles.missionTitle} textBreakStrategy="simple" lineBreakStrategyIOS="hangul-word">{mission.title}</Text>
 
               {/* Description */}
               <Text style={styles.missionDescription}>{mission.description}</Text>

@@ -293,6 +293,9 @@ export default function SettingsScreen() {
     // Case-insensitive comparison for English (allows 'delete', 'Delete', 'DELETE')
     if (deleteConfirmText.toLowerCase() !== t('settings.deleteAccount.confirmText').toLowerCase()) return;
 
+    // Dismiss keyboard before showing alert to prevent keyboard flicker
+    Keyboard.dismiss();
+
     // Show final confirmation alert before proceeding
     Alert.alert(
       t('settings.deleteAccount.finalConfirmTitle'),

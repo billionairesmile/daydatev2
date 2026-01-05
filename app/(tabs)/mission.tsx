@@ -1228,7 +1228,7 @@ export default function MissionScreen() {
                 offset: SNAP_INTERVAL * index,
                 index,
               })}
-              extraData={[hasGeneratedMissions, allMissions.map(m => m.id).join(','), lockedMissionId, todayCompletedMission]}
+              extraData={[hasGeneratedMissions, allMissions.map(m => m.id).join(','), lockedMissionId, todayCompletedMission, allMissionProgress]}
               initialNumToRender={3}
               maxToRenderPerBatch={3}
               windowSize={5}
@@ -1584,7 +1584,7 @@ function MissionCardContent({ mission, onStartPress, onKeepPress, isKept, canSta
       {/* Content */}
       <View style={styles.cardContent}>
         {/* Title */}
-        <Text style={styles.missionTitle}>{mission.title}</Text>
+        <Text style={styles.missionTitle} textBreakStrategy="simple" lineBreakStrategyIOS="hangul-word">{mission.title}</Text>
 
         {/* Description */}
         <Text style={styles.missionDescription}>{mission.description}</Text>

@@ -32,7 +32,17 @@ export function BookmarkedMissionsPage({ onBack }: BookmarkedMissionsPageProps) 
   // Subscribe to todayCompletedMission to trigger re-render when a mission is completed
   // This ensures Start buttons are properly disabled after completing any mission
   const { keptMissions, removeKeptMissionByKeptId, canStartMission, isTodayCompletedMission, todayCompletedMission } = useMissionStore();
-  const { sharedBookmarks, removeBookmark, isInitialized: isSyncInitialized } = useCoupleSyncStore();
+  const { sharedBookmarks, removeBookmark, isInitialized: isSyncInitialized, lockedMissionId, allMissionProgress } = useCoupleSyncStore();
+
+  // Check if another mission is in progress (locked but not completed)
+  const isAnotherMissionInProgress = useCallback((missionId: string) => {
+    if (!lockedMissionId || lockedMissionId === missionId) {
+      return false;
+    }
+    // Check if the locked mission is still in progress (not completed)
+    const lockedProgress = allMissionProgress.find(p => p.mission_id === lockedMissionId);
+    return lockedProgress?.status !== 'completed';
+  }, [lockedMissionId, allMissionProgress]);
 
   // Use synced bookmarks if initialized, otherwise fall back to local
   const bookmarks: BookmarkItem[] = isSyncInitialized
@@ -56,19 +66,29 @@ export function BookmarkedMissionsPage({ onBack }: BookmarkedMissionsPageProps) 
   };
 
   const handleMissionPress = useCallback((missionId: string) => {
-    // Show message if can't start (already completed another mission today)
+    // Show message if can't start (already completed another mission today or another in progress)
     if (!canStartMission(missionId) && !isTodayCompletedMission(missionId)) {
-      Alert.alert(
-        t('mission.alerts.cannotStart'),
-        t('mission.alerts.dailyLimitMessage'),
-        [{ text: t('common.confirm') }]
-      );
+      if (isAnotherMissionInProgress(missionId)) {
+        // Another mission is in progress (locked but not completed)
+        Alert.alert(
+          t('mission.alerts.cannotStart'),
+          t('mission.alerts.anotherInProgressMessage'),
+          [{ text: t('common.confirm') }]
+        );
+      } else {
+        // Today's mission quota is used (another mission was completed)
+        Alert.alert(
+          t('mission.alerts.cannotStart'),
+          t('mission.alerts.dailyLimitMessage'),
+          [{ text: t('common.confirm') }]
+        );
+      }
       return;
     }
 
     // Pass source=bookmark to return to bookmark page on back
     router.push(`/mission/${missionId}?source=bookmark`);
-  }, [router, canStartMission, isTodayCompletedMission, t]);
+  }, [router, canStartMission, isTodayCompletedMission, isAnotherMissionInProgress, t]);
 
   const handleRemove = useCallback((bookmark: BookmarkItem, title: string) => {
     Alert.alert(
@@ -162,7 +182,7 @@ export function BookmarkedMissionsPage({ onBack }: BookmarkedMissionsPageProps) 
                   {/* Content */}
                   <View style={styles.cardContent}>
                     {/* Title */}
-                    <Text style={styles.missionTitle} numberOfLines={2}>
+                    <Text style={styles.missionTitle} numberOfLines={2} textBreakStrategy="simple" lineBreakStrategyIOS="hangul-word">
                       {mission.title}
                     </Text>
 
@@ -185,7 +205,9 @@ export function BookmarkedMissionsPage({ onBack }: BookmarkedMissionsPageProps) 
                           styles.startButtonText,
                           !canStartMission(mission.id) && !isTodayCompletedMission(mission.id) && styles.startButtonTextDisabled,
                         ]}>
-                          {isTodayCompletedMission(mission.id) ? t('mission.completed') : t('mission.start')}
+                          {isTodayCompletedMission(mission.id)
+                            ? t('mission.completed')
+                            : (isAnotherMissionInProgress(mission.id) ? t('mission.anotherInProgress') : t('mission.start'))}
                         </Text>
                       </Pressable>
 

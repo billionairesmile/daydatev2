@@ -253,8 +253,22 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
       // Check if any mission is completed today
       hasTodayCompletedMission: () => {
         const { todayCompletedMission } = get();
+        const syncStore = useCoupleSyncStore.getState();
+        const today = getTodayDateString();
+
+        // Check DB-synced completed mission first (most reliable source after re-pairing)
+        if (syncStore.isInitialized) {
+          const completedProgress = syncStore.allMissionProgress.find(
+            p => p.status === 'completed' && p.date === today
+          );
+          if (completedProgress) {
+            return true;
+          }
+        }
+
+        // Fallback to local state
         if (!todayCompletedMission) return false;
-        return todayCompletedMission.date === getTodayDateString();
+        return todayCompletedMission.date === today;
       },
 
       // Check if a specific mission can be started
@@ -262,6 +276,7 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
         const { todayCompletedMission } = get();
         const syncStore = useCoupleSyncStore.getState();
         const subscriptionStore = useSubscriptionStore.getState();
+        const today = getTodayDateString();
 
         // Premium users (or partner is premium) can start unlimited missions
         const isCouplePremium = subscriptionStore.isPremium || subscriptionStore.partnerIsPremium;
@@ -287,8 +302,20 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
           return true;
         }
 
+        // Check DB-synced completed mission first (most reliable source after re-pairing)
+        if (syncStore.isInitialized) {
+          const completedProgress = syncStore.allMissionProgress.find(
+            p => p.status === 'completed' && p.date === today
+          );
+          if (completedProgress) {
+            // Can only start if it's the same mission that was completed today (for viewing)
+            return completedProgress.mission_id === missionId;
+          }
+        }
+
+        // Fallback to local state
         if (!todayCompletedMission) return true;
-        if (todayCompletedMission.date !== getTodayDateString()) return true;
+        if (todayCompletedMission.date !== today) return true;
         // Can only start if it's the same mission that was completed today (for viewing)
         return todayCompletedMission.missionId === missionId;
       },
@@ -296,16 +323,44 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
       // Get today's completed mission ID
       getTodayCompletedMissionId: () => {
         const { todayCompletedMission } = get();
+        const syncStore = useCoupleSyncStore.getState();
+        const today = getTodayDateString();
+
+        // Check DB-synced completed mission first (most reliable source after re-pairing)
+        if (syncStore.isInitialized) {
+          const completedProgress = syncStore.allMissionProgress.find(
+            p => p.status === 'completed' && p.date === today
+          );
+          if (completedProgress) {
+            return completedProgress.mission_id;
+          }
+        }
+
+        // Fallback to local state
         if (!todayCompletedMission) return null;
-        if (todayCompletedMission.date !== getTodayDateString()) return null;
+        if (todayCompletedMission.date !== today) return null;
         return todayCompletedMission.missionId;
       },
 
       // Check if a specific mission is the one completed today
       isTodayCompletedMission: (missionId) => {
         const { todayCompletedMission } = get();
+        const syncStore = useCoupleSyncStore.getState();
+        const today = getTodayDateString();
+
+        // Check DB-synced completed mission first (most reliable source after re-pairing)
+        if (syncStore.isInitialized) {
+          const completedProgress = syncStore.allMissionProgress.find(
+            p => p.status === 'completed' && p.date === today
+          );
+          if (completedProgress) {
+            return completedProgress.mission_id === missionId;
+          }
+        }
+
+        // Fallback to local state
         if (!todayCompletedMission) return false;
-        if (todayCompletedMission.date !== getTodayDateString()) return false;
+        if (todayCompletedMission.date !== today) return false;
         return todayCompletedMission.missionId === missionId;
       },
 

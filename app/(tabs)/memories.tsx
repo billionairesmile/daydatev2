@@ -5368,7 +5368,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#FFFFFF',
-    flex: 1,
     textAlign: 'center',
   },
   albumDetailTitleContainer: {
