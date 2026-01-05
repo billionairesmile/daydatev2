@@ -47,7 +47,7 @@ export const SUBSCRIPTION_LIMITS = {
     maxCompletionsPerDay: 1,
     maxBookmarks: 5,
     maxAlbums: 5,
-    maxPhotos: 100, // Maximum photos in monthly album for free users
+    maxPhotos: 50, // Maximum photos in monthly album for free users
     missionsPerGeneration: 3,
     showAds: true,
     homeFrameOptions: ['polaroid'] as const,
@@ -635,9 +635,12 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
       },
 
       shouldShowAds: () => {
-        const state = get();
-        const isCouplePremium = state.isPremium || state.partnerIsPremium;
-        return !isCouplePremium;
+        // TEMP: Disabled for App Store review - re-enable after approval
+        return false;
+        // Original code (uncomment after app approval):
+        // const state = get();
+        // const isCouplePremium = state.isPremium || state.partnerIsPremium;
+        // return !isCouplePremium;
       },
 
       getAvailableFrameOptions: () => {

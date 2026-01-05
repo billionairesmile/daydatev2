@@ -22,6 +22,14 @@ import { BlurView } from 'expo-blur';
 import { Camera as VisionCamera, useCameraDevice, useCameraFormat, useCameraPermission, CameraRuntimeError } from 'react-native-vision-camera';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as Location from 'expo-location';
+
+// Dynamic import for VolumeManager - fails gracefully in Expo Go
+let VolumeManager: any = null;
+try {
+  VolumeManager = require('react-native-volume-manager').VolumeManager;
+} catch (e) {
+  // Expo Go - volume manager not available, will work in production builds
+}
 import {
   ChevronLeft,
   Camera,
@@ -117,9 +125,11 @@ export default function MissionDetailScreen() {
   const device = useCameraDevice(facing === 'front' ? 'front' : 'back');
   const cameraRef = useRef<VisionCamera>(null);
 
-  // Select best camera format for maximum photo quality
+  // Select best camera format for both photo quality AND preview quality
+  // videoResolution improves the live preview stream quality
   const format = useCameraFormat(device, [
     { photoResolution: 'max' },
+    { videoResolution: 'max' },  // This improves preview quality
     { photoHdr: true },
   ]);
 
@@ -308,6 +318,50 @@ export default function MissionDetailScreen() {
       ExpoImage.prefetch(thisMissionProgress.photo_url).catch(() => {});
     }
   }, [mission?.imageUrl, thisMissionProgress?.photo_url]);
+
+  // Volume button capture - trigger photo capture when volume up/down is pressed
+  // Use refs to avoid stale closure issues
+  const handleCaptureRef = useRef<(() => void) | null>(null);
+  const showCameraRef = useRef(showCamera);
+  const showPreviewStateRef = useRef(showPreview);
+  const isCapturingRef = useRef(isCapturing);
+
+  // Keep refs updated
+  useEffect(() => {
+    showCameraRef.current = showCamera;
+    showPreviewStateRef.current = showPreview;
+    isCapturingRef.current = isCapturing;
+  }, [showCamera, showPreview, isCapturing]);
+
+  useEffect(() => {
+    if (!showCamera || showPreview || !VolumeManager) {
+      return;
+    }
+
+    let volumeListener: { remove: () => void } | null = null;
+
+    // Listen for volume button presses
+    // Only works in production builds (EAS Build), not in Expo Go
+    try {
+      volumeListener = VolumeManager.addVolumeListener((result: any) => {
+        // Only capture if camera is active and not already capturing
+        if (showCameraRef.current && !showPreviewStateRef.current && !isCapturingRef.current) {
+          // Trigger capture
+          if (handleCaptureRef.current) {
+            handleCaptureRef.current();
+          }
+        }
+      });
+    } catch (error) {
+      // VolumeManager failed - volume button capture disabled
+    }
+
+    return () => {
+      if (volumeListener) {
+        volumeListener.remove();
+      }
+    };
+  }, [showCamera, showPreview]);
 
   // Sync state from thisMissionProgress (real-time updates from partner for THIS mission)
   useEffect(() => {
@@ -663,7 +717,7 @@ export default function MissionDetailScreen() {
     setShowCamera(true);
   };
 
-  const handleCapture = async () => {
+  const handleCapture = useCallback(async () => {
     if (cameraRef.current && !isCapturing) {
       setIsCapturing(true);
       try {
@@ -684,7 +738,8 @@ export default function MissionDetailScreen() {
           showPreviewRef.current = true; // Track for async callback
           setIsCapturing(false);
 
-          // Get original image dimensions and process
+          // Get original image dimensions and process with SINGLE JPEG encoding
+          // This eliminates generation loss from multiple re-encodings
           RNImage.getSize(photoUri, async (originalWidth: number, originalHeight: number) => {
             // Check if user already went back (cancelled preview) using ref
             if (!showPreviewRef.current) {
@@ -693,125 +748,91 @@ export default function MissionDetailScreen() {
             }
             try {
               const isLandscapeImage = originalWidth > originalHeight;
-              const manipulations: ImageManipulator.Action[] = [];
 
-              // Track dimensions after each manipulation
+              // Track dimensions through transformations (calculation only, no encoding)
               let currentWidth = originalWidth;
               let currentHeight = originalHeight;
 
-              // Step 1: Rotate if needed (camera returns landscape for portrait capture)
+              // Build all manipulations in a single array for ONE JPEG encoding
+              const allManipulations: ImageManipulator.Action[] = [];
+
+              // Step 1: Calculate rotation if needed
               if (isLandscapeImage) {
                 if (facing === 'back') {
-                  manipulations.push({ rotate: -90 });
+                  allManipulations.push({ rotate: -90 });
                 } else {
-                  manipulations.push({ rotate: 90 });
+                  allManipulations.push({ rotate: 90 });
                 }
                 // After rotation, dimensions swap
                 currentWidth = originalHeight;
                 currentHeight = originalWidth;
               }
 
-              // Front camera photos are kept mirrored (like the viewfinder)
-              // No horizontal flip - this keeps the "selfie" appearance users expect
-
-              // Apply rotation first
-              let processedUri = photoUri;
-              if (manipulations.length > 0) {
-                const result = await ImageManipulator.manipulateAsync(
-                  photoUri,
-                  manipulations,
-                  { format: ImageManipulator.SaveFormat.JPEG, compress: 1 }
-                );
-                processedUri = result.uri;
-                console.log('[Camera] Photo after rotation:', currentWidth, 'x', currentHeight);
-              }
-
-              // Step 2: First crop to VIEWFINDER aspect (screen aspect)
-              // The viewfinder fills the screen, so it shows a cropped view of the sensor
-              // We need to match that crop so preview shows exactly what user saw
+              // Step 2: Calculate viewfinder crop (match what user saw)
               const photoAspect = currentWidth / currentHeight;
-              const screenAspect = width / height; // What user saw in viewfinder
+              const screenAspect = width / height;
 
               if (photoAspect > screenAspect) {
-                // Photo is wider than viewfinder - crop sides to match viewfinder
                 const viewfinderCropHeight = currentHeight;
                 const viewfinderCropWidth = Math.round(currentHeight * screenAspect);
                 const viewfinderCropX = Math.round((currentWidth - viewfinderCropWidth) / 2);
-                const viewfinderCropY = 0;
 
-                console.log('[Camera] Step 1 - Cropping to viewfinder:', {
-                  viewfinderCropX, viewfinderCropY, viewfinderCropWidth, viewfinderCropHeight,
-                  photoAspect: photoAspect.toFixed(3), screenAspect: screenAspect.toFixed(3)
+                allManipulations.push({
+                  crop: { originX: viewfinderCropX, originY: 0, width: viewfinderCropWidth, height: viewfinderCropHeight }
                 });
 
-                const viewfinderResult = await ImageManipulator.manipulateAsync(
-                  processedUri,
-                  [{ crop: { originX: viewfinderCropX, originY: viewfinderCropY, width: viewfinderCropWidth, height: viewfinderCropHeight } }],
-                  { format: ImageManipulator.SaveFormat.JPEG, compress: 1 }
-                );
-                processedUri = viewfinderResult.uri;
                 currentWidth = viewfinderCropWidth;
                 currentHeight = viewfinderCropHeight;
+                console.log('[Camera] Viewfinder crop:', viewfinderCropWidth, 'x', viewfinderCropHeight);
               }
 
-              // Step 3: Crop to 3:4 photocard aspect ratio (final saved format)
+              // Step 3: Calculate 3:4 crop
               const currentAspect = currentWidth / currentHeight;
               const targetAspect = 3 / 4;
 
               if (Math.abs(currentAspect - targetAspect) > 0.01) {
-                let cropWidth: number;
-                let cropHeight: number;
-                let cropX: number;
-                let cropY: number;
+                let cropWidth: number, cropHeight: number, cropX: number, cropY: number;
 
                 if (currentAspect > targetAspect) {
-                  // Photo is wider than 3:4 - crop sides
                   cropHeight = currentHeight;
                   cropWidth = Math.round(cropHeight * targetAspect);
                   cropX = Math.round((currentWidth - cropWidth) / 2);
                   cropY = 0;
                 } else {
-                  // Photo is taller than 3:4 - crop top/bottom
                   cropWidth = currentWidth;
                   cropHeight = Math.round(cropWidth / targetAspect);
                   cropX = 0;
                   cropY = Math.round((currentHeight - cropHeight) / 2);
                 }
 
-                console.log('[Camera] Step 2 - Cropping to 3:4:', { cropX, cropY, cropWidth, cropHeight });
+                allManipulations.push({
+                  crop: { originX: cropX, originY: cropY, width: cropWidth, height: cropHeight }
+                });
 
-                const croppedResult = await ImageManipulator.manipulateAsync(
-                  processedUri,
-                  [{ crop: { originX: cropX, originY: cropY, width: cropWidth, height: cropHeight } }],
-                  { format: ImageManipulator.SaveFormat.JPEG, compress: 1 }
-                );
-                processedUri = croppedResult.uri;
                 currentWidth = cropWidth;
                 currentHeight = cropHeight;
+                console.log('[Camera] 3:4 crop:', cropWidth, 'x', cropHeight);
               }
 
-              // Step 4: Resize if too large and apply final compression for optimal quality/size balance
-              // Target: max 1500px width (1500x2000 for 3:4) with 0.85 compression = ~1-1.5MB
+              // Step 4: Calculate resize if needed
               const maxWidth = 1500;
-              const finalManipulations: ImageManipulator.Action[] = [];
-
               if (currentWidth > maxWidth) {
                 const scaledHeight = Math.round(currentHeight * (maxWidth / currentWidth));
-                finalManipulations.push({ resize: { width: maxWidth, height: scaledHeight } });
-                console.log('[Camera] Step 3 - Resizing:', currentWidth, 'x', currentHeight, '→', maxWidth, 'x', scaledHeight);
+                allManipulations.push({ resize: { width: maxWidth, height: scaledHeight } });
+                console.log('[Camera] Resize:', currentWidth, 'x', currentHeight, '→', maxWidth, 'x', scaledHeight);
               }
 
-              // Apply final resize (if needed) and compression
+              // SINGLE JPEG encoding with all transformations - 0.92 quality (no generation loss)
               const finalResult = await ImageManipulator.manipulateAsync(
-                processedUri,
-                finalManipulations,
-                { format: ImageManipulator.SaveFormat.JPEG, compress: 0.85 }
+                photoUri,
+                allManipulations,
+                { format: ImageManipulator.SaveFormat.JPEG, compress: 0.92 }
               );
-              processedUri = finalResult.uri;
-              console.log('[Camera] Final photo ready with 85% quality compression');
+
+              console.log('[Camera] Single JPEG encoding complete - 92% quality, no generation loss');
 
               // Set the processed photo and stop loading
-              setPreviewPhoto(processedUri);
+              setPreviewPhoto(finalResult.uri);
               setIsProcessingPhoto(false);
             } catch (manipError) {
               console.error('Image manipulation error:', manipError);
@@ -832,7 +853,12 @@ export default function MissionDetailScreen() {
         setIsCapturing(false); // Only reset on capture failure (not in finally, as success already resets)
       }
     }
-  };
+  }, [isCapturing, flashEnabled, facing, width, height, t]);
+
+  // Update ref for volume button capture
+  useEffect(() => {
+    handleCaptureRef.current = handleCapture;
+  }, [handleCapture]);
 
   // Function to get current location with reverse geocoding
   const getCurrentLocationName = async (): Promise<string> => {
@@ -1386,7 +1412,7 @@ export default function MissionDetailScreen() {
               photo={true}
               format={format}
               photoHdr={format?.supportsPhotoHdr}
-              photoQualityBalance="quality"
+              photoQualityBalance="balanced"
               zoom={device?.neutralZoom ?? 1}
               enableZoomGesture={true}
               torch={flashEnabled && facing === 'back' ? 'on' : 'off'}

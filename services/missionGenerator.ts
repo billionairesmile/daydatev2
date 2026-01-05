@@ -763,66 +763,37 @@ function extractKeywordsFromHistory(
 // Deduplication Context Builder (Token-Efficient)
 // ============================================
 
-function buildDeduplicationContext(history: MissionHistorySummary | undefined, language: SupportedLanguage): string {
+function buildDeduplicationContext(history: MissionHistorySummary | undefined): string {
   if (!history || history.totalCompleted === 0) {
     return '';
   }
 
   const parts: string[] = [];
 
-  // 1. Recent titles (max 20 for token efficiency, ~100-200 tokens)
+  // 1. Recent titles (max 15 for token efficiency)
   if (history.recentTitles.length > 0) {
-    const titlesToInclude = history.recentTitles.slice(0, 20);
-    if (language === 'ko') {
-      parts.push(`\n🚫 [최근 완료한 미션 - 중복 금지!]`);
-      parts.push(`  ${titlesToInclude.join(', ')}`);
-    } else {
-      parts.push(`\n🚫 [Recently Completed Missions - Avoid Duplicates!]`);
-      parts.push(`  ${titlesToInclude.join(', ')}`);
-    }
+    const titlesToInclude = history.recentTitles.slice(0, 15);
+    parts.push(`RECENT (avoid): ${titlesToInclude.join(', ')}`);
   }
 
-  // 2. Extract and blacklist keywords from recent missions (NEW in v4)
+  // 2. Extract and blacklist keywords (combined, max 10)
   if (history.recentTitles.length > 0) {
     const { activityKeywords, themeKeywords } = extractKeywordsFromHistory(history.recentTitles);
-
-    if (activityKeywords.length > 0 || themeKeywords.length > 0) {
-      if (language === 'ko') {
-        parts.push(`\n🚨🚨🚨 [금지 키워드 - 이 단어가 포함된 미션 생성 절대 금지!] 🚨🚨🚨`);
-        if (activityKeywords.length > 0) {
-          parts.push(`  ❌ 금지 활동: ${activityKeywords.join(', ')}`);
-        }
-        if (themeKeywords.length > 0) {
-          parts.push(`  ❌ 금지 테마/장소: ${themeKeywords.join(', ')}`);
-        }
-        parts.push(`  ⚠️ 위 키워드와 유사한 표현도 금지! (예: stroll ≈ walk ≈ 산책)`);
-        parts.push(`  ✅ 완전히 새로운 활동과 장소 유형만 추천하세요!`);
-      } else {
-        parts.push(`\n🚨🚨🚨 [BLACKLISTED KEYWORDS - NEVER use these in missions!] 🚨🚨🚨`);
-        if (activityKeywords.length > 0) {
-          parts.push(`  ❌ Forbidden activities: ${activityKeywords.join(', ')}`);
-        }
-        if (themeKeywords.length > 0) {
-          parts.push(`  ❌ Forbidden themes/places: ${themeKeywords.join(', ')}`);
-        }
-        parts.push(`  ⚠️ Similar expressions are also forbidden! (e.g., stroll ≈ walk ≈ wander)`);
-        parts.push(`  ✅ Only recommend completely NEW activities and place types!`);
-      }
+    const allKeywords = [...activityKeywords, ...themeKeywords].slice(0, 10);
+    if (allKeywords.length > 0) {
+      parts.push(`FORBIDDEN: ${allKeywords.join(', ')}`);
     }
   }
 
-  // 3. Category statistics (very token efficient, ~30-50 tokens)
+  // 3. Category guidance (overused/underused)
   if (Object.keys(history.categoryStats).length > 0) {
-    // Sort by count (descending) to show most used categories
     const sortedCategories = Object.entries(history.categoryStats)
       .sort((a, b) => b[1] - a[1]);
 
-    // Find overused categories (3+ times)
     const overusedCategories = sortedCategories
       .filter(([_, count]) => count >= 3)
       .map(([cat]) => cat);
 
-    // Find underutilized categories - expanded list for more diversity
     const allCategories = [
       'cafe', 'restaurant', 'outdoor', 'home', 'game', 'creative', 'culture',
       'photo', 'romantic', 'online', 'fitness', 'sports', 'wellness',
@@ -832,34 +803,15 @@ function buildDeduplicationContext(history: MissionHistorySummary | undefined, l
       !history.categoryStats[cat] || history.categoryStats[cat] <= 1
     );
 
-    if (language === 'ko') {
-      const statsStr = sortedCategories.map(([cat, count]) => `${cat}(${count})`).join(', ');
-      parts.push(`\n📊 [카테고리별 완료 현황]`);
-      parts.push(`  ${statsStr}`);
-
-      if (overusedCategories.length > 0) {
-        parts.push(`  🚫 과다 사용 카테고리 (피하세요!): ${overusedCategories.join(', ')}`);
-      }
-
-      if (underusedCategories.length > 0) {
-        parts.push(`  💡 덜 해본 카테고리 (우선 추천!): ${underusedCategories.slice(0, 7).join(', ')}`);
-      }
-    } else {
-      const statsStr = sortedCategories.map(([cat, count]) => `${cat}(${count})`).join(', ');
-      parts.push(`\n📊 [Category Completion Stats]`);
-      parts.push(`  ${statsStr}`);
-
-      if (overusedCategories.length > 0) {
-        parts.push(`  🚫 Overused categories (AVOID!): ${overusedCategories.join(', ')}`);
-      }
-
-      if (underusedCategories.length > 0) {
-        parts.push(`  💡 Less explored (PRIORITIZE!): ${underusedCategories.slice(0, 7).join(', ')}`);
-      }
+    if (overusedCategories.length > 0) {
+      parts.push(`OVERUSED: ${overusedCategories.join(', ')}`);
+    }
+    if (underusedCategories.length > 0) {
+      parts.push(`PRIORITIZE: ${underusedCategories.slice(0, 5).join(', ')}`);
     }
   }
 
-  return parts.join('\n');
+  return parts.length > 0 ? `\n[HISTORY]\n${parts.join('\n')}` : '';
 }
 
 // ============================================
@@ -1066,288 +1018,62 @@ const CULTURE_PROMPTS: Record<RegionCode, CulturePrompt> = {
 };
 
 // ============================================
-// Cost Balance Logic
-// ============================================
-
-function buildCostDirective(
-  missionCount: number,
-  language: SupportedLanguage
-): string {
-  // Always require at least 1 free/low-cost mission regardless of mission count
-  const requiredFree = 1;
-
-  if (language === 'ko') {
-    return `
-## 비용 균형 (중요!)
-매 미션 생성 시 반드시 무료/저비용 미션 1개 이상 포함:
-
-무료 (₩0): 산책, 자전거, 드라이브, 공원, 일출/일몰, 집에서 하는 활동
-저비용 (<₩10,000): 편의점 데이트, 포장음식 피크닉, 네컷사진, 길거리 음식
-
-규칙: ${missionCount}개 미션 생성 시 → 반드시 최소 ${requiredFree}개는 무료/저비용 (difficulty: 1)`;
-  }
-
-  return `
-## COST BALANCE (Critical!)
-Every generation MUST include at least 1 FREE/LOW-COST mission:
-
-FREE ($0): Walking, cycling, driving, parks, sunrise/sunset, home activities
-LOW-COST (<$10): Convenience store date, takeout picnic, photo booth, street food
-
-RULE: Generate ${missionCount} missions → MUST include at least ${requiredFree} free/low-cost (difficulty: 1)`;
-}
-
-// ============================================
 // System Prompt Generator (Region-based v3)
 // ============================================
 
 function getSystemPrompt(
   regionCode: RegionCode,
   language: SupportedLanguage,
-  season: SeasonType,
-  missionCount: number
+  season: SeasonType
 ): string {
   const culture = CULTURE_PROMPTS[regionCode];
   const seasonalActivities = culture.seasonal[season] || culture.seasonal['mild'] || '';
-  const costDirective = buildCostDirective(missionCount, language);
-  const outputInstruction = getOutputLanguageInstruction(language);
 
-  // System prompt in English for token efficiency, output in target language
-  return `You are a couple date mission generator.
-
-## CULTURE CONTEXT (${regionCode})
-Tone: ${culture.toneGuide}
-Trends: ${culture.trends}
-Couple Style: ${culture.coupleStyle}
-Anniversary Style: ${culture.anniversaryStyle}
-
-## SEASONAL CONTEXT
-Current Season: ${season}
-Recommended Activities: ${seasonalActivities}
-
-## FREE ACTIVITIES (Must include!)
-${culture.freeActivities.join(', ')}
-
-## PAID ACTIVITIES
-${culture.paidActivities}
-
-## FOOD OPTIONS
-${culture.food}
-
-${costDirective}
-
-## OUTPUT LANGUAGE
-${outputInstruction}
-
-## Mission Writing Rules
-1. title: Emotional, poetic phrase (not direct like "Go to cafe")
-   - Good: "Under the Sparkling Lights, Our Winter Story"
-   - Bad: "Visit a cafe", "Do escape room"
-2. description: Under 80 chars, clearly explain what to do
-3. Never mention prices
-4. Activities should naturally lend themselves to photo verification
-
-## Remote Mission Rules (When couple can't meet)
-- Only one partner takes a photo on-site for verification
-- Structure: "Both do the same thing separately, one verifies"
-- Examples: Same book→verify page, Same recipe→verify result
-
-## Mission Role Distribution
-- Mission 1: Best match for user concerns/mood
-- Mission 2: Similar but slightly different direction
-- Mission 3: Unexpected fresh suggestion
-※ Three missions should have different categories!
-
-## Category List (Must use one!)
-Food: cafe, restaurant, streetfood, dessert, cooking, drink, brunch
-Place: outdoor, home, travel, daytrip, drive, night, nature
-Activity: culture, movie, sports, fitness, wellness, creative, game, shopping, photo, learning
-Special: romantic, anniversary, surprise, memory
-Online: online, challenge
-
-## JSON Output Format
-{"missions":[{"title":"","description":"","category":"","difficulty":1-3,"tags":["",""]}]}
-
-difficulty scale:
-1 = FREE (walks, home activities, stargazing, convenience store)
-2 = LOW-COST (<$10, street food, photo booth, takeout picnic)
-3 = PAID ($10+, restaurants, classes, attractions)`;
-}
-
-// Output language instruction based on app language
-function getOutputLanguageInstruction(language: SupportedLanguage): string {
-  const instructions: Record<SupportedLanguage, string> = {
-    ko: '반드시 한국어로 미션을 생성하세요. 제목과 설명 모두 한국어로 작성합니다.',
-    en: 'Generate all missions in English. Both title and description must be in English.',
-    es: 'Genera todas las misiones en español. El título y la descripción deben estar en español.',
-    'zh-TW': '請用繁體中文生成所有任務。標題和描述都必須用繁體中文。',
-    ja: 'すべてのミッションを日本語で生成してください。タイトルと説明は日本語で書いてください。',
+  // Language mapping for output
+  const languageNames: Record<SupportedLanguage, string> = {
+    ko: 'Korean', en: 'English', es: 'Spanish', 'zh-TW': 'Traditional Chinese', ja: 'Japanese'
   };
-  return instructions[language] || instructions.en;
+
+  // Optimized system prompt - focused on role/tone/format only
+  return `Couple date mission generator. Respond in JSON format.
+
+OUTPUT: {"missions":[{title, description(<80chars), category, difficulty:1-3, tags:[]}]}
+LANGUAGE: ${languageNames[language] || 'English'} - All output MUST be in this language
+CATEGORIES: cafe,restaurant,streetfood,dessert,cooking,drink,brunch,outdoor,home,travel,daytrip,drive,night,nature,culture,movie,sports,fitness,wellness,creative,game,shopping,photo,learning,romantic,anniversary,surprise,memory,online,challenge
+DIFFICULTY: 1=FREE 2=LOW(<$10) 3=PAID($10+)
+
+STYLE:
+- title: Poetic/emotional phrase (not literal like "Go to cafe")
+- description: Specific action under 80 characters
+- Each mission MUST have different category
+- At least 1 difficulty:1 (free) mission required
+
+CONTEXT (${regionCode}, ${season}):
+Tone: ${culture.toneGuide}
+Season activities: ${seasonalActivities}
+Free options: ${culture.freeActivities.slice(0, 5).join(', ')}`;
 }
 
 // ============================================
-// Region-specific Few-shot Examples (Cultural context)
+// Few-shot Examples Generator (Simplified)
 // ============================================
 
-const REGION_FEW_SHOTS: Record<RegionCode, string> = {
-  EAST_ASIA: `[
-  {"title":"퍼즐 한 조각씩, 완성되는 우리","description":"1000피스 직소 퍼즐을 함께 맞추며 대화하기","category":"game","difficulty":1},
-  {"title":"땀 흘린 후의 달콤함","description":"30분 같이 조깅하고 근처 맛집에서 보상 식사","category":"fitness","difficulty":1},
-  {"title":"우리만의 플레이리스트","description":"서로 추천 노래 5곡씩 공유하고 감상평 나누기","category":"online","difficulty":1},
-  {"title":"보드게임 챔피언십","description":"3가지 보드게임으로 진지한 토너먼트 대결","category":"game","difficulty":1},
-  {"title":"새로운 레시피 도전기","description":"한 번도 안 만들어본 요리 함께 도전","category":"cooking","difficulty":2},
-  {"title":"우리동네 사진관","description":"스마트폰으로 동네 숨은 명소 10곳 촬영 미션","category":"photo","difficulty":1},
-  {"title":"독서 데이트","description":"같은 공간에서 각자 책 읽고 30분 후 감상 공유","category":"learning","difficulty":1},
-  {"title":"홈트 챌린지","description":"유튜브 운동 영상 따라하며 함께 스트레칭","category":"fitness","difficulty":1},
-  {"title":"추억의 게임 대결","description":"레트로 게임이나 모바일 게임으로 대결하기","category":"game","difficulty":1}
-]`,
+function getFewShotExamples(language: SupportedLanguage): string {
+  // Select only 3 examples based on language (reduced from 19)
+  const examples = language === 'ko'
+    ? [
+        {"title":"퍼즐 한 조각씩, 완성되는 우리","description":"1000피스 직소 퍼즐을 함께 맞추며 대화하기","category":"game","difficulty":1},
+        {"title":"새로운 레시피 도전기","description":"한 번도 안 만들어본 요리 함께 도전","category":"cooking","difficulty":2},
+        {"title":"우리동네 사진관","description":"스마트폰으로 동네 숨은 명소 10곳 촬영","category":"photo","difficulty":1}
+      ]
+    : [
+        {"title":"Puzzle Night In","description":"Work on a 500+ piece puzzle together over snacks","category":"game","difficulty":1},
+        {"title":"Recipe Challenge","description":"Each pick an ingredient, create a dish using both","category":"cooking","difficulty":1},
+        {"title":"Photo Walk Challenge","description":"Take 15 photos each on a theme, compare favorites","category":"photo","difficulty":1}
+      ];
 
-  SOUTHEAST_ASIA: `[
-  {"title":"Couple's Yoga Morning","description":"Follow a beginner yoga video together and stretch","category":"fitness","difficulty":1},
-  {"title":"Recipe Roulette","description":"Pick a random local recipe and cook it together","category":"cooking","difficulty":1},
-  {"title":"Board Game Battle","description":"Challenge each other to 3 rounds of card or board games","category":"game","difficulty":1},
-  {"title":"Photo Scavenger Hunt","description":"Take 10 creative photos based on a theme you choose","category":"photo","difficulty":1},
-  {"title":"Language Exchange","description":"Teach each other 10 words in your native languages","category":"learning","difficulty":1},
-  {"title":"Smoothie Challenge","description":"Create unique fruit smoothies and rate each other's","category":"cooking","difficulty":1},
-  {"title":"DIY Spa Night","description":"Face masks, foot soaks, and relaxation at home","category":"wellness","difficulty":1},
-  {"title":"Puzzle Partners","description":"Complete a jigsaw puzzle together while chatting","category":"game","difficulty":1},
-  {"title":"Dance Tutorial Date","description":"Learn a TikTok dance or simple choreography together","category":"creative","difficulty":1}
-]`,
-
-  NORTH_AMERICA: `[
-  {"title":"Puzzle Night In","description":"Work on a 500+ piece puzzle together over snacks","category":"game","difficulty":1},
-  {"title":"Workout Buddies","description":"Complete a 30-min home workout video together","category":"fitness","difficulty":1},
-  {"title":"Recipe Challenge","description":"Each pick an ingredient, create a dish using both","category":"cooking","difficulty":1},
-  {"title":"Board Game Tournament","description":"Play best of 3 board games with bragging rights","category":"game","difficulty":1},
-  {"title":"Photo Walk Challenge","description":"Take 15 photos each on a theme, compare favorites","category":"photo","difficulty":1},
-  {"title":"Book Club for Two","description":"Read the same chapter and discuss over tea","category":"learning","difficulty":1},
-  {"title":"DIY Craft Night","description":"Follow a YouTube craft tutorial and create together","category":"creative","difficulty":2},
-  {"title":"Playlist Swap","description":"Create playlists for each other and listen together","category":"online","difficulty":1},
-  {"title":"Trivia Night at Home","description":"Quiz each other on random topics, keep score","category":"game","difficulty":1}
-]`,
-
-  EUROPE: `[
-  {"title":"Puzzle & Wine Evening","description":"Work on a puzzle while sharing a bottle of wine","category":"game","difficulty":1},
-  {"title":"Morning Yoga Together","description":"Follow a yoga video and start the day refreshed","category":"fitness","difficulty":1},
-  {"title":"Recipe from Scratch","description":"Cook a traditional dish neither has made before","category":"cooking","difficulty":2},
-  {"title":"Card Game Marathon","description":"Learn a new card game and play multiple rounds","category":"game","difficulty":1},
-  {"title":"Photo Journal","description":"Document your day in photos and create a mini album","category":"photo","difficulty":1},
-  {"title":"Language Lesson","description":"Teach each other phrases in different languages","category":"learning","difficulty":1},
-  {"title":"Pottery or Craft Class","description":"Take a beginner crafting workshop together","category":"creative","difficulty":3},
-  {"title":"Music Discovery Session","description":"Share 5 songs each that defined your youth","category":"online","difficulty":1},
-  {"title":"Documentary & Discussion","description":"Watch a documentary and debate the topic after","category":"learning","difficulty":1}
-]`,
-
-  LATIN_AMERICA: `[
-  {"title":"Salsa at Home","description":"Learn basic salsa steps from YouTube in your living room","category":"fitness","difficulty":1},
-  {"title":"Recipe Adventure","description":"Cook a dish from a country neither has visited","category":"cooking","difficulty":2},
-  {"title":"Card Game Night","description":"Play traditional card games with homemade snacks","category":"game","difficulty":1},
-  {"title":"Photo Story","description":"Create a photo story of your neighborhood together","category":"photo","difficulty":1},
-  {"title":"Puzzle Party","description":"Complete a colorful puzzle while listening to music","category":"game","difficulty":1},
-  {"title":"Craft Project","description":"Make friendship bracelets or simple crafts together","category":"creative","difficulty":1},
-  {"title":"Music Exchange","description":"Introduce each other to your favorite artists","category":"online","difficulty":1},
-  {"title":"Workout Challenge","description":"Do a fitness challenge video and cheer each other on","category":"fitness","difficulty":1},
-  {"title":"Trivia Battle","description":"Create trivia questions about each other and compete","category":"game","difficulty":1}
-]`,
-
-  DEFAULT: `[
-  {"title":"Puzzle Time","description":"Start a jigsaw puzzle together and chat","category":"game","difficulty":1},
-  {"title":"Home Workout","description":"Follow a workout video together at home","category":"fitness","difficulty":1},
-  {"title":"Cooking Challenge","description":"Each choose an ingredient, cook something with both","category":"cooking","difficulty":1},
-  {"title":"Board Game Night","description":"Play 2-3 board games and keep a running score","category":"game","difficulty":1},
-  {"title":"Photo Mission","description":"Take 10 creative photos around your area","category":"photo","difficulty":1},
-  {"title":"Learning Together","description":"Watch an educational video and discuss","category":"learning","difficulty":1},
-  {"title":"DIY Project","description":"Create something together following a tutorial","category":"creative","difficulty":2},
-  {"title":"Music Sharing","description":"Create playlists for each other to enjoy","category":"online","difficulty":1},
-  {"title":"Quiz Night","description":"Take personality quizzes together and compare","category":"game","difficulty":1}
-]`,
-};
-
-// ============================================
-// Language-specific Few-shot Examples (Output format)
-// ============================================
-
-const LANGUAGE_FEW_SHOTS: Record<SupportedLanguage, string> = {
-  ko: `[
-  {"title":"퍼즐 한 조각씩, 완성되는 우리","description":"1000피스 직소 퍼즐을 함께 맞추며 대화하기","category":"game","difficulty":1},
-  {"title":"땀 흘린 후의 달콤함","description":"30분 같이 조깅하고 근처 맛집에서 보상 식사","category":"fitness","difficulty":1},
-  {"title":"보드게임 챔피언십","description":"3가지 보드게임으로 진지한 토너먼트 대결","category":"game","difficulty":1},
-  {"title":"새로운 레시피 도전기","description":"한 번도 안 만들어본 요리 함께 도전","category":"cooking","difficulty":2},
-  {"title":"독서 데이트","description":"같은 공간에서 각자 책 읽고 30분 후 감상 공유","category":"learning","difficulty":1},
-  {"title":"우리동네 사진관","description":"스마트폰으로 동네 숨은 명소 10곳 촬영 미션","category":"photo","difficulty":1},
-  {"title":"홈트 챌린지","description":"유튜브 운동 영상 따라하며 함께 스트레칭","category":"fitness","difficulty":1}
-]`,
-
-  en: `[
-  {"title":"Puzzle Night In","description":"Work on a 500+ piece puzzle together over snacks","category":"game","difficulty":1},
-  {"title":"Workout Buddies","description":"Complete a 30-min home workout video together","category":"fitness","difficulty":1},
-  {"title":"Board Game Tournament","description":"Play best of 3 board games with bragging rights","category":"game","difficulty":1},
-  {"title":"Recipe Challenge","description":"Each pick an ingredient, create a dish using both","category":"cooking","difficulty":1},
-  {"title":"Book Club for Two","description":"Read the same chapter and discuss over tea","category":"learning","difficulty":1},
-  {"title":"Photo Walk Challenge","description":"Take 15 photos each on a theme, compare favorites","category":"photo","difficulty":1},
-  {"title":"DIY Craft Night","description":"Follow a YouTube craft tutorial and create together","category":"creative","difficulty":2}
-]`,
-
-  es: `[
-  {"title":"Noche de Rompecabezas","description":"Armar un puzzle juntos mientras conversan","category":"game","difficulty":1},
-  {"title":"Compañeros de Ejercicio","description":"Completar un video de ejercicios juntos en casa","category":"fitness","difficulty":1},
-  {"title":"Torneo de Juegos","description":"Jugar 3 juegos de mesa y competir por el título","category":"game","difficulty":1},
-  {"title":"Desafío Culinario","description":"Cada uno elige un ingrediente y cocinan juntos","category":"cooking","difficulty":1},
-  {"title":"Club de Lectura para Dos","description":"Leer el mismo capítulo y discutirlo después","category":"learning","difficulty":1},
-  {"title":"Misión Fotográfica","description":"Tomar 10 fotos creativas de su vecindario","category":"photo","difficulty":1},
-  {"title":"Noche de Manualidades","description":"Seguir un tutorial y crear algo juntos","category":"creative","difficulty":2}
-]`,
-
-  'zh-TW': `[
-  {"title":"拼圖之夜","description":"一起完成一幅拼圖，邊聊天邊進行","category":"game","difficulty":1},
-  {"title":"運動夥伴","description":"一起跟著健身影片運動30分鐘","category":"fitness","difficulty":1},
-  {"title":"桌遊錦標賽","description":"玩三局桌遊，爭奪冠軍頭銜","category":"game","difficulty":1},
-  {"title":"料理挑戰","description":"各選一種食材，一起創作新料理","category":"cooking","difficulty":1},
-  {"title":"二人讀書會","description":"閱讀同一章節，之後一起討論","category":"learning","difficulty":1},
-  {"title":"攝影任務","description":"拍攝10張創意照片，比較彼此的作品","category":"photo","difficulty":1},
-  {"title":"手作之夜","description":"跟著教學影片一起做手工藝","category":"creative","difficulty":2}
-]`,
-
-  ja: `[
-  {"title":"パズルナイト","description":"ジグソーパズルを一緒に完成させながらおしゃべり","category":"game","difficulty":1},
-  {"title":"ワークアウトバディ","description":"30分間のホームワークアウト動画を一緒にやる","category":"fitness","difficulty":1},
-  {"title":"ボードゲーム大会","description":"3つのボードゲームで真剣勝負","category":"game","difficulty":1},
-  {"title":"レシピチャレンジ","description":"それぞれ材料を選んで、一緒に料理を作る","category":"cooking","difficulty":1},
-  {"title":"二人読書会","description":"同じ章を読んで、感想を共有する","category":"learning","difficulty":1},
-  {"title":"フォトミッション","description":"テーマを決めて10枚の写真を撮る","category":"photo","difficulty":1},
-  {"title":"DIYクラフトナイト","description":"チュートリアルを見ながら一緒に作る","category":"creative","difficulty":2}
-]`,
-};
-
-// ============================================
-// Few-shot Examples Generator (Region + Language)
-// ============================================
-
-function getFewShotExamples(regionCode: RegionCode, language: SupportedLanguage): string {
-  const regionExamples = REGION_FEW_SHOTS[regionCode] || REGION_FEW_SHOTS.DEFAULT;
-  const languageExamples = LANGUAGE_FEW_SHOTS[language] || LANGUAGE_FEW_SHOTS.en;
-
-  return `
-## Cultural Context Examples (${regionCode})
-${regionExamples}
-
-## Output Language Format (${language})
-${languageExamples}
-
-## Online Mission Examples (When Can't Meet)
-[
-  {"title":"Dreams for Our Tomorrow","description":"Write a bucket list of things to do together next year","category":"online","difficulty":1},
-  {"title":"Same Page, Different Places","description":"Read the same book and verify with page photos","category":"online","difficulty":1},
-  {"title":"Same Taste, Miles Apart","description":"Cook the same recipe separately and share result photos","category":"online","difficulty":1}
-]
-
-## Important Notes
-- Titles should be emotional/poetic, not literal descriptions
-- Descriptions should be specific and actionable
-- difficulty: 1=FREE, 2=LOW-COST, 3=PAID
-- At least one difficulty:1 mission required per batch
-`;
+  return `STYLE EXAMPLES (reference only, do NOT copy):
+${examples.map(e => JSON.stringify(e)).join('\n')}`;
 }
 
 // ============================================
@@ -1362,76 +1088,29 @@ function getUserPrompt(
   excludedMissionsContext: string,
   missionCount: number = 3
 ): string {
-  if (language === 'ko') {
-    return `다음 상황의 커플을 위한 데이트 미션 ${missionCount}개를 생성해주세요.
-
-${contextString}
-${excludedMissionsContext}
-${deduplicationContext}
-
----
-🚨🚨🚨 [미션 다양성 - 필수 준수 규칙!] 🚨🚨🚨
-
-❌ 절대 금지 (위반 시 생성 실패):
-${excludedMissionsContext ? '1. 위 "절대 금지" 미션들과 동일/유사한 미션 = 실패' : ''}
-${deduplicationContext ? '2. 위 "금지 키워드"가 포함된 미션 = 실패' : ''}
-3. 최근 7일 내 생성된 미션과 유사한 활동 유형 = 실패
-4. 매일 똑같은 패턴(산책, 카페, 야시장 등) 반복 = 실패
-
-✅ 필수 준수 규칙:
-1. ${missionCount}개 미션은 반드시 서로 완전히 다른 활동 유형이어야 함
-2. "덜 해본 카테고리"에서 최소 ${Math.ceil(missionCount * 0.6)}개 이상 선택
-3. 일반적인 "산책/카페/맛집" 대신 독특하고 창의적인 활동 제안
-4. 예시: 보드게임 대결, 같이 운동 후 브런치, 직소 퍼즐 도전, 플리마켓 구경, 쿠킹 클래스
-
-💡 창의성 우선:
-- 흔한 데이트 코스가 아닌, 이 커플만을 위한 특별한 경험
-- "이런 데이트도 있구나!" 싶은 신선한 아이디어
-- 커플이 함께 성장하거나 새로운 것을 배울 수 있는 활동
-
----
-참고할 좋은 예시들 (스타일 참고용, 그대로 복사 금지!):
-${fewShotExamples}
-
----
-위 정보를 바탕으로 이 커플에게 딱 맞는 미션 ${missionCount}개를 JSON으로 생성해주세요.
-반드시 JSON 형식으로만 응답하세요.`;
+  // Build constraints section (only if there are exclusions)
+  const constraints: string[] = [];
+  if (excludedMissionsContext) {
+    constraints.push(excludedMissionsContext);
   }
+  if (deduplicationContext) {
+    constraints.push(deduplicationContext);
+  }
+  const constraintsSection = constraints.length > 0 ? constraints.join('\n') : '';
 
-  // English prompt
-  return `Please generate ${missionCount} date missions for the following couple's situation.
+  // Simplified prompt - rules already in system prompt, only context-specific here
+  const creativityHint = language === 'ko'
+    ? '창의적이고 독특한 활동 우선'
+    : 'Prioritize creative, unique activities';
+
+  return `Generate ${missionCount} missions:
 
 ${contextString}
-${excludedMissionsContext}
-${deduplicationContext}
+${constraintsSection}
 
----
-🚨🚨🚨 [MISSION DIVERSITY - MANDATORY RULES!] 🚨🚨🚨
+${creativityHint}
 
-❌ STRICTLY FORBIDDEN (Violation = Generation Failure):
-${excludedMissionsContext ? '1. Missions similar to "STRICTLY FORBIDDEN" above = FAIL' : ''}
-${deduplicationContext ? '2. Missions containing "BLACKLISTED KEYWORDS" = FAIL' : ''}
-3. Activities similar to those generated in the last 7 days = FAIL
-4. Repeating the same patterns daily (walks, cafes, markets) = FAIL
-
-✅ MANDATORY REQUIREMENTS:
-1. All ${missionCount} missions MUST be completely different activity types
-2. Select at least ${Math.ceil(missionCount * 0.6)} from "Less explored" categories
-3. Suggest unique, creative activities instead of generic "walk/cafe/restaurant"
-4. Examples: board game tournament, workout then brunch, jigsaw puzzle challenge, flea market visit, cooking class
-
-💡 CREATIVITY FIRST:
-- Special experiences unique to THIS couple, not generic date ideas
-- Fresh ideas that make them think "I never thought of this for a date!"
-- Activities where the couple can grow together or learn something new
-
----
-Reference examples (for style only, DO NOT copy directly!):
-${fewShotExamples}
-
----
-Based on the above information, generate ${missionCount} perfectly matched missions for this couple in JSON format.
-Respond only in JSON format.`;
+${fewShotExamples}`;
 }
 
 // ============================================
@@ -1534,7 +1213,7 @@ export async function generateMissionsWithAI(input: MissionGenerationInput): Pro
   const contextString = buildContext(input, weather, combinedDateWorries);
 
   // Build deduplication context from mission history (token-efficient)
-  const deduplicationContext = buildDeduplicationContext(input.missionHistory, language);
+  const deduplicationContext = buildDeduplicationContext(input.missionHistory);
 
   // Build excluded missions context for refresh (CRITICAL - avoid duplicates)
   const excludedMissionsContext = buildExcludedMissionsContext(input.excludedMissions, language);
@@ -1553,13 +1232,13 @@ export async function generateMissionsWithAI(input: MissionGenerationInput): Pro
     : SUBSCRIPTION_LIMITS.free.missionsPerGeneration;
 
   // Get region and language-specific prompts
-  const systemPrompt = getSystemPrompt(weather.regionCode, language, weather.season, missionCount);
-  const fewShotExamples = getFewShotExamples(weather.regionCode, language);
+  const systemPrompt = getSystemPrompt(weather.regionCode, language, weather.season);
+  const fewShotExamples = getFewShotExamples(language);
   const userPrompt = getUserPrompt(contextString, fewShotExamples, language, deduplicationContext, excludedMissionsContext, missionCount);
 
   try {
-    // Increase max_tokens for premium users (6 missions need more tokens)
-    const maxTokens = missionCount > 3 ? 4500 : 2500;
+    // Reduced max_tokens due to optimized prompts (40% smaller)
+    const maxTokens = missionCount > 3 ? 3000 : 1500;
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
@@ -1567,10 +1246,10 @@ export async function generateMissionsWithAI(input: MissionGenerationInput): Pro
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
-      temperature: 0.9,
+      temperature: 0.75,  // Reduced from 0.9 for better JSON stability
       max_tokens: maxTokens,
-      presence_penalty: 0.7,
-      frequency_penalty: 0.4,
+      presence_penalty: 0.5,  // Reduced from 0.7
+      frequency_penalty: 0.3,  // Reduced from 0.4
       response_format: { type: 'json_object' },
     });
 

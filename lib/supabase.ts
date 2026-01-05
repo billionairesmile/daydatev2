@@ -2764,16 +2764,10 @@ export const db = {
       try {
         const client = getSupabase();
 
-        // Compress and resize image before upload to reduce storage and egress costs
-        // Max 1080px width, JPEG format with 0.7 quality (good balance of quality/size)
-        const manipulatedImage = await ImageManipulator.manipulateAsync(
-          uri,
-          [{ resize: { width: 1080 } }],
-          { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
-        );
-
-        // Read compressed file as base64
-        const file = new ExpoFile(manipulatedImage.uri);
+        // Photo is already processed locally in mission/[id].tsx (1500px, 0.85 quality)
+        // No additional compression needed - upload as-is to preserve quality
+        // This avoids double compression which degrades image quality significantly
+        const file = new ExpoFile(uri);
         const base64 = await file.base64();
 
         const fileName = `${coupleId}/${Date.now()}.jpg`;
