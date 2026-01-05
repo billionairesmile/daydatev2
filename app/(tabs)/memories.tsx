@@ -100,6 +100,37 @@ const ALBUM_CARD_WIDTH = 140; // Fixed width 140px
 const ALBUM_DETAIL_WIDTH = 180; // Fixed width for album detail modal
 const ALBUM_SCALE_RATIO = ALBUM_CARD_WIDTH / MODAL_PREVIEW_WIDTH;
 const ALBUM_DETAIL_SCALE_RATIO = ALBUM_DETAIL_WIDTH / MODAL_PREVIEW_WIDTH;
+const ALBUM_CARD_HEIGHT = ALBUM_CARD_WIDTH * 4 / 3;
+const ALBUM_DETAIL_HEIGHT = ALBUM_DETAIL_WIDTH * 4 / 3;
+
+// Check if position is normalized (0-1 range)
+const isNormalizedPosition = (pos: { x: number; y: number }): boolean => {
+  return pos.x >= 0 && pos.x <= 1 && pos.y >= 0 && pos.y <= 1;
+};
+
+// Calculate album card position (handles both normalized and legacy positions)
+const getAlbumCardPosition = (pos: { x: number; y: number } | undefined) => {
+  const defaultPos = { x: 0.096, y: 0.038 }; // 30/312, 16/416 normalized
+  if (!pos) return { left: defaultPos.x * ALBUM_CARD_WIDTH, top: defaultPos.y * ALBUM_CARD_HEIGHT };
+
+  if (isNormalizedPosition(pos)) {
+    // Normalized value: apply directly
+    return { left: pos.x * ALBUM_CARD_WIDTH, top: pos.y * ALBUM_CARD_HEIGHT };
+  }
+  // Legacy absolute value: use old scale ratio
+  return { left: pos.x * ALBUM_SCALE_RATIO, top: pos.y * ALBUM_SCALE_RATIO };
+};
+
+// Calculate album detail position (handles both normalized and legacy positions)
+const getAlbumDetailPosition = (pos: { x: number; y: number } | undefined) => {
+  const defaultPos = { x: 0.096, y: 0.038 };
+  if (!pos) return { left: defaultPos.x * ALBUM_DETAIL_WIDTH, top: defaultPos.y * ALBUM_DETAIL_HEIGHT };
+
+  if (isNormalizedPosition(pos)) {
+    return { left: pos.x * ALBUM_DETAIL_WIDTH, top: pos.y * ALBUM_DETAIL_HEIGHT };
+  }
+  return { left: pos.x * ALBUM_DETAIL_SCALE_RATIO, top: pos.y * ALBUM_DETAIL_SCALE_RATIO };
+};
 
 type MemoryType = typeof SAMPLE_MEMORIES[0];
 
@@ -751,12 +782,18 @@ export default function MemoriesScreen() {
         }
       }
 
+      // Normalize position to 0-1 range for consistent scaling across different screen sizes
+      const normalizedPosition = {
+        x: namePosition.x / containerBounds.current.width,
+        y: namePosition.y / containerBounds.current.height,
+      };
+
       const newAlbum: Album = {
         id: Date.now().toString(),
         name: albumName.trim(),
         coverPhoto: finalCoverPhotoUrl,
         createdAt: new Date(),
-        namePosition: { ...namePosition },
+        namePosition: normalizedPosition,
         textScale: textScale,
         fontStyle: fontStyle,
         ransomSeed: ransomSeed, // Save the ransom seed for consistent rendering
@@ -768,7 +805,7 @@ export default function MemoriesScreen() {
           await syncCreateAlbum(
             albumName.trim(),
             finalCoverPhotoUrl,
-            { ...namePosition },
+            normalizedPosition,
             textScale,
             fontStyle || 'basic',
             ransomSeed
@@ -1031,11 +1068,17 @@ export default function MemoriesScreen() {
   // Save edited album
   const handleSaveEdit = async () => {
     if (selectedAlbum && editAlbumName.trim()) {
+      // Normalize position to 0-1 range for consistent scaling
+      const normalizedEditPosition = {
+        x: editTextPosition.x / editContainerBounds.current.width,
+        y: editTextPosition.y / editContainerBounds.current.height,
+      };
+
       const updatedAlbum: Album = {
         ...selectedAlbum,
         name: editAlbumName.trim(),
         coverPhoto: editCoverPhoto,
-        namePosition: { ...editTextPosition },
+        namePosition: normalizedEditPosition,
         textScale: editTextScale,
         fontStyle: editFontStyle,
         ransomSeed: editRansomSeed,
@@ -1047,7 +1090,7 @@ export default function MemoriesScreen() {
           await syncUpdateAlbum(selectedAlbum.id, {
             name: editAlbumName.trim(),
             cover_photo_url: editCoverPhoto,
-            name_position: { ...editTextPosition },
+            name_position: normalizedEditPosition,
             text_scale: editTextScale,
             font_style: editFontStyle || 'basic',
             ransom_seed: editRansomSeed,
@@ -1194,10 +1237,7 @@ export default function MemoriesScreen() {
                             {/* Album Name - Basic or Ransom Style */}
                             <View style={[
                               styles.albumNameOverlay,
-                              {
-                                left: (album.namePosition?.x ?? 30) * ALBUM_SCALE_RATIO,
-                                top: (album.namePosition?.y ?? 16) * ALBUM_SCALE_RATIO,
-                              }
+                              getAlbumCardPosition(album.namePosition)
                             ]}>
                               {album.fontStyle === 'basic' ? (
                                 // Basic Jua Font Style
@@ -1414,10 +1454,7 @@ export default function MemoriesScreen() {
                             {/* Album Name - Basic or Ransom Style */}
                             <View style={[
                               styles.albumNameOverlay,
-                              {
-                                left: (album.namePosition?.x ?? 30) * ALBUM_SCALE_RATIO,
-                                top: (album.namePosition?.y ?? 16) * ALBUM_SCALE_RATIO,
-                              }
+                              getAlbumCardPosition(album.namePosition)
                             ]}>
                               {album.fontStyle === 'basic' ? (
                                 // Basic Jua Font Style
@@ -2091,7 +2128,15 @@ export default function MemoriesScreen() {
                             setEditAlbumName(selectedAlbum.name);
                             setEditFontStyle(selectedAlbum.fontStyle);
                             setEditCoverPhoto(selectedAlbum.coverPhoto);
-                            setEditTextPosition(selectedAlbum.namePosition || { x: 30, y: 16 });
+                            // Convert normalized position to absolute pixels for editor
+                            const storedPos = selectedAlbum.namePosition || { x: 0.096, y: 0.038 };
+                            const editPos = isNormalizedPosition(storedPos)
+                              ? {
+                                  x: storedPos.x * editContainerBounds.current.width,
+                                  y: storedPos.y * editContainerBounds.current.height,
+                                }
+                              : storedPos;
+                            setEditTextPosition(editPos);
                             setEditTextScale(selectedAlbum.textScale || 1);
                             setEditRansomSeed(selectedAlbum.ransomSeed || Math.floor(Math.random() * 1000000));
                             setEditAlbumStep('fontStyle');
@@ -2196,10 +2241,7 @@ export default function MemoriesScreen() {
                       {/* Album Name Overlay */}
                       <View style={[
                         styles.albumDetailNameOverlay,
-                        {
-                          left: (selectedAlbum.namePosition?.x ?? 30) * ALBUM_DETAIL_SCALE_RATIO,
-                          top: (selectedAlbum.namePosition?.y ?? 16) * ALBUM_DETAIL_SCALE_RATIO,
-                        }
+                        getAlbumDetailPosition(selectedAlbum.namePosition)
                       ]}>
                         {selectedAlbum.fontStyle === 'basic' ? (
                           <Text style={[styles.basicFontOverlay, { fontSize: 16 * selectedAlbum.textScale * ALBUM_DETAIL_SCALE_RATIO, lineHeight: 16 * selectedAlbum.textScale * ALBUM_DETAIL_SCALE_RATIO * 1.3 }]}>
