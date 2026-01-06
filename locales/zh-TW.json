@@ -265,7 +265,7 @@
     "title": "回憶",
     "subtitle": "我們一起度過的時刻",
     "empty": "沒有已完成的任務",
-    "emptyHint": "任務認證照片會按日期保存",
+    "emptyHint": "請完成任務！",
     "viewAll": "查看全部",
     "togetherMoment": "一起的時刻",
     "itemCount": "{{count}}個項目",

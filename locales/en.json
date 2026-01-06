@@ -268,7 +268,7 @@
     "title": "Memories",
     "subtitle": "Moments we shared together",
     "empty": "No completed missions",
-    "emptyHint": "Mission verification photos are saved by date",
+    "emptyHint": "Complete a mission to see your memories!",
     "viewAll": "View All",
     "togetherMoment": "Moment together",
     "itemCount": "{{count}} items",

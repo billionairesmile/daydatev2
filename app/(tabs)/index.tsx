@@ -817,9 +817,20 @@ export default function HomeScreen() {
         const yearlyDate = new Date(anniversaryDate);
         yearlyDate.setFullYear(anniversaryDate.getFullYear() + year);
         if (yearlyDate > today) {
-          const datingLabel = i18n.language === 'ko'
-            ? `${t('home.anniversary.datingAnniversary')} ${year}주년`
-            : `${year}${year === 1 ? 'st' : year === 2 ? 'nd' : year === 3 ? 'rd' : 'th'} ${t('home.anniversary.datingAnniversary')} Anniversary`;
+          const datingLabel = (() => {
+            switch (i18n.language) {
+              case 'ko':
+                return `${t('home.anniversary.datingAnniversary')} ${year}주년`;
+              case 'ja':
+                return `${t('home.anniversary.datingAnniversary')} ${year}周年`;
+              case 'zh-TW':
+                return `${t('home.anniversary.datingAnniversary')} ${year}週年`;
+              case 'es':
+                return `${year}º Aniversario`;
+              default: // 'en' and others
+                return `${year}${year === 1 ? 'st' : year === 2 ? 'nd' : year === 3 ? 'rd' : 'th'} Anniversary`;
+            }
+          })();
           baseAnniversaries.push({
             id: idCounter++,
             label: datingLabel,

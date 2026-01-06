@@ -265,7 +265,7 @@
     "title": "Recuerdos",
     "subtitle": "Momentos que compartimos juntos",
     "empty": "No hay misiones completadas",
-    "emptyHint": "Las fotos de verificación de misión se guardan por fecha",
+    "emptyHint": "¡Completa una misión para ver tus recuerdos!",
     "viewAll": "Ver Todo",
     "togetherMoment": "Momento juntos",
     "itemCount": "{{count}} elementos",

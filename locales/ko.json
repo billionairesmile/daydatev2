@@ -268,7 +268,7 @@
     "title": "추억",
     "subtitle": "우리가 함께한 순간들",
     "empty": "완료된 미션이 없습니다",
-    "emptyHint": "미션 인증 사진이 날짜별로 저장돼요",
+    "emptyHint": "미션을 완료해 주세요!",
     "viewAll": "전체 보기",
     "togetherMoment": "함께한 순간",
     "itemCount": "{{count}}개의 항목",

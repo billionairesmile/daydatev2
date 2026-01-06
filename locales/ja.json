@@ -268,7 +268,7 @@
     "title": "思い出",
     "subtitle": "二人で過ごした瞬間",
     "empty": "完了したミッションがありません",
-    "emptyHint": "ミッション認証写真が日付別に保存されます",
+    "emptyHint": "ミッションを完了してください！",
     "viewAll": "すべて見る",
     "togetherMoment": "一緒に過ごした瞬間",
     "itemCount": "{{count}}件",

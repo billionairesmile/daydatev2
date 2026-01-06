@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.daydate.app",
-      "buildNumber": "14",
+      "buildNumber": "16",
       "usesAppleSignIn": true,
       "infoPlist": {
         "NSCameraUsageDescription": "Allow Daydate to access your camera to capture memories.",
