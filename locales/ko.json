@@ -24,6 +24,26 @@
     "days": "일",
     "daysCount": "일째"
   },
+  "auth": {
+    "email": {
+      "button": "이미 이메일 계정이 있어요",
+      "loginTitle": "이메일 로그인",
+      "signUpTitle": "이메일 회원가입",
+      "emailPlaceholder": "이메일 주소",
+      "passwordPlaceholder": "비밀번호",
+      "confirmPasswordPlaceholder": "비밀번호 확인",
+      "login": "로그인",
+      "signUp": "회원가입",
+      "haveAccount": "이미 계정이 있으신가요? 로그인",
+      "noAccount": "계정이 없으신가요? 회원가입",
+      "emptyFields": "이메일과 비밀번호를 입력해주세요",
+      "passwordMismatch": "비밀번호가 일치하지 않습니다",
+      "passwordTooShort": "비밀번호는 6자 이상이어야 합니다",
+      "signUpSuccess": "회원가입 완료",
+      "checkEmail": "이메일 인증 링크를 확인해주세요",
+      "error": "인증에 실패했습니다"
+    }
+  },
   "tabs": {
     "home": "홈",
     "mission": "미션",

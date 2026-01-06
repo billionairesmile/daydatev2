@@ -25,7 +25,6 @@ import {
   UserX,
   Link2Off,
   AlertTriangle,
-  FileText,
   Info,
   Globe,
   Check,
@@ -547,18 +546,6 @@ export default function SettingsScreen() {
             </View>
             <Text style={styles.versionStatus}>{t('settings.other.latestVersion')}</Text>
           </View>
-
-          <View style={styles.settingDivider} />
-
-          <Pressable style={styles.menuItem} onPress={() => router.push('/more/terms')}>
-            <View style={styles.settingItemLeft}>
-              <View style={styles.iconWrapper}>
-                <FileText color={COLORS.black} size={20} />
-              </View>
-              <Text style={styles.settingItemLabel}>{t('settings.other.termsAndPolicies')}</Text>
-            </View>
-            <ChevronRight color="#999" size={20} />
-          </Pressable>
         </View>
 
         {/* Account Actions */}

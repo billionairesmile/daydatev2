@@ -24,6 +24,26 @@
     "days": "days",
     "daysCount": "days"
   },
+  "auth": {
+    "email": {
+      "button": "Already have an email account?",
+      "loginTitle": "Email Login",
+      "signUpTitle": "Email Sign Up",
+      "emailPlaceholder": "Email address",
+      "passwordPlaceholder": "Password",
+      "confirmPasswordPlaceholder": "Confirm password",
+      "login": "Log In",
+      "signUp": "Sign Up",
+      "haveAccount": "Already have an account? Log in",
+      "noAccount": "Don't have an account? Sign up",
+      "emptyFields": "Please enter email and password",
+      "passwordMismatch": "Passwords do not match",
+      "passwordTooShort": "Password must be at least 6 characters",
+      "signUpSuccess": "Sign Up Complete",
+      "checkEmail": "Please check your email for verification link",
+      "error": "Authentication failed"
+    }
+  },
   "tabs": {
     "home": "Home",
     "mission": "Mission",

@@ -2884,6 +2884,50 @@ export const db = {
       const errors: string[] = [];
 
       try {
+        // FIRST: Delete user from auth.users via Edge Function (MUST be done while session is still valid)
+        // This is critical - doing this first ensures the session token is still valid
+        try {
+          console.log('[Account Delete] Step 0: Deleting from auth.users FIRST (while session is valid)');
+          console.log('[Account Delete] supabaseUrl:', supabaseUrl);
+
+          const { data: sessionData, error: sessionError } = await client.auth.getSession();
+          console.log('[Account Delete] Session check - has session:', !!sessionData?.session, 'error:', sessionError?.message);
+
+          if (sessionData?.session?.access_token) {
+            console.log('[Account Delete] Calling Edge Function delete-user-account...');
+            const edgeFunctionUrl = `${supabaseUrl}/functions/v1/delete-user-account`;
+            console.log('[Account Delete] Edge Function URL:', edgeFunctionUrl);
+
+            const response = await fetch(
+              edgeFunctionUrl,
+              {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${sessionData.session.access_token}`,
+                  'Content-Type': 'application/json',
+                },
+              }
+            );
+
+            console.log('[Account Delete] Edge Function response status:', response.status);
+
+            if (!response.ok) {
+              const errorData = await response.json();
+              console.error('[Account Delete] Edge function error:', errorData);
+              errors.push(`auth.users: ${errorData.error || 'Failed to delete auth user'}`);
+            } else {
+              const successData = await response.json();
+              console.log('[Account Delete] Successfully deleted from auth.users:', successData);
+            }
+          } else {
+            console.warn('[Account Delete] No session/access_token available - cannot delete from auth.users');
+            errors.push('auth.users: No session available for deletion');
+          }
+        } catch (authDeleteError) {
+          console.error('[Account Delete] Auth user deletion error:', authDeleteError);
+          errors.push(`auth.users: ${String(authDeleteError)}`);
+        }
+
         // 1. Delete mission completions (depends on daily_missions)
         if (coupleId) {
           const { error: mcError } = await client
@@ -3019,7 +3063,7 @@ export const db = {
           }
         }
 
-        // 13. Sign out from Supabase Auth (this invalidates the session)
+        // 12. Sign out from Supabase Auth (auth.users deletion was done in Step 0)
         const { error: signOutError } = await client.auth.signOut();
         if (signOutError) errors.push(`auth.signOut: ${signOutError.message}`);
 

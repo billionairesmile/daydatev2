@@ -24,6 +24,26 @@
     "days": "天",
     "daysCount": "天"
   },
+  "auth": {
+    "email": {
+      "button": "已有電子郵件帳號？",
+      "loginTitle": "電子郵件登入",
+      "signUpTitle": "電子郵件註冊",
+      "emailPlaceholder": "電子郵件地址",
+      "passwordPlaceholder": "密碼",
+      "confirmPasswordPlaceholder": "確認密碼",
+      "login": "登入",
+      "signUp": "註冊",
+      "haveAccount": "已有帳號？登入",
+      "noAccount": "沒有帳號？註冊",
+      "emptyFields": "請輸入電子郵件和密碼",
+      "passwordMismatch": "密碼不一致",
+      "passwordTooShort": "密碼必須至少6個字元",
+      "signUpSuccess": "註冊完成",
+      "checkEmail": "請查看您的電子郵件以獲取驗證連結",
+      "error": "認證失敗"
+    }
+  },
   "tabs": {
     "home": "首頁",
     "mission": "任務",

@@ -24,6 +24,26 @@
     "days": "días",
     "daysCount": "días"
   },
+  "auth": {
+    "email": {
+      "button": "¿Ya tienes una cuenta de correo?",
+      "loginTitle": "Iniciar sesión",
+      "signUpTitle": "Crear cuenta",
+      "emailPlaceholder": "Correo electrónico",
+      "passwordPlaceholder": "Contraseña",
+      "confirmPasswordPlaceholder": "Confirmar contraseña",
+      "login": "Iniciar sesión",
+      "signUp": "Crear cuenta",
+      "haveAccount": "¿Ya tienes una cuenta? Inicia sesión",
+      "noAccount": "¿No tienes cuenta? Crea una",
+      "emptyFields": "Por favor, ingresa correo y contraseña",
+      "passwordMismatch": "Las contraseñas no coinciden",
+      "passwordTooShort": "La contraseña debe tener al menos 6 caracteres",
+      "signUpSuccess": "Registro completado",
+      "checkEmail": "Por favor, revisa tu correo para verificar tu cuenta",
+      "error": "Error de autenticación"
+    }
+  },
   "tabs": {
     "home": "Inicio",
     "mission": "Misión",

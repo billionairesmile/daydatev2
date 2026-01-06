@@ -17,6 +17,7 @@ import {
   ActivityIndicator,
   StatusBar,
   Share,
+  Keyboard,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -30,6 +31,7 @@ import {
   Copy,
   X,
   LogOut,
+  UserX,
 } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as Linking from 'expo-linking';
@@ -623,6 +625,201 @@ export default function OnboardingScreen() {
     }
   }, [animateTransition, setStep, setUser, updateData]);
 
+  // Email Login Handler
+  const handleEmailLogin = useCallback(async (email: string, password: string, isSignUp: boolean) => {
+    if (!supabase) {
+      throw new Error('Supabase not initialized');
+    }
+
+    try {
+      console.log(`[Onboarding] Starting email ${isSignUp ? 'sign up' : 'login'}...`);
+
+      let session;
+      if (isSignUp) {
+        // Sign up with email/password
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: email.split('@')[0],
+            }
+          }
+        });
+
+        if (error) throw error;
+
+        if (data.user && !data.session) {
+          // Email confirmation required
+          Alert.alert(
+            t('auth.email.signUpSuccess'),
+            t('auth.email.checkEmail'),
+            [{ text: t('onboarding.confirm') }]
+          );
+          return;
+        }
+
+        session = data.session;
+      } else {
+        // Sign in with email/password
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (error) throw error;
+        session = data.session;
+      }
+
+      if (session && session.user) {
+        console.log(`[Onboarding] Email auth successful:`, session.user.id);
+
+        // Check if user already exists in database
+        const { data: existingProfile } = await db.profiles.get(session.user.id);
+        const isExistingDbUser = !!existingProfile;
+
+        // Create user object
+        const dbPreferences = existingProfile?.preferences as Record<string, unknown> | undefined;
+        const birthDateCalendarType = (existingProfile?.birth_date_calendar_type as 'solar' | 'lunar')
+          || (dbPreferences?.birthDateCalendarType as 'solar' | 'lunar')
+          || 'solar';
+
+        const userObject = {
+          id: session.user.id,
+          email: existingProfile?.email || email,
+          nickname: existingProfile?.nickname || email.split('@')[0] || t('onboarding.defaultUser'),
+          inviteCode: generatePairingCode(),
+          birthDate: existingProfile?.birth_date ? parseDateAsLocal(existingProfile.birth_date) : undefined,
+          birthDateCalendarType,
+          preferences: existingProfile?.preferences || {} as any,
+          createdAt: existingProfile?.created_at ? new Date(existingProfile.created_at) : new Date(),
+        };
+
+        setUser(userObject);
+
+        if (existingProfile?.nickname) {
+          updateData({ nickname: existingProfile.nickname });
+        }
+
+        // Consent fields
+        const consentFields = {
+          age_verified: true,
+          terms_agreed: true,
+          location_terms_agreed: true,
+          privacy_agreed: true,
+          consent_given_at: new Date().toISOString(),
+        };
+
+        if (isExistingDbUser) {
+          const needsConsentUpdate = !existingProfile?.terms_agreed || !existingProfile?.privacy_agreed;
+          await db.profiles.update(session.user.id, {
+            auth_provider: 'email',
+            ...(needsConsentUpdate ? consentFields : {}),
+          });
+        } else {
+          await db.profiles.upsert({
+            id: session.user.id,
+            nickname: userObject.nickname,
+            email: userObject.email || undefined,
+            auth_provider: 'email',
+            ...consentFields,
+          });
+        }
+
+        // Check if user already has a completed couple
+        const { data: existingCouple } = await db.couples.getActiveByUserId(session.user.id);
+
+        if (existingCouple && existingCouple.user1_id && existingCouple.user2_id) {
+          console.log('[Onboarding] Email user already paired');
+
+          const hasCompleteBirthDate = !!existingProfile?.birth_date;
+          const hasCompletePreferences = existingProfile?.preferences &&
+            Object.keys(existingProfile.preferences).length > 0 &&
+            existingProfile.preferences.mbti;
+          const isProfileComplete = hasCompleteBirthDate && hasCompletePreferences;
+
+          setCouple({
+            id: existingCouple.id,
+            user1Id: existingCouple.user1_id,
+            user2Id: existingCouple.user2_id,
+            anniversaryDate: existingCouple.dating_start_date ? parseDateAsLocal(existingCouple.dating_start_date) : undefined,
+            datingStartDate: existingCouple.dating_start_date ? parseDateAsLocal(existingCouple.dating_start_date) : undefined,
+            anniversaryType: t('onboarding.anniversary.datingStart'),
+            status: 'active',
+            createdAt: existingCouple.created_at ? new Date(existingCouple.created_at) : new Date(),
+          });
+
+          const partnerId = existingCouple.user1_id === session.user.id
+            ? existingCouple.user2_id
+            : existingCouple.user1_id;
+
+          const { data: partnerProfile } = await db.profiles.get(partnerId);
+          if (partnerProfile) {
+            setPartner({
+              id: partnerId,
+              email: partnerProfile.email || '',
+              nickname: partnerProfile.nickname || '',
+              inviteCode: '',
+              birthDate: partnerProfile.birth_date ? parseDateAsLocal(partnerProfile.birth_date) : undefined,
+              preferences: partnerProfile.preferences || {},
+              createdAt: partnerProfile.created_at ? new Date(partnerProfile.created_at) : new Date(),
+            });
+          }
+
+          await db.couples.cleanupPendingCouples(session.user.id, existingCouple.id);
+
+          if (isProfileComplete) {
+            const prefs = existingProfile?.preferences as Record<string, unknown> | undefined;
+            updateData({
+              nickname: existingProfile?.nickname || '',
+              birthDate: existingProfile?.birth_date ? parseDateAsLocal(existingProfile.birth_date) : undefined,
+              birthDateCalendarType: (existingProfile?.birth_date_calendar_type as CalendarType) || (prefs?.birthDateCalendarType as CalendarType) || 'solar',
+              mbti: (prefs?.mbti as string) || '',
+              gender: (prefs?.gender as Gender) || null,
+              activityTypes: (prefs?.activityTypes as ActivityType[]) || [],
+              dateWorries: (prefs?.dateWorries as DateWorry[]) || [],
+              constraints: (prefs?.constraints as Constraint[]) || [],
+              relationshipType: (prefs?.relationshipType as RelationshipType) || 'dating',
+              anniversaryDate: existingCouple.dating_start_date ? parseDateAsLocal(existingCouple.dating_start_date) : undefined,
+              isPairingConnected: true,
+            });
+
+            setIsRedirectingToHome(true);
+            setIsOnboardingComplete(true);
+            router.replace('/(tabs)');
+            return;
+          } else {
+            updateData({ isPairingConnected: true });
+            if (existingProfile?.birth_date) {
+              updateData({ birthDate: parseDateAsLocal(existingProfile.birth_date) });
+            }
+            if (existingCouple.dating_start_date) {
+              updateData({ anniversaryDate: parseDateAsLocal(existingCouple.dating_start_date) });
+            }
+            animateTransition(() => setStep('basic_info'));
+            return;
+          }
+        }
+
+        // Go to pairing
+        console.log('[Onboarding] Email login success, going to pairing');
+        Alert.alert(
+          t('onboarding.login.success'),
+          t('onboarding.login.successMessage', { provider: 'Email' }),
+          [
+            {
+              text: t('onboarding.continue'),
+              onPress: () => animateTransition(() => setStep('pairing')),
+            },
+          ]
+        );
+      }
+    } catch (error: any) {
+      console.error('[Onboarding] Email auth failed:', error);
+      throw error;
+    }
+  }, [animateTransition, setStep, setUser, updateData, setCouple, setPartner, setIsOnboardingComplete, router, t]);
+
   const handleComplete = useCallback(async () => {
     updateNickname(data.nickname);
 
@@ -801,6 +998,69 @@ export default function OnboardingScreen() {
         </Pressable>
       )}
 
+      {/* Delete Account button - shown only on pairing step (for App Store compliance) */}
+      {effectiveStep === 'pairing' && (
+        <Pressable
+          style={styles.deleteAccountButton}
+          onPress={async () => {
+            Alert.alert(
+              t('settings.deleteAccount.confirmAlertTitle'),
+              t('settings.deleteAccount.confirmAlertMessage'),
+              [
+                { text: t('common.cancel'), style: 'cancel' },
+                {
+                  text: t('common.confirm'),
+                  style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      // Get current user ID
+                      let userId: string | undefined;
+                      if (supabase) {
+                        const { data: authData } = await supabase.auth.getUser();
+                        userId = authData?.user?.id;
+                      }
+
+                      // Delete from database
+                      if (userId) {
+                        await db.account.deleteAccount(userId, null);
+                      }
+
+                      // Sign out
+                      await signOut();
+
+                      // Reset stores
+                      useAuthStore.getState().signOut();
+                      useOnboardingStore.getState().reset();
+
+                      // Clear local storage
+                      await db.account.clearLocalStorage();
+
+                      // Generate new pairing code for next session (important!)
+                      // Without this, the same code would be reused after account deletion
+                      setGeneratedCode(generatePairingCode());
+
+                      Alert.alert(
+                        t('settings.deleteAccount.success'),
+                        t('settings.deleteAccount.successMessage')
+                      );
+
+                      setStep('welcome');
+                    } catch (error) {
+                      console.error('[Onboarding] Account deletion error:', error);
+                      Alert.alert(t('common.error'), t('settings.deleteAccount.error'));
+                    }
+                  },
+                },
+              ]
+            );
+          }}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Text style={styles.deleteAccountButtonText}>{t('settings.account.deleteAccount')}</Text>
+          <UserX size={18} color="#FF4444" />
+        </Pressable>
+      )}
+
       {/* Content */}
       <ScrollView
         style={styles.scrollView}
@@ -814,6 +1074,7 @@ export default function OnboardingScreen() {
           {effectiveStep === 'welcome' && (
             <WelcomeStep
               onSocialLogin={handleSocialLogin}
+              onEmailLogin={handleEmailLogin}
             />
           )}
           {effectiveStep === 'pairing' && (
@@ -948,9 +1209,17 @@ export default function OnboardingScreen() {
 // ========== STEP COMPONENTS ==========
 
 // Welcome Step
-function WelcomeStep({ onSocialLogin }: { onSocialLogin: (provider: 'google' | 'kakao' | 'apple') => Promise<void> }) {
+function WelcomeStep({ onSocialLogin, onEmailLogin }: {
+  onSocialLogin: (provider: 'google' | 'kakao' | 'apple') => Promise<void>;
+  onEmailLogin: (email: string, password: string, isSignUp: boolean) => Promise<void>;
+}) {
   const { t, i18n } = useTranslation();
-  const [isLoading, setIsLoading] = useState<'google' | 'kakao' | 'apple' | null>(null);
+  const [isLoading, setIsLoading] = useState<'google' | 'kakao' | 'apple' | 'email' | null>(null);
+
+  // Email login state
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
   // Font and style settings per language
   // English/Spanish: Poetsen One, Japanese: Mochiy Pop One, Chinese: Chiron GoRound TC, Korean: Jua
@@ -1006,6 +1275,38 @@ function WelcomeStep({ onSocialLogin }: { onSocialLogin: (provider: 'google' | '
     }
   };
 
+  // Handle email login (login only, no sign up)
+  const handleEmailAuth = async () => {
+    if (!email || !password) {
+      Alert.alert(t('common.error'), t('auth.email.emptyFields'));
+      return;
+    }
+
+    if (password.length < 6) {
+      Alert.alert(t('common.error'), t('auth.email.passwordTooShort'));
+      return;
+    }
+
+    // Dismiss keyboard before starting login to prevent layout shift
+    Keyboard.dismiss();
+
+    setIsLoading('email');
+    try {
+      await onEmailLogin(email, password, false); // Always login, never sign up
+      // Don't close modal on success - let navigation/step change handle it
+      // Closing modal here causes brief layout flash as keyboard dismisses
+      // The component will unmount or step will change, handling cleanup naturally
+    } catch (error: any) {
+      console.error('Email auth error:', error);
+      Alert.alert(t('common.error'), error.message || t('auth.email.error'));
+      // Only reset form on error
+      setEmail('');
+      setPassword('');
+    } finally {
+      setIsLoading(null);
+    }
+  };
+
   return (
     <View style={styles.welcomeStepContainer}>
       {/* Tagline at top-left with responsive spacing */}
@@ -1016,7 +1317,7 @@ function WelcomeStep({ onSocialLogin }: { onSocialLogin: (provider: 'google' | '
       {/* Login buttons fixed at bottom */}
       <View style={styles.welcomeBottomContainer}>
         <View style={styles.socialLoginContainer}>
-          {/* Apple Login Button (iOS only) - First */}
+          {/* Apple Login Button (iOS only) */}
           {Platform.OS === 'ios' && (
             <TouchableOpacity
               style={[styles.socialButton, styles.appleButton, isLoading !== null && styles.disabledButton]}
@@ -1074,6 +1375,19 @@ function WelcomeStep({ onSocialLogin }: { onSocialLogin: (provider: 'google' | '
               </>
             )}
           </TouchableOpacity>
+
+          {/* Email Login Text Link - After social buttons (for App Store compliance) */}
+          <Pressable
+            style={styles.emailLoginLink}
+            onPress={() => setShowEmailModal(true)}
+            disabled={isLoading !== null}
+          >
+            {isLoading === 'email' ? (
+              <ActivityIndicator size="small" color="#000000" />
+            ) : (
+              <Text style={styles.emailLoginLinkText}>{t('auth.email.button')}</Text>
+            )}
+          </Pressable>
         </View>
 
         {/* Terms disclaimer */}
@@ -1107,6 +1421,64 @@ function WelcomeStep({ onSocialLogin }: { onSocialLogin: (provider: 'google' | '
           </Text>
         </View>
       </View>
+
+      {/* Email Login Modal */}
+      <Modal
+        visible={showEmailModal}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setShowEmailModal(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.emailModalOverlay}
+        >
+          <View style={styles.emailModalContent}>
+            <View style={styles.emailModalHeader}>
+              <Text style={styles.emailModalTitle}>
+                {t('auth.email.loginTitle')}
+              </Text>
+              <Pressable
+                onPress={() => setShowEmailModal(false)}
+                style={styles.emailModalCloseButton}
+              >
+                <X size={24} color={COLORS.black} />
+              </Pressable>
+            </View>
+
+            <TextInput
+              style={styles.emailInput}
+              placeholder={t('auth.email.emailPlaceholder')}
+              placeholderTextColor="rgba(0, 0, 0, 0.4)"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+
+            <TextInput
+              style={styles.emailInput}
+              placeholder={t('auth.email.passwordPlaceholder')}
+              placeholderTextColor="rgba(0, 0, 0, 0.4)"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+            />
+
+            <TouchableOpacity
+              style={[styles.emailSubmitButton, isLoading === 'email' && styles.disabledButton]}
+              onPress={handleEmailAuth}
+              disabled={isLoading === 'email'}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.emailSubmitText}>
+                {isLoading === 'email' ? t('common.loading') : t('auth.email.login')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -3425,7 +3797,7 @@ function PairingStep({
                 {isCodeSaved ? (
                   <Text style={styles.codeText}>{generatedCode}</Text>
                 ) : (
-                  <ActivityIndicator size="small" color={COLORS.primary} />
+                  <ActivityIndicator size="small" color={COLORS.black} />
                 )}
                 <Pressable
                   style={[styles.shareButton, !isCodeSaved && { opacity: 0.3 }]}
@@ -4601,6 +4973,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
+  deleteAccountButton: {
+    position: 'absolute',
+    top: 72,
+    right: SPACING.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    paddingVertical: SPACING.sm,
+    zIndex: 20,
+  },
+  deleteAccountButtonText: {
+    color: '#FF4444',
+    fontSize: 14,
+    fontWeight: '500',
+  },
   copyToastOverlay: {
     position: 'absolute',
     top: 0,
@@ -4620,6 +5007,89 @@ const styles = StyleSheet.create({
   copyToastText: {
     fontSize: 15,
     color: COLORS.white,
+    fontWeight: '500',
+  },
+  deleteAccountLink: {
+    alignSelf: 'center',
+    paddingVertical: SPACING.md,
+    marginTop: SPACING.sm,
+  },
+  deleteAccountLinkText: {
+    fontSize: 13,
+    color: 'rgba(0, 0, 0, 0.4)',
+    textDecorationLine: 'underline',
+  },
+  // Email login styles
+  emailLoginLink: {
+    alignSelf: 'center',
+    paddingVertical: SPACING.xs,
+    marginBottom: 0,
+  },
+  emailLoginLinkText: {
+    fontSize: 14,
+    color: 'rgba(0, 0, 0, 0.6)',
+    textDecorationLine: 'underline',
+  },
+  emailModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.lg,
+  },
+  emailModalContent: {
+    backgroundColor: COLORS.white,
+    borderRadius: 24,
+    padding: SPACING.xl,
+    width: '100%',
+    maxWidth: 400,
+  },
+  emailModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.xl,
+  },
+  emailModalTitle: {
+    fontSize: 20,
+    color: COLORS.black,
+    fontWeight: '700',
+  },
+  emailModalCloseButton: {
+    padding: SPACING.xs,
+  },
+  emailInput: {
+    width: '100%',
+    height: 52,
+    backgroundColor: '#f5f5f5',
+    borderRadius: RADIUS.md,
+    paddingHorizontal: SPACING.lg,
+    fontSize: 16,
+    color: COLORS.black,
+    marginBottom: SPACING.md,
+  },
+  emailSubmitButton: {
+    width: '100%',
+    height: 52,
+    backgroundColor: COLORS.black,
+    borderRadius: RADIUS.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: SPACING.sm,
+  },
+  emailSubmitText: {
+    fontSize: 16,
+    color: COLORS.white,
+    fontWeight: '600',
+  },
+  emailToggleButton: {
+    alignSelf: 'center',
+    marginTop: SPACING.lg,
+    padding: SPACING.sm,
+  },
+  emailToggleText: {
+    fontSize: 14,
+    color: COLORS.accent,
     fontWeight: '500',
   },
   codeHint: {

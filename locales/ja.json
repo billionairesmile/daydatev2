@@ -24,6 +24,26 @@
     "days": "日",
     "daysCount": "日目"
   },
+  "auth": {
+    "email": {
+      "button": "メールアカウントをお持ちですか？",
+      "loginTitle": "メールログイン",
+      "signUpTitle": "メール登録",
+      "emailPlaceholder": "メールアドレス",
+      "passwordPlaceholder": "パスワード",
+      "confirmPasswordPlaceholder": "パスワード確認",
+      "login": "ログイン",
+      "signUp": "登録",
+      "haveAccount": "すでにアカウントをお持ちですか？ログイン",
+      "noAccount": "アカウントをお持ちでないですか？登録",
+      "emptyFields": "メールアドレスとパスワードを入力してください",
+      "passwordMismatch": "パスワードが一致しません",
+      "passwordTooShort": "パスワードは6文字以上である必要があります",
+      "signUpSuccess": "登録完了",
+      "checkEmail": "確認メールをご確認ください",
+      "error": "認証に失敗しました"
+    }
+  },
   "tabs": {
     "home": "ホーム",
     "mission": "ミッション",
