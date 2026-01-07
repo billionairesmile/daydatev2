@@ -341,39 +341,62 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
           // Skip in Expo Go
           if (isExpoGo || !Purchases) {
             console.log('[Subscription] Purchase skipped (Expo Go or native module missing)');
+            set({ error: 'In-App Purchase is not available in this environment' });
             return false;
           }
 
           // Skip if RevenueCat is not configured yet
           if (!get().isRevenueCatConfigured) {
             console.log('[Subscription] Purchase skipped (RevenueCat not configured)');
+            set({ error: 'Store is not initialized. Please restart the app.' });
             return false;
           }
 
           set({ isLoading: true, error: null });
 
-          const offerings = get().offerings || (await Purchases.getOfferings());
+          // Get offerings with timeout to prevent hanging
+          let offerings = get().offerings;
+          if (!offerings) {
+            try {
+              const offeringsPromise = Purchases.getOfferings();
+              const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Offerings load timeout')), 10000)
+              );
+              offerings = await Promise.race([offeringsPromise, timeoutPromise]) as typeof offerings;
+            } catch (offeringsError) {
+              console.error('[Subscription] Failed to load offerings:', offeringsError);
+              set({ isLoading: false, error: 'Failed to load products' });
+              return false;
+            }
+          }
+
+          // Verify offerings loaded successfully
+          if (!offerings || !offerings.current) {
+            console.error('[Subscription] No offerings available');
+            set({ isLoading: false, error: 'Products not available' });
+            return false;
+          }
 
           // Debug: Log available packages
-          console.log('[Subscription] Current offering:', offerings.current?.identifier);
-          console.log('[Subscription] Available packages:', offerings.current?.availablePackages.map(
+          console.log('[Subscription] Current offering:', offerings.current.identifier);
+          console.log('[Subscription] Available packages:', offerings.current.availablePackages.map(
             (pkg: PurchasesPackage) => `${pkg.identifier}: ${pkg.product.identifier}`
           ));
 
           // Try to find monthly package by product ID first, then by package type
-          let monthlyPackage = offerings.current?.availablePackages.find(
+          let monthlyPackage = offerings.current.availablePackages.find(
             (pkg: PurchasesPackage) => pkg.product.identifier === PRODUCT_IDS.MONTHLY
           );
 
           // Fallback: try to find by package identifier (e.g., '$rc_monthly')
           if (!monthlyPackage) {
-            monthlyPackage = offerings.current?.availablePackages.find(
+            monthlyPackage = offerings.current.availablePackages.find(
               (pkg: PurchasesPackage) => pkg.identifier === '$rc_monthly' || pkg.identifier.toLowerCase().includes('monthly')
             );
           }
 
           if (!monthlyPackage) {
-            const availableIds = offerings.current?.availablePackages.map(
+            const availableIds = offerings.current.availablePackages.map(
               (pkg: PurchasesPackage) => pkg.product.identifier
             ).join(', ') || 'none';
             throw new Error(`Monthly package not found. Available products: ${availableIds}`);
@@ -411,39 +434,62 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
           // Skip in Expo Go
           if (isExpoGo || !Purchases) {
             console.log('[Subscription] Purchase skipped (Expo Go or native module missing)');
+            set({ error: 'In-App Purchase is not available in this environment' });
             return false;
           }
 
           // Skip if RevenueCat is not configured yet
           if (!get().isRevenueCatConfigured) {
             console.log('[Subscription] Purchase skipped (RevenueCat not configured)');
+            set({ error: 'Store is not initialized. Please restart the app.' });
             return false;
           }
 
           set({ isLoading: true, error: null });
 
-          const offerings = get().offerings || (await Purchases.getOfferings());
+          // Get offerings with timeout to prevent hanging
+          let offerings = get().offerings;
+          if (!offerings) {
+            try {
+              const offeringsPromise = Purchases.getOfferings();
+              const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Offerings load timeout')), 10000)
+              );
+              offerings = await Promise.race([offeringsPromise, timeoutPromise]) as typeof offerings;
+            } catch (offeringsError) {
+              console.error('[Subscription] Failed to load offerings:', offeringsError);
+              set({ isLoading: false, error: 'Failed to load products' });
+              return false;
+            }
+          }
+
+          // Verify offerings loaded successfully
+          if (!offerings || !offerings.current) {
+            console.error('[Subscription] No offerings available');
+            set({ isLoading: false, error: 'Products not available' });
+            return false;
+          }
 
           // Debug: Log available packages
-          console.log('[Subscription] Current offering:', offerings.current?.identifier);
-          console.log('[Subscription] Available packages:', offerings.current?.availablePackages.map(
+          console.log('[Subscription] Current offering:', offerings.current.identifier);
+          console.log('[Subscription] Available packages:', offerings.current.availablePackages.map(
             (pkg: PurchasesPackage) => `${pkg.identifier}: ${pkg.product.identifier}`
           ));
 
           // Try to find annual package by product ID first, then by package type
-          let annualPackage = offerings.current?.availablePackages.find(
+          let annualPackage = offerings.current.availablePackages.find(
             (pkg: PurchasesPackage) => pkg.product.identifier === PRODUCT_IDS.ANNUAL
           );
 
           // Fallback: try to find by package identifier (e.g., '$rc_annual')
           if (!annualPackage) {
-            annualPackage = offerings.current?.availablePackages.find(
+            annualPackage = offerings.current.availablePackages.find(
               (pkg: PurchasesPackage) => pkg.identifier === '$rc_annual' || pkg.identifier.toLowerCase().includes('annual')
             );
           }
 
           if (!annualPackage) {
-            const availableIds = offerings.current?.availablePackages.map(
+            const availableIds = offerings.current.availablePackages.map(
               (pkg: PurchasesPackage) => pkg.product.identifier
             ).join(', ') || 'none';
             throw new Error(`Annual package not found. Available products: ${availableIds}`);

@@ -1,9 +1,41 @@
 import { makeRedirectUri } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import * as AppleAuthentication from 'expo-apple-authentication';
-import { Platform } from 'react-native';
+import { Platform, Dimensions } from 'react-native';
+import * as Device from 'expo-device';
 import { supabase, isDemoMode } from './supabase';
 import { removePushToken, cancelAllScheduledNotifications } from './pushNotifications';
+
+/**
+ * Check if current device is an iPad
+ * Uses multiple detection methods for reliability
+ */
+const isIPad = (): boolean => {
+  if (Platform.OS !== 'ios') return false;
+
+  // Method 1: Check device type from expo-device
+  if (Device.deviceType === Device.DeviceType.TABLET) {
+    return true;
+  }
+
+  // Method 2: Check screen dimensions (iPad typically has larger screens)
+  const { width, height } = Dimensions.get('window');
+  const screenSize = Math.max(width, height);
+
+  // iPads typically have screens >= 768 points on the short edge
+  // or >= 1024 points on the long edge
+  if (Math.min(width, height) >= 600 || screenSize >= 1024) {
+    return true;
+  }
+
+  // Method 3: Check Platform constants (works on some iOS versions)
+  // @ts-ignore - interfaceIdiom is not in the type definitions
+  if (Platform.isPad === true) {
+    return true;
+  }
+
+  return false;
+};
 
 // Required for web only
 WebBrowser.maybeCompleteAuthSession();
@@ -226,11 +258,144 @@ export const signInWithKakao = async () => {
 };
 
 /**
- * Sign in with Apple (iOS only, native authentication)
+ * Helper function to perform the actual Apple Sign-In request
+ */
+const performAppleSignIn = async (): Promise<AuthSession | null> => {
+  // Request Apple Sign-In
+  const credential = await AppleAuthentication.signInAsync({
+    requestedScopes: [
+      AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+      AppleAuthentication.AppleAuthenticationScope.EMAIL,
+    ],
+  });
+
+  console.log('[SocialAuth] Apple credential received:', {
+    hasIdentityToken: !!credential.identityToken,
+    hasAuthorizationCode: !!credential.authorizationCode,
+    hasEmail: !!credential.email,
+    hasFullName: !!credential.fullName,
+    user: credential.user?.substring(0, 20) + '...',
+  });
+
+  if (!credential.identityToken) {
+    console.error('[SocialAuth] No identity token received from Apple');
+    return null;
+  }
+
+  // Sign in to Supabase using the Apple identity token
+  console.log('[SocialAuth] Signing in to Supabase with Apple token...');
+  const { data, error } = await supabase!.auth.signInWithIdToken({
+    provider: 'apple',
+    token: credential.identityToken,
+  });
+
+  if (error) {
+    console.error('[SocialAuth] Supabase Apple sign in error:', error);
+    throw error;
+  }
+
+  if (data.session) {
+    console.log('[SocialAuth] Apple Sign-In successful, user:', data.session.user.id);
+
+    // If we got name from Apple (first sign in only), update user metadata
+    if (credential.fullName?.givenName || credential.fullName?.familyName) {
+      const fullName = [credential.fullName?.givenName, credential.fullName?.familyName]
+        .filter(Boolean)
+        .join(' ');
+
+      if (fullName) {
+        console.log('[SocialAuth] Updating user name:', fullName);
+        await supabase!.auth.updateUser({
+          data: { full_name: fullName, name: fullName }
+        });
+      }
+    }
+
+    return data.session as unknown as AuthSession;
+  }
+
+  return null;
+};
+
+/**
+ * Sign in with Apple using web-based OAuth (for iPad)
+ * iPad has issues with native Apple Sign-In after Settings redirect
+ */
+const signInWithAppleOAuth = async (): Promise<AuthSession | null> => {
+  console.log('[SocialAuth] Using web-based Apple OAuth for iPad...');
+
+  try {
+    // Close any existing browser session first
+    try {
+      await Promise.race([
+        WebBrowser.dismissBrowser(),
+        new Promise((resolve) => setTimeout(resolve, 1000)),
+      ]);
+    } catch (dismissError) {
+      console.log('[SocialAuth] dismissBrowser error (ignored):', dismissError);
+    }
+
+    const { data, error } = await supabase!.auth.signInWithOAuth({
+      provider: 'apple',
+      options: {
+        redirectTo,
+        skipBrowserRedirect: true,
+      },
+    });
+
+    if (error) {
+      console.error('[SocialAuth] Apple OAuth error:', error);
+      throw error;
+    }
+
+    if (!data?.url) {
+      console.error('[SocialAuth] No auth URL returned for Apple OAuth');
+      return null;
+    }
+
+    console.log('[SocialAuth] Opening Apple OAuth URL...');
+
+    const result = await WebBrowser.openAuthSessionAsync(
+      data.url,
+      redirectTo,
+      {
+        showInRecents: true,
+        preferEphemeralSession: false,
+      }
+    );
+
+    console.log(`[SocialAuth] WebBrowser result type: ${result.type}`);
+
+    if (result.type === 'success') {
+      const { url } = result;
+      console.log('[SocialAuth] Apple OAuth success, processing callback...');
+
+      const session = await createSessionFromUrl(url);
+
+      if (session) {
+        console.log('[SocialAuth] Apple OAuth session created for user:', session.user.id);
+        return session as unknown as AuthSession;
+      }
+    } else if (result.type === 'cancel') {
+      console.log('[SocialAuth] User cancelled Apple OAuth');
+    }
+
+    return null;
+  } catch (error) {
+    console.error('[SocialAuth] Apple OAuth failed:', error);
+    throw error;
+  }
+};
+
+/**
+ * Sign in with Apple (iOS only)
+ * Uses native authentication on iPhone, web-based OAuth on iPad
+ * iPad has known issues with native Apple Sign-In after Settings redirect
  */
 export const signInWithApple = async (): Promise<AuthSession | null> => {
   console.log('[SocialAuth] signInWithApple called');
-  console.log(`[SocialAuth] Platform: ${Platform.OS}, isDemoMode: ${isDemoMode}`);
+  const isOnIPad = isIPad();
+  console.log(`[SocialAuth] Platform: ${Platform.OS}, isIPad: ${isOnIPad}, isDemoMode: ${isDemoMode}`);
 
   if (isDemoMode || !supabase) {
     console.log('Demo mode - Apple login not available');
@@ -242,6 +407,13 @@ export const signInWithApple = async (): Promise<AuthSession | null> => {
     return null;
   }
 
+  // On iPad, use web-based OAuth to avoid Settings redirect issues
+  if (isOnIPad) {
+    console.log('[SocialAuth] iPad detected - using web-based Apple OAuth');
+    return signInWithAppleOAuth();
+  }
+
+  // On iPhone, use native Apple Sign-In
   try {
     // Check if Apple Sign-In is available on this device
     const isAvailable = await AppleAuthentication.isAvailableAsync();
@@ -250,68 +422,37 @@ export const signInWithApple = async (): Promise<AuthSession | null> => {
       return null;
     }
 
-    console.log('[SocialAuth] Starting Apple Sign-In...');
+    console.log('[SocialAuth] Starting native Apple Sign-In...');
 
-    // Request Apple Sign-In
-    const credential = await AppleAuthentication.signInAsync({
-      requestedScopes: [
-        AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-        AppleAuthentication.AppleAuthenticationScope.EMAIL,
-      ],
-    });
-
-    console.log('[SocialAuth] Apple credential received:', {
-      hasIdentityToken: !!credential.identityToken,
-      hasAuthorizationCode: !!credential.authorizationCode,
-      hasEmail: !!credential.email,
-      hasFullName: !!credential.fullName,
-    });
-
-    if (!credential.identityToken) {
-      console.error('[SocialAuth] No identity token received from Apple');
-      return null;
-    }
-
-    // Sign in to Supabase using the Apple identity token
-    console.log('[SocialAuth] Signing in to Supabase with Apple token...');
-    const { data, error } = await supabase.auth.signInWithIdToken({
-      provider: 'apple',
-      token: credential.identityToken,
-    });
-
-    if (error) {
-      console.error('[SocialAuth] Supabase Apple sign in error:', error);
-      throw error;
-    }
-
-    if (data.session) {
-      console.log('[SocialAuth] Apple Sign-In successful, user:', data.session.user.id);
-
-      // If we got name from Apple (first sign in only), update user metadata
-      if (credential.fullName?.givenName || credential.fullName?.familyName) {
-        const fullName = [credential.fullName?.givenName, credential.fullName?.familyName]
-          .filter(Boolean)
-          .join(' ');
-
-        if (fullName) {
-          console.log('[SocialAuth] Updating user name:', fullName);
-          await supabase.auth.updateUser({
-            data: { full_name: fullName, name: fullName }
-          });
-        }
-      }
-
-      return data.session as unknown as AuthSession;
-    }
-
-    return null;
+    const result = await performAppleSignIn();
+    return result;
   } catch (error: any) {
-    if (error.code === 'ERR_REQUEST_CANCELED') {
+    // Handle user cancellation
+    if (error.code === 'ERR_REQUEST_CANCELED' || error.code === 'ERR_CANCELED') {
       console.log('[SocialAuth] User cancelled Apple Sign-In');
       return null;
     }
+
+    // Handle Apple Sign-In not available
+    if (error.code === 'ERR_APPLE_AUTHENTICATION_UNAVAILABLE') {
+      console.log('[SocialAuth] Apple Sign-In unavailable on this device');
+      throw new Error('Apple Sign-In is not available on this device. Please try another login method.');
+    }
+
+    // Handle credential errors (expired, revoked, etc.)
+    if (error.code === 'ERR_APPLE_AUTHENTICATION_CREDENTIAL') {
+      console.log('[SocialAuth] Apple credential error');
+      throw new Error('Apple Sign-In credential error. Please try again.');
+    }
+
+    // Handle network/server errors
+    if (error.message?.includes('network') || error.message?.includes('timeout')) {
+      console.log('[SocialAuth] Network error during Apple Sign-In');
+      throw new Error('Network error. Please check your connection and try again.');
+    }
+
     console.error('[SocialAuth] Apple Sign-In failed:', error);
-    throw error;
+    throw new Error(error.message || 'Apple Sign-In failed. Please try again.');
   }
 };
 

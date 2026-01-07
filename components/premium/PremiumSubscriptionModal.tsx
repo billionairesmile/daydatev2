@@ -125,12 +125,51 @@ export default function PremiumSubscriptionModal({
   const handlePurchase = async () => {
     if (!selectedPlan) return;
 
-    if (selectedPlan === 'monthly') {
-      await purchaseMonthly();
-    } else {
-      await purchaseAnnual();
+    // Check if RevenueCat is properly configured
+    const { isRevenueCatConfigured } = useSubscriptionStore.getState();
+
+    if (!isRevenueCatConfigured) {
+      console.log('[PremiumModal] RevenueCat not configured');
+      Alert.alert(
+        t('common.error'),
+        t('premium.storeNotAvailable', { defaultValue: 'In-App Purchase is not available. Please try again later.' }),
+        [{ text: t('common.confirm') }]
+      );
+      return;
     }
-    // Don't close modal - it will re-render with premium management view if purchase succeeds
+
+    try {
+      let success = false;
+      if (selectedPlan === 'monthly') {
+        success = await purchaseMonthly();
+      } else {
+        success = await purchaseAnnual();
+      }
+
+      // Don't close modal - it will re-render with premium management view if purchase succeeds
+      if (!success) {
+        // Check if there's an error in the store
+        const { error: purchaseError } = useSubscriptionStore.getState();
+        if (purchaseError) {
+          console.log('[PremiumModal] Purchase failed with error:', purchaseError);
+          Alert.alert(
+            t('common.error'),
+            purchaseError,
+            [{ text: t('common.confirm') }]
+          );
+        } else {
+          // Purchase was cancelled by user - no need to show error
+          console.log('[PremiumModal] Purchase cancelled or not completed');
+        }
+      }
+    } catch (error) {
+      console.error('[PremiumModal] Purchase error:', error);
+      Alert.alert(
+        t('common.error'),
+        t('premium.purchaseError'),
+        [{ text: t('common.confirm') }]
+      );
+    }
   };
 
   const handleRestore = async () => {

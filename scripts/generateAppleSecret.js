@@ -5,7 +5,7 @@ const path = require('path');
 // Apple Sign-In 설정
 const TEAM_ID = '8D3XV33734';
 const KEY_ID = 'PDSH378R44';
-const CLIENT_ID = 'com.daydate.app';
+const CLIENT_ID = 'com.daydate.app.web';  // Services ID for web OAuth
 
 // .p8 파일 경로
 const privateKeyPath = path.join(process.env.HOME, 'Downloads', 'AuthKey_PDSH378R44.p8');

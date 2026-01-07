@@ -14,9 +14,9 @@
       "backgroundColor": "#FFFFFF"
     },
     "ios": {
-      "supportsTablet": false,
+      "supportsTablet": true,
       "bundleIdentifier": "com.daydate.app",
-      "buildNumber": "16",
+      "buildNumber": "18",
       "usesAppleSignIn": true,
       "infoPlist": {
         "NSCameraUsageDescription": "Allow Daydate to access your camera to capture memories.",

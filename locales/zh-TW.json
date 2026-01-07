@@ -841,6 +841,7 @@
     "restoreSuccessMessage": "已成功恢復您之前的購買。",
     "restoreFailed": "恢復失敗",
     "restoreFailedMessage": "找不到之前的購買記錄。如果問題持續，請聯繫客服。",
+    "purchaseError": "購買過程中發生錯誤。請稍後再試。",
     "restoreNoticeTitle": "恢復購買說明",
     "restoreNotice1": "如果您更換了新裝置或重新安裝了應用程式，請點擊恢復購買以恢復之前的訂閱。",
     "restoreNotice2": "訂閱與您的 Apple ID 或 Google 帳戶綁定，可在多個裝置上使用。",

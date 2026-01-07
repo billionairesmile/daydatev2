@@ -844,6 +844,7 @@
     "restoreSuccessMessage": "購入が正常に復元されました。",
     "restoreFailed": "購入復元失敗",
     "restoreFailedMessage": "以前の購入履歴が見つかりません。問題があると思われる場合はカスタマーサービスにお問い合わせください。",
+    "purchaseError": "購入処理中にエラーが発生しました。しばらくしてからもう一度お試しください。",
     "restoreNoticeTitle": "購入復元について",
     "restoreNotice1": "新しいデバイスに変更したり、アプリを再インストールした場合は、購入を復元をタップして以前の購読を復元できます。",
     "restoreNotice2": "購読はApple IDまたはGoogleアカウントに紐づいており、複数のデバイスで使用できます。",

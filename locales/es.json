@@ -841,6 +841,7 @@
     "restoreSuccessMessage": "Tu compra ha sido restaurada exitosamente.",
     "restoreFailed": "Restauración Fallida",
     "restoreFailedMessage": "No se encontraron compras anteriores. Si crees que esto es un error, por favor contacta soporte.",
+    "purchaseError": "Ocurrió un error durante la compra. Por favor intenta de nuevo más tarde.",
     "restoreNoticeTitle": "Info de Restaurar Compra",
     "restoreNotice1": "Si cambiaste a un nuevo dispositivo o reinstalaste la app, toca Restaurar Compra para recuperar tu suscripción anterior.",
     "restoreNotice2": "Las suscripciones están vinculadas a tu Apple ID o cuenta de Google y pueden usarse en múltiples dispositivos.",
