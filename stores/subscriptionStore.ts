@@ -34,10 +34,10 @@ const REVENUECAT_API_KEY_IOS = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY_IOS ||
 const REVENUECAT_API_KEY_ANDROID = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID || '';
 const ENTITLEMENT_ID = 'daydate Premium';
 
-// Product identifiers (must match RevenueCat dashboard)
+// Product identifiers (must match RevenueCat dashboard and App Store Connect)
 export const PRODUCT_IDS = {
-  MONTHLY: 'monthly',
-  ANNUAL: 'yearly',
+  MONTHLY: 'com.daydate.premium.month',
+  ANNUAL: 'com.daydate.premium.annually',
 } as const;
 
 // Subscription limits
@@ -213,7 +213,7 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
             // Determine plan type from product identifier
             if (activeEntitlement.productIdentifier.includes('annual')) {
               plan = 'annual';
-            } else if (activeEntitlement.productIdentifier.includes('monthly')) {
+            } else if (activeEntitlement.productIdentifier.includes('month')) {
               plan = 'monthly';
             }
             expiryDate = activeEntitlement.expirationDate
@@ -249,7 +249,7 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
             if (isPremiumNow && entitlement) {
               if (entitlement.productIdentifier.includes('annual')) {
                 newPlan = 'annual';
-              } else if (entitlement.productIdentifier.includes('monthly')) {
+              } else if (entitlement.productIdentifier.includes('month')) {
                 newPlan = 'monthly';
               }
               newExpiryDate = entitlement.expirationDate
@@ -301,7 +301,7 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
           if (isPremium && activeEntitlement) {
             if (activeEntitlement.productIdentifier.includes('annual')) {
               plan = 'annual';
-            } else if (activeEntitlement.productIdentifier.includes('monthly')) {
+            } else if (activeEntitlement.productIdentifier.includes('month')) {
               plan = 'monthly';
             }
             expiryDate = activeEntitlement.expirationDate
@@ -388,10 +388,13 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
             (pkg: PurchasesPackage) => pkg.product.identifier === PRODUCT_IDS.MONTHLY
           );
 
-          // Fallback: try to find by package identifier (e.g., '$rc_monthly')
+          // Fallback: try to find by package identifier (e.g., '$rc_monthly') or product ID containing 'month'
           if (!monthlyPackage) {
             monthlyPackage = offerings.current.availablePackages.find(
-              (pkg: PurchasesPackage) => pkg.identifier === '$rc_monthly' || pkg.identifier.toLowerCase().includes('monthly')
+              (pkg: PurchasesPackage) =>
+                pkg.identifier === '$rc_monthly' ||
+                pkg.identifier.toLowerCase().includes('month') ||
+                pkg.product.identifier.toLowerCase().includes('month')
             );
           }
 
@@ -481,10 +484,15 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
             (pkg: PurchasesPackage) => pkg.product.identifier === PRODUCT_IDS.ANNUAL
           );
 
-          // Fallback: try to find by package identifier (e.g., '$rc_annual')
+          // Fallback: try to find by package identifier (e.g., '$rc_annual') or product ID containing 'annual'
           if (!annualPackage) {
             annualPackage = offerings.current.availablePackages.find(
-              (pkg: PurchasesPackage) => pkg.identifier === '$rc_annual' || pkg.identifier.toLowerCase().includes('annual')
+              (pkg: PurchasesPackage) =>
+                pkg.identifier === '$rc_annual' ||
+                pkg.identifier.toLowerCase().includes('annual') ||
+                pkg.identifier.toLowerCase().includes('yearly') ||
+                pkg.product.identifier.toLowerCase().includes('annual') ||
+                pkg.product.identifier.toLowerCase().includes('yearly')
             );
           }
 
@@ -548,7 +556,7 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
           if (isPremium && activeEntitlement) {
             if (activeEntitlement.productIdentifier.includes('annual')) {
               plan = 'annual';
-            } else if (activeEntitlement.productIdentifier.includes('monthly')) {
+            } else if (activeEntitlement.productIdentifier.includes('month')) {
               plan = 'monthly';
             }
             expiryDate = activeEntitlement.expirationDate
