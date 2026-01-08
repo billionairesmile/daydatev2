@@ -24,7 +24,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
-import { COLORS, SPACING, RADIUS } from '@/constants/design';
+import { COLORS, SPACING, RADIUS, IS_TABLET, scale, scaleFont } from '@/constants/design';
 import { useOnboardingStore, useAuthStore } from '@/stores';
 import type { RelationshipType } from '@/stores/onboardingStore';
 import { db, isDemoMode } from '@/lib/supabase';
@@ -179,14 +179,14 @@ export default function CoupleProfileScreen() {
       >
         <View style={styles.menuItemLeft}>
           <View style={styles.iconWrapper}>
-            <Calendar color={COLORS.black} size={20} />
+            <Calendar color={COLORS.black} size={scale(20)} />
           </View>
           <View style={styles.menuItemContent}>
             <Text style={styles.menuItemLabel}>{getDateLabel(syncedRelationshipType)}</Text>
             <Text style={styles.menuItemValue}>{formatDate(syncedAnniversaryDate)}</Text>
           </View>
         </View>
-        <ChevronRight color="#999" size={20} />
+        <ChevronRight color="#999" size={scale(20)} />
       </Pressable>
 
       {/* Account Info Section */}
@@ -197,14 +197,14 @@ export default function CoupleProfileScreen() {
       >
         <View style={styles.menuItemLeft}>
           <View style={[styles.iconWrapper, { backgroundColor: '#e8f5e9' }]}>
-            <User color="#4caf50" size={20} />
+            <User color="#4caf50" size={scale(20)} />
           </View>
           <View style={styles.menuItemContent}>
             <Text style={styles.menuItemLabel}>{t('profile.couple.myAccountInfo', { nickname: myNickname })}</Text>
             <Text style={styles.menuItemValue}>{t('profile.couple.myAccount')}</Text>
           </View>
         </View>
-        <ChevronRight color="#999" size={20} />
+        <ChevronRight color="#999" size={scale(20)} />
       </Pressable>
 
       <Pressable
@@ -213,14 +213,14 @@ export default function CoupleProfileScreen() {
       >
         <View style={styles.menuItemLeft}>
           <View style={[styles.iconWrapper, { backgroundColor: '#fce4ec' }]}>
-            <User color="#e91e63" size={20} />
+            <User color="#e91e63" size={scale(20)} />
           </View>
           <View style={styles.menuItemContent}>
             <Text style={styles.menuItemLabel}>{t('profile.couple.myAccountInfo', { nickname: partnerNickname })}</Text>
             <Text style={styles.menuItemValue}>{t('profile.couple.partnerAccount')}</Text>
           </View>
         </View>
-        <ChevronRight color="#999" size={20} />
+        <ChevronRight color="#999" size={scale(20)} />
       </Pressable>
     </ScrollView>
   );
@@ -252,7 +252,7 @@ export default function CoupleProfileScreen() {
         style={styles.datePickerButton}
         onPress={() => setShowDatePicker(true)}
       >
-        <Calendar color="#666" size={20} />
+        <Calendar color="#666" size={scale(20)} />
         <Text style={[styles.datePickerText, tempAnniversaryDate && styles.datePickerTextSelected]}>
           {tempAnniversaryDate ? formatDate(tempAnniversaryDate) : t('profile.couple.editAnniversary.selectDate')}
         </Text>
@@ -353,7 +353,7 @@ export default function CoupleProfileScreen() {
         <View style={styles.infoCard}>
           <View style={styles.infoItem}>
             <View style={styles.infoItemLeft}>
-              <User color="#666" size={18} />
+              <User color="#666" size={scale(18)} />
               <Text style={styles.infoLabel}>{t('profile.couple.accountDetail.nickname')}</Text>
             </View>
             <Text style={styles.infoValue}>{nickname}</Text>
@@ -363,7 +363,7 @@ export default function CoupleProfileScreen() {
 
           <View style={styles.infoItem}>
             <View style={styles.infoItemLeft}>
-              <Mail color="#666" size={18} />
+              <Mail color="#666" size={scale(18)} />
               <Text style={styles.infoLabel}>{t('profile.couple.accountDetail.email')}</Text>
             </View>
             <Text style={styles.infoValue}>{email}</Text>
@@ -373,7 +373,7 @@ export default function CoupleProfileScreen() {
 
           <View style={styles.infoItem}>
             <View style={styles.infoItemLeft}>
-              <Clock color="#666" size={18} />
+              <Clock color="#666" size={scale(18)} />
               <Text style={styles.infoLabel}>{t('profile.couple.accountDetail.joinDate')}</Text>
             </View>
             <Text style={styles.infoValue}>
@@ -404,7 +404,7 @@ export default function CoupleProfileScreen() {
           onPress={() => viewMode === 'main' ? router.back() : setViewMode('main')}
           style={styles.backButton}
         >
-          <ChevronLeft color={COLORS.black} size={24} />
+          <ChevronLeft color={COLORS.black} size={scale(24)} />
         </Pressable>
         <Text style={styles.headerTitle}>{getHeaderTitle()}</Text>
         <View style={styles.headerSpacer} />
@@ -428,47 +428,47 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.md,
+    paddingHorizontal: scale(SPACING.md),
+    paddingVertical: scale(SPACING.md),
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
   backButton: {
-    width: 40,
-    height: 40,
+    width: scale(40),
+    height: scale(40),
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: scaleFont(18),
     fontWeight: '600',
     color: COLORS.black,
   },
   headerSpacer: {
-    width: 40,
+    width: scale(40),
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingVertical: SPACING.lg,
+    paddingVertical: scale(SPACING.lg),
   },
   sectionTitle: {
-    fontSize: 13,
+    fontSize: scaleFont(13),
     fontWeight: '600',
     color: '#999',
-    marginLeft: SPACING.lg,
-    marginTop: SPACING.lg,
-    marginBottom: SPACING.sm,
+    marginLeft: scale(SPACING.lg),
+    marginTop: scale(SPACING.lg),
+    marginBottom: scale(SPACING.sm),
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: scale(0.5),
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.lg,
+    paddingHorizontal: scale(SPACING.lg),
+    paddingVertical: scale(SPACING.lg),
     backgroundColor: COLORS.white,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
@@ -479,67 +479,67 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   iconWrapper: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: scale(40),
+    height: scale(40),
+    borderRadius: scale(20),
     backgroundColor: '#f5f5f5',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: SPACING.md,
+    marginRight: scale(SPACING.md),
   },
   menuItemContent: {
     flex: 1,
   },
   menuItemLabel: {
-    fontSize: 16,
+    fontSize: scaleFont(16),
     fontWeight: '500',
     color: COLORS.black,
-    marginBottom: 2,
+    marginBottom: scale(2),
   },
   menuItemValue: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     color: '#666',
   },
   editContainer: {
     flex: 1,
-    padding: SPACING.lg,
+    padding: scale(SPACING.lg),
   },
   editTitle: {
-    fontSize: 24,
+    fontSize: scaleFont(24),
     fontWeight: '700',
     color: COLORS.black,
-    marginBottom: SPACING.sm,
+    marginBottom: scale(SPACING.sm),
   },
   editDescription: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     color: '#666',
-    marginBottom: SPACING.xl,
+    marginBottom: scale(SPACING.xl),
   },
   fieldLabel: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     fontWeight: '600',
     color: COLORS.black,
-    marginBottom: SPACING.sm,
-    height: 20, // Fixed height to prevent layout shift when text changes
+    marginBottom: scale(SPACING.sm),
+    height: scale(20), // Fixed height to prevent layout shift when text changes
   },
   relationshipRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: SPACING.xl,
+    gap: scale(12),
+    marginBottom: scale(SPACING.xl),
   },
   relationshipButton: {
     flex: 1,
-    height: 48,
+    height: scale(48),
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#f5f5f5',
-    borderRadius: RADIUS.full,
+    borderRadius: scale(RADIUS.full),
   },
   relationshipButtonActive: {
     backgroundColor: COLORS.black,
   },
   relationshipButtonText: {
-    fontSize: 15,
+    fontSize: scaleFont(15),
     fontWeight: '600',
     color: '#666',
   },
@@ -550,15 +550,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
-    height: 56,
+    height: scale(56),
     backgroundColor: '#f5f5f5',
-    borderRadius: RADIUS.sm,
-    paddingHorizontal: SPACING.lg,
-    gap: SPACING.md,
-    marginBottom: SPACING.xl,
+    borderRadius: scale(RADIUS.sm),
+    paddingHorizontal: scale(SPACING.lg),
+    gap: scale(SPACING.md),
+    marginBottom: scale(SPACING.xl),
   },
   datePickerText: {
-    fontSize: 16,
+    fontSize: scaleFont(16),
     color: '#999',
   },
   datePickerTextSelected: {
@@ -570,124 +570,124 @@ const styles = StyleSheet.create({
   },
   datePickerModalContent: {
     backgroundColor: COLORS.white,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: 40,
+    borderTopLeftRadius: scale(20),
+    borderTopRightRadius: scale(20),
+    paddingBottom: scale(40),
   },
   datePickerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    padding: SPACING.lg,
+    padding: scale(SPACING.lg),
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
   datePickerCancel: {
-    fontSize: 16,
+    fontSize: scaleFont(16),
     color: '#666',
   },
   datePickerConfirm: {
-    fontSize: 16,
+    fontSize: scaleFont(16),
     color: COLORS.black,
     fontWeight: '600',
   },
   datePicker: {
-    height: 200,
+    height: scale(200),
   },
   buttonRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: scale(12),
   },
   cancelButton: {
     flex: 1,
-    height: 52,
+    height: scale(52),
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#f5f5f5',
-    borderRadius: RADIUS.full,
+    borderRadius: scale(RADIUS.full),
   },
   cancelButtonText: {
-    fontSize: 16,
+    fontSize: scaleFont(16),
     fontWeight: '600',
     color: '#666',
   },
   saveButton: {
     flex: 1,
-    height: 52,
+    height: scale(52),
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLORS.black,
-    borderRadius: RADIUS.full,
+    borderRadius: scale(RADIUS.full),
   },
   saveButtonText: {
-    fontSize: 16,
+    fontSize: scaleFont(16),
     fontWeight: '600',
     color: COLORS.white,
   },
   profileHeader: {
     alignItems: 'center',
-    paddingVertical: SPACING.xl,
+    paddingVertical: scale(SPACING.xl),
   },
   largeAvatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: scale(80),
+    height: scale(80),
+    borderRadius: scale(40),
     backgroundColor: '#e8f5e9',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: SPACING.md,
+    marginBottom: scale(SPACING.md),
   },
   largeAvatarText: {
-    fontSize: 32,
+    fontSize: scaleFont(32),
     fontWeight: '700',
     color: '#4caf50',
   },
   profileName: {
-    fontSize: 22,
+    fontSize: scaleFont(22),
     fontWeight: '700',
     color: COLORS.black,
-    marginBottom: SPACING.sm,
+    marginBottom: scale(SPACING.sm),
   },
   relationshipBadge: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs,
+    paddingHorizontal: scale(SPACING.md),
+    paddingVertical: scale(SPACING.xs),
     backgroundColor: '#f5f5f5',
-    borderRadius: RADIUS.full,
+    borderRadius: scale(RADIUS.full),
   },
   relationshipBadgeText: {
-    fontSize: 13,
+    fontSize: scaleFont(13),
     fontWeight: '600',
     color: '#666',
   },
   infoCard: {
-    marginHorizontal: SPACING.lg,
+    marginHorizontal: scale(SPACING.lg),
     backgroundColor: '#f8f8f8',
-    borderRadius: RADIUS.md,
+    borderRadius: scale(RADIUS.md),
     overflow: 'hidden',
   },
   infoItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.lg,
+    paddingHorizontal: scale(SPACING.lg),
+    paddingVertical: scale(SPACING.lg),
   },
   infoItemLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.sm,
+    gap: scale(SPACING.sm),
   },
   infoLabel: {
-    fontSize: 15,
+    fontSize: scaleFont(15),
     color: '#666',
   },
   infoValue: {
-    fontSize: 15,
+    fontSize: scaleFont(15),
     fontWeight: '500',
     color: COLORS.black,
   },
   infoDivider: {
     height: 1,
     backgroundColor: '#e0e0e0',
-    marginHorizontal: SPACING.lg,
+    marginHorizontal: scale(SPACING.lg),
   },
 });

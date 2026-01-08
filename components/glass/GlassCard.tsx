@@ -2,7 +2,7 @@ import React, { ReactNode } from 'react';
 import { StyleSheet, View, ViewStyle, StyleProp } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, RADIUS, GLASS_PRESETS } from '@/constants/design';
+import { COLORS, RADIUS, GLASS_PRESETS, IS_TABLET, scale, scaleFont } from '@/constants/design';
 
 type BlurIntensity = 'light' | 'default' | 'heavy';
 
@@ -74,7 +74,7 @@ export function GlassCard({
             {
               backgroundColor: variantStyle.background,
               borderRadius,
-              padding: noPadding ? 0 : 16,
+              padding: noPadding ? 0 : scale(16),
             },
           ]}
         >
@@ -100,12 +100,12 @@ export function GlassCard({
 const styles = StyleSheet.create({
   container: {
     overflow: 'hidden',
-    borderWidth: 1,
+    borderWidth: scale(1),
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: scale(4) },
     shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowRadius: scale(12),
+    elevation: scale(8),
   },
   blur: {
     overflow: 'hidden',

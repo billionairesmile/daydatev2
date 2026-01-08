@@ -17,7 +17,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
-import { COLORS, SPACING, RADIUS } from '@/constants/design';
+import { COLORS, SPACING, RADIUS, IS_TABLET, scale, scaleFont } from '@/constants/design';
 
 export default function HelpScreen() {
   const router = useRouter();
@@ -35,7 +35,7 @@ export default function HelpScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <ChevronLeft color={COLORS.black} size={24} />
+          <ChevronLeft color={COLORS.black} size={scale(24)} />
         </Pressable>
         <Text style={styles.headerTitle}>{t('more.help.title')}</Text>
         <View style={styles.headerSpacer} />
@@ -58,11 +58,11 @@ export default function HelpScreen() {
               >
                 <View style={styles.menuItemLeft}>
                   <View style={styles.iconWrapper}>
-                    <IconComponent color={COLORS.black} size={20} />
+                    <IconComponent color={COLORS.black} size={scale(20)} />
                   </View>
                   <Text style={styles.menuItemLabel}>{item.label}</Text>
                 </View>
-                <ChevronRight color="#999" size={20} />
+                <ChevronRight color="#999" size={scale(20)} />
               </Pressable>
             );
           })}
@@ -81,43 +81,43 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.md,
+    paddingHorizontal: scale(SPACING.md),
+    paddingVertical: scale(SPACING.md),
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
   backButton: {
-    width: 40,
-    height: 40,
+    width: scale(40),
+    height: scale(40),
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: scaleFont(18),
     fontWeight: '600',
     color: COLORS.black,
   },
   headerSpacer: {
-    width: 40,
+    width: scale(40),
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingVertical: SPACING.lg,
+    paddingVertical: scale(SPACING.lg),
   },
   menuCard: {
-    marginHorizontal: SPACING.lg,
+    marginHorizontal: scale(SPACING.lg),
     backgroundColor: '#f8f8f8',
-    borderRadius: RADIUS.md,
+    borderRadius: scale(RADIUS.md),
     overflow: 'hidden',
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.lg,
+    paddingHorizontal: scale(SPACING.lg),
+    paddingVertical: scale(SPACING.lg),
   },
   menuItemBorder: {
     borderBottomWidth: 1,
@@ -128,16 +128,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   iconWrapper: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: scale(40),
+    height: scale(40),
+    borderRadius: scale(20),
     backgroundColor: '#e0e0e0',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: SPACING.md,
+    marginRight: scale(SPACING.md),
   },
   menuItemLabel: {
-    fontSize: 16,
+    fontSize: scaleFont(16),
     fontWeight: '500',
     color: COLORS.black,
   },

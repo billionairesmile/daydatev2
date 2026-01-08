@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, RADIUS, TYPOGRAPHY, SPACING } from '@/constants/design';
+import { COLORS, RADIUS, TYPOGRAPHY, SPACING, IS_TABLET, scale, scaleFont } from '@/constants/design';
 
 type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'outline';
 type ButtonSize = 'sm' | 'md' | 'lg';
@@ -31,9 +31,9 @@ interface GlassButtonProps {
 }
 
 const sizeStyles: Record<ButtonSize, { height: number; paddingHorizontal: number; fontSize: number }> = {
-  sm: { height: 40, paddingHorizontal: 16, fontSize: 14 },
-  md: { height: 48, paddingHorizontal: 20, fontSize: 15 },
-  lg: { height: 56, paddingHorizontal: 24, fontSize: 16 },
+  sm: { height: scale(40), paddingHorizontal: scale(16), fontSize: scaleFont(14) },
+  md: { height: scale(48), paddingHorizontal: scale(20), fontSize: scaleFont(15) },
+  lg: { height: scale(56), paddingHorizontal: scale(24), fontSize: scaleFont(16) },
 };
 
 export function GlassButton({
@@ -162,29 +162,29 @@ export function GlassButton({
 
 const styles = StyleSheet.create({
   button: {
-    borderRadius: RADIUS.full,
+    borderRadius: scale(RADIUS.full),
     overflow: 'hidden',
     alignSelf: 'flex-start',
   },
   glassButton: {
-    borderWidth: 1,
+    borderWidth: scale(1),
   },
   primaryGradient: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: RADIUS.full,
+    borderRadius: scale(RADIUS.full),
   },
   blur: {
     flex: 1,
-    borderRadius: RADIUS.full,
+    borderRadius: scale(RADIUS.full),
     overflow: 'hidden',
   },
   glassContent: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: RADIUS.full,
+    borderRadius: scale(RADIUS.full),
   },
   fullWidth: {
     alignSelf: 'stretch',
@@ -210,9 +210,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   iconLeft: {
-    marginRight: SPACING.sm,
+    marginRight: scale(SPACING.sm),
   },
   iconRight: {
-    marginLeft: SPACING.sm,
+    marginLeft: scale(SPACING.sm),
   },
 });

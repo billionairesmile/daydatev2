@@ -1,6 +1,128 @@
 // Daydate Design Tokens - Glassmorphism UI System
 // Based on Figma designs - aligned with figma-designs/src/styles/globals.css
 
+import { Dimensions } from 'react-native';
+import * as Device from 'expo-device';
+
+// iPad detection
+// For testing: Force IS_TABLET = true to test iPad scaling in simulator
+// For production: Use Device.deviceType or modelName detection
+const deviceModel = Device.modelName || '';
+const isRealIPad = deviceModel.toLowerCase().includes('ipad');
+
+// TODO: Change to false for iPhone testing, true for iPad testing
+const FORCE_TABLET_MODE = false; // Set to true for iPad simulator testing
+
+export const IS_TABLET = FORCE_TABLET_MODE || isRealIPad || Device.deviceType === Device.DeviceType.TABLET;
+
+// DEBUG: Log iPad detection
+console.log('[DESIGN] Device.modelName:', Device.modelName);
+console.log('[DESIGN] IS_TABLET:', IS_TABLET);
+console.log('[DESIGN] Screen:', Dimensions.get('window'));
+
+// Get screen dimensions for additional calculations
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+// iPad scale factor - 50% size reduction on iPad (scale = 0.5 means 50% of original)
+export const TABLET_SCALE = 0.5;
+
+// Scale function - returns scaled value for iPad, original for iPhone
+export const scale = (size: number): number => {
+  if (IS_TABLET) {
+    return Math.round(size * TABLET_SCALE);
+  }
+  return size;
+};
+
+// Scale function for font sizes - slightly less aggressive scaling for readability
+export const scaleFont = (size: number): number => {
+  if (IS_TABLET) {
+    // Use 0.6 scale for fonts to maintain readability
+    return Math.round(size * 0.6);
+  }
+  return size;
+};
+
+// Scale function that returns both values for conditional styling
+export const scaleValue = <T extends number>(ipadValue: T, iphoneValue: T): T => {
+  return IS_TABLET ? ipadValue : iphoneValue;
+};
+
+// Moderately scale - for elements that shouldn't be reduced as much (60%)
+export const scaleModerate = (size: number): number => {
+  if (IS_TABLET) {
+    return Math.round(size * 0.6);
+  }
+  return size;
+};
+
+// ============================================
+// AUTO-SCALED DESIGN TOKENS FOR IPAD
+// These automatically return scaled values on iPad
+// ============================================
+
+// Auto-scaled SPACING for iPad (50% reduction)
+export const SP = {
+  xs: scale(4),
+  sm: scale(8),
+  md: scale(12),
+  lg: scale(16),
+  xl: scale(20),
+  xxl: scale(24),
+  xxxl: scale(32),
+  huge: scale(40),
+  massive: scale(48),
+};
+
+// Auto-scaled font sizes for iPad (60% for readability)
+export const FS = {
+  xs: scaleFont(10),
+  sm: scaleFont(12),
+  md: scaleFont(14),
+  base: scaleFont(15),
+  lg: scaleFont(16),
+  xl: scaleFont(18),
+  xxl: scaleFont(20),
+  xxxl: scaleFont(24),
+  display: scaleFont(28),
+  hero: scaleFont(32),
+  giant: scaleFont(36),
+  massive: scaleFont(48),
+};
+
+// Auto-scaled RADIUS for iPad
+export const RD = {
+  xs: scale(4),
+  sm: scale(12),
+  md: scale(24),
+  lg: scale(44),
+  xl: scale(60),
+  xxl: scale(80),
+  xxxl: scale(100),
+  full: scale(100),
+};
+
+// Auto-scaled common sizes
+export const SZ = {
+  iconXs: scale(16),
+  iconSm: scale(20),
+  iconMd: scale(24),
+  iconLg: scale(28),
+  iconXl: scale(32),
+  iconXxl: scale(36),
+  buttonHeight: scale(44),
+  buttonHeightLg: scale(52),
+  inputHeight: scale(48),
+  avatarSm: scale(32),
+  avatarMd: scale(48),
+  avatarLg: scale(64),
+  avatarXl: scale(80),
+  headerPaddingTop: scale(64),
+  tabBarBottom: scale(24),
+  cardRadius: scale(45),
+  modalRadius: scale(24),
+};
+
 export const COLORS = {
   // Core semantic colors (from figma-designs CSS variables)
   background: 'transparent',

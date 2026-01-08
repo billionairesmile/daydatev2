@@ -15,7 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Heart, Mail, Lock, Eye, EyeOff, User, ArrowLeft } from 'lucide-react-native';
 import { useRouter, Link } from 'expo-router';
 
-import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '@/constants/design';
+import { COLORS, SPACING, RADIUS, TYPOGRAPHY, IS_TABLET, scale, scaleFont } from '@/constants/design';
 import { GlassCard, GlassButton, GlassInput } from '@/components/glass';
 import { useAuthStore } from '@/stores';
 import { supabase, isDemoMode } from '@/lib/supabase';
@@ -124,13 +124,13 @@ export default function SignupScreen() {
             style={styles.backButton}
             onPress={() => router.back()}
           >
-            <ArrowLeft size={24} color={COLORS.white} />
+            <ArrowLeft size={scale(24)} color={COLORS.white} />
           </TouchableOpacity>
 
           {/* Logo */}
           <View style={styles.logoContainer}>
             <View style={styles.iconContainer}>
-              <Heart color={COLORS.primary} size={32} fill={COLORS.primary} />
+              <Heart color={COLORS.primary} size={scale(32)} fill={COLORS.primary} />
             </View>
             <Text style={styles.logoText}>Daydate</Text>
           </View>
@@ -148,7 +148,7 @@ export default function SignupScreen() {
               value={nickname}
               onChangeText={setNickname}
               autoCapitalize="none"
-              leftIcon={<User size={20} color={COLORS.glass.white60} />}
+              leftIcon={<User size={scale(20)} color={COLORS.glass.white60} />}
             />
 
             <GlassInput
@@ -158,7 +158,7 @@ export default function SignupScreen() {
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
-              leftIcon={<Mail size={20} color={COLORS.glass.white60} />}
+              leftIcon={<Mail size={scale(20)} color={COLORS.glass.white60} />}
             />
 
             <GlassInput
@@ -167,13 +167,13 @@ export default function SignupScreen() {
               value={password}
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
-              leftIcon={<Lock size={20} color={COLORS.glass.white60} />}
+              leftIcon={<Lock size={scale(20)} color={COLORS.glass.white60} />}
               rightIcon={
                 <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
                   {showPassword ? (
-                    <EyeOff size={20} color={COLORS.glass.white60} />
+                    <EyeOff size={scale(20)} color={COLORS.glass.white60} />
                   ) : (
-                    <Eye size={20} color={COLORS.glass.white60} />
+                    <Eye size={scale(20)} color={COLORS.glass.white60} />
                   )}
                 </TouchableOpacity>
               }
@@ -185,7 +185,7 @@ export default function SignupScreen() {
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               secureTextEntry={!showPassword}
-              leftIcon={<Lock size={20} color={COLORS.glass.white60} />}
+              leftIcon={<Lock size={scale(20)} color={COLORS.glass.white60} />}
             />
 
             <GlassButton
@@ -237,9 +237,9 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING.xxxl,
   },
   backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: scale(44),
+    height: scale(44),
+    borderRadius: scale(22),
     backgroundColor: COLORS.glass.white20,
     alignItems: 'center',
     justifyContent: 'center',
@@ -250,14 +250,14 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xxl,
   },
   iconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: scale(64),
+    height: scale(64),
+    borderRadius: scale(32),
     backgroundColor: COLORS.glass.white20,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: SPACING.sm,
-    borderWidth: 1,
+    borderWidth: scale(1),
     borderColor: COLORS.glass.white30,
   },
   logoText: {

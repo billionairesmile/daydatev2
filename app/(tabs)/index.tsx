@@ -33,7 +33,7 @@ const DEFAULT_BACKGROUND_IMAGE = require('@/assets/images/backgroundimage.png');
 Asset.fromModule(LOGO_IMAGE).downloadAsync();
 Asset.fromModule(DEFAULT_BACKGROUND_IMAGE).downloadAsync();
 
-import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '@/constants/design';
+import { COLORS, SPACING, RADIUS, TYPOGRAPHY, scale, scaleFont, IS_TABLET } from '@/constants/design';
 import { useBackground } from '@/contexts';
 import { useOnboardingStore, useAuthStore, useTimezoneStore } from '@/stores';
 import { BannerAdView } from '@/components/ads';
@@ -144,21 +144,21 @@ function SwipeableAnniversaryCard({ anniversary, onEdit, onDelete, isCustom, t }
     if (!isCustom) return null;
 
     // Animate opacity based on progress (0 = closed, 1 = fully open)
-    const opacity = progress.interpolate({
+    const animOpacity = progress.interpolate({
       inputRange: [0, 0.5, 1],
       outputRange: [0, 0, 1],
       extrapolate: 'clamp',
     });
 
     // Animate scale for a nice pop effect
-    const scale = progress.interpolate({
+    const animScale = progress.interpolate({
       inputRange: [0, 0.8, 1],
       outputRange: [0.5, 0.8, 1],
       extrapolate: 'clamp',
     });
 
     return (
-      <Animated.View style={[swipeStyles.actionsContainer, { opacity, transform: [{ scale }] }]}>
+      <Animated.View style={[swipeStyles.actionsContainer, { opacity: animOpacity, transform: [{ scale: animScale }] }]}>
         <Pressable
           style={swipeStyles.editButton}
           onPress={() => {
@@ -166,7 +166,7 @@ function SwipeableAnniversaryCard({ anniversary, onEdit, onDelete, isCustom, t }
             onEdit();
           }}
         >
-          <Edit2 color="#000000" size={20} />
+          <Edit2 color="#000000" size={scale(20)} />
           <Text style={swipeStyles.editActionText}>{t('common.edit')}</Text>
         </Pressable>
         <Pressable
@@ -176,7 +176,7 @@ function SwipeableAnniversaryCard({ anniversary, onEdit, onDelete, isCustom, t }
             onDelete();
           }}
         >
-          <Trash2 color="#FFFFFF" size={20} />
+          <Trash2 color="#FFFFFF" size={scale(20)} />
           <Text style={swipeStyles.actionText}>{t('common.delete')}</Text>
         </Pressable>
       </Animated.View>
@@ -186,10 +186,10 @@ function SwipeableAnniversaryCard({ anniversary, onEdit, onDelete, isCustom, t }
   // Calculate dynamic font size for long labels (EN, ES tend to be longer)
   const getLabelFontSize = (label: string) => {
     const length = label.length;
-    if (length > 25) return 12;
-    if (length > 20) return 13;
-    if (length > 15) return 14;
-    return 15;
+    if (length > 25) return scaleFont(12);
+    if (length > 20) return scaleFont(13);
+    if (length > 15) return scaleFont(14);
+    return scaleFont(15);
   };
 
   const labelFontSize = getLabelFontSize(anniversary.label);
@@ -243,54 +243,54 @@ function SwipeableAnniversaryCard({ anniversary, onEdit, onDelete, isCustom, t }
 
 const swipeStyles = StyleSheet.create({
   container: {
-    marginBottom: 8,
-    borderRadius: 20,
+    marginBottom: scale(8),
+    borderRadius: scale(20),
     overflow: 'hidden',
   },
   swipeableContainer: {
-    borderRadius: 20,
+    borderRadius: scale(20),
     overflow: 'hidden',
   },
   actionsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingLeft: 12,
-    gap: 8,
+    paddingLeft: scale(12),
+    gap: scale(8),
   },
   editButton: {
-    width: 50,
-    height: 50,
+    width: scale(50),
+    height: scale(50),
     backgroundColor: '#FFFFFF',
-    borderRadius: 25,
+    borderRadius: scale(25),
     alignItems: 'center',
     justifyContent: 'center',
   },
   editActionText: {
     color: '#000000',
-    fontSize: 10,
+    fontSize: scaleFont(10),
     fontWeight: '600',
-    marginTop: 2,
+    marginTop: scale(2),
   },
   deleteButton: {
-    width: 50,
-    height: 50,
+    width: scale(50),
+    height: scale(50),
     backgroundColor: '#EF4444',
-    borderRadius: 25,
+    borderRadius: scale(25),
     alignItems: 'center',
     justifyContent: 'center',
   },
   actionText: {
     color: '#FFFFFF',
-    fontSize: 10,
+    fontSize: scaleFont(10),
     fontWeight: '600',
-    marginTop: 2,
+    marginTop: scale(2),
   },
   card: {
-    borderRadius: 20,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    borderRadius: scale(20),
+    paddingVertical: scale(12),
+    paddingHorizontal: scale(16),
     width: '100%',
-    minHeight: 70,
+    minHeight: scale(70),
     justifyContent: 'center',
   },
   cardContent: {
@@ -301,33 +301,33 @@ const swipeStyles = StyleSheet.create({
   cardLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: scale(12),
     flex: 1,
-    marginRight: 8,
+    marginRight: scale(8),
   },
   labelContainer: {
     flex: 1,
   },
   icon: {
-    fontSize: 28,
+    fontSize: scaleFont(28),
   },
   label: {
-    fontSize: 15,
+    fontSize: scaleFont(15),
     fontWeight: '600',
     color: '#FFFFFF',
   },
   date: {
-    fontSize: 12,
+    fontSize: scaleFont(12),
     color: 'rgba(255, 255, 255, 0.7)',
-    marginTop: 2,
+    marginTop: scale(2),
   },
   badge: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingHorizontal: scale(14),
+    paddingVertical: scale(8),
+    borderRadius: scale(20),
   },
   dDay: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     fontWeight: '700',
     color: '#FFFFFF',
   },
@@ -1187,7 +1187,7 @@ export default function HomeScreen() {
                   onLayout={measureButton}
                   style={styles.imageChangeButton}
                 >
-                  <ImageIcon color="#333" size={20} />
+                  <ImageIcon color="#333" size={IS_TABLET ? 20 * 0.75 : scale(20)} />
                 </Pressable>
               </View>
             </View>
@@ -1243,7 +1243,7 @@ export default function HomeScreen() {
                     onPress={closeAnniversaryModal}
                     style={styles.modalCloseButton}
                   >
-                    <X color="rgba(255,255,255,0.8)" size={20} />
+                    <X color="rgba(255,255,255,0.8)" size={scale(20)} />
                   </Pressable>
                 </View>
                 <View style={styles.anniversaryHeaderDivider} />
@@ -1289,7 +1289,7 @@ export default function HomeScreen() {
                       onPress={goToListStep}
                       style={styles.modalCloseButton}
                     >
-                      <X color="rgba(255,255,255,0.8)" size={20} />
+                      <X color="rgba(255,255,255,0.8)" size={scale(20)} />
                     </Pressable>
                   </View>
                   <View style={styles.anniversaryHeaderDivider} />
@@ -1318,7 +1318,7 @@ export default function HomeScreen() {
                             onPress={() => setShowEmojiPicker(false)}
                           >
                             <Text style={[
-                              { color: newAnniversaryName ? COLORS.white : 'rgba(255,255,255,0.4)', fontSize: 15 }
+                              { color: newAnniversaryName ? COLORS.white : 'rgba(255,255,255,0.4)', fontSize: scaleFont(15) }
                             ]}>
                               {newAnniversaryName || t('home.anniversary.namePlaceholder')}
                             </Text>
@@ -1402,7 +1402,7 @@ export default function HomeScreen() {
                     onPress={() => goToAddFromDatePicker()}
                     style={styles.modalCloseButton}
                   >
-                    <X color="rgba(255,255,255,0.8)" size={20} />
+                    <X color="rgba(255,255,255,0.8)" size={scale(20)} />
                   </Pressable>
                 </View>
                 <View style={styles.anniversaryHeaderDivider} />
@@ -1413,7 +1413,7 @@ export default function HomeScreen() {
                       onPress={() => setPickerMonth(new Date(pickerMonth.getFullYear(), pickerMonth.getMonth() - 1, 1))}
                       style={styles.pickerNavButton}
                     >
-                      <ChevronLeft color={COLORS.white} size={18} />
+                      <ChevronLeft color={COLORS.white} size={scale(18)} />
                     </Pressable>
                     <Text style={styles.pickerMonthText}>
                       {i18n.language === 'ko'
@@ -1424,7 +1424,7 @@ export default function HomeScreen() {
                       onPress={() => setPickerMonth(new Date(pickerMonth.getFullYear(), pickerMonth.getMonth() + 1, 1))}
                       style={styles.pickerNavButton}
                     >
-                      <ChevronRight color={COLORS.white} size={18} />
+                      <ChevronRight color={COLORS.white} size={scale(18)} />
                     </Pressable>
                   </View>
 
@@ -1496,7 +1496,7 @@ export default function HomeScreen() {
                       }}
                       style={styles.modalCloseButton}
                     >
-                      <X color="rgba(255,255,255,0.8)" size={20} />
+                      <X color="rgba(255,255,255,0.8)" size={scale(20)} />
                     </Pressable>
                   </View>
                   <View style={styles.anniversaryHeaderDivider} />
@@ -1525,7 +1525,7 @@ export default function HomeScreen() {
                             onPress={() => setShowEditEmojiPicker(false)}
                           >
                             <Text style={[
-                              { color: editAnniversaryName ? COLORS.white : 'rgba(255,255,255,0.4)', fontSize: 15 }
+                              { color: editAnniversaryName ? COLORS.white : 'rgba(255,255,255,0.4)', fontSize: scaleFont(15) }
                             ]}>
                               {editAnniversaryName || t('home.anniversary.namePlaceholder')}
                             </Text>
@@ -1609,7 +1609,7 @@ export default function HomeScreen() {
                     onPress={() => goToEditFromDatePicker()}
                     style={styles.modalCloseButton}
                   >
-                    <X color="rgba(255,255,255,0.8)" size={20} />
+                    <X color="rgba(255,255,255,0.8)" size={scale(20)} />
                   </Pressable>
                 </View>
                 <View style={styles.anniversaryHeaderDivider} />
@@ -1620,7 +1620,7 @@ export default function HomeScreen() {
                       onPress={() => setEditPickerMonth(new Date(editPickerMonth.getFullYear(), editPickerMonth.getMonth() - 1, 1))}
                       style={styles.pickerNavButton}
                     >
-                      <ChevronLeft color={COLORS.white} size={18} />
+                      <ChevronLeft color={COLORS.white} size={scale(18)} />
                     </Pressable>
                     <Text style={styles.pickerMonthText}>
                       {i18n.language === 'ko'
@@ -1631,7 +1631,7 @@ export default function HomeScreen() {
                       onPress={() => setEditPickerMonth(new Date(editPickerMonth.getFullYear(), editPickerMonth.getMonth() + 1, 1))}
                       style={styles.pickerNavButton}
                     >
-                      <ChevronRight color={COLORS.white} size={18} />
+                      <ChevronRight color={COLORS.white} size={scale(18)} />
                     </Pressable>
                   </View>
 
@@ -1710,7 +1710,7 @@ export default function HomeScreen() {
                     onPress={() => setShowImagePickerModal(false)}
                     style={styles.modalCloseButton}
                   >
-                    <X color={COLORS.white} size={18} />
+                    <X color={COLORS.white} size={scale(18)} />
                   </Pressable>
                 </View>
 
@@ -1821,7 +1821,7 @@ const styles = StyleSheet.create({
   },
   bannerAd: {
     position: 'absolute',
-    bottom: 94,
+    bottom: scale(94),
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -1844,11 +1844,11 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: SPACING.lg,
+    paddingHorizontal: scale(SPACING.lg),
   },
   anniversarySection: {
-    paddingTop: 90,
-    paddingBottom: SPACING.lg,
+    paddingTop: scale(90),
+    paddingBottom: scale(SPACING.lg),
     alignItems: 'center',
     backgroundColor: 'transparent',
   },
@@ -1856,29 +1856,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: SPACING.xl,
+    marginBottom: scale(SPACING.xl),
   },
   coupleNameText: {
-    fontSize: 18,
+    fontSize: scaleFont(18),
     color: COLORS.white,
     fontFamily: TYPOGRAPHY.fontFamily.display,
     fontWeight: '400',
-    letterSpacing: 0.5,
+    letterSpacing: scale(0.5),
     opacity: 0.95,
     backgroundColor: 'transparent',
   },
   coupleNameLeft: {
     flex: 1,
     textAlign: 'right',
-    marginRight: SPACING.sm,
+    marginRight: scale(SPACING.sm),
   },
   coupleNameRight: {
     flex: 1,
     textAlign: 'left',
-    marginLeft: SPACING.sm,
+    marginLeft: scale(SPACING.sm),
   },
   heartEmoji: {
     fontFamily: 'System',
+    fontSize: scaleFont(18),
   },
   anniversaryButton: {
     alignItems: 'center',
@@ -1890,21 +1891,21 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   dDayNumber: {
-    fontSize: 56,
+    fontSize: scaleFont(56),
     color: COLORS.white,
     fontFamily: TYPOGRAPHY.fontFamily.display,
     fontWeight: '400',
-    letterSpacing: 1,
+    letterSpacing: scale(1),
     backgroundColor: 'transparent',
     includeFontPadding: false,
   },
   dDayUnit: {
-    fontSize: 26,
+    fontSize: scaleFont(26),
     color: COLORS.white,
     fontFamily: TYPOGRAPHY.fontFamily.display,
     fontWeight: '400',
-    letterSpacing: 0.5,
-    marginLeft: 8,
+    letterSpacing: scale(0.5),
+    marginLeft: scale(8),
     backgroundColor: 'transparent',
     includeFontPadding: false,
   },
@@ -1912,19 +1913,19 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingBottom: 240,
+    paddingBottom: scale(240),
   },
   polaroid: {
-    width: 280,
+    width: IS_TABLET ? 280 * 0.75 : scale(280),
     backgroundColor: '#F8F6F1',
-    padding: 16,
-    paddingBottom: 60,
-    borderRadius: 2,
+    padding: IS_TABLET ? 16 * 0.75 : scale(16),
+    paddingBottom: IS_TABLET ? 60 * 0.75 : scale(60),
+    borderRadius: IS_TABLET ? 2 * 0.75 : scale(2),
     // Multi-layer shadow for realistic depth
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
+    shadowOffset: { width: 0, height: IS_TABLET ? 12 * 0.75 : scale(12) },
     shadowOpacity: 0.25,
-    shadowRadius: 20,
+    shadowRadius: IS_TABLET ? 20 * 0.75 : scale(20),
     elevation: 15,
     position: 'relative',
     // Subtle border for paper edge effect
@@ -1950,19 +1951,19 @@ const styles = StyleSheet.create({
   },
   polaroidBottom: {
     position: 'absolute',
-    bottom: -2,
-    left: 16,
-    right: 12,
-    height: 72,
+    bottom: IS_TABLET ? -2 * 0.75 : scale(-2),
+    left: IS_TABLET ? 16 * 0.75 : scale(16),
+    right: IS_TABLET ? 12 * 0.75 : scale(12),
+    height: IS_TABLET ? 72 * 0.75 : scale(72),
     justifyContent: 'flex-end',
   },
   sloganStrip: {
     position: 'relative',
-    paddingHorizontal: 6,
-    paddingVertical: 3,
+    paddingHorizontal: IS_TABLET ? 6 * 0.75 : scale(6),
+    paddingVertical: IS_TABLET ? 3 * 0.75 : scale(3),
     alignSelf: 'flex-start',
-    marginBottom: -17,
-    marginLeft: 4,
+    marginBottom: IS_TABLET ? -17 * 0.75 : scale(-17),
+    marginLeft: IS_TABLET ? 4 * 0.75 : scale(4),
   },
   sloganWords: {
     flexDirection: 'row',
@@ -1984,8 +1985,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 14,
-    height: 12,
+    bottom: IS_TABLET ? 14 * 0.75 : scale(14),
+    height: IS_TABLET ? 12 * 0.75 : scale(12),
     backgroundColor: '#DFD3C3',
     opacity: 0.7,
     transform: [{ rotate: '1deg' }],
@@ -1996,45 +1997,45 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   polaroidLogo: {
-    width: 110,
-    height: 40,
-    marginLeft: 5,
-    marginBottom: 7
+    width: IS_TABLET ? 110 * 0.75 : scale(110),
+    height: IS_TABLET ? 40 * 0.75 : scale(40),
+    marginLeft: IS_TABLET ? 5 * 0.75 : scale(5),
+    marginBottom: IS_TABLET ? 7 * 0.75 : scale(7)
   },
   brandStrip: {
     position: 'relative',
-    paddingHorizontal: 6,
-    paddingVertical: 3,
+    paddingHorizontal: IS_TABLET ? 6 * 0.75 : scale(6),
+    paddingVertical: IS_TABLET ? 3 * 0.75 : scale(3),
     transform: [{ rotate: '1deg' }],
-    marginLeft: 8,
+    marginLeft: IS_TABLET ? 8 * 0.75 : scale(8),
   },
   highlighter: {
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 14,
-    height: 12,
+    bottom: IS_TABLET ? 14 * 0.75 : scale(14),
+    height: IS_TABLET ? 12 * 0.75 : scale(12),
     backgroundColor: '#DFD3C3',
     opacity: 0.7,
     transform: [{ rotate: '-1deg' }],
   },
   polaroidSlogan: {
-    fontSize: 26,
+    fontSize: IS_TABLET ? 26 * 0.75 : scaleFont(26),
     color: '#4A4440',
     fontFamily: 'JustMeAgainDownHere',
     fontWeight: '500',
-    letterSpacing: 0.5,
+    letterSpacing: IS_TABLET ? 0.5 * 0.75 : scale(0.5),
   },
   polaroidBrand: {
-    fontSize: 26,
+    fontSize: IS_TABLET ? 26 * 0.75 : scaleFont(26),
     color: '#4A4440',
     fontFamily: 'JustMeAgainDownHere',
     fontWeight: '500',
-    letterSpacing: 0.5,
+    letterSpacing: IS_TABLET ? 0.5 * 0.75 : scale(0.5),
   },
   imageChangeButton: {
-    padding: 6,
-    marginRight: -4,
+    padding: IS_TABLET ? 6 * 0.75 : scale(6),
+    marginRight: IS_TABLET ? -4 * 0.75 : scale(-4),
   },
   edgeHighlight: {
     position: 'absolute',
@@ -2042,15 +2043,15 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    borderRadius: 2,
+    borderRadius: scale(2),
     // Top-left light edge (light source simulation)
-    borderTopWidth: 1,
-    borderLeftWidth: 1,
+    borderTopWidth: scale(1),
+    borderLeftWidth: scale(1),
     borderTopColor: 'rgba(255, 255, 255, 0.6)',
     borderLeftColor: 'rgba(255, 255, 255, 0.4)',
     // Bottom-right shadow edge
-    borderBottomWidth: 1,
-    borderRightWidth: 1,
+    borderBottomWidth: scale(1),
+    borderRightWidth: scale(1),
     borderBottomColor: 'rgba(0, 0, 0, 0.05)',
     borderRightColor: 'rgba(0, 0, 0, 0.03)',
   },
@@ -2060,9 +2061,9 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    borderRadius: 2,
+    borderRadius: scale(2),
     // Simulate inner shadow with gradient-like border
-    borderWidth: 3,
+    borderWidth: scale(3),
     borderColor: 'transparent',
     borderTopColor: 'rgba(0, 0, 0, 0.02)',
     borderLeftColor: 'rgba(0, 0, 0, 0.015)',
@@ -2081,7 +2082,7 @@ const styles = StyleSheet.create({
     width: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
+    paddingHorizontal: scale(SPACING.lg),
   },
   modalBackdrop: {
     position: 'absolute',
@@ -2091,10 +2092,10 @@ const styles = StyleSheet.create({
     bottom: 0,
   },
   anniversaryModalContent: {
-    width: width - 48,
+    width: width - scale(48),
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    borderRadius: 32,
-    borderWidth: 1,
+    borderRadius: scale(32),
+    borderWidth: scale(1),
     borderColor: 'rgba(255, 255, 255, 0.2)',
     overflow: 'hidden',
   },
@@ -2102,109 +2103,109 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 20,
+    paddingHorizontal: scale(24),
+    paddingVertical: scale(20),
   },
   anniversaryHeaderDivider: {
-    height: 1,
+    height: scale(1),
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    marginHorizontal: 24,
+    marginHorizontal: scale(24),
   },
   anniversaryModalTitle: {
-    fontSize: 20,
+    fontSize: scaleFont(20),
     color: COLORS.white,
     fontWeight: '600',
-    lineHeight: 28,
+    lineHeight: scale(28),
   },
   modalCloseButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: scale(36),
+    height: scale(36),
+    borderRadius: scale(18),
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   anniversaryListContainer: {
-    maxHeight: 300,
+    maxHeight: scale(300),
     overflow: 'hidden',
   },
   anniversaryListContent: {
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 16,
+    paddingHorizontal: scale(24),
+    paddingTop: scale(20),
+    paddingBottom: scale(16),
   },
   anniversaryFooterDivider: {
-    height: 1,
+    height: scale(1),
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    marginHorizontal: 24,
+    marginHorizontal: scale(24),
   },
   anniversaryFooter: {
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 24,
+    paddingHorizontal: scale(24),
+    paddingTop: scale(16),
+    paddingBottom: scale(24),
   },
   addAnniversaryButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: SPACING.sm,
+    gap: scale(SPACING.sm),
     backgroundColor: COLORS.white,
-    paddingVertical: 14,
-    borderRadius: 100,
+    paddingVertical: scale(14),
+    borderRadius: scale(100),
   },
   addAnniversaryText: {
-    fontSize: 15,
+    fontSize: scaleFont(15),
     color: COLORS.black,
     fontWeight: '500',
   },
   imagePickerModal: {
-    width: width - 48,
+    width: width - scale(48),
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    borderRadius: 32,
-    padding: SPACING.xl,
-    borderWidth: 1,
+    borderRadius: scale(32),
+    padding: scale(SPACING.xl),
+    borderWidth: scale(1),
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   imagePickerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SPACING.md,
+    marginBottom: scale(SPACING.md),
   },
   imagePickerTitle: {
-    fontSize: 18,
+    fontSize: scaleFont(18),
     color: COLORS.white,
     fontWeight: '600',
   },
   imagePickerDescription: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     color: 'rgba(255, 255, 255, 0.7)',
-    marginBottom: SPACING.lg,
+    marginBottom: scale(SPACING.lg),
   },
   imagePickerButtons: {
-    gap: SPACING.sm,
+    gap: scale(SPACING.sm),
   },
   imagePickerButtonPrimary: {
     width: '100%',
-    paddingVertical: 14,
-    borderRadius: 24,
+    paddingVertical: scale(14),
+    borderRadius: scale(24),
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     alignItems: 'center',
   },
   imagePickerButtonPrimaryText: {
-    fontSize: 15,
+    fontSize: scaleFont(15),
     color: '#000',
     fontWeight: '500',
   },
   imagePickerButtonSecondary: {
     width: '100%',
-    paddingVertical: 14,
-    borderRadius: 24,
+    paddingVertical: scale(14),
+    borderRadius: scale(24),
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
   },
   imagePickerButtonSecondaryText: {
-    fontSize: 15,
+    fontSize: scaleFont(15),
     color: COLORS.white,
     fontWeight: '500',
   },
@@ -2214,10 +2215,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   addAnniversaryModalContent: {
-    width: width - 48,
+    width: width - scale(48),
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    borderRadius: 32,
-    borderWidth: 1,
+    borderRadius: scale(32),
+    borderWidth: scale(1),
     borderColor: 'rgba(255, 255, 255, 0.2)',
     overflow: 'hidden',
     maxHeight: height * 0.7,
@@ -2226,130 +2227,130 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 20,
+    paddingHorizontal: scale(24),
+    paddingVertical: scale(20),
   },
   addAnniversaryTitle: {
-    fontSize: 20,
+    fontSize: scaleFont(20),
     color: COLORS.white,
     fontWeight: '600',
-    lineHeight: 28,
+    lineHeight: scale(28),
   },
   addAnniversaryForm: {
-    maxHeight: 320,
+    maxHeight: scale(320),
   },
   addAnniversaryFormContent: {
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 16,
+    paddingHorizontal: scale(24),
+    paddingTop: scale(20),
+    paddingBottom: scale(16),
   },
   formSection: {
-    marginBottom: 24,
+    marginBottom: scale(24),
   },
   formLabel: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     color: 'rgba(255, 255, 255, 0.7)',
-    marginBottom: 12,
+    marginBottom: scale(12),
     fontWeight: '500',
   },
   iconSelector: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: scale(12),
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderWidth: 1,
+    borderRadius: scale(16),
+    paddingVertical: scale(12),
+    paddingHorizontal: scale(16),
+    borderWidth: scale(1),
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   selectedIcon: {
-    fontSize: 32,
+    fontSize: scaleFont(32),
   },
   iconSelectorHint: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     color: 'rgba(255, 255, 255, 0.5)',
   },
   emojiPickerContainer: {
-    marginTop: 12,
+    marginTop: scale(12),
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 16,
-    padding: 12,
-    borderWidth: 1,
+    borderRadius: scale(16),
+    padding: scale(12),
+    borderWidth: scale(1),
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   emojiGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: scale(8),
     justifyContent: 'center',
   },
   emojiOption: {
-    width: 44,
-    height: 44,
+    width: scale(44),
+    height: scale(44),
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
+    borderRadius: scale(12),
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   emojiOptionSelected: {
     backgroundColor: 'rgba(168, 85, 247, 0.4)',
-    borderWidth: 2,
+    borderWidth: scale(2),
     borderColor: '#A855F7',
   },
   emojiOptionText: {
-    fontSize: 24,
+    fontSize: scaleFont(24),
   },
   iconNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: scale(12),
   },
   iconButton: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
+    width: scale(52),
+    height: scale(52),
+    borderRadius: scale(16),
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
+    borderWidth: scale(1),
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   selectedIconSmall: {
-    fontSize: 28,
+    fontSize: scaleFont(28),
   },
   nameInput: {
     flex: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    fontSize: 16,
+    borderRadius: scale(16),
+    paddingVertical: scale(14),
+    paddingHorizontal: scale(16),
+    fontSize: scaleFont(16),
     color: COLORS.white,
-    borderWidth: 1,
+    borderWidth: scale(1),
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   datePickerButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    borderRadius: scale(16),
+    paddingVertical: scale(14),
+    paddingHorizontal: scale(16),
     alignItems: 'center',
-    borderWidth: 1,
+    borderWidth: scale(1),
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   datePickerButtonText: {
-    fontSize: 16,
+    fontSize: scaleFont(16),
     color: COLORS.white,
     fontWeight: '500',
   },
   addAnniversaryFooter: {
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 24,
+    paddingHorizontal: scale(24),
+    paddingTop: scale(16),
+    paddingBottom: scale(24),
   },
   submitButton: {
-    borderRadius: 100,
+    borderRadius: scale(100),
     overflow: 'hidden',
   },
   submitButtonDisabled: {
@@ -2357,12 +2358,12 @@ const styles = StyleSheet.create({
   },
   submitButtonInner: {
     backgroundColor: COLORS.white,
-    paddingVertical: 14,
+    paddingVertical: scale(14),
     alignItems: 'center',
     justifyContent: 'center',
   },
   submitButtonText: {
-    fontSize: 16,
+    fontSize: scaleFont(16),
     color: COLORS.black,
     fontWeight: '600',
   },
@@ -2381,12 +2382,12 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     backgroundColor: 'transparent',
     // Glowing border to highlight the button
-    borderWidth: 3,
+    borderWidth: IS_TABLET ? 3 * 0.75 : scale(3),
     borderColor: 'rgba(255, 255, 255, 0.9)',
     shadowColor: '#FFFFFF',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
-    shadowRadius: 20,
+    shadowRadius: IS_TABLET ? 20 * 0.75 : scale(20),
     elevation: 10,
   },
   tutorialMessageContainer: {
@@ -2394,47 +2395,47 @@ const styles = StyleSheet.create({
   },
   tutorialMessageBox: {
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderWidth: 1,
+    borderRadius: IS_TABLET ? 16 * 0.75 : scale(16),
+    paddingVertical: IS_TABLET ? 16 * 0.75 : scale(16),
+    paddingHorizontal: IS_TABLET ? 20 * 0.75 : scale(20),
+    borderWidth: IS_TABLET ? 1 : scale(1),
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   tutorialMessageTitle: {
-    fontSize: 16,
+    fontSize: IS_TABLET ? 16 * 0.75 : scaleFont(16),
     fontWeight: '600',
     color: COLORS.white,
-    marginBottom: 6,
+    marginBottom: IS_TABLET ? 6 * 0.75 : scale(6),
     textAlign: 'right',
   },
   tutorialMessageText: {
-    fontSize: 13,
+    fontSize: IS_TABLET ? 13 * 0.75 : scaleFont(13),
     color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'right',
-    lineHeight: 18,
+    lineHeight: IS_TABLET ? 18 * 0.75 : scale(18),
   },
   // DatePicker Confirm Button
   datePickerConfirmWrapper: {
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: scale(8),
   },
   datePickerConfirmButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingVertical: 10,
-    paddingHorizontal: 32,
-    borderRadius: 20,
+    paddingVertical: scale(10),
+    paddingHorizontal: scale(32),
+    borderRadius: scale(20),
   },
   datePickerConfirmText: {
-    fontSize: 15,
+    fontSize: scaleFont(15),
     color: COLORS.white,
     fontWeight: '600',
   },
   // Date Picker Modal Styles
   datePickerModalContent: {
-    width: width - 48,
+    width: width - scale(48),
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    borderRadius: 32,
-    borderWidth: 1,
+    borderRadius: scale(32),
+    borderWidth: scale(1),
     borderColor: 'rgba(255, 255, 255, 0.2)',
     overflow: 'hidden',
   },
@@ -2442,48 +2443,48 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 20,
+    paddingHorizontal: scale(24),
+    paddingVertical: scale(20),
   },
   datePickerModalTitle: {
-    fontSize: 20,
+    fontSize: scaleFont(20),
     color: COLORS.white,
     fontWeight: '600',
-    lineHeight: 28,
+    lineHeight: scale(28),
   },
   datePickerModalBody: {
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 24,
+    paddingHorizontal: scale(24),
+    paddingTop: scale(20),
+    paddingBottom: scale(24),
   },
   pickerMonthNav: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: scale(20),
   },
   pickerNavButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: scale(36),
+    height: scale(36),
+    borderRadius: scale(18),
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   pickerMonthText: {
-    fontSize: 16,
+    fontSize: scaleFont(16),
     color: COLORS.white,
     fontWeight: '600',
   },
   pickerDayNames: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginBottom: 12,
+    marginBottom: scale(12),
   },
   pickerDayName: {
-    width: 36,
+    width: scale(36),
     textAlign: 'center',
-    fontSize: 12,
+    fontSize: scaleFont(12),
     color: 'rgba(255, 255, 255, 0.6)',
     fontWeight: '500',
   },
@@ -2497,32 +2498,32 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 2,
+    padding: scale(2),
   },
   pickerDayCellInner: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: scale(36),
+    height: scale(36),
+    borderRadius: scale(18),
     alignItems: 'center',
     justifyContent: 'center',
   },
   pickerDayCellInnerSelected: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: scale(36),
+    height: scale(36),
+    borderRadius: scale(18),
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderWidth: 1,
+    borderWidth: scale(1),
     borderColor: 'rgba(255, 255, 255, 0.5)',
   },
   pickerDayText: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     color: COLORS.white,
     fontWeight: '500',
   },
   pickerDayTextSelected: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     color: COLORS.white,
     fontWeight: '700',
   },

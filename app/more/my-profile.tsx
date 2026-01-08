@@ -24,7 +24,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
-import { COLORS, SPACING, RADIUS } from '@/constants/design';
+import { COLORS, SPACING, RADIUS, IS_TABLET, scale, scaleFont } from '@/constants/design';
 import { useOnboardingStore, useAuthStore } from '@/stores';
 import {
   MBTI_OPTIONS,
@@ -251,14 +251,14 @@ export default function MyProfileScreen() {
       >
         <View style={styles.menuItemLeft}>
           <View style={styles.iconWrapper}>
-            <User color={COLORS.black} size={20} />
+            <User color={COLORS.black} size={scale(20)} />
           </View>
           <View style={styles.menuItemContent}>
             <Text style={styles.menuItemLabel}>{t('profile.nickname')}</Text>
             <Text style={styles.menuItemValue}>{data.nickname || t('profile.notSet')}</Text>
           </View>
         </View>
-        <ChevronRight color="#999" size={20} />
+        <ChevronRight color="#999" size={scale(20)} />
       </Pressable>
 
       {/* Birthday Section */}
@@ -272,7 +272,7 @@ export default function MyProfileScreen() {
       >
         <View style={styles.menuItemLeft}>
           <View style={styles.iconWrapper}>
-            <Calendar color={COLORS.black} size={20} />
+            <Calendar color={COLORS.black} size={scale(20)} />
           </View>
           <View style={styles.menuItemContent}>
             <Text style={styles.menuItemLabel}>{t('profile.birthDate')}</Text>
@@ -282,7 +282,7 @@ export default function MyProfileScreen() {
             </Text>
           </View>
         </View>
-        <ChevronRight color="#999" size={20} />
+        <ChevronRight color="#999" size={scale(20)} />
       </Pressable>
 
       {/* Preferences Section */}
@@ -292,7 +292,7 @@ export default function MyProfileScreen() {
       >
         <View style={styles.menuItemLeft}>
           <View style={styles.iconWrapper}>
-            <Sliders color={COLORS.black} size={20} />
+            <Sliders color={COLORS.black} size={scale(20)} />
           </View>
           <View style={styles.menuItemContent}>
             <Text style={styles.menuItemLabel}>{t('profile.preferences')}</Text>
@@ -303,7 +303,7 @@ export default function MyProfileScreen() {
             </Text>
           </View>
         </View>
-        <ChevronRight color="#999" size={20} />
+        <ChevronRight color="#999" size={scale(20)} />
       </Pressable>
     </ScrollView>
   );
@@ -370,7 +370,7 @@ export default function MyProfileScreen() {
         style={styles.datePickerButton}
         onPress={() => setShowDatePicker(true)}
       >
-        <Calendar color="#666" size={20} />
+        <Calendar color="#666" size={scale(20)} />
         <Text style={[styles.datePickerText, tempBirthday && styles.datePickerTextSelected]}>
           {tempBirthday ? formatDate(tempBirthday) : t('profile.editBirthday.selectDate')}
         </Text>
@@ -641,7 +641,7 @@ export default function MyProfileScreen() {
           onPress={() => editMode ? setEditMode(null) : router.back()}
           style={styles.backButton}
         >
-          <ChevronLeft color={COLORS.black} size={24} />
+          <ChevronLeft color={COLORS.black} size={scale(24)} />
         </Pressable>
         <Text style={styles.headerTitle}>
           {editMode === 'nickname' ? t('profile.editNickname.title') :
@@ -671,37 +671,37 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.md,
+    paddingHorizontal: scale(SPACING.md),
+    paddingVertical: scale(SPACING.md),
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
   backButton: {
-    width: 40,
-    height: 40,
+    width: scale(40),
+    height: scale(40),
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: scaleFont(18),
     fontWeight: '600',
     color: COLORS.black,
   },
   headerSpacer: {
-    width: 40,
+    width: scale(40),
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingVertical: SPACING.lg,
+    paddingVertical: scale(SPACING.lg),
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.lg,
+    paddingHorizontal: scale(SPACING.lg),
+    paddingVertical: scale(SPACING.lg),
     backgroundColor: COLORS.white,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
@@ -712,82 +712,82 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   iconWrapper: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: scale(40),
+    height: scale(40),
+    borderRadius: scale(20),
     backgroundColor: '#f5f5f5',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: SPACING.md,
+    marginRight: scale(SPACING.md),
   },
   menuItemContent: {
     flex: 1,
   },
   menuItemLabel: {
-    fontSize: 16,
+    fontSize: scaleFont(16),
     fontWeight: '500',
     color: COLORS.black,
-    marginBottom: 2,
+    marginBottom: scale(2),
   },
   menuItemValue: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     color: '#666',
   },
   editContainer: {
     flex: 1,
-    padding: SPACING.lg,
+    padding: scale(SPACING.lg),
   },
   editTitle: {
-    fontSize: 24,
+    fontSize: scaleFont(24),
     fontWeight: '700',
     color: COLORS.black,
-    marginBottom: SPACING.sm,
+    marginBottom: scale(SPACING.sm),
   },
   editDescription: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     color: '#666',
-    marginBottom: SPACING.xl,
+    marginBottom: scale(SPACING.xl),
   },
   textInput: {
     width: '100%',
-    height: 56,
+    height: scale(56),
     backgroundColor: '#f5f5f5',
-    borderRadius: RADIUS.sm,
-    paddingHorizontal: SPACING.lg,
-    fontSize: 16,
+    borderRadius: scale(RADIUS.sm),
+    paddingHorizontal: scale(SPACING.lg),
+    fontSize: scaleFont(16),
     color: COLORS.black,
-    marginBottom: SPACING.xl,
+    marginBottom: scale(SPACING.xl),
   },
   buttonRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: scale(12),
   },
   cancelButton: {
     flex: 1,
-    height: 52,
+    height: scale(52),
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#f5f5f5',
-    borderRadius: RADIUS.full,
+    borderRadius: scale(RADIUS.full),
   },
   cancelButtonText: {
-    fontSize: 16,
+    fontSize: scaleFont(16),
     fontWeight: '600',
     color: '#666',
   },
   saveButton: {
     flex: 1,
-    height: 52,
+    height: scale(52),
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLORS.black,
-    borderRadius: RADIUS.full,
+    borderRadius: scale(RADIUS.full),
   },
   saveButtonDisabled: {
     backgroundColor: '#ccc',
   },
   saveButtonText: {
-    fontSize: 16,
+    fontSize: scaleFont(16),
     fontWeight: '600',
     color: COLORS.white,
   },
@@ -795,15 +795,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
-    height: 56,
+    height: scale(56),
     backgroundColor: '#f5f5f5',
-    borderRadius: RADIUS.sm,
-    paddingHorizontal: SPACING.lg,
-    gap: SPACING.md,
-    marginBottom: SPACING.xl,
+    borderRadius: scale(RADIUS.sm),
+    paddingHorizontal: scale(SPACING.lg),
+    gap: scale(SPACING.md),
+    marginBottom: scale(SPACING.xl),
   },
   datePickerText: {
-    fontSize: 16,
+    fontSize: scaleFont(16),
     color: '#999',
   },
   datePickerTextSelected: {
@@ -815,60 +815,60 @@ const styles = StyleSheet.create({
   },
   datePickerModalContent: {
     backgroundColor: COLORS.white,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: 40,
+    borderTopLeftRadius: scale(20),
+    borderTopRightRadius: scale(20),
+    paddingBottom: scale(40),
   },
   datePickerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    padding: SPACING.lg,
+    padding: scale(SPACING.lg),
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
   datePickerCancel: {
-    fontSize: 16,
+    fontSize: scaleFont(16),
     color: '#666',
   },
   datePickerConfirm: {
-    fontSize: 16,
+    fontSize: scaleFont(16),
     color: COLORS.black,
     fontWeight: '600',
   },
   datePicker: {
-    height: 200,
+    height: scale(200),
   },
   preferencesContent: {
-    padding: SPACING.lg,
-    paddingBottom: 100,
+    padding: scale(SPACING.lg),
+    paddingBottom: scale(100),
   },
   preferenceSection: {
-    marginBottom: SPACING.xl,
+    marginBottom: scale(SPACING.xl),
   },
   preferenceSectionTitle: {
-    fontSize: 16,
+    fontSize: scaleFont(16),
     fontWeight: '600',
     color: COLORS.black,
-    marginBottom: SPACING.md,
+    marginBottom: scale(SPACING.md),
   },
   mbtiGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: scale(8),
   },
   mbtiButton: {
-    width: (width - SPACING.lg * 2 - 24) / 4,
-    height: 44,
+    width: (width - scale(SPACING.lg) * 2 - scale(24)) / 4,
+    height: scale(44),
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#f5f5f5',
-    borderRadius: RADIUS.sm,
+    borderRadius: scale(RADIUS.sm),
   },
   mbtiButtonActive: {
     backgroundColor: COLORS.black,
   },
   mbtiButtonText: {
-    fontSize: 13,
+    fontSize: scaleFont(13),
     fontWeight: '600',
     color: '#666',
   },
@@ -877,21 +877,21 @@ const styles = StyleSheet.create({
   },
   toggleRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: scale(12),
   },
   toggleButton: {
     flex: 1,
-    height: 48,
+    height: scale(48),
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#f5f5f5',
-    borderRadius: RADIUS.full,
+    borderRadius: scale(RADIUS.full),
   },
   toggleButtonActive: {
     backgroundColor: COLORS.black,
   },
   toggleButtonText: {
-    fontSize: 15,
+    fontSize: scaleFont(15),
     fontWeight: '600',
     color: '#666',
   },
@@ -901,25 +901,25 @@ const styles = StyleSheet.create({
   activityGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: scale(10),
   },
   activityButton: {
-    width: (width - SPACING.lg * 2 - 10) / 2,
-    paddingVertical: 16,
+    width: (width - scale(SPACING.lg) * 2 - scale(10)) / 2,
+    paddingVertical: scale(16),
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#f5f5f5',
-    borderRadius: RADIUS.sm,
-    gap: 6,
+    borderRadius: scale(RADIUS.sm),
+    gap: scale(6),
   },
   activityButtonActive: {
     backgroundColor: COLORS.black,
   },
   activityIcon: {
-    fontSize: 24,
+    fontSize: scaleFont(24),
   },
   activityButtonText: {
-    fontSize: 13,
+    fontSize: scaleFont(13),
     fontWeight: '500',
     color: '#666',
   },
@@ -927,22 +927,22 @@ const styles = StyleSheet.create({
     color: COLORS.white,
   },
   situationList: {
-    gap: 10,
+    gap: scale(10),
   },
   situationButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 14,
-    paddingHorizontal: SPACING.lg,
+    paddingVertical: scale(14),
+    paddingHorizontal: scale(SPACING.lg),
     backgroundColor: '#f5f5f5',
-    borderRadius: RADIUS.sm,
+    borderRadius: scale(RADIUS.sm),
   },
   situationButtonActive: {
     backgroundColor: COLORS.black,
   },
   situationButtonText: {
-    fontSize: 15,
+    fontSize: scaleFont(15),
     fontWeight: '500',
     color: '#666',
   },
@@ -952,25 +952,25 @@ const styles = StyleSheet.create({
   constraintGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: scale(10),
   },
   constraintButton: {
-    width: (width - SPACING.lg * 2 - 10) / 2,
-    paddingVertical: 16,
+    width: (width - scale(SPACING.lg) * 2 - scale(10)) / 2,
+    paddingVertical: scale(16),
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#f5f5f5',
-    borderRadius: RADIUS.sm,
-    gap: 6,
+    borderRadius: scale(RADIUS.sm),
+    gap: scale(6),
   },
   constraintButtonActive: {
     backgroundColor: COLORS.black,
   },
   constraintIcon: {
-    fontSize: 24,
+    fontSize: scaleFont(24),
   },
   constraintButtonText: {
-    fontSize: 13,
+    fontSize: scaleFont(13),
     fontWeight: '500',
     color: '#666',
   },
@@ -979,25 +979,25 @@ const styles = StyleSheet.create({
   },
   // Date Worries styles
   dateWorryList: {
-    gap: SPACING.sm,
+    gap: scale(SPACING.sm),
   },
   dateWorryButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
+    paddingVertical: scale(SPACING.md),
+    paddingHorizontal: scale(SPACING.lg),
     backgroundColor: '#f5f5f5',
-    borderRadius: RADIUS.lg,
-    gap: SPACING.sm,
+    borderRadius: scale(RADIUS.lg),
+    gap: scale(SPACING.sm),
   },
   dateWorryButtonActive: {
     backgroundColor: COLORS.black,
   },
   dateWorryIcon: {
-    fontSize: 18,
+    fontSize: scaleFont(18),
   },
   dateWorryButtonText: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     fontWeight: '500',
     color: '#666',
     flex: 1,
@@ -1007,73 +1007,73 @@ const styles = StyleSheet.create({
   },
   // Preferences View styles
   preferencesViewContent: {
-    padding: SPACING.lg,
-    paddingBottom: SPACING.xxxl,
+    padding: scale(SPACING.lg),
+    paddingBottom: scale(SPACING.xxxl),
   },
   emptyPreferences: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: SPACING.xxxl,
+    paddingVertical: scale(SPACING.xxxl),
   },
   emptyPreferencesText: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     color: '#999',
   },
   preferenceViewSection: {
-    marginBottom: SPACING.xl,
+    marginBottom: scale(SPACING.xl),
   },
   preferenceViewLabel: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     fontWeight: '600',
     color: '#333',
-    marginBottom: SPACING.sm,
+    marginBottom: scale(SPACING.sm),
   },
   hashtagContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: SPACING.xs,
+    gap: scale(SPACING.xs),
   },
   hashtag: {
     backgroundColor: '#f0f0f0',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs,
-    borderRadius: RADIUS.full,
+    paddingHorizontal: scale(SPACING.md),
+    paddingVertical: scale(SPACING.xs),
+    borderRadius: scale(RADIUS.full),
   },
   hashtagText: {
-    fontSize: 13,
+    fontSize: scaleFont(13),
     color: '#666',
   },
   editPreferencesButton: {
     backgroundColor: COLORS.black,
-    paddingVertical: SPACING.md,
-    borderRadius: RADIUS.lg,
+    paddingVertical: scale(SPACING.md),
+    borderRadius: scale(RADIUS.lg),
     alignItems: 'center',
-    marginTop: SPACING.xl,
+    marginTop: scale(SPACING.xl),
   },
   editPreferencesButtonText: {
-    fontSize: 15,
+    fontSize: scaleFont(15),
     fontWeight: '600',
     color: COLORS.white,
   },
   // Calendar Type Toggle
   calendarTypeToggle: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: SPACING.md,
+    gap: scale(8),
+    marginBottom: scale(SPACING.md),
   },
   calendarTypeButton: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
+    paddingVertical: scale(10),
     backgroundColor: '#f5f5f5',
-    borderRadius: RADIUS.full,
+    borderRadius: scale(RADIUS.full),
   },
   calendarTypeButtonActive: {
     backgroundColor: COLORS.black,
   },
   calendarTypeButtonText: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     color: '#666',
     fontWeight: '500',
   },

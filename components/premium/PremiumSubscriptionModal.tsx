@@ -28,7 +28,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
 import { getLocales } from 'expo-localization';
 
-import { COLORS, SPACING, RADIUS } from '@/constants/design';
+import { COLORS, SPACING, RADIUS, scale, scaleFont, IS_TABLET } from '@/constants/design';
 import { useSubscriptionStore } from '@/stores/subscriptionStore';
 
 interface PremiumSubscriptionModalProps {
@@ -240,7 +240,7 @@ export default function PremiumSubscriptionModal({
               cachePolicy="memory-disk"
             />
             <Pressable onPress={onClose} style={styles.closeButton}>
-              <X color={COLORS.black} size={24} />
+              <X color={COLORS.black} size={scale(24)} />
             </Pressable>
           </View>
 
@@ -249,7 +249,7 @@ export default function PremiumSubscriptionModal({
             {/* Top section: Crown + Title (positioned above center) */}
             <View style={styles.managementTopSection}>
               <View style={styles.premiumBadgeTop}>
-                <Crown color="#FFD700" size={48} />
+                <Crown color="#FFD700" size={scale(48)} />
               </View>
               <Text style={styles.managementTitle}>{t('premium.currentPlan')}</Text>
             </View>
@@ -266,7 +266,7 @@ export default function PremiumSubscriptionModal({
                 onPress={openSubscriptionManagement}
               >
                 <Text style={styles.manageButtonText}>{t('premium.manageSubscription')}</Text>
-                <ChevronRight color="#333" size={18} />
+                <ChevronRight color="#333" size={scale(18)} />
               </Pressable>
             </View>
           </View>
@@ -293,7 +293,7 @@ export default function PremiumSubscriptionModal({
             contentFit="contain"
           />
           <Pressable onPress={onClose} style={styles.closeButton}>
-            <X color={COLORS.black} size={24} />
+            <X color={COLORS.black} size={scale(24)} />
           </Pressable>
         </View>
 
@@ -317,7 +317,7 @@ export default function PremiumSubscriptionModal({
             <View style={styles.benefitsGrid}>
               {premiumBenefits.map((benefit, index) => (
                 <View key={index} style={styles.benefitItem}>
-                  <benefit.icon color={COLORS.black} size={24} />
+                  <benefit.icon color={COLORS.black} size={IS_TABLET ? 24 * 0.75 : scale(24)} />
                   <Text style={styles.benefitTitle}>{benefit.title}</Text>
                 </View>
               ))}
@@ -483,16 +483,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
+    paddingHorizontal: scale(SPACING.md),
+    paddingVertical: scale(SPACING.sm),
   },
   headerLogo: {
-    width: 120,
-    height: 32,
+    width: scale(120),
+    height: scale(32),
   },
   closeButton: {
-    width: 40,
-    height: 40,
+    width: scale(40),
+    height: scale(40),
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -500,38 +500,38 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: SPACING.lg,
-    paddingBottom: SPACING.lg,
+    paddingHorizontal: scale(SPACING.lg),
+    paddingBottom: scale(SPACING.lg),
   },
   heroSection: {
     alignItems: 'flex-start',
-    paddingTop: SPACING.xl,
-    paddingBottom: SPACING.lg,
+    paddingTop: scale(SPACING.xl),
+    paddingBottom: scale(SPACING.lg),
   },
   heroTitle: {
-    fontSize: 24,
+    fontSize: scaleFont(24),
     fontWeight: '700',
     color: COLORS.black,
     textAlign: 'left',
-    marginBottom: SPACING.md,
+    marginBottom: scale(SPACING.md),
   },
   heroSubtitle: {
-    fontSize: 15,
+    fontSize: scaleFont(15),
     color: '#666',
     textAlign: 'left',
   },
   // Benefits Section
   benefitsSection: {
     backgroundColor: '#FAFAFA',
-    borderRadius: RADIUS.md,
-    padding: SPACING.lg,
-    marginBottom: SPACING.lg,
-    borderWidth: 4,
+    borderRadius: IS_TABLET ? RADIUS.md * 0.75 : scale(RADIUS.md),
+    padding: IS_TABLET ? SPACING.lg * 0.75 : scale(SPACING.lg),
+    marginBottom: IS_TABLET ? SPACING.lg * 0.75 : scale(SPACING.lg),
+    borderWidth: IS_TABLET ? 3 : scale(4),
     borderColor: '#FEF3C7',
   },
   benefitsTitleWrapper: {
     alignSelf: 'center',
-    marginBottom: SPACING.lg,
+    marginBottom: scale(SPACING.lg),
   },
   benefitsTitleHighlight: {
     position: 'absolute',
@@ -540,34 +540,36 @@ const styles = StyleSheet.create({
     right: 0,
     height: '50%',
     backgroundColor: '#FEF3C7',
-    borderRadius: 4,
+    borderRadius: scale(4),
   },
   benefitsSectionTitle: {
-    fontSize: 16,
+    fontSize: scaleFont(16),
     fontWeight: '700',
     color: COLORS.black,
     textAlign: 'center',
-    paddingHorizontal: SPACING.sm,
+    paddingHorizontal: scale(SPACING.sm),
   },
   benefitsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    width: '100%',
   },
   benefitItem: {
     width: '47%',
     alignItems: 'center',
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.sm,
-    gap: SPACING.xxl,
+    paddingVertical: IS_TABLET ? SPACING.md * 0.75 : scale(SPACING.md),
+    paddingHorizontal: IS_TABLET ? SPACING.sm * 0.75 : scale(SPACING.sm),
+    gap: IS_TABLET ? SPACING.lg * 0.75 : scale(SPACING.xxl),
     borderWidth: 1,
     borderColor: '#F3F4F6',
-    borderRadius: RADIUS.md,
-    marginBottom: SPACING.sm,
+    borderRadius: IS_TABLET ? RADIUS.md * 0.75 : scale(RADIUS.md),
+    marginBottom: IS_TABLET ? SPACING.sm * 0.75 : scale(SPACING.sm),
     marginHorizontal: '1.5%',
     backgroundColor: COLORS.white,
   },
   benefitTitle: {
-    fontSize: 13,
+    fontSize: IS_TABLET ? 13 * 0.75 : scaleFont(13),
     fontWeight: '600',
     color: COLORS.black,
     textAlign: 'center',
@@ -575,15 +577,15 @@ const styles = StyleSheet.create({
   // Pricing Section
   pricingSection: {
     flexDirection: 'row',
-    gap: SPACING.md,
-    marginBottom: SPACING.xl,
+    gap: scale(SPACING.md),
+    marginBottom: scale(SPACING.xl),
   },
   pricingCard: {
     flex: 1,
     backgroundColor: COLORS.white,
-    borderRadius: 16,
-    padding: SPACING.md,
-    borderWidth: 2,
+    borderRadius: scale(16),
+    padding: scale(SPACING.md),
+    borderWidth: scale(2),
     borderColor: '#E5E7EB',
   },
   pricingCardSelected: {
@@ -593,11 +595,11 @@ const styles = StyleSheet.create({
   cardTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 32,
+    gap: scale(8),
+    marginBottom: scale(32),
   },
   pricingCardTitle: {
-    fontSize: 18,
+    fontSize: scaleFont(18),
     fontWeight: '700',
     color: '#1F2937',
   },
@@ -605,12 +607,12 @@ const styles = StyleSheet.create({
     color: '#1F2937',
   },
   saveBadgeInline: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
+    paddingHorizontal: scale(8),
+    paddingVertical: scale(3),
+    borderRadius: scale(6),
   },
   saveBadgeText: {
-    fontSize: 11,
+    fontSize: scaleFont(11),
     fontWeight: '700',
     color: COLORS.white,
   },
@@ -622,38 +624,38 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
   },
   pricingCardPrice: {
-    fontSize: 24,
+    fontSize: scaleFont(24),
     fontWeight: '700',
     color: COLORS.black,
   },
   pricingCardPeriod: {
-    fontSize: 16,
+    fontSize: scaleFont(16),
     color: '#888',
-    marginLeft: 2,
+    marginLeft: scale(2),
   },
   pricingCardEquivalent: {
-    fontSize: 12,
+    fontSize: scaleFont(12),
     color: '#888',
   },
   originalPrice: {
-    fontSize: 13,
+    fontSize: scaleFont(13),
     color: '#9CA3AF',
     textDecorationLine: 'line-through',
-    marginTop: 2,
+    marginTop: scale(2),
   },
   // Fixed Bottom Container
   fixedBottomContainer: {
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
+    paddingHorizontal: scale(SPACING.lg),
+    paddingVertical: scale(SPACING.md),
     backgroundColor: COLORS.white,
-    borderTopWidth: 1,
+    borderTopWidth: scale(1),
     borderTopColor: '#F0F0F0',
   },
   // CTA Button
   ctaButton: {
     backgroundColor: COLORS.black,
-    borderRadius: RADIUS.full,
-    paddingVertical: 16,
+    borderRadius: scale(RADIUS.full),
+    paddingVertical: scale(16),
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -661,45 +663,45 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   ctaText: {
-    fontSize: 16,
+    fontSize: scaleFont(16),
     fontWeight: '600',
     color: COLORS.white,
   },
   // Notice Sections
   noticeSection: {
-    marginBottom: SPACING.lg,
+    marginBottom: scale(SPACING.lg),
   },
   noticeSectionTitle: {
-    fontSize: 13,
+    fontSize: scaleFont(13),
     fontWeight: '600',
     color: '#555',
-    marginBottom: SPACING.xs,
+    marginBottom: scale(SPACING.xs),
   },
   noticeText: {
-    fontSize: 12,
+    fontSize: scaleFont(12),
     color: '#888',
-    lineHeight: 18,
-    marginBottom: 2,
+    lineHeight: scaleFont(18),
+    marginBottom: scale(2),
   },
   // Legal Section
   legalSection: {
     alignItems: 'center',
-    paddingTop: SPACING.md,
-    paddingBottom: SPACING.lg,
+    paddingTop: scale(SPACING.md),
+    paddingBottom: scale(SPACING.lg),
   },
   restoreButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.md,
+    gap: scale(6),
+    paddingVertical: scale(SPACING.sm),
+    paddingHorizontal: scale(SPACING.md),
     backgroundColor: '#F5F5F5',
-    borderRadius: RADIUS.full,
-    marginTop: -SPACING.md,
-    marginBottom: SPACING.md,
+    borderRadius: scale(RADIUS.full),
+    marginTop: -scale(SPACING.md),
+    marginBottom: scale(SPACING.md),
   },
   restoreButtonText: {
-    fontSize: 15,
+    fontSize: scaleFont(15),
     color: '#666',
     fontWeight: '500',
   },
@@ -718,12 +720,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   legalLink: {
-    fontSize: 15,
+    fontSize: scaleFont(15),
     color: '#888',
     textDecorationLine: 'underline',
   },
   legalDivider: {
-    fontSize: 15,
+    fontSize: scaleFont(15),
     color: '#DDD',
   },
   // Management view styles
@@ -735,19 +737,19 @@ const styles = StyleSheet.create({
     flex: 0.8,
     justifyContent: 'flex-end',
     alignItems: 'center',
-    paddingBottom: SPACING.lg,
+    paddingBottom: scale(SPACING.lg),
   },
   premiumBadgeTop: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: SPACING.md,
+    marginBottom: scale(SPACING.md),
   },
   managementTitle: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     color: '#666',
   },
   managementPlan: {
-    fontSize: 24,
+    fontSize: scaleFont(24),
     fontWeight: '700',
     color: COLORS.black,
   },
@@ -755,34 +757,34 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-start',
     alignItems: 'center',
-    paddingTop: SPACING.xl,
+    paddingTop: scale(SPACING.xl),
   },
   manageButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F5F5F5',
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.xl,
-    borderRadius: RADIUS.full,
-    gap: SPACING.xs,
+    paddingVertical: scale(SPACING.md),
+    paddingHorizontal: scale(SPACING.xl),
+    borderRadius: scale(RADIUS.full),
+    gap: scale(SPACING.xs),
   },
   manageButtonText: {
-    fontSize: 15,
+    fontSize: scaleFont(15),
     fontWeight: '600',
     color: '#333',
   },
   partnerPremiumNote: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     color: '#888',
     textAlign: 'center',
-    lineHeight: 20,
-    paddingHorizontal: SPACING.lg,
+    lineHeight: scaleFont(20),
+    paddingHorizontal: scale(SPACING.lg),
   },
   partnerPremiumBannerText: {
-    fontSize: 13,
+    fontSize: scaleFont(13),
     color: '#D97706',
     textAlign: 'center',
-    marginBottom: SPACING.sm,
+    marginBottom: scale(SPACING.sm),
     fontWeight: '500',
   },
 });

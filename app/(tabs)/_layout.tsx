@@ -6,8 +6,12 @@ import { Target, BookHeart, Home, Calendar, Menu } from 'lucide-react-native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useTranslation } from 'react-i18next';
 
-import { COLORS } from '@/constants/design';
+import { COLORS, IS_TABLET, scale, scaleFont } from '@/constants/design';
 import { useUIStore } from '@/stores/uiStore';
+
+// Scaled icon size for iPad
+const TAB_ICON_SIZE = scale(28);
+const TAB_LABEL_SIZE = scaleFont(11);
 
 function TabBarIcon({
   Icon,
@@ -17,7 +21,7 @@ function TabBarIcon({
   return (
     <Icon
       color={COLORS.white}
-      size={28}
+      size={TAB_ICON_SIZE}
       strokeWidth={1.5}
     />
   );
@@ -200,33 +204,33 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   tabBarContainer: {
     position: 'absolute',
-    bottom: 24,
+    bottom: scale(24),
     left: 0,
     right: 0,
     alignItems: 'center',
     zIndex: 50,
   },
   tabBarOuter: {
-    width: '90%',
-    maxWidth: 400,
-    borderRadius: 100,
+    width: IS_TABLET ? '60%' : '90%',
+    maxWidth: scale(400),
+    borderRadius: scale(100),
     overflow: 'hidden',
     // Glass effect shadow
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
+    shadowOffset: { width: 0, height: scale(8) },
     shadowOpacity: 0.2,
-    shadowRadius: 32,
+    shadowRadius: scale(32),
     elevation: 8,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.12)',
   },
   tabBarBlur: {
     width: '100%',
-    borderRadius: 100,
+    borderRadius: scale(100),
     overflow: 'hidden',
   },
   tabBarInner: {
-    padding: 6,
+    padding: scale(6),
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
   tabsContainer: {
@@ -239,19 +243,19 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 100,
+    borderRadius: scale(100),
   },
   tabItem: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 2,
-    borderRadius: 100,
+    paddingVertical: scale(6),
+    paddingHorizontal: scale(2),
+    borderRadius: scale(100),
   },
   tabLabel: {
-    fontSize: 11,
-    marginTop: 2,
+    fontSize: TAB_LABEL_SIZE,
+    marginTop: scale(2),
     textAlign: 'center',
   },
 });

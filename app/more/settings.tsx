@@ -37,7 +37,7 @@ import { useTranslation } from 'react-i18next';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { COLORS, SPACING, RADIUS } from '@/constants/design';
+import { COLORS, SPACING, RADIUS, IS_TABLET, scale, scaleFont } from '@/constants/design';
 import { useOnboardingStore, useAuthStore, useMemoryStore, useLanguageStore, getLanguageDisplayName, useSubscriptionStore, useTimezoneStore, getTimezoneDisplayName, getDeviceTimezoneLabel, COMMON_TIMEZONES } from '@/stores';
 import type { SupportedLanguage, TimezoneId } from '@/stores';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
@@ -411,7 +411,7 @@ export default function SettingsScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <ChevronLeft color={COLORS.black} size={24} />
+          <ChevronLeft color={COLORS.black} size={scale(24)} />
         </Pressable>
         <Text style={styles.headerTitle}>{t('settings.title')}</Text>
         <View style={styles.headerSpacer} />
@@ -428,7 +428,7 @@ export default function SettingsScreen() {
           <View style={styles.settingItem}>
             <View style={styles.settingItemLeft}>
               <View style={styles.iconWrapper}>
-                <Bell color={COLORS.black} size={20} />
+                <Bell color={COLORS.black} size={scale(20)} />
               </View>
               <View style={styles.settingItemContent}>
                 <Text style={styles.settingItemLabel}>{t('settings.notifications.push')}</Text>
@@ -450,7 +450,7 @@ export default function SettingsScreen() {
           <View style={styles.settingItem}>
             <View style={styles.settingItemLeft}>
               <View style={styles.iconWrapper}>
-                <Megaphone color={COLORS.black} size={20} />
+                <Megaphone color={COLORS.black} size={scale(20)} />
               </View>
               <View style={styles.settingItemContent}>
                 <Text style={styles.settingItemLabel}>{t('settings.marketing.news')}</Text>
@@ -470,7 +470,7 @@ export default function SettingsScreen() {
           <View style={styles.settingItem}>
             <View style={styles.settingItemLeft}>
               <View style={styles.iconWrapper}>
-                <Gift color={COLORS.black} size={20} />
+                <Gift color={COLORS.black} size={scale(20)} />
               </View>
               <View style={styles.settingItemContent}>
                 <Text style={styles.settingItemLabel}>{t('settings.marketing.info')}</Text>
@@ -492,13 +492,13 @@ export default function SettingsScreen() {
           <Pressable style={styles.menuItem} onPress={() => setShowLanguageModal(true)}>
             <View style={styles.settingItemLeft}>
               <View style={styles.iconWrapper}>
-                <Globe color={COLORS.black} size={20} />
+                <Globe color={COLORS.black} size={scale(20)} />
               </View>
               <Text style={styles.settingItemLabel}>{t('settings.other.language')}</Text>
             </View>
             <View style={styles.languageValue}>
               <Text style={styles.languageValueText}>{getLanguageDisplayName(language)}</Text>
-              <ChevronRight color="#999" size={20} />
+              <ChevronRight color="#999" size={scale(20)} />
             </View>
           </Pressable>
 
@@ -510,7 +510,7 @@ export default function SettingsScreen() {
               style={styles.timezoneMismatchBanner}
               onPress={() => setShowTimezoneModal(true)}
             >
-              <AlertTriangle color="#F59E0B" size={20} />
+              <AlertTriangle color="#F59E0B" size={scale(20)} />
               <View style={styles.timezoneMismatchTextContainer}>
                 <Text style={styles.timezoneMismatchTitle}>
                   {t('settings.other.timezoneMismatchTitle')}
@@ -525,13 +525,13 @@ export default function SettingsScreen() {
           <Pressable style={styles.menuItem} onPress={() => setShowTimezoneModal(true)}>
             <View style={styles.settingItemLeft}>
               <View style={styles.iconWrapper}>
-                <Clock color={COLORS.black} size={20} />
+                <Clock color={COLORS.black} size={scale(20)} />
               </View>
               <Text style={styles.settingItemLabel}>{t('settings.other.timezone')}</Text>
             </View>
             <View style={styles.languageValue}>
               <Text style={styles.languageValueText}>{getTimezoneDisplayName(timezone)}</Text>
-              <ChevronRight color="#999" size={20} />
+              <ChevronRight color="#999" size={scale(20)} />
             </View>
           </Pressable>
 
@@ -540,7 +540,7 @@ export default function SettingsScreen() {
           <View style={styles.versionItem}>
             <View style={styles.settingItemLeft}>
               <View style={styles.iconWrapper}>
-                <Info color={COLORS.black} size={20} />
+                <Info color={COLORS.black} size={scale(20)} />
               </View>
               <Text style={styles.settingItemLabel}>{t('settings.other.version', { version: '1.0.0' })}</Text>
             </View>
@@ -554,7 +554,7 @@ export default function SettingsScreen() {
           <Pressable style={styles.menuItem} onPress={handleLogout}>
             <View style={styles.settingItemLeft}>
               <View style={[styles.iconWrapper, { backgroundColor: '#e3f2fd' }]}>
-                <LogOut color="#2196f3" size={20} />
+                <LogOut color="#2196f3" size={scale(20)} />
               </View>
               <Text style={[styles.settingItemLabel, { color: '#2196f3' }]}>{t('settings.account.logout')}</Text>
             </View>
@@ -565,7 +565,7 @@ export default function SettingsScreen() {
           <Pressable style={styles.dangerItem} onPress={() => router.push('/more/unpair')}>
             <View style={styles.settingItemLeft}>
               <View style={[styles.iconWrapper, { backgroundColor: '#fff3e0' }]}>
-                <Link2Off color="#ff9800" size={20} />
+                <Link2Off color="#ff9800" size={scale(20)} />
               </View>
               <Text style={[styles.dangerItemLabel, { color: '#ff9800' }]}>{t('settings.account.unpair')}</Text>
             </View>
@@ -576,7 +576,7 @@ export default function SettingsScreen() {
           <Pressable style={styles.dangerItem} onPress={handleAccountDeletion}>
             <View style={styles.settingItemLeft}>
               <View style={[styles.iconWrapper, { backgroundColor: '#ffebee' }]}>
-                <UserX color="#f44336" size={20} />
+                <UserX color="#f44336" size={scale(20)} />
               </View>
               <Text style={styles.dangerItemLabel}>{t('settings.account.deleteAccount')}</Text>
             </View>
@@ -608,7 +608,7 @@ export default function SettingsScreen() {
                   <Text style={styles.languageOptionSubname}>{lang.name}</Text>
                 </View>
                 {language === lang.code && (
-                  <Check color="#4caf50" size={20} />
+                  <Check color="#4caf50" size={scale(20)} />
                 )}
               </Pressable>
             ))}
@@ -642,7 +642,7 @@ export default function SettingsScreen() {
                   <Text style={styles.languageOptionSubname}>{t('settings.other.timezoneAutoDesc')}</Text>
                 </View>
                 {timezone === 'auto' && (
-                  <Check color="#4caf50" size={20} />
+                  <Check color="#4caf50" size={scale(20)} />
                 )}
               </Pressable>
 
@@ -661,7 +661,7 @@ export default function SettingsScreen() {
                     </Text>
                   </View>
                   {timezone === tz.id && (
-                    <Check color="#4caf50" size={20} />
+                    <Check color="#4caf50" size={scale(20)} />
                   )}
                 </Pressable>
               ))}
@@ -690,7 +690,7 @@ export default function SettingsScreen() {
             ]}
           >
             <View style={styles.deleteWarningIcon}>
-              <AlertTriangle color="#f44336" size={32} />
+              <AlertTriangle color="#f44336" size={scale(32)} />
             </View>
             <Text style={styles.confirmModalTitle}>{t('settings.deleteAccount.title')}</Text>
             <Text style={styles.confirmModalDescription}>
@@ -755,54 +755,54 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.md,
+    paddingHorizontal: scale(SPACING.md),
+    paddingVertical: scale(SPACING.md),
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
   backButton: {
-    width: 40,
-    height: 40,
+    width: scale(40),
+    height: scale(40),
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: scaleFont(18),
     fontWeight: '600',
     color: COLORS.black,
   },
   headerSpacer: {
-    width: 40,
+    width: scale(40),
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingVertical: SPACING.lg,
-    paddingBottom: 100,
+    paddingVertical: scale(SPACING.lg),
+    paddingBottom: scale(100),
   },
   sectionTitle: {
-    fontSize: 13,
+    fontSize: scaleFont(13),
     fontWeight: '600',
     color: '#999',
-    marginLeft: SPACING.lg,
-    marginTop: SPACING.lg,
-    marginBottom: SPACING.sm,
+    marginLeft: scale(SPACING.lg),
+    marginTop: scale(SPACING.lg),
+    marginBottom: scale(SPACING.sm),
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: scale(0.5),
   },
   settingCard: {
-    marginHorizontal: SPACING.lg,
+    marginHorizontal: scale(SPACING.lg),
     backgroundColor: '#f8f8f8',
-    borderRadius: RADIUS.md,
+    borderRadius: scale(RADIUS.md),
     overflow: 'hidden',
   },
   settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
+    paddingHorizontal: scale(SPACING.lg),
+    paddingVertical: scale(SPACING.md),
   },
   settingItemLeft: {
     flexDirection: 'row',
@@ -810,52 +810,52 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   iconWrapper: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: scale(36),
+    height: scale(36),
+    borderRadius: scale(18),
     backgroundColor: '#e0e0e0',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: SPACING.md,
+    marginRight: scale(SPACING.md),
   },
   iconWrapperEmpty: {
-    width: 36,
-    marginRight: SPACING.md,
+    width: scale(36),
+    marginRight: scale(SPACING.md),
   },
   settingItemContent: {
     flex: 1,
   },
   settingItemLabel: {
-    fontSize: 15,
+    fontSize: scaleFont(15),
     fontWeight: '500',
     color: COLORS.black,
-    marginBottom: 2,
+    marginBottom: scale(2),
   },
   settingItemDescription: {
-    fontSize: 13,
+    fontSize: scaleFont(13),
     color: '#999',
   },
   settingDivider: {
     height: 1,
     backgroundColor: '#e8e8e8',
-    marginLeft: SPACING.lg + 36 + SPACING.md,
+    marginLeft: scale(SPACING.lg) + scale(36) + scale(SPACING.md),
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.lg,
+    paddingHorizontal: scale(SPACING.lg),
+    paddingVertical: scale(SPACING.lg),
   },
   versionItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.lg,
+    paddingHorizontal: scale(SPACING.lg),
+    paddingVertical: scale(SPACING.lg),
   },
   versionStatus: {
-    fontSize: 13,
+    fontSize: scaleFont(13),
     color: '#999',
     fontWeight: '400',
   },
@@ -863,11 +863,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.lg,
+    paddingHorizontal: scale(SPACING.lg),
+    paddingVertical: scale(SPACING.lg),
   },
   dangerItemLabel: {
-    fontSize: 15,
+    fontSize: scaleFont(15),
     fontWeight: '500',
     color: '#f44336',
   },
@@ -877,90 +877,90 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: SPACING.lg,
+    padding: scale(SPACING.lg),
   },
   confirmModalContent: {
     width: '100%',
     backgroundColor: COLORS.white,
-    borderRadius: RADIUS.md,
-    padding: SPACING.xl,
+    borderRadius: scale(RADIUS.md),
+    padding: scale(SPACING.xl),
     alignItems: 'center',
   },
   confirmModalTitle: {
-    fontSize: 20,
+    fontSize: scaleFont(20),
     fontWeight: '700',
     color: COLORS.black,
-    marginBottom: SPACING.sm,
+    marginBottom: scale(SPACING.sm),
   },
   confirmModalDescription: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     color: '#666',
     textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: SPACING.lg,
+    lineHeight: scale(20),
+    marginBottom: scale(SPACING.lg),
   },
   confirmInput: {
     width: '100%',
-    height: 52,
+    height: scale(52),
     backgroundColor: '#f5f5f5',
-    borderRadius: RADIUS.sm,
-    paddingHorizontal: SPACING.lg,
-    fontSize: 16,
+    borderRadius: scale(RADIUS.sm),
+    paddingHorizontal: scale(SPACING.lg),
+    fontSize: scaleFont(16),
     color: COLORS.black,
     textAlign: 'center',
-    marginBottom: SPACING.lg,
+    marginBottom: scale(SPACING.lg),
   },
   confirmButtonRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: scale(12),
     width: '100%',
   },
   confirmCancelButton: {
     flex: 1,
-    height: 48,
+    height: scale(48),
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#f5f5f5',
-    borderRadius: RADIUS.full,
+    borderRadius: scale(RADIUS.full),
   },
   confirmCancelButtonText: {
-    fontSize: 15,
+    fontSize: scaleFont(15),
     fontWeight: '600',
     color: '#666',
   },
   // Account Deletion Modal Styles
   deleteWarningIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: scale(64),
+    height: scale(64),
+    borderRadius: scale(32),
     backgroundColor: '#ffebee',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: SPACING.md,
+    marginBottom: scale(SPACING.md),
   },
   deleteWarningText: {
     color: '#f44336',
     fontWeight: '700',
   },
   deleteConfirmHint: {
-    fontSize: 13,
+    fontSize: scaleFont(13),
     color: '#999',
     textAlign: 'center',
-    marginBottom: SPACING.md,
+    marginBottom: scale(SPACING.md),
   },
   confirmDeleteButton: {
     flex: 1,
-    height: 48,
+    height: scale(48),
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#f44336',
-    borderRadius: RADIUS.full,
+    borderRadius: scale(RADIUS.full),
   },
   confirmDeleteButtonDisabled: {
     backgroundColor: '#ffcdd2',
   },
   confirmDeleteButtonText: {
-    fontSize: 15,
+    fontSize: scaleFont(15),
     fontWeight: '600',
     color: COLORS.white,
   },
@@ -968,10 +968,10 @@ const styles = StyleSheet.create({
   languageValue: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: scale(4),
   },
   languageValueText: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     color: '#666',
   },
   languageModalOverlay: {
@@ -979,27 +979,27 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: SPACING.lg,
+    padding: scale(SPACING.lg),
   },
   languageModalContent: {
     width: '100%',
-    maxWidth: 320,
+    maxWidth: scale(320),
     backgroundColor: COLORS.white,
-    borderRadius: RADIUS.md,
-    padding: SPACING.lg,
+    borderRadius: scale(RADIUS.md),
+    padding: scale(SPACING.lg),
   },
   languageModalTitle: {
-    fontSize: 18,
+    fontSize: scaleFont(18),
     fontWeight: '700',
     color: COLORS.black,
     textAlign: 'center',
-    marginBottom: SPACING.lg,
+    marginBottom: scale(SPACING.lg),
   },
   languageOption: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: SPACING.md,
+    paddingVertical: scale(SPACING.md),
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
@@ -1007,41 +1007,41 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   languageOptionName: {
-    fontSize: 16,
+    fontSize: scaleFont(16),
     fontWeight: '500',
     color: COLORS.black,
   },
   languageOptionSubname: {
-    fontSize: 13,
+    fontSize: scaleFont(13),
     color: '#999',
-    marginTop: 2,
+    marginTop: scale(2),
   },
   // Timezone Selection Styles
   timezoneModalContent: {
     width: '100%',
-    maxWidth: 360,
+    maxWidth: scale(360),
     maxHeight: '80%',
     backgroundColor: COLORS.white,
-    borderRadius: RADIUS.md,
-    padding: SPACING.lg,
+    borderRadius: scale(RADIUS.md),
+    padding: scale(SPACING.lg),
   },
   timezoneScrollView: {
     flexGrow: 0,
   },
   timezoneHint: {
-    fontSize: 13,
+    fontSize: scaleFont(13),
     color: '#999',
     textAlign: 'center',
-    marginBottom: SPACING.md,
+    marginBottom: scale(SPACING.md),
   },
   timezoneManualHeader: {
-    fontSize: 13,
+    fontSize: scaleFont(13),
     fontWeight: '600',
     color: '#999',
-    marginTop: SPACING.md,
-    marginBottom: SPACING.sm,
+    marginTop: scale(SPACING.md),
+    marginBottom: scale(SPACING.sm),
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: scale(0.5),
   },
   // Timezone Mismatch Banner Styles
   timezoneMismatchBanner: {
@@ -1050,24 +1050,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEF3C7',
     borderWidth: 1,
     borderColor: '#F59E0B',
-    borderRadius: RADIUS.md,
-    padding: SPACING.md,
-    marginHorizontal: SPACING.md,
-    marginBottom: SPACING.sm,
-    gap: SPACING.sm,
+    borderRadius: scale(RADIUS.md),
+    padding: scale(SPACING.md),
+    marginHorizontal: scale(SPACING.md),
+    marginBottom: scale(SPACING.sm),
+    gap: scale(SPACING.sm),
   },
   timezoneMismatchTextContainer: {
     flex: 1,
   },
   timezoneMismatchTitle: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     fontWeight: '600',
     color: '#92400E',
-    marginBottom: 4,
+    marginBottom: scale(4),
   },
   timezoneMismatchDesc: {
-    fontSize: 13,
+    fontSize: scaleFont(13),
     color: '#B45309',
-    lineHeight: 18,
+    lineHeight: scale(18),
   },
 });

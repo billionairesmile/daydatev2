@@ -25,7 +25,7 @@ import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useUIStore } from '@/stores/uiStore';
 import * as Location from 'expo-location';
 
-import { COLORS, SPACING, RADIUS } from '@/constants/design';
+import { COLORS, SPACING, RADIUS, IS_TABLET, scale, scaleFont } from '@/constants/design';
 import { useMissionStore, MOOD_OPTIONS, TIME_OPTIONS, type TodayMood, type AvailableTime, type MissionGenerationAnswers } from '@/stores/missionStore';
 import type { ExcludedMission } from '@/services/missionGenerator';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
@@ -45,8 +45,8 @@ import { cancelHourlyReminders, cancelMissionReminderNotification } from '@/lib/
 type CarouselItem = Mission | { type: 'ad'; id: string } | { type: 'refresh'; id: string };
 
 // Fixed card dimensions (width is calculated dynamically in component)
-const CARD_HEIGHT = 468;
-const CARD_MARGIN = 10;
+const CARD_HEIGHT = scale(468);
+const CARD_MARGIN = scale(10);
 
 // Easing gradient for smooth blur transition
 const { colors: blurGradientColors, locations: blurGradientLocations } = easeGradient({
@@ -1187,7 +1187,7 @@ export default function MissionScreen() {
           style={styles.historyButton}
           onPress={() => setShowBookmarkedMissions(true)}
         >
-          <Bookmark color={COLORS.white} size={20} strokeWidth={2} />
+          <Bookmark color={COLORS.white} size={scale(20)} strokeWidth={2} />
           {bookmarkCount > 0 && (
             <View style={styles.badgeContainer}>
               <Text style={styles.badgeText}>{bookmarkCount}</Text>
@@ -1254,7 +1254,7 @@ export default function MissionScreen() {
           <View style={styles.emptyStateContainer}>
             {isGenerating || isLoadingAd ? (
               <View style={styles.loadingAnimationWrapper}>
-                <CircularLoadingAnimation size={100} strokeWidth={6} color={COLORS.white} />
+                <CircularLoadingAnimation size={scale(100)} strokeWidth={scale(6)} color={COLORS.white} />
                 <Text style={styles.loadingAnimationText}>
                   {isLoadingAd ? t('mission.refresh.loadingAd') : (partnerGeneratingMessage ? t('mission.generating') : t('mission.generatingMessage'))}
                 </Text>
@@ -1304,7 +1304,7 @@ export default function MissionScreen() {
                   setSelectedMoods([]);
                 }}
               >
-                <X color={COLORS.black} size={24} />
+                <X color={COLORS.black} size={scale(24)} />
               </Pressable>
             </View>
 
@@ -1617,7 +1617,7 @@ function MissionCardContent({ mission, onStartPress, onKeepPress, isKept, canSta
                 {isKept && (
                   <Bookmark
                     color={COLORS.white}
-                    size={16}
+                    size={scale(16)}
                     fill={COLORS.white}
                   />
                 )}
@@ -1688,27 +1688,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    paddingTop: 64,
-    paddingHorizontal: SPACING.lg,
-    paddingBottom: SPACING.lg,
+    paddingTop: scale(64),
+    paddingHorizontal: scale(SPACING.lg),
+    paddingBottom: scale(SPACING.lg),
     zIndex: 20,
   },
   headerTitle: {
-    fontSize: 32,
+    fontSize: scaleFont(32),
     color: COLORS.white,
     fontWeight: '700',
-    lineHeight: 38,
+    lineHeight: scaleFont(38),
   },
   headerSubtitle: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     color: 'rgba(255, 255, 255, 0.6)',
     fontWeight: '400',
-    marginTop: 4,
+    marginTop: scale(4),
   },
   historyButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: scale(36),
+    height: scale(36),
+    borderRadius: scale(18),
     backgroundColor: COLORS.secondary,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1716,14 +1716,14 @@ const styles = StyleSheet.create({
   cardContainer: {
     flex: 1,
     justifyContent: 'center',
-    paddingBottom: 120,
+    paddingBottom: scale(120),
   },
   carouselWrapper: {
-    height: CARD_HEIGHT + 40,
+    height: CARD_HEIGHT + scale(40),
   },
   cardStack: {
     width: '100%',
-    maxWidth: 324,
+    maxWidth: scale(324),
     height: CARD_HEIGHT,
     position: 'relative',
   },
@@ -1731,17 +1731,17 @@ const styles = StyleSheet.create({
     // width is set dynamically inline using CARD_WIDTH = screenWidth * 0.75
     height: CARD_HEIGHT,
     marginHorizontal: CARD_MARGIN,
-    borderRadius: 45,
+    borderRadius: scale(45),
     backgroundColor: 'transparent',
   },
   cardInner: {
     flex: 1,
-    borderRadius: 45,
+    borderRadius: scale(45),
     overflow: 'hidden',
   },
   cardInnerAd: {
     flex: 1,
-    borderRadius: 45,
+    borderRadius: scale(45),
     // NO overflow: hidden for ad cards - causes "asset boundaries" error
     backgroundColor: '#000000',
   },
@@ -1771,43 +1771,43 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    padding: SPACING.lg,
+    padding: scale(SPACING.lg),
     zIndex: 2,
   },
   missionTitle: {
-    fontSize: 28,
+    fontSize: scaleFont(28),
     color: COLORS.white,
     fontWeight: '700',
-    marginBottom: 12,
-    lineHeight: 34,
+    marginBottom: scale(12),
+    lineHeight: scaleFont(34),
   },
   missionDescription: {
-    fontSize: 15,
+    fontSize: scaleFont(15),
     color: 'rgba(255, 255, 255, 0.8)',
-    lineHeight: 22,
-    marginBottom: 12,
+    lineHeight: scaleFont(22),
+    marginBottom: scale(12),
   },
   tagsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 12,
+    gap: scale(8),
+    marginBottom: scale(12),
   },
   tagText: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     color: 'rgba(255, 255, 255, 0.9)',
     fontWeight: '400',
   },
   actionButtonsRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: scale(10),
   },
   keepActionButton: {
     flex: 1,
-    height: 52,
+    height: scale(52),
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 100,
+    borderRadius: scale(100),
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
@@ -1822,28 +1822,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: scale(8),
   },
   keepActionButtonText: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     color: COLORS.white,
     fontWeight: '600',
   },
   startActionButton: {
     flex: 1,
-    height: 52,
-    borderRadius: 100,
+    height: scale(52),
+    borderRadius: scale(100),
     backgroundColor: COLORS.white,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: scale(4) },
     shadowOpacity: 0.2,
-    shadowRadius: 8,
+    shadowRadius: scale(8),
     elevation: 4,
   },
   startActionButtonText: {
-    fontSize: 15,
+    fontSize: scaleFont(15),
     color: COLORS.black,
     fontWeight: '600',
   },
@@ -1859,40 +1859,40 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
-    marginTop: 16,
+    gap: scale(8),
+    marginTop: scale(16),
   },
   dot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: scale(12),
+    height: scale(12),
+    borderRadius: scale(6),
     backgroundColor: 'rgba(255, 255, 255, 0.4)',
   },
   dotActive: {
-    width: 32,
-    height: 12,
-    borderRadius: 6,
+    width: scale(32),
+    height: scale(12),
+    borderRadius: scale(6),
     backgroundColor: COLORS.white,
     shadowColor: '#fff',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
-    shadowRadius: 4,
+    shadowRadius: scale(4),
     elevation: 2,
   },
   badgeContainer: {
     position: 'absolute',
-    top: -4,
-    right: -4,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
+    top: scale(-4),
+    right: scale(-4),
+    minWidth: scale(18),
+    height: scale(18),
+    borderRadius: scale(9),
     backgroundColor: '#FF4444',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 5,
+    paddingHorizontal: scale(5),
   },
   badgeText: {
-    fontSize: 11,
+    fontSize: scaleFont(11),
     color: COLORS.white,
     fontWeight: '700',
   },
@@ -1901,34 +1901,34 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: SPACING.xl,
+    paddingHorizontal: scale(SPACING.xl),
   },
   glassGenerateButton: {
-    paddingVertical: 18,
-    paddingHorizontal: 48,
-    borderRadius: 100,
+    paddingVertical: scale(18),
+    paddingHorizontal: scale(48),
+    borderRadius: scale(100),
     overflow: 'hidden',
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.25)',
   },
   glassGenerateButtonText: {
-    fontSize: 16,
+    fontSize: scaleFont(16),
     fontWeight: '600',
     color: COLORS.white,
   },
   loadingAnimationWrapper: {
     alignItems: 'center',
-    gap: 20,
+    gap: scale(20),
   },
   loadingAnimationText: {
-    fontSize: 18,
+    fontSize: scaleFont(18),
     fontWeight: '600',
     color: COLORS.white,
-    marginTop: 8,
+    marginTop: scale(8),
   },
   loadingAnimationSubtext: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     color: 'rgba(255, 255, 255, 0.7)',
     fontWeight: '400',
   },
@@ -1939,67 +1939,67 @@ const styles = StyleSheet.create({
   },
   whiteModalContainer: {
     backgroundColor: COLORS.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingBottom: 40,
+    borderTopLeftRadius: scale(24),
+    borderTopRightRadius: scale(24),
+    paddingBottom: scale(40),
   },
   whiteModalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
+    paddingHorizontal: scale(SPACING.lg),
+    paddingVertical: scale(SPACING.md),
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
   whiteModalTitle: {
-    fontSize: 18,
+    fontSize: scaleFont(18),
     fontWeight: '600',
     color: COLORS.black,
   },
   modalHeaderSpacer: {
-    width: 40,
+    width: scale(40),
   },
   whiteModalCloseButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: scale(40),
+    height: scale(40),
+    borderRadius: scale(20),
     alignItems: 'center',
     justifyContent: 'center',
   },
   whiteQuestionSection: {
-    paddingHorizontal: SPACING.lg,
-    marginTop: SPACING.xl,
+    paddingHorizontal: scale(SPACING.lg),
+    marginTop: scale(SPACING.xl),
   },
   whiteQuestionLabel: {
-    fontSize: 16,
+    fontSize: scaleFont(16),
     fontWeight: '600',
     color: COLORS.black,
-    marginBottom: SPACING.md,
+    marginBottom: scale(SPACING.md),
   },
   whiteBinaryOptions: {
     flexDirection: 'row',
-    gap: 12,
+    gap: scale(12),
   },
   whiteBinaryOption: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: SPACING.md,
-    borderRadius: 100,
+    paddingVertical: scale(16),
+    paddingHorizontal: scale(SPACING.md),
+    borderRadius: scale(100),
     backgroundColor: '#f5f5f5',
     borderWidth: 1,
     borderColor: '#e0e0e0',
-    gap: 8,
+    gap: scale(8),
   },
   whiteBinaryOptionActive: {
     backgroundColor: '#e8f5e9',
     borderColor: '#4CAF50',
   },
   whiteBinaryOptionText: {
-    fontSize: 15,
+    fontSize: scaleFont(15),
     fontWeight: '500',
     color: '#666',
   },
@@ -2008,14 +2008,14 @@ const styles = StyleSheet.create({
   },
   whiteTimeOptions: {
     flexDirection: 'row',
-    gap: 8,
+    gap: scale(8),
   },
   whiteTimeOption: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 100,
+    paddingVertical: scale(16),
+    borderRadius: scale(100),
     backgroundColor: '#f5f5f5',
     borderWidth: 1,
     borderColor: '#e0e0e0',
@@ -2025,10 +2025,10 @@ const styles = StyleSheet.create({
     borderColor: '#4CAF50',
   },
   whiteTimeOptionIcon: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
   },
   whiteTimeOptionLabel: {
-    fontSize: 13,
+    fontSize: scaleFont(13),
     fontWeight: '500',
     color: '#666',
   },
@@ -2038,30 +2038,30 @@ const styles = StyleSheet.create({
   whiteMoodOptions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: scale(10),
     justifyContent: 'center',
   },
   whiteMoodOption: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 100,
+    paddingVertical: scale(14),
+    paddingHorizontal: scale(16),
+    borderRadius: scale(100),
     backgroundColor: '#f5f5f5',
     borderWidth: 1,
     borderColor: '#e0e0e0',
-    gap: 6,
+    gap: scale(6),
   },
   whiteMoodOptionActive: {
     backgroundColor: '#e8f5e9',
     borderColor: '#4CAF50',
   },
   whiteMoodOptionIcon: {
-    fontSize: 16,
+    fontSize: scaleFont(16),
   },
   whiteMoodOptionText: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     fontWeight: '500',
     color: '#666',
   },
@@ -2069,23 +2069,23 @@ const styles = StyleSheet.create({
     color: COLORS.black,
   },
   whiteModalButtonContainer: {
-    paddingHorizontal: SPACING.lg,
-    marginTop: SPACING.xl,
+    paddingHorizontal: scale(SPACING.lg),
+    marginTop: scale(SPACING.xl),
   },
   whiteModalGenerateButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 18,
-    paddingHorizontal: SPACING.lg,
-    borderRadius: 16,
+    paddingVertical: scale(18),
+    paddingHorizontal: scale(SPACING.lg),
+    borderRadius: scale(16),
     backgroundColor: COLORS.black,
   },
   whiteModalGenerateButtonDisabled: {
     backgroundColor: '#e0e0e0',
   },
   whiteModalGenerateButtonText: {
-    fontSize: 16,
+    fontSize: scaleFont(16),
     fontWeight: '600',
     color: COLORS.white,
   },
@@ -2095,6 +2095,6 @@ const styles = StyleSheet.create({
   generatingContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: scale(10),
   },
 });

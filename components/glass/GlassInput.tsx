@@ -10,7 +10,7 @@ import {
   StyleProp,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { COLORS, RADIUS, TYPOGRAPHY, SPACING } from '@/constants/design';
+import { COLORS, RADIUS, TYPOGRAPHY, SPACING, IS_TABLET, scale, scaleFont } from '@/constants/design';
 
 interface GlassInputProps extends Omit<TextInputProps, 'style'> {
   label?: string;
@@ -93,17 +93,17 @@ GlassInput.displayName = 'GlassInput';
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: SPACING.md,
+    marginBottom: scale(SPACING.md),
   },
   label: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontSize: scaleFont(TYPOGRAPHY.fontSize.sm),
     fontWeight: TYPOGRAPHY.fontWeight.medium,
     color: COLORS.white,
-    marginBottom: SPACING.sm,
+    marginBottom: scale(SPACING.sm),
   },
   inputWrapper: {
-    borderRadius: RADIUS.xl,
-    borderWidth: 1,
+    borderRadius: scale(RADIUS.xl),
+    borderWidth: scale(1),
     borderColor: COLORS.glass.white20,
     overflow: 'hidden',
   },
@@ -114,39 +114,39 @@ const styles = StyleSheet.create({
     borderColor: COLORS.error,
   },
   blur: {
-    borderRadius: RADIUS.xl,
+    borderRadius: scale(RADIUS.xl),
     overflow: 'hidden',
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.glass.white10,
-    minHeight: 52,
-    paddingHorizontal: SPACING.lg,
+    minHeight: scale(52),
+    paddingHorizontal: scale(SPACING.lg),
   },
   input: {
     flex: 1,
-    fontSize: TYPOGRAPHY.fontSize.md,
+    fontSize: scaleFont(TYPOGRAPHY.fontSize.md),
     color: COLORS.white,
-    paddingVertical: SPACING.md,
+    paddingVertical: scale(SPACING.md),
   },
   inputWithLeftIcon: {
-    paddingLeft: SPACING.sm,
+    paddingLeft: scale(SPACING.sm),
   },
   inputWithRightIcon: {
-    paddingRight: SPACING.sm,
+    paddingRight: scale(SPACING.sm),
   },
   leftIcon: {
-    marginRight: SPACING.sm,
+    marginRight: scale(SPACING.sm),
   },
   rightIcon: {
-    marginLeft: SPACING.sm,
+    marginLeft: scale(SPACING.sm),
   },
   helperText: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
+    fontSize: scaleFont(TYPOGRAPHY.fontSize.xs),
     color: COLORS.glass.white60,
-    marginTop: SPACING.xs,
-    marginLeft: SPACING.xs,
+    marginTop: scale(SPACING.xs),
+    marginLeft: scale(SPACING.xs),
   },
   errorText: {
     color: COLORS.error,

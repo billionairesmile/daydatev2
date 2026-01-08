@@ -36,7 +36,7 @@ import {
 
 import { useTranslation } from 'react-i18next';
 import { useFocusEffect } from 'expo-router';
-import { COLORS, SPACING, RADIUS } from '@/constants/design';
+import { COLORS, SPACING, RADIUS, IS_TABLET, scale, scaleFont } from '@/constants/design';
 import { useBackground } from '@/contexts';
 import { useMemoryStore, SAMPLE_MEMORIES } from '@/stores/memoryStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -296,11 +296,11 @@ function SwipeableTodoItem({
         ]}
       >
         <Pressable style={styles.todoEditButton} onPress={handleEdit}>
-          <Edit2 color={COLORS.black} size={18} strokeWidth={2} />
+          <Edit2 color={COLORS.black} size={scale(18)} strokeWidth={2} />
           <Text style={styles.todoEditButtonText}>{editLabel}</Text>
         </Pressable>
         <Pressable style={styles.todoDeleteButton} onPress={handleDelete}>
-          <Trash2 color={COLORS.white} size={18} strokeWidth={2} />
+          <Trash2 color={COLORS.white} size={scale(18)} strokeWidth={2} />
           <Text style={styles.todoDeleteButtonText}>{deleteLabel}</Text>
         </Pressable>
       </Animated.View>
@@ -316,12 +316,12 @@ function SwipeableTodoItem({
         <Pressable onPress={onToggle} style={styles.todoCheckbox}>
           {todo.completed ? (
             <View style={styles.todoCheckboxCompleted}>
-              <Check color={COLORS.black} size={14} strokeWidth={3} />
+              <Check color={COLORS.black} size={scale(14)} strokeWidth={3} />
             </View>
           ) : (
             <Circle
               color="rgba(255,255,255,0.4)"
-              size={20}
+              size={scale(20)}
             />
           )}
         </Pressable>
@@ -1009,7 +1009,7 @@ export default function CalendarScreen() {
           style={styles.settingsButton}
           onPress={openSettingsModal}
         >
-          <Settings color={COLORS.white} size={20} strokeWidth={2} />
+          <Settings color={COLORS.white} size={scale(20)} strokeWidth={2} />
         </Pressable>
       </View>
 
@@ -1027,7 +1027,7 @@ export default function CalendarScreen() {
               setCurrentDate(new Date(year, month - 1, 1));
             }}
           >
-            <ChevronLeft color={COLORS.white} size={20} strokeWidth={2} />
+            <ChevronLeft color={COLORS.white} size={scale(20)} strokeWidth={2} />
           </Pressable>
           <Text style={styles.monthYearText}>
             {MONTH_NAMES_EN[month]} {year}
@@ -1038,7 +1038,7 @@ export default function CalendarScreen() {
               setCurrentDate(new Date(year, month + 1, 1));
             }}
           >
-            <ChevronRight color={COLORS.white} size={20} strokeWidth={2} />
+            <ChevronRight color={COLORS.white} size={scale(20)} strokeWidth={2} />
           </Pressable>
         </View>
 
@@ -1182,7 +1182,7 @@ export default function CalendarScreen() {
               style={styles.iconButtonRound}
               onPress={openTodoModal}
             >
-              <Pen color={COLORS.white} size={18} strokeWidth={2} />
+              <Pen color={COLORS.white} size={scale(18)} strokeWidth={2} />
             </Pressable>
           </View>
           <View style={styles.divider} />
@@ -1193,7 +1193,7 @@ export default function CalendarScreen() {
               <Pressable style={styles.emptyTodoCard} onPress={openTodoModal}>
                 <Text style={styles.emptyTodoText}>{t('calendar.todo.empty')}</Text>
                 <View style={styles.emptyTodoHint}>
-                  <Pen color="rgba(255,255,255,0.5)" size={16} strokeWidth={2} />
+                  <Pen color="rgba(255,255,255,0.5)" size={scale(16)} strokeWidth={2} />
                   <Text style={styles.emptyTodoHintText}>{t('calendar.todo.emptyHint')}</Text>
                 </View>
               </Pressable>
@@ -1224,7 +1224,7 @@ export default function CalendarScreen() {
                 style={styles.iconButtonRound}
                 onPress={() => openPeriodModal()}
               >
-                <Pen color={COLORS.white} size={18} strokeWidth={2} />
+                <Pen color={COLORS.white} size={scale(18)} strokeWidth={2} />
               </Pressable>
             </View>
             <View style={styles.divider} />
@@ -1237,7 +1237,7 @@ export default function CalendarScreen() {
                   end={{ x: 1, y: 1 }}
                   style={styles.periodIconLarge}
                 >
-                  <Droplet color={COLORS.white} size={32} strokeWidth={2} />
+                  <Droplet color={COLORS.white} size={scale(32)} strokeWidth={2} />
                 </LinearGradient>
                 <Text style={styles.emptyPeriodTitle}>{t('calendar.period.inputTitle')}</Text>
               </Pressable>
@@ -1258,7 +1258,7 @@ export default function CalendarScreen() {
                         end={{ x: 1, y: 1 }}
                         style={styles.periodIconSmall}
                       >
-                        <Droplet color={COLORS.white} size={20} strokeWidth={2} />
+                        <Droplet color={COLORS.white} size={scale(20)} strokeWidth={2} />
                       </LinearGradient>
                       <View>
                         <Text style={styles.nextPeriodLabel}>
@@ -1338,7 +1338,7 @@ export default function CalendarScreen() {
                   onPress={() => closeSettingsModal(false)}
                   style={styles.modalCloseButton}
                 >
-                  <X color="rgba(255,255,255,0.8)" size={20} strokeWidth={2} />
+                  <X color="rgba(255,255,255,0.8)" size={scale(20)} strokeWidth={2} />
                 </Pressable>
               </View>
               <View style={styles.modalHeaderDivider} />
@@ -1359,7 +1359,7 @@ export default function CalendarScreen() {
                     end={{ x: 1, y: 1 }}
                     style={styles.featureIconRound}
                   >
-                    <Droplet color={COLORS.white} size={24} strokeWidth={2} />
+                    <Droplet color={COLORS.white} size={scale(24)} strokeWidth={2} />
                   </LinearGradient>
                   <View style={styles.featureInfo}>
                     <Text style={styles.featureTitle}>{t('calendar.period.calendar')}</Text>
@@ -1369,10 +1369,10 @@ export default function CalendarScreen() {
                   </View>
                   {tempMenstrualEnabled ? (
                     <View style={styles.checkCircleActive}>
-                      <Check color={COLORS.black} size={16} strokeWidth={3} />
+                      <Check color={COLORS.black} size={scale(16)} strokeWidth={3} />
                     </View>
                   ) : (
-                    <Circle color="rgba(255,255,255,0.4)" size={24} strokeWidth={2} />
+                    <Circle color="rgba(255,255,255,0.4)" size={scale(24)} strokeWidth={2} />
                   )}
                 </Pressable>
               </View>
@@ -1407,7 +1407,7 @@ export default function CalendarScreen() {
                     onPress={closeTodoModal}
                     style={styles.modalCloseButton}
                   >
-                    <X color="rgba(255,255,255,0.8)" size={20} strokeWidth={2} />
+                    <X color="rgba(255,255,255,0.8)" size={scale(20)} strokeWidth={2} />
                   </Pressable>
                 </View>
                 <View style={styles.modalHeaderDivider} />
@@ -1462,7 +1462,7 @@ export default function CalendarScreen() {
                     onPress={closeEditTodoModal}
                     style={styles.modalCloseButton}
                   >
-                    <X color="rgba(255,255,255,0.8)" size={20} strokeWidth={2} />
+                    <X color="rgba(255,255,255,0.8)" size={scale(20)} strokeWidth={2} />
                   </Pressable>
                 </View>
                 <View style={styles.modalHeaderDivider} />
@@ -1516,7 +1516,7 @@ export default function CalendarScreen() {
                         onPress={() => closePeriodModal(false)}
                         style={styles.modalCloseButton}
                       >
-                        <X color="rgba(255,255,255,0.8)" size={20} strokeWidth={2} />
+                        <X color="rgba(255,255,255,0.8)" size={scale(20)} strokeWidth={2} />
                       </Pressable>
                     </View>
                     <View style={styles.modalHeaderDivider} />
@@ -1535,7 +1535,7 @@ export default function CalendarScreen() {
                             end={{ x: 1, y: 1 }}
                             style={styles.settingIconRound}
                           >
-                            <CalendarIcon color={COLORS.white} size={18} strokeWidth={2} />
+                            <CalendarIcon color={COLORS.white} size={scale(18)} strokeWidth={2} />
                           </LinearGradient>
                           <View style={styles.periodSettingInfo}>
                             <Text style={styles.periodSettingHint}>{t('calendar.period.lastStartDate')}</Text>
@@ -1545,7 +1545,7 @@ export default function CalendarScreen() {
                                 : tempLastPeriodDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
                             </Text>
                           </View>
-                          <ChevronRight color="rgba(255,255,255,0.4)" size={20} strokeWidth={2} />
+                          <ChevronRight color="rgba(255,255,255,0.4)" size={scale(20)} strokeWidth={2} />
                         </Pressable>
                       </View>
 
@@ -1562,7 +1562,7 @@ export default function CalendarScreen() {
                             end={{ x: 1, y: 1 }}
                             style={styles.settingIconRound}
                           >
-                            <Clock color={COLORS.white} size={18} strokeWidth={2} />
+                            <Clock color={COLORS.white} size={scale(18)} strokeWidth={2} />
                           </LinearGradient>
                           <TextInput
                             style={styles.cycleInput}
@@ -1574,7 +1574,7 @@ export default function CalendarScreen() {
                           <Text style={styles.cycleUnit}>{t('calendar.period.daysUnit')}</Text>
                         </Pressable>
                         <View style={styles.infoTextContainer}>
-                          <Info color="rgba(255, 255, 255, 0.5)" size={14} strokeWidth={2} />
+                          <Info color="rgba(255, 255, 255, 0.5)" size={scale(14)} strokeWidth={2} />
                           <Text style={styles.infoText}>{t('calendar.period.cycleHint')}</Text>
                         </View>
                       </View>
@@ -1597,7 +1597,7 @@ export default function CalendarScreen() {
                         onPress={() => closeDatePicker()}
                         style={styles.modalCloseButton}
                       >
-                        <X color="rgba(255,255,255,0.8)" size={20} strokeWidth={2} />
+                        <X color="rgba(255,255,255,0.8)" size={scale(20)} strokeWidth={2} />
                       </Pressable>
                     </View>
                     <View style={styles.modalHeaderDivider} />
@@ -1609,7 +1609,7 @@ export default function CalendarScreen() {
                           onPress={() => setPickerMonth(new Date(pickerMonth.getFullYear(), pickerMonth.getMonth() - 1, 1))}
                           style={styles.pickerNavButton}
                         >
-                          <ChevronLeft color={COLORS.foreground} size={18} />
+                          <ChevronLeft color={COLORS.foreground} size={scale(18)} />
                         </Pressable>
                         <Text style={styles.pickerMonthText}>
                           {i18n.language === 'ko'
@@ -1620,7 +1620,7 @@ export default function CalendarScreen() {
                           onPress={() => setPickerMonth(new Date(pickerMonth.getFullYear(), pickerMonth.getMonth() + 1, 1))}
                           style={styles.pickerNavButton}
                         >
-                          <ChevronRight color={COLORS.foreground} size={18} />
+                          <ChevronRight color={COLORS.foreground} size={scale(18)} />
                         </Pressable>
                       </View>
 
@@ -1706,7 +1706,7 @@ const styles = StyleSheet.create({
   },
   bannerAd: {
     position: 'absolute',
-    bottom: 94,
+    bottom: scale(94),
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -1737,43 +1737,43 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: SPACING.lg,
-    paddingBottom: 170,
+    paddingHorizontal: scale(SPACING.lg),
+    paddingBottom: scale(170),
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    paddingTop: 64,
-    paddingHorizontal: SPACING.lg,
-    paddingBottom: SPACING.lg,
+    paddingTop: scale(64),
+    paddingHorizontal: scale(SPACING.lg),
+    paddingBottom: scale(SPACING.lg),
     zIndex: 20,
   },
   headerTitle: {
-    fontSize: 32,
+    fontSize: scaleFont(32),
     color: COLORS.white,
     fontWeight: '700',
-    lineHeight: 38,
+    lineHeight: scaleFont(38),
   },
   headerSubtitle: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     color: COLORS.mutedForeground,
     fontWeight: '400',
-    marginTop: 4,
+    marginTop: scale(4),
   },
   // Icon button - circular style
   settingsButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: scale(36),
+    height: scale(36),
+    borderRadius: scale(18),
     backgroundColor: COLORS.secondary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconButtonRound: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: scale(36),
+    height: scale(36),
+    borderRadius: scale(18),
     backgroundColor: COLORS.secondary,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1782,34 +1782,34 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 16,
-    marginBottom: SPACING.md,
+    gap: scale(16),
+    marginBottom: scale(SPACING.md),
   },
   monthNavButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: scale(32),
+    height: scale(32),
+    borderRadius: scale(16),
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   monthYearText: {
-    fontSize: 16,
+    fontSize: scaleFont(16),
     color: COLORS.white,
     fontWeight: '600',
     textAlign: 'center',
-    minWidth: 120,
+    minWidth: scale(120),
   },
   dayNamesRow: {
     flexDirection: 'row',
-    marginBottom: SPACING.md,
+    marginBottom: scale(SPACING.md),
   },
   dayNameCell: {
     flex: 1,
     alignItems: 'center',
   },
   dayNameText: {
-    fontSize: 12,
+    fontSize: scaleFont(12),
     color: COLORS.mutedForeground,
     fontWeight: '500',
   },
@@ -1819,12 +1819,12 @@ const styles = StyleSheet.create({
   calendarGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: SPACING.lg,
+    marginBottom: scale(SPACING.lg),
   },
   dayCell: {
     width: `${100 / 7}%`,
     aspectRatio: 1,
-    padding: 3,
+    padding: scale(3),
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1833,7 +1833,7 @@ const styles = StyleSheet.create({
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: RADIUS.full,
+    borderRadius: scale(RADIUS.full),
     position: 'relative',
   },
   missionCell: {
@@ -1853,77 +1853,77 @@ const styles = StyleSheet.create({
   // Selection overlay for mission cells - positioned on top without affecting image size
   missionSelectionOverlay: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: RADIUS.full,
-    borderWidth: 2,
+    borderRadius: scale(RADIUS.full),
+    borderWidth: scale(2),
   },
   missionTodayIndicator: {
     borderColor: COLORS.primary,
     shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.4,
-    shadowRadius: 8,
+    shadowRadius: scale(8),
   },
   missionSelectedIndicator: {
     borderColor: '#E8DCC4',
     shadowColor: '#E8DCC4',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.4,
-    shadowRadius: 8,
+    shadowRadius: scale(8),
   },
   missionDayText: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     fontWeight: '600',
     color: COLORS.white,
     textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 8,
+    textShadowOffset: { width: 0, height: scale(2) },
+    textShadowRadius: scale(8),
   },
   todayBorder: {
-    borderWidth: 2,
+    borderWidth: scale(2),
     borderColor: COLORS.primary,
     shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.4,
-    shadowRadius: 8,
+    shadowRadius: scale(8),
   },
   selectedBorder: {
-    borderWidth: 2,
+    borderWidth: scale(2),
     borderColor: '#E8DCC4',
     shadowColor: '#E8DCC4',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.4,
-    shadowRadius: 8,
+    shadowRadius: scale(8),
   },
   todayCell: {
     backgroundColor: COLORS.glass.white10,
-    borderWidth: 2,
+    borderWidth: scale(2),
     borderColor: COLORS.primary,
     shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.4,
-    shadowRadius: 8,
+    shadowRadius: scale(8),
   },
   todayDayText: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     fontWeight: '700',
     color: COLORS.foreground,
   },
   selectedCell: {
     backgroundColor: COLORS.glass.white08,
-    borderWidth: 2,
+    borderWidth: scale(2),
     borderColor: '#E8DCC4',
     shadowColor: '#E8DCC4',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.4,
-    shadowRadius: 8,
+    shadowRadius: scale(8),
   },
   selectedDayText: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     fontWeight: '700',
     color: COLORS.foreground,
   },
   normalDayText: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     fontWeight: '500',
     color: COLORS.text.secondary,
   },
@@ -1932,170 +1932,170 @@ const styles = StyleSheet.create({
   },
   periodDot: {
     position: 'absolute',
-    top: 4,
-    right: 4,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    top: scale(4),
+    right: scale(4),
+    width: scale(6),
+    height: scale(6),
+    borderRadius: scale(3),
     backgroundColor: '#ec4899',
   },
   ovulationDot: {
     position: 'absolute',
-    top: 4,
-    right: 4,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    top: scale(4),
+    right: scale(4),
+    width: scale(6),
+    height: scale(6),
+    borderRadius: scale(3),
     backgroundColor: '#eab308',
   },
   fertileDot: {
     position: 'absolute',
-    top: 4,
-    right: 4,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    top: scale(4),
+    right: scale(4),
+    width: scale(6),
+    height: scale(6),
+    borderRadius: scale(3),
     backgroundColor: '#93c5fd',
   },
   todoDot: {
     position: 'absolute',
     top: '78%',
-    width: 18,
-    height: 3,
-    borderRadius: 2,
+    width: scale(18),
+    height: scale(3),
+    borderRadius: scale(2),
     backgroundColor: '#E8DCC4',
   },
   todaySection: {
-    marginTop: SPACING.lg,
-    paddingBottom: SPACING.lg,
+    marginTop: scale(SPACING.lg),
+    paddingBottom: scale(SPACING.lg),
   },
   todaySectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: SPACING.sm,
+    marginBottom: scale(SPACING.sm),
   },
   todaySectionTitle: {
-    fontSize: 24,
+    fontSize: scaleFont(24),
     color: COLORS.white,
     fontWeight: '600',
   },
   // Separator - aligned with figma-designs separator.tsx
   divider: {
-    height: 1,
+    height: scale(1),
     backgroundColor: COLORS.border,
-    marginBottom: SPACING.md,
+    marginBottom: scale(SPACING.md),
   },
   todoList: {
-    gap: 4,
+    gap: scale(4),
   },
   // Empty state card - aligned with figma-designs card.tsx
   emptyTodoCard: {
-    padding: 24,
-    borderRadius: 20,
+    padding: scale(24),
+    borderRadius: scale(20),
     backgroundColor: COLORS.card,
-    borderWidth: 1,
+    borderWidth: scale(1),
     borderColor: COLORS.border,
     alignItems: 'center',
   },
   emptyTodoText: {
-    fontSize: 18,
+    fontSize: scaleFont(18),
     color: COLORS.text.secondary,
     fontWeight: '500',
-    marginBottom: 12,
+    marginBottom: scale(12),
   },
   emptyTodoHint: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: scale(8),
   },
   emptyTodoHintText: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     color: COLORS.text.muted,
     fontWeight: '400',
   },
   // Swipeable Todo Item styles
   todoItemWrapper: {
     position: 'relative',
-    marginBottom: 4,
+    marginBottom: scale(4),
   },
   todoActionsContainer: {
     position: 'absolute',
-    right: 4,
+    right: scale(4),
     top: 0,
     bottom: 0,
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'center',
-    gap: 8,
-    paddingRight: 4,
+    gap: scale(8),
+    paddingRight: scale(4),
     zIndex: 0,
   },
   // Edit button - matches anniversary card style
   todoEditButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: scale(50),
+    height: scale(50),
+    borderRadius: scale(25),
     backgroundColor: COLORS.white,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: scale(2) },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: scale(4),
   },
   // Delete button - matches anniversary card style
   todoDeleteButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: scale(50),
+    height: scale(50),
+    borderRadius: scale(25),
     backgroundColor: '#EF4444',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#EF4444',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: scale(2) },
     shadowOpacity: 0.3,
-    shadowRadius: 4,
+    shadowRadius: scale(4),
   },
   // Button text labels
   todoEditButtonText: {
-    fontSize: 10,
+    fontSize: scaleFont(10),
     color: COLORS.black,
     fontWeight: '600',
-    marginTop: 2,
+    marginTop: scale(2),
   },
   todoDeleteButtonText: {
-    fontSize: 10,
+    fontSize: scaleFont(10),
     color: COLORS.white,
     fontWeight: '600',
-    marginTop: 2,
+    marginTop: scale(2),
   },
   // Todo item card - maximum rounded
   todoItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 999,
+    padding: scale(16),
+    borderRadius: scale(999),
     backgroundColor: COLORS.card,
-    borderWidth: 1,
+    borderWidth: scale(1),
     borderColor: COLORS.border,
-    gap: 12,
+    gap: scale(12),
     zIndex: 1,
   },
   todoCheckbox: {
     flexShrink: 0,
   },
   todoCheckboxCompleted: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: scale(20),
+    height: scale(20),
+    borderRadius: scale(10),
     backgroundColor: COLORS.white,
     alignItems: 'center',
     justifyContent: 'center',
   },
   todoText: {
     flex: 1,
-    fontSize: 16,
+    fontSize: scaleFont(16),
     color: COLORS.white,
     fontWeight: '400',
   },
@@ -2104,128 +2104,128 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   periodSection: {
-    marginTop: SPACING.xl,
-    paddingBottom: SPACING.lg,
+    marginTop: scale(SPACING.xl),
+    paddingBottom: scale(SPACING.lg),
   },
   periodSectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: SPACING.sm,
+    marginBottom: scale(SPACING.sm),
   },
   periodSectionTitle: {
-    fontSize: 24,
+    fontSize: scaleFont(24),
     color: COLORS.white,
     fontWeight: '600',
   },
   // Period empty card - aligned with figma-designs card.tsx
   emptyPeriodCard: {
-    padding: 24,
-    borderRadius: 20,
+    padding: scale(24),
+    borderRadius: scale(20),
     backgroundColor: COLORS.card,
-    borderWidth: 1,
+    borderWidth: scale(1),
     borderColor: COLORS.border,
     alignItems: 'center',
-    gap: 12,
+    gap: scale(12),
   },
   periodIconLarge: {
-    width: 64,
-    height: 64,
-    borderRadius: RADIUS.full,
+    width: scale(64),
+    height: scale(64),
+    borderRadius: scale(RADIUS.full),
     alignItems: 'center',
     justifyContent: 'center',
   },
   emptyPeriodTitle: {
-    fontSize: 18,
+    fontSize: scaleFont(18),
     color: COLORS.foreground,
     fontWeight: '600',
   },
   periodDataContainer: {
-    gap: 12,
+    gap: scale(12),
   },
   // Next period card - aligned with figma-designs card.tsx
   nextPeriodCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
-    borderRadius: 20,
-    borderWidth: 1,
+    padding: scale(16),
+    borderRadius: scale(20),
+    borderWidth: scale(1),
     borderColor: COLORS.border,
   },
   nextPeriodLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: scale(12),
   },
   periodIconSmall: {
-    width: 40,
-    height: 40,
-    borderRadius: RADIUS.full,
+    width: scale(40),
+    height: scale(40),
+    borderRadius: scale(RADIUS.full),
     alignItems: 'center',
     justifyContent: 'center',
   },
   nextPeriodLabel: {
-    fontSize: 12,
+    fontSize: scaleFont(12),
     color: COLORS.text.tertiary,
     fontWeight: '500',
   },
   nextPeriodDate: {
-    fontSize: 16,
+    fontSize: scaleFont(16),
     color: COLORS.white,
     fontWeight: '600',
   },
   dDayBadge: {
     backgroundColor: COLORS.glass.white20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: RADIUS.sm,
+    paddingHorizontal: scale(12),
+    paddingVertical: scale(6),
+    borderRadius: scale(RADIUS.sm),
   },
   dDayText: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     color: COLORS.white,
     fontWeight: '700',
   },
   cycleInfoRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: scale(12),
   },
   cycleInfoCard: {
     flex: 1,
-    padding: 16,
-    borderRadius: 20,
-    borderWidth: 1,
+    padding: scale(16),
+    borderRadius: scale(20),
+    borderWidth: scale(1),
     borderColor: COLORS.border,
   },
   cycleInfoLabel: {
-    fontSize: 12,
+    fontSize: scaleFont(12),
     color: COLORS.text.tertiary,
     fontWeight: '500',
-    marginBottom: 4,
+    marginBottom: scale(4),
   },
   cycleInfoValue: {
-    fontSize: 16,
+    fontSize: scaleFont(16),
     color: COLORS.white,
     fontWeight: '600',
   },
   legendRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 16,
-    marginTop: 8,
+    gap: scale(16),
+    marginTop: scale(8),
   },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: scale(6),
   },
   legendDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: scale(8),
+    height: scale(8),
+    borderRadius: scale(4),
   },
   legendText: {
-    fontSize: 12,
+    fontSize: scaleFont(12),
     color: COLORS.text.tertiary,
     fontWeight: '400',
   },
@@ -2240,14 +2240,14 @@ const styles = StyleSheet.create({
     width: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
+    paddingHorizontal: scale(SPACING.lg),
   },
   // Figma: bg-white/30 backdrop-blur-xl border-white/40 rounded-[32px]
   modalContent: {
-    width: width - 48,
+    width: width - scale(48),
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    borderRadius: 32,
-    borderWidth: 1,
+    borderRadius: scale(32),
+    borderWidth: scale(1),
     borderColor: 'rgba(255, 255, 255, 0.2)',
     overflow: 'hidden',
   },
@@ -2256,66 +2256,66 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 20,
+    paddingHorizontal: scale(24),
+    paddingVertical: scale(20),
   },
   modalHeaderDivider: {
-    height: 1,
+    height: scale(1),
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    marginHorizontal: 24,
+    marginHorizontal: scale(24),
   },
   // Figma: fontSize 20px, fontWeight 600
   modalTitle: {
-    fontSize: 20,
+    fontSize: scaleFont(20),
     color: COLORS.foreground,
     fontWeight: '600',
-    lineHeight: 28,
+    lineHeight: scaleFont(28),
   },
   // Figma: p-2 rounded-full hover:bg-white/20
   modalCloseButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: scale(36),
+    height: scale(36),
+    borderRadius: scale(18),
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   modalBody: {
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 24,
-    gap: 16,
+    paddingHorizontal: scale(24),
+    paddingTop: scale(20),
+    paddingBottom: scale(24),
+    gap: scale(16),
   },
   modalDescription: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     color: COLORS.mutedForeground,
     fontWeight: '400',
-    lineHeight: 20,
+    lineHeight: scaleFont(20),
   },
   modalFooter: {
-    paddingHorizontal: 24,
-    paddingBottom: 24,
+    paddingHorizontal: scale(24),
+    paddingBottom: scale(24),
   },
   // Button styles - rounded like navigation bar
   // Figma: primary button - bg-white text-black, very rounded
   modalDoneButton: {
-    height: 44,
+    height: scale(44),
     backgroundColor: COLORS.white,
-    paddingHorizontal: 24,
-    borderRadius: 22,
+    paddingHorizontal: scale(24),
+    borderRadius: scale(22),
     alignItems: 'center',
     justifyContent: 'center',
   },
   modalDoneButtonText: {
-    fontSize: 15,
+    fontSize: scaleFont(15),
     color: COLORS.black,
     fontWeight: '600',
   },
   modalAddButtonFull: {
     width: '100%',
-    height: 44,
+    height: scale(44),
     backgroundColor: COLORS.white,
-    borderRadius: 22,
+    borderRadius: scale(22),
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2323,21 +2323,21 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   modalAddButtonText: {
-    fontSize: 15,
+    fontSize: scaleFont(15),
     color: COLORS.black,
     fontWeight: '600',
   },
   // Figma: primary button - bg-white text-black, very rounded
   modalSaveButton: {
-    height: 44,
+    height: scale(44),
     backgroundColor: COLORS.white,
-    paddingHorizontal: 24,
-    borderRadius: 22,
+    paddingHorizontal: scale(24),
+    borderRadius: scale(22),
     alignItems: 'center',
     justifyContent: 'center',
   },
   modalSaveButtonText: {
-    fontSize: 15,
+    fontSize: scaleFont(15),
     color: COLORS.black,
     fontWeight: '600',
   },
@@ -2346,12 +2346,12 @@ const styles = StyleSheet.create({
   featureCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 16,
+    padding: scale(16),
+    borderRadius: scale(16),
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderWidth: 2,
+    borderWidth: scale(2),
     borderColor: 'rgba(255, 255, 255, 0.2)',
-    gap: 16,
+    gap: scale(16),
   },
   // Figma: active - bg-white/30 border-white
   featureCardActive: {
@@ -2359,17 +2359,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   checkCircleActive: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: scale(24),
+    height: scale(24),
+    borderRadius: scale(12),
     backgroundColor: COLORS.white,
     alignItems: 'center',
     justifyContent: 'center',
   },
   featureIconRound: {
-    width: 48,
-    height: 48,
-    borderRadius: RADIUS.full,
+    width: scale(48),
+    height: scale(48),
+    borderRadius: scale(RADIUS.full),
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2377,13 +2377,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   featureTitle: {
-    fontSize: 16,
+    fontSize: scaleFont(16),
     color: COLORS.white,
     fontWeight: '600',
-    marginBottom: 4,
+    marginBottom: scale(4),
   },
   featureDescription: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     color: COLORS.text.tertiary,
     fontWeight: '400',
   },
@@ -2391,53 +2391,53 @@ const styles = StyleSheet.create({
   // Figma: bg-white/10 border-white/20 rounded-2xl
   todoInputContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 16,
-    borderWidth: 1,
+    borderRadius: scale(16),
+    borderWidth: scale(1),
     borderColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: scale(16),
+    paddingVertical: scale(12),
   },
   todoInput: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     color: COLORS.foreground,
     fontWeight: '400',
-    minHeight: 72,
+    minHeight: scale(72),
     textAlignVertical: 'top',
-    lineHeight: 20,
+    lineHeight: scaleFont(20),
   },
   todoInputCount: {
-    fontSize: 12,
+    fontSize: scaleFont(12),
     color: 'rgba(255, 255, 255, 0.4)',
     textAlign: 'right',
-    marginTop: 8,
+    marginTop: scale(8),
   },
   // Period settings - aligned with figma-designs input.tsx
   periodSettingSection: {
-    marginBottom: 20,
+    marginBottom: scale(20),
   },
   periodSettingLabel: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     color: 'rgba(255, 255, 255, 0.7)',
     fontWeight: '500',
-    marginBottom: 10,
+    marginBottom: scale(10),
   },
   // Figma: bg-white/10 border-white/20 rounded-2xl
   periodSettingButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 16,
+    paddingHorizontal: scale(16),
+    paddingVertical: scale(12),
+    borderRadius: scale(16),
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderWidth: 1,
+    borderWidth: scale(1),
     borderColor: 'rgba(255, 255, 255, 0.2)',
-    gap: 12,
+    gap: scale(12),
   },
   // Gradient background for period settings icons
   settingIconRound: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: scale(36),
+    height: scale(36),
+    borderRadius: scale(18),
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2445,12 +2445,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   periodSettingHint: {
-    fontSize: 12,
+    fontSize: scaleFont(12),
     color: COLORS.mutedForeground,
     fontWeight: '400',
   },
   periodSettingValue: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     color: COLORS.foreground,
     fontWeight: '500',
   },
@@ -2458,33 +2458,33 @@ const styles = StyleSheet.create({
   cycleInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 16,
+    paddingHorizontal: scale(16),
+    paddingVertical: scale(12),
+    borderRadius: scale(16),
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderWidth: 1,
+    borderWidth: scale(1),
     borderColor: 'rgba(255, 255, 255, 0.2)',
-    gap: 12,
+    gap: scale(12),
   },
   cycleInput: {
     flex: 1,
-    fontSize: 14,
+    fontSize: scaleFont(14),
     color: COLORS.foreground,
     fontWeight: '500',
   },
   cycleUnit: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     color: 'rgba(255, 255, 255, 0.6)',
     fontWeight: '400',
   },
   infoTextContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginTop: 8,
+    gap: scale(4),
+    marginTop: scale(8),
   },
   infoText: {
-    fontSize: 12,
+    fontSize: scaleFont(12),
     color: 'rgba(255, 255, 255, 0.5)',
     fontWeight: '400',
   },
@@ -2493,57 +2493,57 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    marginBottom: 12,
+    paddingHorizontal: scale(8),
+    paddingVertical: scale(8),
+    marginBottom: scale(12),
   },
   pickerNavButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: scale(32),
+    height: scale(32),
+    borderRadius: scale(16),
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   pickerMonthText: {
-    fontSize: 16,
+    fontSize: scaleFont(16),
     color: COLORS.foreground,
     fontWeight: '600',
   },
   pickerDayNames: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginBottom: 8,
-    paddingHorizontal: 4,
+    marginBottom: scale(8),
+    paddingHorizontal: scale(4),
   },
   pickerDayName: {
     flex: 1,
     textAlign: 'center',
-    fontSize: 12,
+    fontSize: scaleFont(12),
     color: COLORS.mutedForeground,
     fontWeight: '500',
   },
   pickerGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: 4,
+    paddingHorizontal: scale(4),
   },
   pickerDayCell: {
     width: '14.28%',
     aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 2,
+    padding: scale(2),
   },
   pickerDayCellInner: {
     width: '100%',
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 100,
+    borderRadius: scale(100),
   },
   pickerDayText: {
-    fontSize: 14,
+    fontSize: scaleFont(14),
     color: COLORS.foreground,
     fontWeight: '400',
   },

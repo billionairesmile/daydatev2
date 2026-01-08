@@ -22,7 +22,7 @@ import {
 import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
 
-import { COLORS, SPACING } from '@/constants/design';
+import { COLORS, SPACING, IS_TABLET, scale, scaleFont } from '@/constants/design';
 import { useBackground } from '@/contexts';
 import { useSubscriptionStore } from '@/stores';
 import { PremiumSubscriptionModal } from '@/components/premium';
@@ -93,10 +93,10 @@ export default function MoreScreen() {
         onPress={item.onPress}
       >
         <View style={styles.menuItemLeft}>
-          <IconComponent color="rgba(255, 255, 255, 0.8)" size={22} />
+          <IconComponent color="rgba(255, 255, 255, 0.8)" size={scale(22)} />
           <Text style={styles.menuItemLabel}>{item.label}</Text>
         </View>
-        <ChevronRight color="rgba(255, 255, 255, 0.4)" size={20} />
+        <ChevronRight color="rgba(255, 255, 255, 0.4)" size={scale(20)} />
       </Pressable>
     );
   };
@@ -150,7 +150,7 @@ export default function MoreScreen() {
                 >
                   <View style={styles.premiumCardLeft}>
                     <View style={[styles.premiumIconWrapper, hasPremiumAccess && styles.premiumIconWrapperActive]}>
-                      <Crown color={hasPremiumAccess ? '#D97706' : COLORS.black} size={22} />
+                      <Crown color={hasPremiumAccess ? '#D97706' : COLORS.black} size={scale(22)} />
                     </View>
                     <View style={styles.premiumInfo}>
                       <Text style={[styles.premiumTitle, hasPremiumAccess && styles.premiumTitleActive]}>
@@ -167,7 +167,7 @@ export default function MoreScreen() {
                       </Text>
                     </View>
                   </View>
-                  <ChevronRight color={hasPremiumAccess ? '#D97706' : '#999'} size={20} />
+                  <ChevronRight color={hasPremiumAccess ? '#D97706' : '#999'} size={scale(20)} />
                 </Pressable>
               </View>
             )}
@@ -216,35 +216,35 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: SPACING.lg,
-    paddingBottom: 120,
+    paddingHorizontal: scale(SPACING.lg),
+    paddingBottom: scale(120),
   },
   header: {
-    paddingTop: 64,
-    paddingHorizontal: SPACING.lg,
-    paddingBottom: SPACING.lg,
+    paddingTop: scale(64),
+    paddingHorizontal: scale(SPACING.lg),
+    paddingBottom: scale(SPACING.lg),
     zIndex: 20,
   },
   headerTitle: {
-    fontSize: 32,
+    fontSize: scaleFont(32),
     color: COLORS.white,
     fontWeight: '700',
-    lineHeight: 38,
+    lineHeight: scaleFont(38),
   },
   section: {
-    marginBottom: SPACING.lg,
+    marginBottom: scale(SPACING.lg),
   },
   sectionTitle: {
-    fontSize: 13,
+    fontSize: scaleFont(13),
     color: 'rgba(255, 255, 255, 0.6)',
     fontWeight: '500',
-    marginBottom: SPACING.sm,
-    marginLeft: SPACING.xs,
+    marginBottom: scale(SPACING.sm),
+    marginLeft: scale(SPACING.xs),
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: scale(0.5),
   },
   menuCard: {
-    borderRadius: 20,
+    borderRadius: scale(20),
     overflow: 'hidden',
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderWidth: 1,
@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: SPACING.lg,
+    padding: scale(SPACING.lg),
   },
   menuItemBorder: {
     borderBottomWidth: 1,
@@ -265,17 +265,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   menuItemLabel: {
-    fontSize: 16,
+    fontSize: scaleFont(16),
     color: COLORS.white,
-    marginLeft: SPACING.md,
+    marginLeft: scale(SPACING.md),
     fontWeight: '400',
   },
   // Premium Card Styles
   premiumCard: {
-    borderRadius: 20,
+    borderRadius: scale(20),
     overflow: 'hidden',
     backgroundColor: COLORS.white,
-    padding: SPACING.lg,
+    padding: scale(SPACING.lg),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -289,13 +289,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   premiumIconWrapper: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: scale(44),
+    height: scale(44),
+    borderRadius: scale(22),
     backgroundColor: '#f5f5f5',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: SPACING.md,
+    marginRight: scale(SPACING.md),
   },
   premiumIconWrapperActive: {
     backgroundColor: '#FEF3C7',
@@ -304,16 +304,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   premiumTitle: {
-    fontSize: 16,
+    fontSize: scaleFont(16),
     fontWeight: '600',
     color: COLORS.black,
-    marginBottom: 2,
+    marginBottom: scale(2),
   },
   premiumTitleActive: {
     color: '#D97706',
   },
   premiumDescription: {
-    fontSize: 13,
+    fontSize: scaleFont(13),
     color: '#666',
   },
 });
