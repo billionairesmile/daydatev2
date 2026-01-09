@@ -6,6 +6,7 @@ import {
   Dimensions,
   Pressable,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Image as ExpoImage } from 'expo-image';
@@ -22,7 +23,7 @@ import {
 import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
 
-import { COLORS, SPACING, IS_TABLET, scale, scaleFont } from '@/constants/design';
+import { COLORS, SPACING, scale, scaleFont } from '@/constants/design';
 import { useBackground } from '@/contexts';
 import { useSubscriptionStore } from '@/stores';
 import { PremiumSubscriptionModal } from '@/components/premium';
@@ -103,19 +104,20 @@ export default function MoreScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Background - ExpoImage + BlurView (optimized) */}
+      {/* Background */}
       <View style={styles.backgroundImage}>
         <ExpoImage
           source={backgroundImage?.uri ? { uri: backgroundImage.uri } : backgroundImage}
           placeholder="L6PZfSi_.AyE_3t7t7R**0LTIpIp"
           contentFit="cover"
-          transition={150}
+          transition={0}
           cachePolicy="memory-disk"
+          priority="high"
           style={styles.backgroundImageStyle}
         />
-        <BlurView intensity={90} tint="light" style={StyleSheet.absoluteFill} />
+        <BlurView experimentalBlurMethod="dimezisBlurView" intensity={Platform.OS === 'ios' ? 90 : 50} tint={Platform.OS === 'ios' ? 'light' : 'default'} style={StyleSheet.absoluteFill} />
       </View>
-      <View style={styles.overlay} />
+      <View style={[styles.overlay, { backgroundColor: Platform.OS === 'ios' ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.15)' }]} />
 
       {/* Header - Fixed at top */}
       <View style={styles.header}>
@@ -210,7 +212,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.35)',
   },
   scrollView: {
     flex: 1,
@@ -230,6 +231,7 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontWeight: '700',
     lineHeight: scaleFont(38),
+    textShadowColor: 'transparent',
   },
   section: {
     marginBottom: scale(SPACING.lg),

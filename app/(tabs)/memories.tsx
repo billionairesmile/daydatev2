@@ -22,6 +22,7 @@ import {
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as MediaLibrary from 'expo-media-library';
@@ -87,6 +88,7 @@ interface Album {
   textScale: number; // Overall text scale (0.5 - 1.5)
   fontStyle: FontStyleType; // 'basic' for Jua, 'ransom' for image-based ransom style
   ransomSeed?: number; // Seed for consistent ransom text image selection
+  textColor?: 'white' | 'black'; // Text color for basic font style
 }
 
 const { width, height } = Dimensions.get('window');
@@ -102,6 +104,9 @@ const ALBUM_SCALE_RATIO = ALBUM_CARD_WIDTH / MODAL_PREVIEW_WIDTH;
 const ALBUM_DETAIL_SCALE_RATIO = ALBUM_DETAIL_WIDTH / MODAL_PREVIEW_WIDTH;
 const ALBUM_CARD_HEIGHT = ALBUM_CARD_WIDTH * 4 / 3;
 const ALBUM_DETAIL_HEIGHT = ALBUM_DETAIL_WIDTH * 4 / 3;
+// Default text position - horizontally centered (35% from left)
+const DEFAULT_TEXT_X = Math.floor(MODAL_PREVIEW_WIDTH * 0.35);
+const DEFAULT_TEXT_Y = 16;
 
 // Check if position is normalized (0-1 range)
 const isNormalizedPosition = (pos: { x: number; y: number }): boolean => {
@@ -146,6 +151,7 @@ export default function MemoriesScreen() {
   const { backgroundImage } = useBackground();
   const { memories, deleteMemory, loadFromDB } = useMemoryStore();
   const { user, partner, couple } = useAuthStore();
+  const insets = useSafeAreaInsets();
 
   // Album sync store
   const {
@@ -194,6 +200,7 @@ export default function MemoriesScreen() {
     textScale: syncedAlbum.text_scale || 1.0,
     fontStyle: (syncedAlbum.font_style as FontStyleType) || 'basic',
     ransomSeed: syncedAlbum.ransom_seed ?? undefined,
+    textColor: (syncedAlbum.title_color as 'white' | 'black') || 'white',
   }), []);
 
   // Use synced albums if available, otherwise fallback to local
@@ -266,7 +273,7 @@ export default function MemoriesScreen() {
   const [isPending, startTransition] = useTransition(); // For non-blocking preview updates
   const [albumCoverPhoto, setAlbumCoverPhoto] = useState<string | null>(null);
   const [albumStep, setAlbumStep] = useState<'fontStyle' | 'name' | 'cover'>('fontStyle'); // Start with font selection
-  const [namePosition, setNamePosition] = useState({ x: 30, y: 16 }); // Default position (past 24px book spine)
+  const [namePosition, setNamePosition] = useState({ x: DEFAULT_TEXT_X, y: DEFAULT_TEXT_Y }); // Default position (centered)
   const [textScale, setTextScale] = useState(1.0); // Overall text scale (0.5 - 1.5)
   const [fontStyle, setFontStyle] = useState<FontStyleType>(null); // No style selected by default
   const [textColor, setTextColor] = useState<'white' | 'black'>('white'); // Text color for basic font
@@ -305,8 +312,9 @@ export default function MemoriesScreen() {
   const [editFontStyle, setEditFontStyle] = useState<FontStyleType>(null);
   const [editRansomSeed, setEditRansomSeed] = useState<number>(() => Math.floor(Math.random() * 1000000));
   const [editCoverPhoto, setEditCoverPhoto] = useState<string | null>(null);
-  const [editTextPosition, setEditTextPosition] = useState({ x: 30, y: 16 });
+  const [editTextPosition, setEditTextPosition] = useState({ x: DEFAULT_TEXT_X, y: DEFAULT_TEXT_Y });
   const [editTextScale, setEditTextScale] = useState(1);
+  const [editTextColor, setEditTextColor] = useState<'white' | 'black'>('white');
 
 
   // Refs to keep state values fresh in PanResponder callbacks
@@ -337,7 +345,7 @@ export default function MemoriesScreen() {
   const stepOpacityAnim = useRef(new Animated.Value(1)).current;
 
   // Animated position for dragging
-  const panPosition = useRef(new Animated.ValueXY({ x: 30, y: 16 })).current;
+  const panPosition = useRef(new Animated.ValueXY({ x: DEFAULT_TEXT_X, y: DEFAULT_TEXT_Y })).current;
   const panOffset = useRef({ x: 0, y: 0 });
 
   // Actual container bounds measured via onLayout (ref to work with PanResponder)
@@ -399,17 +407,27 @@ export default function MemoriesScreen() {
         const actualWidth = containerBounds.current.width;
         const actualHeight = containerBounds.current.height;
 
-        // Simple bounds - just use fixed margins, let text overflow naturally
+        // Get current text properties for dynamic bounds calculation
+        const currentText = albumNameRef.current;
+        const currentFontStyle = fontStyleRef.current;
+        const currentScale = textScaleRef.current;
+        const isRansom = currentFontStyle === 'ransom';
+
+        // Calculate estimated text dimensions
+        const estimatedTextWidth = getEstimatedTextWidth(currentText, isRansom, currentScale);
+        // Basic font: fontSize 16 * scale, lineHeight 1.3x
+        // Ransom font: characterSize 18 * scale
+        const baseHeight = isRansom ? 18 : 16;
+        const estimatedTextHeight = baseHeight * currentScale * 1.3;
+
+        // Bounds: ensure text stays within photo area
         const BOOK_SPINE_WIDTH = 24;
         const SPINE_MARGIN = 4;
-        const RIGHT_MARGIN = 16;
-        const TEXT_HEIGHT_BUFFER = 32;
-        const TOP_PADDING = 8;
 
-        const minX = BOOK_SPINE_WIDTH + SPINE_MARGIN;
-        const maxX = actualWidth - RIGHT_MARGIN;
-        const minY = TOP_PADDING;
-        const maxY = actualHeight - TEXT_HEIGHT_BUFFER;
+        const minX = BOOK_SPINE_WIDTH + SPINE_MARGIN; // Left: past book spine
+        const maxX = actualWidth; // Right: no limit, can go past photo edge
+        const minY = 0; // Top: text top can touch photo top
+        const maxY = actualHeight - estimatedTextHeight; // Bottom: text bottom at photo bottom
 
         newX = Math.max(minX, Math.min(maxX, newX));
         newY = Math.max(minY, Math.min(maxY, newY));
@@ -797,6 +815,7 @@ export default function MemoriesScreen() {
         textScale: textScale,
         fontStyle: fontStyle,
         ransomSeed: ransomSeed, // Save the ransom seed for consistent rendering
+        textColor: textColor, // Save text color for basic font style
       };
 
       // Sync or local save based on mode
@@ -808,7 +827,8 @@ export default function MemoriesScreen() {
             normalizedPosition,
             textScale,
             fontStyle || 'basic',
-            ransomSeed
+            ransomSeed,
+            textColor
           );
         } catch (error) {
           console.error('Error syncing album:', error);
@@ -822,7 +842,7 @@ export default function MemoriesScreen() {
 
       // Prefetch cover photo before showing in list for instant display
       if (finalCoverPhotoUrl) {
-        ExpoImage.prefetch(finalCoverPhotoUrl).catch(() => {});
+        ExpoImage.prefetch(finalCoverPhotoUrl).catch(() => { });
       }
 
       // Animate out then reset modal state
@@ -843,8 +863,8 @@ export default function MemoriesScreen() {
         setPreviewText('');
         setAlbumCoverPhoto(null);
         setAlbumStep('fontStyle'); // Reset to font selection
-        setNamePosition({ x: 30, y: 16 }); // Reset position (past 24px book spine)
-        panPosition.setValue({ x: 30, y: 16 }); // Reset animated position
+        setNamePosition({ x: DEFAULT_TEXT_X, y: DEFAULT_TEXT_Y }); // Reset position (centered)
+        panPosition.setValue({ x: DEFAULT_TEXT_X, y: DEFAULT_TEXT_Y }); // Reset animated position
         setTextScale(1.0); // Reset text scale
         setFontStyle(null); // Reset font style - no selection
         setRansomSeed(Math.floor(Math.random() * 1000000)); // Generate new seed for next album
@@ -894,8 +914,8 @@ export default function MemoriesScreen() {
     setAlbumName('');
     setPreviewText('');
     setAlbumCoverPhoto(null);
-    setNamePosition({ x: 30, y: 16 }); // Reset position (past 24px book spine)
-    panPosition.setValue({ x: 30, y: 16 }); // Reset animated position
+    setNamePosition({ x: DEFAULT_TEXT_X, y: DEFAULT_TEXT_Y }); // Reset position (centered)
+    panPosition.setValue({ x: DEFAULT_TEXT_X, y: DEFAULT_TEXT_Y }); // Reset animated position
     setTextScale(1.0); // Reset text scale
     setFontStyle(null); // Reset font style - no selection
     setRansomSeed(Math.floor(Math.random() * 1000000)); // Generate fresh seed
@@ -936,8 +956,8 @@ export default function MemoriesScreen() {
       setPreviewText('');
       setAlbumCoverPhoto(null);
       setAlbumStep('fontStyle');
-      setNamePosition({ x: 30, y: 16 });
-      panPosition.setValue({ x: 30, y: 16 });
+      setNamePosition({ x: DEFAULT_TEXT_X, y: DEFAULT_TEXT_Y });
+      panPosition.setValue({ x: DEFAULT_TEXT_X, y: DEFAULT_TEXT_Y });
       setTextScale(1.0);
       setFontStyle(null);
     });
@@ -996,7 +1016,7 @@ export default function MemoriesScreen() {
   // ====== Cover Edit Modal Functions ======
 
   // Animated position for edit modal dragging
-  const editPanPosition = useRef(new Animated.ValueXY({ x: 30, y: 16 })).current;
+  const editPanPosition = useRef(new Animated.ValueXY({ x: DEFAULT_TEXT_X, y: DEFAULT_TEXT_Y })).current;
   const editPanOffset = useRef({ x: 0, y: 0 });
   const editContainerBounds = useRef({ width: MODAL_PREVIEW_WIDTH, height: MODAL_PREVIEW_WIDTH * 4 / 3 });
 
@@ -1024,16 +1044,25 @@ export default function MemoriesScreen() {
         const actualWidth = editContainerBounds.current.width;
         const actualHeight = editContainerBounds.current.height;
 
-        // Simple bounds - just use fixed margins, let text overflow naturally
+        // Get current text properties for dynamic bounds calculation
+        const currentText = editAlbumNameRef.current;
+        const currentFontStyle = editFontStyleRef.current;
+        const currentScale = editTextScaleRef.current;
+        const isRansom = currentFontStyle === 'ransom';
+
+        // Calculate estimated text dimensions
+        const estimatedTextWidth = getEstimatedTextWidth(currentText, isRansom, currentScale);
+        const baseHeight = isRansom ? 18 : 16;
+        const estimatedTextHeight = baseHeight * currentScale * 1.3;
+
+        // Bounds: ensure text stays within photo area
         const BOOK_SPINE_WIDTH = 24;
         const SPINE_MARGIN = 4;
-        const RIGHT_MARGIN = 16;
-        const TEXT_HEIGHT_BUFFER = 32;
 
-        const minX = BOOK_SPINE_WIDTH + SPINE_MARGIN;
-        const maxX = actualWidth - RIGHT_MARGIN;
-        const minY = 0;
-        const maxY = actualHeight - TEXT_HEIGHT_BUFFER;
+        const minX = BOOK_SPINE_WIDTH + SPINE_MARGIN; // Left: past book spine
+        const maxX = actualWidth; // Right: no limit, can go past photo edge
+        const minY = 0; // Top: text top can touch photo top
+        const maxY = actualHeight - estimatedTextHeight; // Bottom: text bottom at photo bottom
 
         newX = Math.max(minX, Math.min(maxX, newX));
         newY = Math.max(minY, Math.min(maxY, newY));
@@ -1074,14 +1103,38 @@ export default function MemoriesScreen() {
         y: editTextPosition.y / editContainerBounds.current.height,
       };
 
+      let finalCoverPhotoUrl = editCoverPhoto;
+
+      // If syncing and cover photo changed to a new local file, upload it first
+      if (isSyncInitialized && !isDemoMode && coupleId) {
+        const coverPhotoChanged = editCoverPhoto !== selectedAlbum.coverPhoto;
+        const isLocalFile = editCoverPhoto && !editCoverPhoto.startsWith('http');
+
+        if (coverPhotoChanged && isLocalFile) {
+          try {
+            console.log('[Album Edit] Uploading new cover photo to Supabase Storage...');
+            const uploadedUrl = await db.storage.uploadAlbumCover(coupleId, editCoverPhoto);
+            if (uploadedUrl) {
+              console.log('[Album Edit] Cover photo uploaded:', uploadedUrl);
+              finalCoverPhotoUrl = uploadedUrl;
+            } else {
+              console.warn('[Album Edit] Cover photo upload failed, using local URI');
+            }
+          } catch (error) {
+            console.error('[Album Edit] Cover photo upload error:', error);
+          }
+        }
+      }
+
       const updatedAlbum: Album = {
         ...selectedAlbum,
         name: editAlbumName.trim(),
-        coverPhoto: editCoverPhoto,
+        coverPhoto: finalCoverPhotoUrl,
         namePosition: normalizedEditPosition,
         textScale: editTextScale,
         fontStyle: editFontStyle,
         ransomSeed: editRansomSeed,
+        textColor: editTextColor,
       };
 
       // Sync or local update based on mode
@@ -1089,11 +1142,12 @@ export default function MemoriesScreen() {
         try {
           await syncUpdateAlbum(selectedAlbum.id, {
             name: editAlbumName.trim(),
-            cover_photo_url: editCoverPhoto,
+            cover_photo_url: finalCoverPhotoUrl,
             name_position: normalizedEditPosition,
             text_scale: editTextScale,
             font_style: editFontStyle || 'basic',
             ransom_seed: editRansomSeed,
+            title_color: editTextColor,
           });
         } catch (error) {
           console.error('Error syncing album update:', error);
@@ -1117,7 +1171,14 @@ export default function MemoriesScreen() {
   // Initialize edit pan position when modal opens
   useEffect(() => {
     if (showCoverEditModal && selectedAlbum) {
-      const pos = selectedAlbum.namePosition || { x: 30, y: 16 };
+      // Convert normalized position to absolute pixels for editor
+      const storedPos = selectedAlbum.namePosition || { x: 0.096, y: 0.038 };
+      const pos = isNormalizedPosition(storedPos)
+        ? {
+          x: storedPos.x * editContainerBounds.current.width,
+          y: storedPos.y * editContainerBounds.current.height,
+        }
+        : storedPos;
       editPanPosition.setValue(pos);
       editPanOffset.current = pos;
     }
@@ -1125,19 +1186,20 @@ export default function MemoriesScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Background Image - Optimized with expo-image + blur */}
+      {/* Background Image */}
       <View style={styles.backgroundImage}>
         <ExpoImage
           source={backgroundImage?.uri ? { uri: backgroundImage.uri } : backgroundImage}
           placeholder="L6PZfSi_.AyE_3t7t7R**0LTIpIp"
           contentFit="cover"
-          transition={150}
+          transition={0}
           cachePolicy="memory-disk"
+          priority="high"
           style={styles.backgroundImageStyle}
         />
-        <BlurView intensity={90} tint="light" style={StyleSheet.absoluteFill} />
+        <BlurView experimentalBlurMethod="dimezisBlurView" intensity={Platform.OS === 'ios' ? 90 : 50} tint={Platform.OS === 'ios' ? 'light' : 'default'} style={StyleSheet.absoluteFill} />
       </View>
-      <View style={styles.overlay} />
+      <View style={[styles.overlay, { backgroundColor: Platform.OS === 'ios' ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.15)' }]} />
 
       {/* Header */}
       <View style={styles.header}>
@@ -1241,7 +1303,7 @@ export default function MemoriesScreen() {
                             ]}>
                               {album.fontStyle === 'basic' ? (
                                 // Basic Jua Font Style
-                                <Text style={[styles.basicFontTiny, { fontSize: 16 * (album.textScale || 1) * ALBUM_SCALE_RATIO, lineHeight: 16 * (album.textScale || 1) * ALBUM_SCALE_RATIO * 1.3 }]}>{album.name}</Text>
+                                <Text style={[styles.basicFontTiny, { fontSize: 16 * (album.textScale || 1) * ALBUM_SCALE_RATIO, lineHeight: 16 * (album.textScale || 1) * ALBUM_SCALE_RATIO * 1.3, color: album.textColor === 'black' ? '#000000' : '#FFFFFF' }]}>{album.name}</Text>
                               ) : (
                                 // Ransom Style - Image-based
                                 <RansomText
@@ -1458,7 +1520,7 @@ export default function MemoriesScreen() {
                             ]}>
                               {album.fontStyle === 'basic' ? (
                                 // Basic Jua Font Style
-                                <Text style={[styles.basicFontTiny, { fontSize: 16 * (album.textScale || 1) * ALBUM_SCALE_RATIO, lineHeight: 16 * (album.textScale || 1) * ALBUM_SCALE_RATIO * 1.3 }]}>{album.name}</Text>
+                                <Text style={[styles.basicFontTiny, { fontSize: 16 * (album.textScale || 1) * ALBUM_SCALE_RATIO, lineHeight: 16 * (album.textScale || 1) * ALBUM_SCALE_RATIO * 1.3, color: album.textColor === 'black' ? '#000000' : '#FFFFFF' }]}>{album.name}</Text>
                               ) : (
                                 // Ransom Style - Image-based
                                 <RansomText
@@ -1512,7 +1574,7 @@ export default function MemoriesScreen() {
                 }
               }}
             >
-              <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
+              <BlurView experimentalBlurMethod="dimezisBlurView" intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
             </Pressable>
           </Animated.View>
 
@@ -1626,7 +1688,15 @@ export default function MemoriesScreen() {
         onRequestClose={closeAlbumModal}
       >
         <Animated.View style={[styles.albumModalFadeWrapper, { opacity: albumModalOpacityAnim }]}>
-          <BlurView intensity={80} tint="dark" style={styles.albumModalContainer}>
+          <BlurView
+            experimentalBlurMethod="dimezisBlurView"
+            intensity={80}
+            tint="dark"
+            style={[
+              styles.albumModalContainer,
+              { paddingBottom: Math.max(insets.bottom, scale(24)) }
+            ]}
+          >
             {/* Preload all character images when modal opens */}
             <CharacterPreloader />
             <TouchableWithoutFeedback onPress={closeAlbumModal}>
@@ -2001,7 +2071,7 @@ export default function MemoriesScreen() {
                   style={styles.monthModalBackdrop}
                   onPress={closeCoverPhotoPicker}
                 >
-                  <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
+                  <BlurView experimentalBlurMethod="dimezisBlurView" intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
                 </Pressable>
                 <Animated.View
                   style={[
@@ -2132,12 +2202,13 @@ export default function MemoriesScreen() {
                             const storedPos = selectedAlbum.namePosition || { x: 0.096, y: 0.038 };
                             const editPos = isNormalizedPosition(storedPos)
                               ? {
-                                  x: storedPos.x * editContainerBounds.current.width,
-                                  y: storedPos.y * editContainerBounds.current.height,
-                                }
+                                x: storedPos.x * editContainerBounds.current.width,
+                                y: storedPos.y * editContainerBounds.current.height,
+                              }
                               : storedPos;
                             setEditTextPosition(editPos);
                             setEditTextScale(selectedAlbum.textScale || 1);
+                            setEditTextColor(selectedAlbum.textColor || 'white');
                             setEditRansomSeed(selectedAlbum.ransomSeed || Math.floor(Math.random() * 1000000));
                             setEditAlbumStep('fontStyle');
                             setShowCoverEditModal(true);
@@ -2244,7 +2315,7 @@ export default function MemoriesScreen() {
                         getAlbumDetailPosition(selectedAlbum.namePosition)
                       ]}>
                         {selectedAlbum.fontStyle === 'basic' ? (
-                          <Text style={[styles.basicFontOverlay, { fontSize: 16 * selectedAlbum.textScale * ALBUM_DETAIL_SCALE_RATIO, lineHeight: 16 * selectedAlbum.textScale * ALBUM_DETAIL_SCALE_RATIO * 1.3 }]}>
+                          <Text style={[styles.basicFontOverlay, { fontSize: 16 * selectedAlbum.textScale * ALBUM_DETAIL_SCALE_RATIO, lineHeight: 16 * selectedAlbum.textScale * ALBUM_DETAIL_SCALE_RATIO * 1.3, color: selectedAlbum.textColor === 'black' ? '#000000' : '#FFFFFF' }]}>
                             {selectedAlbum.name}
                           </Text>
                         ) : (
@@ -2527,7 +2598,7 @@ export default function MemoriesScreen() {
                 style={styles.monthModalBackdrop}
                 onPress={closeMissionPicker}
               >
-                <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
+                <BlurView experimentalBlurMethod="dimezisBlurView" intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
               </Pressable>
               <Animated.View
                 style={[
@@ -2664,7 +2735,7 @@ export default function MemoriesScreen() {
               animationType="fade"
               onRequestClose={() => setShowCoverEditModal(false)}
             >
-              <BlurView intensity={80} tint="dark" style={styles.albumModalContainer}>
+              <BlurView experimentalBlurMethod="dimezisBlurView" intensity={80} tint="dark" style={styles.albumModalContainer}>
                 <TouchableWithoutFeedback onPress={() => setShowCoverEditModal(false)}>
                   <View style={styles.albumModalBackdrop} />
                 </TouchableWithoutFeedback>
@@ -2730,16 +2801,16 @@ export default function MemoriesScreen() {
                             }}
                           >
                             <View style={styles.fontStylePreviewContainer}>
-                            <RansomText
-                              text="FONT"
-                              seed={12345}
-                              characterSize={28}
-                              spacing={-4}
-                              enableRotation={true}
-                              enableYOffset={true}
-                            />
-                          </View>
-                          <Text style={styles.fontStyleLabel}>{t('memories.album.ransomStyle')}</Text>
+                              <RansomText
+                                text="FONT"
+                                seed={12345}
+                                characterSize={28}
+                                spacing={-4}
+                                enableRotation={true}
+                                enableYOffset={true}
+                              />
+                            </View>
+                            <Text style={styles.fontStyleLabel}>{t('memories.album.ransomStyle')}</Text>
                           </Pressable>
                         </View>
 
@@ -2884,7 +2955,7 @@ export default function MemoriesScreen() {
                                     {
                                       fontSize: 16 * editTextScale,
                                       lineHeight: 16 * editTextScale * 1.3,
-                                      color: textColor === 'black' ? '#000000' : COLORS.white,
+                                      color: editTextColor === 'black' ? '#000000' : COLORS.white,
                                     }
                                   ]}>{editAlbumName}</Text>
                                 ) : (
@@ -2921,17 +2992,17 @@ export default function MemoriesScreen() {
                                   style={[
                                     styles.colorButton,
                                     { backgroundColor: '#000000' },
-                                    textColor === 'black' && styles.colorButtonSelected,
+                                    editTextColor === 'black' && styles.colorButtonSelected,
                                   ]}
-                                  onPress={() => setTextColor('black')}
+                                  onPress={() => setEditTextColor('black')}
                                 />
                                 <Pressable
                                   style={[
                                     styles.colorButton,
                                     { backgroundColor: '#FFFFFF' },
-                                    textColor === 'white' && styles.colorButtonSelected,
+                                    editTextColor === 'white' && styles.colorButtonSelected,
                                   ]}
-                                  onPress={() => setTextColor('white')}
+                                  onPress={() => setEditTextColor('white')}
                                 />
                               </View>
                             </View>
@@ -3478,7 +3549,7 @@ function PhotoDetailView({
           style={styles.photoDetailMenuOverlay}
           onPress={() => setShowPhotoDetailMenu(false)}
         >
-          <BlurView intensity={50} tint="dark" style={styles.photoDetailMenuDropdown}>
+          <BlurView experimentalBlurMethod="dimezisBlurView" intensity={50} tint="dark" style={styles.photoDetailMenuDropdown}>
             <Pressable
               style={styles.photoDetailMenuItem}
               onPress={() => {
@@ -3600,7 +3671,6 @@ function PhotoDetailView({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.white,
   },
   bannerAd: {
     position: 'absolute',
@@ -3628,7 +3698,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.35)',
   },
   topFadeOverlay: {
     position: 'absolute',
@@ -3649,6 +3718,7 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontWeight: '700',
     lineHeight: scaleFont(38),
+    textShadowColor: 'transparent',
   },
   headerSubtitle: {
     fontSize: scaleFont(14),
@@ -4547,6 +4617,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    // paddingBottom applied dynamically with safe area insets
   },
   albumModalBackdrop: {
     ...StyleSheet.absoluteFillObject,

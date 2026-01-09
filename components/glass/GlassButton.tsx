@@ -141,7 +141,7 @@ export function GlassButton({
         style,
       ]}
     >
-      <BlurView intensity={40} tint="dark" style={styles.blur}>
+      <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={styles.blur}>
         <View
           style={[
             styles.glassContent,

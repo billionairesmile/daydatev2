@@ -67,7 +67,6 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1504630083234-14187a9df0f5${IMAGE_PARAMS}`, // 카페 모닝
     `${UNSPLASH_BASE}/photo-1497935586351-b67a49e012bf${IMAGE_PARAMS}`, // 커피 타임
     `${UNSPLASH_BASE}/photo-1495774856032-8b90bbb32b32${IMAGE_PARAMS}`, // 커피숍 분위기
-    `${UNSPLASH_BASE}/photo-1516743619420-154b70a65c9a${IMAGE_PARAMS}`, // 에스프레소
     `${UNSPLASH_BASE}/photo-1507133750040-4a8f57021571${IMAGE_PARAMS}`, // 커피 원두
     `${UNSPLASH_BASE}/photo-1461023058943-07fcbe16d735${IMAGE_PARAMS}`, // 카푸치노
     `${UNSPLASH_BASE}/photo-1514066558159-fc8c737ef259${IMAGE_PARAMS}`, // 아침 커피
@@ -87,13 +86,11 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1476224203421-9ac39bcb3327${IMAGE_PARAMS}`, // 맛있는 음식
     `${UNSPLASH_BASE}/photo-1540189549336-e6e99c3679fe${IMAGE_PARAMS}`, // 요리 플레이팅
     `${UNSPLASH_BASE}/photo-1565299624946-b28f40a0ae38${IMAGE_PARAMS}`, // 피자
-    `${UNSPLASH_BASE}/photo-1567620905732-57e1f6e91b97${IMAGE_PARAMS}`, // 음식 사진
     `${UNSPLASH_BASE}/photo-1559339352-11d035aa65de${IMAGE_PARAMS}`, // 코스 요리
     `${UNSPLASH_BASE}/photo-1551218808-94e220e084d2${IMAGE_PARAMS}`, // 파스타
     `${UNSPLASH_BASE}/photo-1466978913421-dad2ebd01d17${IMAGE_PARAMS}`, // 브런치
     `${UNSPLASH_BASE}/photo-1559847844-5315695dadae${IMAGE_PARAMS}`, // 디너
     `${UNSPLASH_BASE}/photo-1484980972926-edee96e0960d${IMAGE_PARAMS}`, // 요리 접시
-    `${UNSPLASH_BASE}/photo-1529543544277-82c2e2c35d71${IMAGE_PARAMS}`, // 테이블 세팅
     `${UNSPLASH_BASE}/photo-1550966871-3ed3cdb5ed0c${IMAGE_PARAMS}`, // 음식과 와인
     `${UNSPLASH_BASE}/photo-1537047902294-62a40c20a6ae${IMAGE_PARAMS}`, // 식사 시간
     `${UNSPLASH_BASE}/photo-1515669097368-22e68427d265${IMAGE_PARAMS}`, // 레스토랑 음식
@@ -121,7 +118,6 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1529006557810-274b9b2fc783${IMAGE_PARAMS}`, // 핫도그
     `${UNSPLASH_BASE}/photo-1551024506-0bccd828d307${IMAGE_PARAMS}`, // 치킨
     `${UNSPLASH_BASE}/photo-1536304929831-ee1ca9d44906${IMAGE_PARAMS}`, // 타코야끼
-    `${UNSPLASH_BASE}/photo-1567620905732-57e1f6e91b97${IMAGE_PARAMS}`, // 음식 사진
     `${UNSPLASH_BASE}/photo-1476224203421-9ac39bcb3327${IMAGE_PARAMS}`, // 맛있는 음식
     `${UNSPLASH_BASE}/photo-1565958011703-44f9829ba187${IMAGE_PARAMS}`, // 디저트
     `${UNSPLASH_BASE}/photo-1512621776951-a57141f2eefd${IMAGE_PARAMS}`, // 건강식
@@ -151,11 +147,8 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1586788680434-30d324b2d46f${IMAGE_PARAMS}`, // 푸딩
     `${UNSPLASH_BASE}/photo-1562440499-64c9a111f713${IMAGE_PARAMS}`, // 파르페
     `${UNSPLASH_BASE}/photo-1485921325833-c519f76c4927${IMAGE_PARAMS}`, // 케이크
-    `${UNSPLASH_BASE}/photo-1560180474-e8563f5284f4${IMAGE_PARAMS}`, // 팬케이크
-    `${UNSPLASH_BASE}/photo-1551106652-a5bcf0b59c85${IMAGE_PARAMS}`, // 딸기 케이크
     `${UNSPLASH_BASE}/photo-1499636136210-6f4ee915583e${IMAGE_PARAMS}`, // 베이커리
     `${UNSPLASH_BASE}/photo-1486427944299-d1955d23e34d${IMAGE_PARAMS}`, // 쿠키
-    `${UNSPLASH_BASE}/photo-1587241321097-72d14a9f75ed${IMAGE_PARAMS}`, // 젤라또
   ],
 
   // 🍴 Food & Drink - 요리
@@ -172,7 +165,6 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1505935428862-770b6f24f629${IMAGE_PARAMS}`, // 요리 과정
     `${UNSPLASH_BASE}/photo-1563379926898-05f4575a45d8${IMAGE_PARAMS}`, // 파스타 만들기
     `${UNSPLASH_BASE}/photo-1543353071-087092ec393a${IMAGE_PARAMS}`, // 베이킹
-    `${UNSPLASH_BASE}/photo-1607877361964-d8e11e745566${IMAGE_PARAMS}`, // 쿠킹 클래스
     `${UNSPLASH_BASE}/photo-1504754524776-8f4f37790ca0${IMAGE_PARAMS}`, // 음식 준비
     `${UNSPLASH_BASE}/photo-1452251889946-8ff5ea7b27ab${IMAGE_PARAMS}`, // 테이블 세팅
     `${UNSPLASH_BASE}/photo-1476718406336-bb5a9690ee2a${IMAGE_PARAMS}`, // 요리 완성
@@ -223,21 +215,17 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1484723091739-30a097e8f929${IMAGE_PARAMS}`, // 프렌치 토스트
     `${UNSPLASH_BASE}/photo-1504754524776-8f4f37790ca0${IMAGE_PARAMS}`, // 브런치 테이블
     `${UNSPLASH_BASE}/photo-1528207776546-365bb710ee93${IMAGE_PARAMS}`, // 샐러드
-    `${UNSPLASH_BASE}/photo-1567620905732-57e1f6e91b97${IMAGE_PARAMS}`, // 아침 식사
     `${UNSPLASH_BASE}/photo-1493770348161-369560ae357d${IMAGE_PARAMS}`, // 베이글
     `${UNSPLASH_BASE}/photo-1497445702960-c21c96af4c68${IMAGE_PARAMS}`, // 오믈렛
-    `${UNSPLASH_BASE}/photo-1482049016gy9c-4d5b-z${IMAGE_PARAMS}`, // 팬케이크
     `${UNSPLASH_BASE}/photo-1496412705862-e0088f16f791${IMAGE_PARAMS}`, // 아침 음식
     `${UNSPLASH_BASE}/photo-1506084868230-bb9d95c24759${IMAGE_PARAMS}`, // 계란 요리
     `${UNSPLASH_BASE}/photo-1495214783159-3503fd1b572d${IMAGE_PARAMS}`, // 요거트 볼
     `${UNSPLASH_BASE}/photo-1473093226795-af9932fe5856${IMAGE_PARAMS}`, // 빵과 커피
     `${UNSPLASH_BASE}/photo-1455619452474-d2be8b1e70cd${IMAGE_PARAMS}`, // 아침 식탁
     `${UNSPLASH_BASE}/photo-1467003909585-2f8a72700288${IMAGE_PARAMS}`, // 시리얼
-    `${UNSPLASH_BASE}/photo-1482049016gt8-4d5b-z${IMAGE_PARAMS}`, // 과일
     `${UNSPLASH_BASE}/photo-1490457843367-34b21b6ccd85${IMAGE_PARAMS}`, // 크로와상
     `${UNSPLASH_BASE}/photo-1460306855393-0410f61241c7${IMAGE_PARAMS}`, // 오렌지 주스
     `${UNSPLASH_BASE}/photo-1476718406336-bb5a9690ee2a${IMAGE_PARAMS}`, // 아침 요리
-    `${UNSPLASH_BASE}/photo-1482049016gta-4d5b-z${IMAGE_PARAMS}`, // 아침 카페
   ],
 
   // 🏞️ Place & Environment - 야외
@@ -253,7 +241,6 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1475924156734-496f6cac6ec1${IMAGE_PARAMS}`, // 초원
     `${UNSPLASH_BASE}/photo-1465188162913-8fb5709d6d57${IMAGE_PARAMS}`, // 공원
     `${UNSPLASH_BASE}/photo-1504280390367-361c6d9f38f4${IMAGE_PARAMS}`, // 캠핑
-    `${UNSPLASH_BASE}/photo-1476611338391-6f395a0dd982${IMAGE_PARAMS}`, // 꽃밭
     `${UNSPLASH_BASE}/photo-1510797215324-95aa89f43c33${IMAGE_PARAMS}`, // 해변
     `${UNSPLASH_BASE}/photo-1506744038136-46273834b3fb${IMAGE_PARAMS}`, // 산과 호수
     `${UNSPLASH_BASE}/photo-1472214103451-9374bd1c798e${IMAGE_PARAMS}`, // 일출
@@ -300,7 +287,6 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1512917774080-9991f1c4c750${IMAGE_PARAMS}`, // 럭셔리 홈
     `${UNSPLASH_BASE}/photo-1484154218962-a197022b5858${IMAGE_PARAMS}`, // 주방 인테리어
     `${UNSPLASH_BASE}/photo-1571939228382-b2f2b585ce15${IMAGE_PARAMS}`, // 아늑한 침실
-    `${UNSPLASH_BASE}/photo-1551298370-9d3d53f1eaa0${IMAGE_PARAMS}`, // 미니멀 침실
     `${UNSPLASH_BASE}/photo-1600607687939-ce8a6c25118c${IMAGE_PARAMS}`, // 창가 거실
     `${UNSPLASH_BASE}/photo-1600210492493-0946911123ea${IMAGE_PARAMS}`, // 따뜻한 거실
     `${UNSPLASH_BASE}/photo-1600585154526-990dced4db0d${IMAGE_PARAMS}`, // 침실 전경
@@ -347,13 +333,11 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1507525428034-b723cf961d3e${IMAGE_PARAMS}`, // 해변
     `${UNSPLASH_BASE}/photo-1517639493569-5666a7b2f494${IMAGE_PARAMS}`, // 놀이공원
     `${UNSPLASH_BASE}/photo-1513889961551-628c1e5e2ee9${IMAGE_PARAMS}`, // 롤러코스터
-    `${UNSPLASH_BASE}/photo-1560713781-d00a5b794ce8${IMAGE_PARAMS}`, // 피크닉
     `${UNSPLASH_BASE}/photo-1517457373958-b7bdd4587205${IMAGE_PARAMS}`, // 공원
     `${UNSPLASH_BASE}/photo-1484723091739-30a097e8f929${IMAGE_PARAMS}`, // 브런치
     `${UNSPLASH_BASE}/photo-1504280390367-361c6d9f38f4${IMAGE_PARAMS}`, // 캠핑
     `${UNSPLASH_BASE}/photo-1506929562872-bb421503ef21${IMAGE_PARAMS}`, // 해변 여행
     `${UNSPLASH_BASE}/photo-1511632765486-a01980e01a18${IMAGE_PARAMS}`, // 가족
-    `${UNSPLASH_BASE}/photo-1527856263669-12c3a0af2571${IMAGE_PARAMS}`, // 관람차
     `${UNSPLASH_BASE}/photo-1563207153-f403bf289096${IMAGE_PARAMS}`, // 아쿠아리움
     `${UNSPLASH_BASE}/photo-1534854638093-bada1813ca19${IMAGE_PARAMS}`, // 동물원
     `${UNSPLASH_BASE}/photo-1494783367193-149034c05e8f${IMAGE_PARAMS}`, // 여행
@@ -379,7 +363,6 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1489824904134-891ab64532f1${IMAGE_PARAMS}`, // 차 내부
     `${UNSPLASH_BASE}/photo-1459603677915-a62079ffd002${IMAGE_PARAMS}`, // 산길 드라이브
     `${UNSPLASH_BASE}/photo-1530533718754-001d2668365a${IMAGE_PARAMS}`, // 일몰 드라이브
-    `${UNSPLASH_BASE}/photo-1506015391gy1-15cf-4e9d2${IMAGE_PARAMS}`, // 해변 도로
     `${UNSPLASH_BASE}/photo-1519420573924-65fcd45245f8${IMAGE_PARAMS}`, // 터널
     `${UNSPLASH_BASE}/photo-1493238792000-8113da705763${IMAGE_PARAMS}`, // 밤 드라이브
     `${UNSPLASH_BASE}/photo-1541443131876-44b03de101c5${IMAGE_PARAMS}`, // 도심 드라이브
@@ -406,10 +389,8 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1531297484001-80022131f5a1${IMAGE_PARAMS}`, // 컴퓨터 야경
     `${UNSPLASH_BASE}/photo-1534430480872-3498386e7856${IMAGE_PARAMS}`, // 밤 도시
     `${UNSPLASH_BASE}/photo-1515825838458-f2a94b20105a${IMAGE_PARAMS}`, // 해안 야경
-    `${UNSPLASH_BASE}/photo-1506816561089-5cc37b4330ee${IMAGE_PARAMS}`, // 별빛
     `${UNSPLASH_BASE}/photo-1492571350019-22de08371fd3${IMAGE_PARAMS}`, // 은하수
     `${UNSPLASH_BASE}/photo-1503899036084-c55cdd92da26${IMAGE_PARAMS}`, // 도쿄 타워
-    `${UNSPLASH_BASE}/photo-1494366080280-c39e0f2e4241${IMAGE_PARAMS}`, // 파티 조명
     `${UNSPLASH_BASE}/photo-1509099836639-18ba1795216d${IMAGE_PARAMS}`, // 밤 풍경
     `${UNSPLASH_BASE}/photo-1493514789931-586cb221d7a7${IMAGE_PARAMS}`, // 오로라
     `${UNSPLASH_BASE}/photo-1536599018102-9f803c140fc1${IMAGE_PARAMS}`, // 런던 야경
@@ -508,11 +489,9 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
 
   // 🎯 Activities - 스포츠
   sports: [
-    `${UNSPLASH_BASE}/photo-1461896836934-ber48048547${IMAGE_PARAMS}`, // 농구
     `${UNSPLASH_BASE}/photo-1579952363873-27f3bade9f55${IMAGE_PARAMS}`, // 축구
     `${UNSPLASH_BASE}/photo-1554068865-24cecd4e34b8${IMAGE_PARAMS}`, // 테니스
     `${UNSPLASH_BASE}/photo-1471295253337-3ceaaedca402${IMAGE_PARAMS}`, // 야구
-    `${UNSPLASH_BASE}/photo-1508098682722-e99c43a406b2${IMAGE_PARAMS}`, // 배드민턴
     `${UNSPLASH_BASE}/photo-1574629810360-7efbbe195018${IMAGE_PARAMS}`, // 축구장
     `${UNSPLASH_BASE}/photo-1546519638-68e109498ffc${IMAGE_PARAMS}`, // 농구공
     `${UNSPLASH_BASE}/photo-1560272564-c83b66b1ad12${IMAGE_PARAMS}`, // 볼링
@@ -523,7 +502,6 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1521412644187-c49fa049e84d${IMAGE_PARAMS}`, // 스케이트보드
     `${UNSPLASH_BASE}/photo-1544717305-2782549b5136${IMAGE_PARAMS}`, // 배구
     `${UNSPLASH_BASE}/photo-1587280501635-68a0e82cd5ff${IMAGE_PARAMS}`, // 탁구
-    `${UNSPLASH_BASE}/photo-1509077317645-68c8e6af3bc8${IMAGE_PARAMS}`, // 당구
     `${UNSPLASH_BASE}/photo-1519861531473-9200262188bf${IMAGE_PARAMS}`, // 농구 경기
     `${UNSPLASH_BASE}/photo-1431324155629-1a6deb1dec8d${IMAGE_PARAMS}`, // 축구 경기
     `${UNSPLASH_BASE}/photo-1562771379-eafdca7a02f8${IMAGE_PARAMS}`, // 아이스링크
@@ -546,7 +524,6 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1552196563-55cd4e45efb3${IMAGE_PARAMS}`, // 조깅
     `${UNSPLASH_BASE}/photo-1594737625785-a6cbdabd333c${IMAGE_PARAMS}`, // 요가 수업
     `${UNSPLASH_BASE}/photo-1483721310020-03333e577078${IMAGE_PARAMS}`, // 팔굽혀펴기
-    `${UNSPLASH_BASE}/photo-1581009146145-b5ef050c149a${IMAGE_PARAMS}`, // 피트니스
     `${UNSPLASH_BASE}/photo-1599058917212-d750089bc07e${IMAGE_PARAMS}`, // 덤벨
     `${UNSPLASH_BASE}/photo-1518459031867-a89b944bffe4${IMAGE_PARAMS}`, // 매트 운동
     `${UNSPLASH_BASE}/photo-1574680096145-d05b474e2155${IMAGE_PARAMS}`, // 운동 기구
@@ -567,7 +544,6 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1519823551278-64ac92734fb1${IMAGE_PARAMS}`, // 온천
     `${UNSPLASH_BASE}/photo-1596178060810-72f53ce9a65c${IMAGE_PARAMS}`, // 풀장
     `${UNSPLASH_BASE}/photo-1571019613576-2b22c76fd955${IMAGE_PARAMS}`, // 마인드풀니스
-    `${UNSPLASH_BASE}/photo-1574269909862-7e3d7eb5283e${IMAGE_PARAMS}`, // 캔들
     `${UNSPLASH_BASE}/photo-1600618528240-fb9fc964b853${IMAGE_PARAMS}`, // 족욕
     `${UNSPLASH_BASE}/photo-1507003211169-0a1dd7228f2d${IMAGE_PARAMS}`, // 힐링
     `${UNSPLASH_BASE}/photo-1515377905703-c4788e51af15${IMAGE_PARAMS}`, // 자연 치유
@@ -585,7 +561,6 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1499892477393-f675706cbe6e${IMAGE_PARAMS}`, // 수채화
     `${UNSPLASH_BASE}/photo-1513364776144-60967b0f800f${IMAGE_PARAMS}`, // 아트
     `${UNSPLASH_BASE}/photo-1460661419201-fd4cecdf8a8b${IMAGE_PARAMS}`, // 페인팅
-    `${UNSPLASH_BASE}/photo-1551732998-9573f695fdbb${IMAGE_PARAMS}`, // 캔들 만들기
     `${UNSPLASH_BASE}/photo-1487530811176-3780de880c2d${IMAGE_PARAMS}`, // 꽃꽂이
     `${UNSPLASH_BASE}/photo-1604871000636-074fa5117945${IMAGE_PARAMS}`, // 공예
     `${UNSPLASH_BASE}/photo-1528312635006-8ea0bc49ec63${IMAGE_PARAMS}`, // 뜨개질
@@ -605,7 +580,6 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
   // 🎯 Activities - 게임
   game: [
     `${UNSPLASH_BASE}/photo-1511512578047-dfb367046420${IMAGE_PARAMS}`, // 게임
-    `${UNSPLASH_BASE}/photo-1493711662062-fa541f7f3d24${IMAGE_PARAMS}`, // 비디오 게임
     `${UNSPLASH_BASE}/photo-1612287230202-1ff1d85d1bdf${IMAGE_PARAMS}`, // 게임 컨트롤러
     `${UNSPLASH_BASE}/photo-1538481199705-c710c4e965fc${IMAGE_PARAMS}`, // PC 게임
     `${UNSPLASH_BASE}/photo-1606167668584-78701c57f13d${IMAGE_PARAMS}`, // 보드게임
@@ -613,7 +587,6 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1566694271453-390536dd1f0d${IMAGE_PARAMS}`, // 아케이드
     `${UNSPLASH_BASE}/photo-1578303512597-81e6cc155b3e${IMAGE_PARAMS}`, // 방탈출
     `${UNSPLASH_BASE}/photo-1545558014-8692077e9b5c${IMAGE_PARAMS}`, // VR 게임
-    `${UNSPLASH_BASE}/photo-1552820728-8b83bb6b2b07${IMAGE_PARAMS}`, // 닌텐도
     `${UNSPLASH_BASE}/photo-1612287230202-1ff1d85d1bdf${IMAGE_PARAMS}`, // 플레이스테이션
     `${UNSPLASH_BASE}/photo-1593305841991-05c297ba4575${IMAGE_PARAMS}`, // 포커
     `${UNSPLASH_BASE}/photo-1596451190630-186aff535bf2${IMAGE_PARAMS}`, // 체스
@@ -658,7 +631,6 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1452780212940-6f5c0d14d848${IMAGE_PARAMS}`, // 폴라로이드
     `${UNSPLASH_BASE}/photo-1554844453-7ea2a562a6c8${IMAGE_PARAMS}`, // 네컷사진
     `${UNSPLASH_BASE}/photo-1542038784456-1ea8e935640e${IMAGE_PARAMS}`, // 셀카
-    `${UNSPLASH_BASE}/photo-1606001342441-bb49a55ed7bc${IMAGE_PARAMS}`, // 인생네컷
     `${UNSPLASH_BASE}/photo-1527443224154-c4a3942d3acf${IMAGE_PARAMS}`, // 사진관
     `${UNSPLASH_BASE}/photo-1551721434-8b94ddff0e6d${IMAGE_PARAMS}`, // 필름 카메라
     `${UNSPLASH_BASE}/photo-1495555687398-3f50d6e79e1e${IMAGE_PARAMS}`, // 사진 앨범
@@ -669,7 +641,6 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1494232410401-ad00d5433cfa${IMAGE_PARAMS}`, // 스냅사진
     `${UNSPLASH_BASE}/photo-1500051638674-ff996a0ec29e${IMAGE_PARAMS}`, // 커플 셀피
     `${UNSPLASH_BASE}/photo-1581591524425-c7e0978865fc${IMAGE_PARAMS}`, // 사진 촬영
-    `${UNSPLASH_BASE}/photo-1517633220927-9b84d4098b40${IMAGE_PARAMS}`, // 스마트폰 사진
     `${UNSPLASH_BASE}/photo-1484154218962-a197022b5858${IMAGE_PARAMS}`, // 인테리어 사진
   ],
 
@@ -718,7 +689,6 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1537204696486-967f1b7198c8${IMAGE_PARAMS}`, // 피크닉
     `${UNSPLASH_BASE}/photo-1523301343968-6a6ebf63c672${IMAGE_PARAMS}`, // 음악 듣기
     `${UNSPLASH_BASE}/photo-1491438590914-bc09fcaaf77a${IMAGE_PARAMS}`, // 함께 웃기
-    `${UNSPLASH_BASE}/photo-1516967124798-10656f7dca28${IMAGE_PARAMS}`, // 해변 산책
     `${UNSPLASH_BASE}/photo-1521543832500-49e69fb2bea2${IMAGE_PARAMS}`, // 서로 바라보기
     `${UNSPLASH_BASE}/photo-1455103493930-a116f655b6c5${IMAGE_PARAMS}`, // 로맨틱 뷰
     `${UNSPLASH_BASE}/photo-1469371670807-013ccf25f16a${IMAGE_PARAMS}`, // 웨딩
@@ -726,9 +696,7 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1494774157365-9e04c6720e47${IMAGE_PARAMS}`, // 장미
     `${UNSPLASH_BASE}/photo-1518621736915-f3b1c41bfd00${IMAGE_PARAMS}`, // 손잡기
     `${UNSPLASH_BASE}/photo-1511632765486-a01980e01a18${IMAGE_PARAMS}`, // 가족
-    `${UNSPLASH_BASE}/photo-1499578124509-1f0f27f7fa66${IMAGE_PARAMS}`, // 커플 사진
     `${UNSPLASH_BASE}/photo-1529634806980-85c3dd6d34ac${IMAGE_PARAMS}`, // 해변 일몰
-    `${UNSPLASH_BASE}/photo-1545396395-da3161d2f1fc${IMAGE_PARAMS}`, // 핑크 하트
   ],
 
   // 💝 Special - 기념일
@@ -786,10 +754,8 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1526170375885-4d8ecf77b99f${IMAGE_PARAMS}`, // 폴라로이드 카메라
     `${UNSPLASH_BASE}/photo-1493863641943-9b68992a8d07${IMAGE_PARAMS}`, // 사진 앨범
     `${UNSPLASH_BASE}/photo-1507721999472-8ed4421c4af2${IMAGE_PARAMS}`, // 스크랩북
-    `${UNSPLASH_BASE}/photo-1478641300939-0ec5188d3f0a${IMAGE_PARAMS}`, // 추억 사진들
     `${UNSPLASH_BASE}/photo-1533227268428-f9ed0900fb3b${IMAGE_PARAMS}`, // 다이어리 작성
     `${UNSPLASH_BASE}/photo-1506905925346-21bda4d32df4${IMAGE_PARAMS}`, // 아름다운 풍경
-    `${UNSPLASH_BASE}/photo-1489914099268-1bd15bf864e8${IMAGE_PARAMS}`, // 빈티지 카메라
     `${UNSPLASH_BASE}/photo-1503177119275-0aa32b3a9368${IMAGE_PARAMS}`, // 여행 사진
     `${UNSPLASH_BASE}/photo-1517816743773-6e0fd518b4a6${IMAGE_PARAMS}`, // 노트북 일기
     `${UNSPLASH_BASE}/photo-1455390582262-044cdead277a${IMAGE_PARAMS}`, // 펜과 노트
@@ -820,7 +786,6 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     // 🎬 영화/드라마 보기
     `${UNSPLASH_BASE}/photo-1489599849927-2ee91cede3ba${IMAGE_PARAMS}`, // 팝콘과 영화
     `${UNSPLASH_BASE}/photo-1536440136628-849c177e76a1${IMAGE_PARAMS}`, // 홈시어터
-    `${UNSPLASH_BASE}/photo-1594908900066-3f47337c1d55${IMAGE_PARAMS}`, // 영화 시청
     `${UNSPLASH_BASE}/photo-1585647347483-22b66260dfff${IMAGE_PARAMS}`, // 팝콘 영화시간
     `${UNSPLASH_BASE}/photo-1522869635100-9f4c5e86aa37${IMAGE_PARAMS}`, // 영화관 팝콘
     // 🎨 그림그리기 & 창작
@@ -842,7 +807,6 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1551218372-a8789b81b253${IMAGE_PARAMS}`, // 파스타 만들기
     `${UNSPLASH_BASE}/photo-1495521821757-a1efb6729352${IMAGE_PARAMS}`, // 쿠킹 재료
     // 🎮 게임하기
-    `${UNSPLASH_BASE}/photo-1493711662062-fa541f7f3d24${IMAGE_PARAMS}`, // 게임 컨트롤러
     `${UNSPLASH_BASE}/photo-1511512578047-dfb367046420${IMAGE_PARAMS}`, // 게임하는 손
     `${UNSPLASH_BASE}/photo-1538481199705-c710c4e965fc${IMAGE_PARAMS}`, // 게이밍
     `${UNSPLASH_BASE}/photo-1550745165-9bc0b252726f${IMAGE_PARAMS}`, // 게임 콘솔
@@ -855,7 +819,6 @@ export const MISSION_IMAGES: Record<MissionCategory, string[]> = {
     `${UNSPLASH_BASE}/photo-1495474472287-4d71bcdd2085${IMAGE_PARAMS}`, // 카페 라떼
     `${UNSPLASH_BASE}/photo-1445116572660-236099ec97a0${IMAGE_PARAMS}`, // 따뜻한 커피
     `${UNSPLASH_BASE}/photo-1497515114629-f71d768fd07c${IMAGE_PARAMS}`, // 창가 차 한잔
-    `${UNSPLASH_BASE}/photo-1518882605630-8af5f4f3c279${IMAGE_PARAMS}`, // 아늑한 티타임
     `${UNSPLASH_BASE}/photo-1517487881594-2787fef5ebf7${IMAGE_PARAMS}`, // 모닝 커피
     // 🌅 하늘/노을 공유
     `${UNSPLASH_BASE}/photo-1495616811223-4d98c6e9c869${IMAGE_PARAMS}`, // 아름다운 일몰

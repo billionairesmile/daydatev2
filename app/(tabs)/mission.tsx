@@ -1152,19 +1152,20 @@ export default function MissionScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Background Image - Optimized with expo-image + blur */}
+      {/* Background Image */}
       <View style={styles.backgroundImage}>
         <ExpoImage
           source={backgroundImage?.uri ? { uri: backgroundImage.uri } : backgroundImage}
           placeholder="L6PZfSi_.AyE_3t7t7R**0LTIpIp"
           contentFit="cover"
-          transition={150}
+          transition={0}
           cachePolicy="memory-disk"
+          priority="high"
           style={styles.backgroundImageStyle}
         />
-        <BlurView intensity={90} tint="light" style={StyleSheet.absoluteFill} />
+        <BlurView experimentalBlurMethod="dimezisBlurView" intensity={Platform.OS === 'ios' ? 90 : 50} tint={Platform.OS === 'ios' ? 'light' : 'default'} style={StyleSheet.absoluteFill} />
       </View>
-      <View style={styles.overlay} />
+      <View style={[styles.overlay, { backgroundColor: Platform.OS === 'ios' ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.15)' }]} />
 
       {/* BookmarkedMissionsPage Overlay */}
       {showBookmarkedMissions && (
@@ -1268,8 +1269,9 @@ export default function MissionScreen() {
                 onPress={handleGenerateButtonPress}
               >
                 <BlurView
-                  intensity={30}
-                  tint="dark"
+                  experimentalBlurMethod="dimezisBlurView"
+                  intensity={Platform.OS === 'ios' ? 30 : 40}
+                  tint={Platform.OS === 'ios' ? 'dark' : 'default'}
                   style={StyleSheet.absoluteFill}
                 />
                 <Text style={styles.glassGenerateButtonText}>{t('mission.title')}</Text>
@@ -1568,6 +1570,7 @@ function MissionCardContent({ mission, onStartPress, onKeepPress, isKept, canSta
           style={StyleSheet.absoluteFill}
         >
           <BlurView
+            experimentalBlurMethod="dimezisBlurView"
             intensity={50}
             tint={Platform.OS === 'ios' ? 'systemChromeMaterialDark' : 'dark'}
             style={StyleSheet.absoluteFill}
@@ -1609,6 +1612,7 @@ function MissionCardContent({ mission, onStartPress, onKeepPress, isKept, canSta
               onPress={handleKeepPress}
             >
               <BlurView
+                experimentalBlurMethod="dimezisBlurView"
                 intensity={30}
                 tint="dark"
                 style={StyleSheet.absoluteFill}
@@ -1682,7 +1686,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.35)',
   },
   header: {
     flexDirection: 'row',
@@ -1698,6 +1701,7 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontWeight: '700',
     lineHeight: scaleFont(38),
+    textShadowColor: 'transparent',
   },
   headerSubtitle: {
     fontSize: scaleFont(14),

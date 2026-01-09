@@ -523,6 +523,7 @@
       "timezoneManual": "Manual Selection",
       "timezoneManualDesc": "Manual timezone for long-distance couples",
       "timezoneHint": "Applied to mission reset and D-day calculations",
+      "coupleSharedTimezoneHint": "Select a timezone for both partners. Missions reset simultaneously in the shared timezone.",
       "timezoneMismatchTitle": "Different timezones detected",
       "timezoneMismatchDesc": "Your partner's device uses {{partnerTimezone}}. Go to More > Settings > Timezone to set a shared timezone.",
       "termsAndPolicies": "Terms & Policies",
@@ -530,7 +531,8 @@
       "locationTerms": "Location Terms",
       "privacyPolicy": "Privacy Policy",
       "version": "Version {{version}}",
-      "latestVersion": "Latest"
+      "latestVersion": "Latest",
+      "updateAvailable": "Update"
     },
     "account": {
       "logout": "Sign out",

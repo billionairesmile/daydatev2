@@ -87,7 +87,7 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   return (
     <View style={styles.tabBarContainer}>
       <View style={styles.tabBarOuter}>
-        <BlurView intensity={50} tint="dark" style={styles.tabBarBlur}>
+        <BlurView experimentalBlurMethod="dimezisBlurView" intensity={50} tint="dark" style={styles.tabBarBlur}>
           <View style={styles.tabBarInner}>
             {/* Tabs Container - indicator and tabs share the same reference */}
             <View style={styles.tabsContainer} onLayout={handleTabsContainerLayout}>
@@ -159,49 +159,56 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 
 export default function TabLayout() {
   return (
-    <Tabs
-      tabBar={(props) => <CustomTabBar {...props} />}
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: { display: 'none' },
-      }}
-      initialRouteName="index"
-    >
-      <Tabs.Screen
-        name="mission"
-        options={{
-          title: '미션',
+    <View style={styles.container}>
+      <Tabs
+        tabBar={(props) => <CustomTabBar {...props} />}
+        screenOptions={{
+          headerShown: false,
+          tabBarStyle: { display: 'none' },
+          animation: 'none', // 탭 전환 애니메이션 제거로 플래시 감소
         }}
-      />
-      <Tabs.Screen
-        name="memories"
-        options={{
-          title: '추억',
-        }}
-      />
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: '홈',
-        }}
-      />
-      <Tabs.Screen
-        name="calendar"
-        options={{
-          title: '캘린더',
-        }}
-      />
-      <Tabs.Screen
-        name="more"
-        options={{
-          title: '더보기',
-        }}
-      />
-    </Tabs>
+        initialRouteName="index"
+      >
+        <Tabs.Screen
+          name="mission"
+          options={{
+            title: '미션',
+          }}
+        />
+        <Tabs.Screen
+          name="memories"
+          options={{
+            title: '추억',
+          }}
+        />
+        <Tabs.Screen
+          name="index"
+          options={{
+            title: '홈',
+          }}
+        />
+        <Tabs.Screen
+          name="calendar"
+          options={{
+            title: '캘린더',
+          }}
+        />
+        <Tabs.Screen
+          name="more"
+          options={{
+            title: '더보기',
+          }}
+        />
+      </Tabs>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
   tabBarContainer: {
     position: 'absolute',
     bottom: scale(24),

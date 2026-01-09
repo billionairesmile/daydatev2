@@ -21,6 +21,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useAuthStore, useOnboardingStore, useTimezoneStore, useSubscriptionStore, useLanguageStore } from '@/stores';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
+import { useMissionStore } from '@/stores/missionStore';
 import { BackgroundProvider, useBackground } from '@/contexts';
 import { preloadCharacterAssets } from '@/utils';
 import { CharacterPreloader } from '@/components/ransom';
@@ -199,6 +200,7 @@ function RootLayoutNav() {
   const { t } = useTranslation();
   const { isAuthenticated, isOnboardingComplete, setIsOnboardingComplete, couple, user, setCouple, setPartner, partner, _hasHydrated: authHydrated } = useAuthStore();
   const { initializeSync, cleanup: cleanupSync, processPendingOperations, loadMissionProgress, loadSharedMissions, loadAlbums, loadTodos, loadMenstrualSettings } = useCoupleSyncStore();
+  const { checkAndResetMissions } = useMissionStore();
   const { setStep: setOnboardingStep, updateData: updateOnboardingData } = useOnboardingStore();
   const { syncFromCouple } = useTimezoneStore();
   const { initializeRevenueCat, loadFromDatabase, checkCouplePremium, setPartnerIsPremium, _hasHydrated: subscriptionHydrated } = useSubscriptionStore();
@@ -392,6 +394,12 @@ function RootLayoutNav() {
       if (coupleError) {
         console.error('Error fetching couple:', coupleError);
         return;
+      }
+
+      // Sync couple timezone to timezoneStore (ensures both users use same timezone)
+      if (coupleData?.timezone) {
+        console.log('[Layout] Syncing couple timezone to local store:', coupleData.timezone);
+        useTimezoneStore.getState().syncFromCouple(coupleData.timezone);
       }
 
       // Couple record was deleted (partner deleted their account)
@@ -617,6 +625,8 @@ function RootLayoutNav() {
         // App has come to the foreground, refresh all synced data
         fetchCoupleAndPartnerData();
         updateUserLocation();
+        // Check and reset missions if date changed (CRITICAL: Must be called before loading missions)
+        checkAndResetMissions();
         // Refresh mission data to sync any changes from partner
         loadMissionProgress();
         loadSharedMissions();
@@ -634,7 +644,7 @@ function RootLayoutNav() {
     return () => {
       subscription.remove();
     };
-  }, [fetchCoupleAndPartnerData, updateUserLocation, loadMissionProgress, loadSharedMissions, loadAlbums, loadTodos, loadMenstrualSettings, loadFromDatabase]);
+  }, [fetchCoupleAndPartnerData, updateUserLocation, checkAndResetMissions, loadMissionProgress, loadSharedMissions, loadAlbums, loadTodos, loadMenstrualSettings, loadFromDatabase]);
 
   // Also refresh if partner data is incomplete (partner might have completed onboarding)
   useEffect(() => {
@@ -971,30 +981,31 @@ function RootLayoutNav() {
   const needsNavigationToAuth = shouldBeInAuth && !inAuthGroup;
 
   // Track if navigation has been performed to prevent re-navigation
-  const [hasNavigated, setHasNavigated] = useState(false);
+  // Use ref instead of state to persist across hot reloads
+  const hasNavigated = useRef(false);
 
   useEffect(() => {
     if (!isNavigationReady || !authHydrated) return;
     // Wait for segments to be populated (prevents flash during error recovery)
     if (!segments?.[0]) return;
     // Prevent re-navigation
-    if (hasNavigated) return;
+    if (hasNavigated.current) return;
 
     // If onboarding not complete and not in auth group, redirect to onboarding
     if (needsNavigationToAuth) {
-      setHasNavigated(true);
+      hasNavigated.current = true;
       router.replace('/(auth)/onboarding');
     }
     // If onboarding is complete and in auth group, redirect to tabs
     else if (needsNavigationToTabs) {
-      setHasNavigated(true);
+      hasNavigated.current = true;
       router.replace('/(tabs)');
     }
-  }, [isNavigationReady, isOnboardingComplete, authHydrated, segments, needsNavigationToTabs, needsNavigationToAuth, hasNavigated]);
+  }, [isNavigationReady, isOnboardingComplete, authHydrated, segments, needsNavigationToTabs, needsNavigationToAuth]);
 
   // Reset navigation flag when onboarding state changes
   useEffect(() => {
-    setHasNavigated(false);
+    hasNavigated.current = false;
   }, [isOnboardingComplete]);
 
   // Don't render Stack until:
@@ -1042,6 +1053,6 @@ function RootLayoutNav() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#000000',
   },
 });

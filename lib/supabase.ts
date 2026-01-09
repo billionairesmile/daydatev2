@@ -16,13 +16,13 @@ const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 export const supabase: SupabaseClient | null =
   supabaseUrl && supabaseAnonKey
     ? createClient(supabaseUrl, supabaseAnonKey, {
-        auth: {
-          storage: AsyncStorage,
-          autoRefreshToken: true,
-          persistSession: true,
-          detectSessionInUrl: false,
-        },
-      })
+      auth: {
+        storage: AsyncStorage,
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: false,
+      },
+    })
     : null;
 
 // 개발 모드에서 Supabase 없이도 앱 테스트 가능
@@ -1566,7 +1566,7 @@ export const db = {
 
     subscribeToMissions(
       coupleId: string,
-      callback: (payload: { missions: unknown[]; generated_by: string; eventType: 'INSERT' | 'DELETE' | 'UPDATE'; refreshed_at?: string | null }) => void
+      callback: (payload: { missions: unknown[]; generated_by: string; generated_at: string; eventType: 'INSERT' | 'DELETE' | 'UPDATE'; refreshed_at?: string | null }) => void
     ) {
       const client = getSupabase();
       const channel = client
@@ -1580,8 +1580,8 @@ export const db = {
             filter: `couple_id=eq.${coupleId}`,
           },
           (payload) => {
-            const record = payload.new as { missions: unknown[]; generated_by: string; refreshed_at?: string | null };
-            callback({ missions: record.missions, generated_by: record.generated_by, eventType: 'INSERT', refreshed_at: record.refreshed_at });
+            const record = payload.new as { missions: unknown[]; generated_by: string; generated_at: string; refreshed_at?: string | null };
+            callback({ missions: record.missions, generated_by: record.generated_by, generated_at: record.generated_at, eventType: 'INSERT', refreshed_at: record.refreshed_at });
           }
         )
         .on(
@@ -1594,9 +1594,9 @@ export const db = {
           },
           (payload) => {
             // When missions are updated (e.g., refreshed_at is set), sync the state
-            const record = payload.new as { missions: unknown[]; generated_by: string; refreshed_at?: string | null };
+            const record = payload.new as { missions: unknown[]; generated_by: string; generated_at: string; refreshed_at?: string | null };
             console.log('[Supabase] couple_missions UPDATE event received, refreshed_at:', record.refreshed_at);
-            callback({ missions: record.missions, generated_by: record.generated_by, eventType: 'UPDATE', refreshed_at: record.refreshed_at });
+            callback({ missions: record.missions, generated_by: record.generated_by, generated_at: record.generated_at, eventType: 'UPDATE', refreshed_at: record.refreshed_at });
           }
         )
         .on(
@@ -1610,7 +1610,7 @@ export const db = {
           (payload) => {
             // When missions are deleted, notify with empty array
             console.log('[Supabase] couple_missions DELETE event received');
-            callback({ missions: [], generated_by: '', eventType: 'DELETE' });
+            callback({ missions: [], generated_by: '', generated_at: '', eventType: 'DELETE' });
           }
         )
         .subscribe();
@@ -2454,6 +2454,7 @@ export const db = {
         text_scale?: number;
         font_style?: string;
         ransom_seed?: number;
+        title_color?: string;
       },
       userId: string
     ) {
@@ -2479,6 +2480,7 @@ export const db = {
         text_scale?: number;
         font_style?: string;
         ransom_seed?: number;
+        title_color?: string;
       }
     ) {
       const client = getSupabase();

@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform, Linking } from 'react-native';
 import Constants from 'expo-constants';
 import { supabase } from '@/lib/supabase';
+import { getTodayInTimezone } from './timezoneStore';
 
 // Check if we're running in Expo Go (not a development build)
 const isExpoGo = Constants.appOwnership === 'expo';
@@ -154,13 +155,13 @@ const initialState: SubscriptionState = {
   _hasHydrated: false,
 };
 
-// Helper: Get today's date string in YYYY-MM-DD format
+// Helper: Get today's date string in YYYY-MM-DD format (using couple's shared timezone)
 const getTodayString = (): string => {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  // Use couple's shared timezone for consistent usage tracking
+  return getTodayInTimezone();
 };
 
-// Helper: Check if date string is today
+// Helper: Check if date string is today (in couple's timezone)
 const isToday = (dateString: string): boolean => {
   return dateString === getTodayString();
 };
@@ -689,12 +690,16 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
       },
 
       shouldShowAds: () => {
-        // TEMP: Disabled for App Store review - re-enable after approval
-        return false;
-        // Original code (uncomment after app approval):
-        // const state = get();
-        // const isCouplePremium = state.isPremium || state.partnerIsPremium;
-        // return !isCouplePremium;
+        // Android: Disabled for Play Store review
+        // iOS: Enabled (App Store approved)
+        if (Platform.OS === 'android') {
+          return false; // Disabled for Play Store review
+        }
+
+        // iOS: Show ads for free users
+        const state = get();
+        const isCouplePremium = state.isPremium || state.partnerIsPremium;
+        return !isCouplePremium;
       },
 
       getAvailableFrameOptions: () => {

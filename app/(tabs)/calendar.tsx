@@ -379,7 +379,7 @@ export default function CalendarScreen() {
   // Derived menstrual state from sync
   const menstrualTrackingEnabled = menstrualSettings?.enabled ?? false;
   const lastPeriodDate = menstrualSettings?.last_period_date ? parseDateAsLocal(menstrualSettings.last_period_date) : null;
-  const cycleLength = menstrualSettings?.cycle_length ?? 28;
+  const cycleLength = menstrualSettings?.cycle_length ?? 30;
   const hasPeriodData = !!menstrualSettings?.last_period_date;
 
   // Keyboard animation for modals
@@ -473,7 +473,7 @@ export default function CalendarScreen() {
         setTempLastPeriodDate(new Date());
         setPickerMonth(new Date());
       }
-      setTempCycleLength(String(menstrualSettings?.cycle_length ?? 28));
+      setTempCycleLength(String(menstrualSettings?.cycle_length ?? 30));
       setPeriodModalStep('settings'); // Reset to settings step
     }
 
@@ -495,7 +495,7 @@ export default function CalendarScreen() {
     }).start(async () => {
       if (save) {
         const parsedCycle = parseInt(tempCycleLength, 10);
-        const validCycle = !isNaN(parsedCycle) && parsedCycle >= 21 && parsedCycle <= 35 ? parsedCycle : 28;
+        const validCycle = !isNaN(parsedCycle) && parsedCycle >= 20 && parsedCycle <= 50 ? parsedCycle : 28;
 
         // Format date as YYYY-MM-DD for DB
         const formattedDate = `${tempLastPeriodDate.getFullYear()}-${String(tempLastPeriodDate.getMonth() + 1).padStart(2, '0')}-${String(tempLastPeriodDate.getDate()).padStart(2, '0')}`;
@@ -985,19 +985,20 @@ export default function CalendarScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Background Image - Optimized with expo-image + blur */}
+      {/* Background Image */}
       <View style={styles.backgroundImage}>
         <ExpoImage
           source={backgroundImage?.uri ? { uri: backgroundImage.uri } : backgroundImage}
           placeholder="L6PZfSi_.AyE_3t7t7R**0LTIpIp"
           contentFit="cover"
-          transition={150}
+          transition={0}
           cachePolicy="memory-disk"
+          priority="high"
           style={styles.backgroundImageStyle}
         />
-        <BlurView intensity={90} tint="light" style={StyleSheet.absoluteFill} />
+        <BlurView experimentalBlurMethod="dimezisBlurView" intensity={Platform.OS === 'ios' ? 90 : 50} tint={Platform.OS === 'ios' ? 'light' : 'default'} style={StyleSheet.absoluteFill} />
       </View>
-      <View style={styles.overlay} />
+      <View style={[styles.overlay, { backgroundColor: Platform.OS === 'ios' ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.15)' }]} />
 
       {/* Header - Fixed at top */}
       <View style={styles.header}>
@@ -1174,8 +1175,8 @@ export default function CalendarScreen() {
             <Text style={styles.todaySectionTitle}>
               {selectedDate
                 ? (i18n.language === 'ko'
-                    ? `${selectedDate.month + 1}월 ${selectedDate.day}일`
-                    : new Date(selectedDate.year, selectedDate.month, selectedDate.day).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))
+                  ? `${selectedDate.month + 1}월 ${selectedDate.day}일`
+                  : new Date(selectedDate.year, selectedDate.month, selectedDate.day).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))
                 : t('common.today')}
             </Text>
             <Pressable
@@ -1330,7 +1331,7 @@ export default function CalendarScreen() {
         onRequestClose={() => closeSettingsModal(false)}
       >
         <Animated.View style={[styles.modalOverlay, { opacity: settingsOpacity }]}>
-          <BlurView intensity={60} tint="dark" style={styles.blurOverlay}>
+          <BlurView experimentalBlurMethod="dimezisBlurView" intensity={60} tint="dark" style={styles.blurOverlay}>
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>{t('calendar.settings.title')}</Text>
@@ -1399,7 +1400,7 @@ export default function CalendarScreen() {
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <Animated.View style={[styles.modalOverlay, { opacity: todoOpacity }]}>
-            <BlurView intensity={60} tint="dark" style={styles.blurOverlay}>
+            <BlurView experimentalBlurMethod="dimezisBlurView" intensity={60} tint="dark" style={styles.blurOverlay}>
               <Animated.View style={[styles.modalContent, { transform: [{ translateY: keyboardOffset }] }]}>
                 <View style={styles.modalHeader}>
                   <Text style={styles.modalTitle}>{t('calendar.todo.addTitle')}</Text>
@@ -1454,7 +1455,7 @@ export default function CalendarScreen() {
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <Animated.View style={[styles.modalOverlay, { opacity: editTodoOpacity }]}>
-            <BlurView intensity={60} tint="dark" style={styles.blurOverlay}>
+            <BlurView experimentalBlurMethod="dimezisBlurView" intensity={60} tint="dark" style={styles.blurOverlay}>
               <Animated.View style={[styles.modalContent, { transform: [{ translateY: keyboardOffset }] }]}>
                 <View style={styles.modalHeader}>
                   <Text style={styles.modalTitle}>{t('calendar.todo.editTitle')}</Text>
@@ -1506,7 +1507,7 @@ export default function CalendarScreen() {
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <Animated.View style={[styles.modalOverlay, { opacity: periodOpacity }]}>
-            <BlurView intensity={60} tint="dark" style={styles.blurOverlay}>
+            <BlurView experimentalBlurMethod="dimezisBlurView" intensity={60} tint="dark" style={styles.blurOverlay}>
               <Animated.View style={[styles.modalContent, { transform: [{ translateY: keyboardOffset }] }]}>
                 {periodModalStep === 'settings' ? (
                   <>
@@ -1731,7 +1732,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.35)',
   },
   scrollView: {
     flex: 1,
@@ -1754,6 +1754,7 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontWeight: '700',
     lineHeight: scaleFont(38),
+    textShadowColor: 'transparent',
   },
   headerSubtitle: {
     fontSize: scaleFont(14),

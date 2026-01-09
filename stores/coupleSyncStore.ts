@@ -6,8 +6,7 @@ import { db, isInTestMode, supabase } from '@/lib/supabase';
 import type { Mission } from '@/types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { useMemoryStore, dbToCompletedMission } from './memoryStore';
-import { formatDateToLocal } from '@/lib/dateUtils';
-import { getTodayInTimezone, getNextMidnightInTimezone, useTimezoneStore } from './timezoneStore';
+import { getTodayInTimezone, getNextMidnightInTimezone, useTimezoneStore, formatDateInTimezone, type TimezoneId } from './timezoneStore';
 import { offlineQueue, OfflineOperationType } from '@/lib/offlineQueue';
 import { getIsOnline } from '@/lib/useNetwork';
 import {
@@ -98,6 +97,7 @@ export interface CoupleAlbum {
   name_position: { x: number; y: number };
   text_scale: number;
   font_style: string;
+  title_color: string;
   ransom_seed: number | null;
   created_by: string;
   created_at: string;
@@ -237,7 +237,8 @@ interface CoupleSyncActions {
     namePosition?: { x: number; y: number },
     textScale?: number,
     fontStyle?: string,
-    ransomSeed?: number
+    ransomSeed?: number,
+    titleColor?: string
   ) => Promise<CoupleAlbum | null>;
   updateAlbum: (albumId: string, updates: Partial<CoupleAlbum>) => Promise<void>;
   deleteAlbum: (albumId: string) => Promise<void>;
@@ -324,6 +325,27 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
 
     set({ coupleId, userId });
 
+    // Load couple data and sync timezone FIRST (before loading other data)
+    // This ensures timezone is set correctly for all subsequent date operations
+    const { data: coupleData } = await db.couples.get(coupleId);
+    if (coupleData?.timezone) {
+      // MIGRATION: Convert legacy 'auto' timezone to actual device timezone
+      if (coupleData.timezone === 'auto') {
+        console.log('[CoupleSyncStore] Migrating legacy "auto" timezone to device timezone');
+        const deviceTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        console.log('[CoupleSyncStore] Device timezone:', deviceTimezone);
+
+        // Update couple table with actual timezone
+        await db.couples.updateTimezone(coupleId, deviceTimezone as TimezoneId);
+
+        // Sync to local store
+        useTimezoneStore.getState().syncFromCouple(deviceTimezone);
+      } else {
+        console.log('[CoupleSyncStore] Syncing couple timezone on initialization:', coupleData.timezone);
+        useTimezoneStore.getState().syncFromCouple(coupleData.timezone);
+      }
+    }
+
     // Load initial data
     await Promise.all([
       get().loadSharedMissions(),
@@ -372,9 +394,13 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
 
       // Handle INSERT event - new missions generated
       const missions = payload.missions as Mission[];
+      // CRITICAL: Use the actual mission generation date from realtime payload in couple's timezone
+      // This ensures proper date comparison in checkAndResetSharedMissions
+      const timezone = useTimezoneStore.getState().getEffectiveTimezone();
+      const missionDate = payload.generated_at ? formatDateInTimezone(new Date(payload.generated_at), timezone) : today;
       set({
         sharedMissions: missions,
-        sharedMissionsDate: today, // Set the date when receiving missions via real-time
+        sharedMissionsDate: missionDate, // Set the actual date when missions were generated
         sharedMissionsRefreshedAt: payload.refreshed_at || null, // Also include refreshed_at on insert
         lastMissionUpdate: new Date(),
         missionGenerationStatus: 'completed',
@@ -542,18 +568,26 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       const album = payload.album as CoupleAlbum;
 
       if (payload.eventType === 'INSERT') {
-        set((state) => ({
-          coupleAlbums: [album, ...state.coupleAlbums],
-        }));
-        // Load photos for the new album
-        const { data: photosData } = await db.albumPhotos.getByAlbum(album.id);
-        if (photosData) {
+        // Check if album already exists (prevents duplicates from optimistic updates)
+        const { coupleAlbums } = get();
+        const albumExists = coupleAlbums.some(a => a.id === album.id);
+
+        if (!albumExists) {
           set((state) => ({
-            albumPhotosMap: {
-              ...state.albumPhotosMap,
-              [album.id]: photosData as AlbumPhoto[],
-            },
+            coupleAlbums: [album, ...state.coupleAlbums],
           }));
+          // Load photos for the new album
+          const { data: photosData } = await db.albumPhotos.getByAlbum(album.id);
+          if (photosData) {
+            set((state) => ({
+              albumPhotosMap: {
+                ...state.albumPhotosMap,
+                [album.id]: photosData as AlbumPhoto[],
+              },
+            }));
+          }
+        } else {
+          console.log('[Albums Realtime] INSERT: Album already exists, skipping duplicate:', album.id);
         }
       } else if (payload.eventType === 'UPDATE') {
         console.log('[Albums Realtime] UPDATE received for album:', album.id, album.name);
@@ -933,9 +967,13 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       if (!error && data) {
         const missions = data.missions as Mission[];
         const refreshedAt = (data as { refreshed_at?: string }).refreshed_at || null;
+        // CRITICAL: Use the actual mission generation date from DB in couple's timezone
+        // This ensures proper date comparison in checkAndResetSharedMissions
+        const timezone = useTimezoneStore.getState().getEffectiveTimezone();
+        const missionDate = data.generated_at ? formatDateInTimezone(new Date(data.generated_at), timezone) : today;
         set({
           sharedMissions: missions,
-          sharedMissionsDate: today,
+          sharedMissionsDate: missionDate,
           sharedMissionsRefreshedAt: refreshedAt,
           lastMissionUpdate: new Date(data.generated_at),
           missionGenerationStatus: 'completed',
@@ -1121,24 +1159,48 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
 
   // Check and reset shared missions if date changed (called from missionStore.checkAndResetMissions)
   checkAndResetSharedMissions: () => {
-    const { sharedMissionsDate, sharedMissions, allMissionProgress } = get();
+    const { sharedMissionsDate, sharedMissions, allMissionProgress, lastMissionUpdate } = get();
     const today = getTodayInTimezone();
 
-    // Only reset if we have missions AND the date is explicitly set to a different day
+    // ANTI-ABUSE: Prevent timezone manipulation to reset missions early
+    // Only reset if BOTH conditions are met:
+    // 1. Date changed in current timezone (normal midnight reset)
+    // 2. At least 24 hours have passed in real time (UTC-based check)
+
+    const dateChanged = sharedMissionsDate !== null && sharedMissionsDate !== today;
+
+    // Check if at least 24 hours have passed since mission generation (UTC-based)
+    const generatedAtMs = lastMissionUpdate?.getTime() || 0;
+    const nowMs = Date.now();
+    const hours24InMs = 24 * 60 * 60 * 1000;
+    const hasBeenAtLeast24Hours = (nowMs - generatedAtMs) >= hours24InMs;
+
     // IMPORTANT: If sharedMissionsDate is null but missions exist, we should NOT reset
     // This protects against hydration timing issues or partial state restoration
     const shouldReset = sharedMissions.length > 0 &&
-      sharedMissionsDate !== null &&
-      sharedMissionsDate !== today;
+      dateChanged &&
+      hasBeenAtLeast24Hours;
 
     if (shouldReset) {
-      console.log('[CoupleSyncStore] Resetting shared missions. Old date:', sharedMissionsDate, 'Today:', today);
+      console.log('[CoupleSyncStore] Resetting shared missions.');
+      console.log('[CoupleSyncStore] - Date changed:', sharedMissionsDate, '→', today);
+      console.log('[CoupleSyncStore] - Generated at:', lastMissionUpdate?.toISOString());
+      console.log('[CoupleSyncStore] - Hours elapsed:', Math.floor((nowMs - generatedAtMs) / (60 * 60 * 1000)));
       set({
         sharedMissions: [],
         sharedMissionsDate: null,
         missionGenerationStatus: 'idle',
         generatingUserId: null,
       });
+    } else if (sharedMissions.length > 0 && dateChanged && !hasBeenAtLeast24Hours) {
+      // Timezone abuse attempt detected!
+      console.warn('[CoupleSyncStore] ⚠️ Timezone manipulation detected!');
+      console.warn('[CoupleSyncStore] - Date appears changed but <24hrs elapsed');
+      console.warn('[CoupleSyncStore] - Generated at:', lastMissionUpdate?.toISOString());
+      console.warn('[CoupleSyncStore] - Hours elapsed:', Math.floor((nowMs - generatedAtMs) / (60 * 60 * 1000)));
+      console.warn('[CoupleSyncStore] - Keeping existing missions');
+      // Update the date to today to prevent repeated warnings
+      set({ sharedMissionsDate: today });
     }
 
     // If missions exist but date is null (shouldn't happen normally), set the date to today
@@ -2014,7 +2076,8 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     namePosition?: { x: number; y: number },
     textScale?: number,
     fontStyle?: string,
-    ransomSeed?: number
+    ransomSeed?: number,
+    titleColor?: string
   ) => {
     const { coupleId, userId, coupleAlbums } = get();
 
@@ -2037,6 +2100,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
         name_position: namePosition || { x: 0.5, y: 0.5 },
         text_scale: textScale ?? 1.0,
         font_style: fontStyle || 'basic',
+        title_color: titleColor || 'white',
         ransom_seed: finalRansomSeed,
         created_by: userId || 'demo',
         created_at: new Date().toISOString(),
@@ -2054,13 +2118,20 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
         name_position: namePosition || { x: 0.5, y: 0.5 },
         text_scale: textScale ?? 1.0,
         font_style: fontStyle || 'basic',
+        title_color: titleColor || 'white',
         ransom_seed: finalRansomSeed,
       },
       userId
     );
 
     if (!error && data) {
-      return data as CoupleAlbum;
+      const album = data as CoupleAlbum;
+      // Optimistic update: add to local state immediately for instant UI feedback
+      // The subscription will handle sync, but this prevents UI lag
+      set((state) => ({
+        coupleAlbums: [album, ...state.coupleAlbums],
+      }));
+      return album;
     }
     return null;
   },
@@ -2095,6 +2166,14 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       text_scale: updates.text_scale,
       font_style: updates.font_style,
       ransom_seed: updates.ransom_seed ?? undefined,
+      title_color: updates.title_color,
+    });
+
+    // Update local state for immediate UI update
+    set({
+      coupleAlbums: coupleAlbums.map((a) =>
+        a.id === albumId ? { ...a, ...updates, updated_at: new Date().toISOString() } : a
+      ),
     });
   },
 

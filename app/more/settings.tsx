@@ -34,6 +34,7 @@ import {
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import Constants from 'expo-constants';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -75,6 +76,31 @@ export default function SettingsScreen() {
 
   // Timezone selection modal
   const [showTimezoneModal, setShowTimezoneModal] = useState(false);
+
+  // Version information
+  const currentVersion = Constants.expoConfig?.version || '1.0.0';
+  const latestVersion = '1.0.0'; // TODO: Fetch from Supabase after Play Store release
+
+  // Check if update is available
+  const isUpdateAvailable = () => {
+    const current = currentVersion.split('.').map(Number);
+    const latest = latestVersion.split('.').map(Number);
+
+    for (let i = 0; i < 3; i++) {
+      if (latest[i] > current[i]) return true;
+      if (latest[i] < current[i]) return false;
+    }
+    return false;
+  };
+
+  // Open store for update
+  const handleUpdate = () => {
+    const storeUrl = Platform.OS === 'ios'
+      ? 'https://apps.apple.com/kr/app/daydate-%EC%BB%A4%ED%94%8C-%EB%8D%B0%EC%9D%B4%ED%8A%B8-%EB%AF%B8%EC%85%98/id6757266824'
+      : 'https://play.google.com/store/apps/details?id=com.daydate.app'; // TODO: Update with actual Play Store URL
+
+    Linking.openURL(storeUrl);
+  };
 
 
   // Keyboard animation for modals
@@ -542,9 +568,15 @@ export default function SettingsScreen() {
               <View style={styles.iconWrapper}>
                 <Info color={COLORS.black} size={scale(20)} />
               </View>
-              <Text style={styles.settingItemLabel}>{t('settings.other.version', { version: '1.0.0' })}</Text>
+              <Text style={styles.settingItemLabel}>{t('settings.other.version', { version: currentVersion })}</Text>
             </View>
-            <Text style={styles.versionStatus}>{t('settings.other.latestVersion')}</Text>
+            {isUpdateAvailable() ? (
+              <Pressable style={styles.updateButton} onPress={handleUpdate}>
+                <Text style={styles.updateButtonText}>{t('settings.other.updateAvailable')}</Text>
+              </Pressable>
+            ) : (
+              <Text style={styles.versionStatus}>{t('settings.other.latestVersion')}</Text>
+            )}
           </View>
         </View>
 
@@ -629,25 +661,10 @@ export default function SettingsScreen() {
         >
           <View style={styles.timezoneModalContent}>
             <Text style={styles.languageModalTitle}>{t('settings.other.selectTimezone')}</Text>
-            <Text style={styles.timezoneHint}>{t('settings.other.timezoneHint')}</Text>
+            <Text style={styles.timezoneHint}>{t('settings.other.coupleSharedTimezoneHint')}</Text>
 
             <ScrollView style={styles.timezoneScrollView} showsVerticalScrollIndicator={false}>
-              {/* Auto (Device) Option - Shows actual detected city */}
-              <Pressable
-                style={styles.languageOption}
-                onPress={() => handleTimezoneSelect('auto')}
-              >
-                <View style={styles.languageOptionLeft}>
-                  <Text style={styles.languageOptionName}>{getDeviceTimezoneLabel()}</Text>
-                  <Text style={styles.languageOptionSubname}>{t('settings.other.timezoneAutoDesc')}</Text>
-                </View>
-                {timezone === 'auto' && (
-                  <Check color="#4caf50" size={scale(20)} />
-                )}
-              </Pressable>
-
-              {/* Manual Timezones */}
-              <Text style={styles.timezoneManualHeader}>{t('settings.other.timezoneManual')}</Text>
+              {/* Couple Shared Timezones - Both partners will use the same timezone */}
               {COMMON_TIMEZONES.map((tz) => (
                 <Pressable
                   key={tz.id}
@@ -858,6 +875,17 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(13),
     color: '#999',
     fontWeight: '400',
+  },
+  updateButton: {
+    backgroundColor: '#2196F3',
+    paddingHorizontal: scale(16),
+    paddingVertical: scale(8),
+    borderRadius: scale(8),
+  },
+  updateButtonText: {
+    fontSize: scaleFont(13),
+    color: '#FFFFFF',
+    fontWeight: '600',
   },
   dangerItem: {
     flexDirection: 'row',

@@ -49,7 +49,7 @@ export const GlassInput = forwardRef<TextInput, GlassInputProps>(
             error && styles.inputWrapperError,
           ]}
         >
-          <BlurView intensity={40} tint="dark" style={styles.blur}>
+          <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={styles.blur}>
             <View style={styles.inputContainer}>
               {leftIcon && <View style={styles.leftIcon}>{leftIcon}</View>}
 

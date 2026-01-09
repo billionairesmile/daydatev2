@@ -117,8 +117,9 @@ export function BookmarkedMissionsPage({ onBack }: BookmarkedMissionsPageProps) 
     <View style={styles.container}>
       {/* Blurred Background Overlay */}
       <BlurView
-        intensity={80}
-        tint="dark"
+        experimentalBlurMethod="dimezisBlurView"
+        intensity={60}
+        tint="default"
         style={styles.blurOverlay}
       />
       <View style={styles.darkOverlay} />
@@ -140,10 +141,7 @@ export function BookmarkedMissionsPage({ onBack }: BookmarkedMissionsPageProps) 
       {/* Content */}
       {bookmarks.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <View style={styles.emptyIconContainer}>
-            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-            <Bookmark color="rgba(255, 255, 255, 0.4)" size={40} />
-          </View>
+          <Bookmark color="rgba(255, 255, 255, 0.4)" size={48} style={{ marginBottom: 24 }} />
           <Text style={styles.emptyText}>{t('bookmark.empty')}</Text>
           <Text style={styles.emptySubtext}>{t('bookmark.emptyHint')}</Text>
         </View>
@@ -161,7 +159,7 @@ export function BookmarkedMissionsPage({ onBack }: BookmarkedMissionsPageProps) 
 
             return (
               <View key={bookmarkId} style={styles.missionCard}>
-                <BlurView intensity={10} tint="dark" style={StyleSheet.absoluteFill} />
+                <BlurView experimentalBlurMethod="dimezisBlurView" intensity={10} tint="dark" style={StyleSheet.absoluteFill} />
 
                 <View style={styles.cardInner}>
                   {/* Thumbnail */}
@@ -277,18 +275,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: -80,
-  },
-  emptyIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    marginBottom: 16,
-    overflow: 'hidden',
   },
   emptyText: {
     fontSize: 16,

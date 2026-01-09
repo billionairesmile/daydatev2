@@ -1119,12 +1119,12 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Background Image - Optimized with expo-image */}
+      {/* Background Image */}
       <ExpoImage
         source={backgroundImage?.uri ? { uri: backgroundImage.uri } : backgroundImage}
         placeholder="L6PZfSi_.AyE_3t7t7R**0LTIpIp"
         contentFit="cover"
-        transition={150}
+        transition={0}
         cachePolicy="memory-disk"
         style={[styles.backgroundImage, styles.backgroundImageStyle]}
       />
@@ -1222,7 +1222,7 @@ export default function HomeScreen() {
         }}
       >
         <Animated.View style={[styles.blurContainer, { opacity: anniversaryModalOpacity }]}>
-          <BlurView intensity={80} tint="dark" style={styles.blurOverlay}>
+          <BlurView experimentalBlurMethod="dimezisBlurView" intensity={80} tint="dark" style={styles.blurOverlay}>
             <TouchableWithoutFeedback onPress={() => {
               if (anniversaryModalStep === 'list') {
                 closeAnniversaryModal();
@@ -1701,7 +1701,7 @@ export default function HomeScreen() {
           style={styles.modalOverlay}
           onPress={() => setShowImagePickerModal(false)}
         >
-          <BlurView intensity={60} tint="dark" style={styles.blurOverlay}>
+          <BlurView experimentalBlurMethod="dimezisBlurView" intensity={60} tint="dark" style={styles.blurOverlay}>
             <Pressable onPress={(e) => e.stopPropagation()}>
               <View style={styles.imagePickerModal}>
                 <View style={styles.imagePickerHeader}>

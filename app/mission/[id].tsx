@@ -1522,7 +1522,7 @@ export default function MissionDetailScreen() {
           cachePolicy="memory-disk"
           transition={100}
         />
-        <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+        <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
         <View style={styles.overlay} />
       </View>
 
@@ -1546,7 +1546,7 @@ export default function MissionDetailScreen() {
       >
         {/* Mission Info Card */}
         <View style={styles.missionCard}>
-          <BlurView intensity={30} tint="light" style={styles.cardBlur}>
+          <BlurView experimentalBlurMethod="dimezisBlurView" intensity={30} tint="light" style={styles.cardBlur}>
             <View style={styles.missionContent}>
               {/* Title */}
               <Text style={styles.missionTitle} textBreakStrategy="simple" lineBreakStrategyIOS="hangul-word">{mission.title}</Text>
@@ -1571,7 +1571,7 @@ export default function MissionDetailScreen() {
         {/* Additional Content Card (Affiliate links, promotional content) */}
         {additionalContent && (
           <View style={styles.additionalContentCard}>
-            <BlurView intensity={30} tint="light" style={styles.cardBlur}>
+            <BlurView experimentalBlurMethod="dimezisBlurView" intensity={30} tint="light" style={styles.cardBlur}>
               <View style={styles.additionalContentInner}>
                 {renderRichContent(additionalContent)}
               </View>
@@ -1581,7 +1581,7 @@ export default function MissionDetailScreen() {
 
         {/* Mission Steps Card */}
         <View style={styles.stepsCard}>
-          <BlurView intensity={30} tint="light" style={styles.cardBlur}>
+          <BlurView experimentalBlurMethod="dimezisBlurView" intensity={30} tint="light" style={styles.cardBlur}>
             <View style={styles.stepsContent}>
               {/* Step 1: Photo */}
               <View style={styles.stepItem}>
@@ -1727,7 +1727,7 @@ export default function MissionDetailScreen() {
       </ScrollView>
 
       {/* Bottom CTA */}
-      <BlurView intensity={40} tint="dark" style={styles.bottomBar}>
+      <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={styles.bottomBar}>
         <View style={styles.bottomContent}>
           <Pressable
             style={[
@@ -1788,7 +1788,7 @@ export default function MissionDetailScreen() {
             onPress={() => setShowMessageModal(false)}
           />
           <View style={[styles.modalContainer, { width: width - 48 }]}>
-            <BlurView intensity={60} tint="dark" style={styles.modalBlur}>
+            <BlurView experimentalBlurMethod="dimezisBlurView" intensity={60} tint="dark" style={styles.modalBlur}>
               <View style={styles.modalContent}>
                 {/* Modal Header */}
                 <View style={styles.modalHeader}>
