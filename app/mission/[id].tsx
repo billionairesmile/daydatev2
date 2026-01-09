@@ -311,11 +311,11 @@ export default function MissionDetailScreen() {
   useEffect(() => {
     // Prefetch mission background image
     if (mission?.imageUrl) {
-      ExpoImage.prefetch(mission.imageUrl).catch(() => {});
+      ExpoImage.prefetch(mission.imageUrl).catch(() => { });
     }
     // Prefetch mission progress photo (for this specific mission)
     if (thisMissionProgress?.photo_url) {
-      ExpoImage.prefetch(thisMissionProgress.photo_url).catch(() => {});
+      ExpoImage.prefetch(thisMissionProgress.photo_url).catch(() => { });
     }
   }, [mission?.imageUrl, thisMissionProgress?.photo_url]);
 
@@ -605,7 +605,7 @@ export default function MissionDetailScreen() {
 
     // If out of bounds, spring back
     if (Math.abs(clampedX - enlargedTranslateXRef.current) > 0.1 ||
-        Math.abs(clampedY - enlargedTranslateYRef.current) > 0.1) {
+      Math.abs(clampedY - enlargedTranslateYRef.current) > 0.1) {
       enlargedTranslateXRef.current = clampedX;
       enlargedTranslateYRef.current = clampedY;
       Animated.parallel([
@@ -1522,7 +1522,7 @@ export default function MissionDetailScreen() {
           cachePolicy="memory-disk"
           transition={100}
         />
-        <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+        <BlurView experimentalBlurMethod="dimezisBlurView" intensity={Platform.OS === 'ios' ? 40 : 40} tint={Platform.OS === 'ios' ? 'light' : 'default'} style={StyleSheet.absoluteFill} />
         <View style={styles.overlay} />
       </View>
 
@@ -1546,7 +1546,7 @@ export default function MissionDetailScreen() {
       >
         {/* Mission Info Card */}
         <View style={styles.missionCard}>
-          <BlurView experimentalBlurMethod="dimezisBlurView" intensity={30} tint="light" style={styles.cardBlur}>
+          <BlurView experimentalBlurMethod="dimezisBlurView" intensity={Platform.OS === 'ios' ? 10 : 30} tint={Platform.OS === 'ios' ? 'default' : 'dark'} style={styles.cardBlur}>
             <View style={styles.missionContent}>
               {/* Title */}
               <Text style={styles.missionTitle} textBreakStrategy="simple" lineBreakStrategyIOS="hangul-word">{mission.title}</Text>
@@ -1571,7 +1571,7 @@ export default function MissionDetailScreen() {
         {/* Additional Content Card (Affiliate links, promotional content) */}
         {additionalContent && (
           <View style={styles.additionalContentCard}>
-            <BlurView experimentalBlurMethod="dimezisBlurView" intensity={30} tint="light" style={styles.cardBlur}>
+            <BlurView experimentalBlurMethod="dimezisBlurView" intensity={Platform.OS === 'ios' ? 10 : 30} tint={Platform.OS === 'ios' ? 'default' : 'dark'} style={styles.cardBlur}>
               <View style={styles.additionalContentInner}>
                 {renderRichContent(additionalContent)}
               </View>
@@ -1581,7 +1581,7 @@ export default function MissionDetailScreen() {
 
         {/* Mission Steps Card */}
         <View style={styles.stepsCard}>
-          <BlurView experimentalBlurMethod="dimezisBlurView" intensity={30} tint="light" style={styles.cardBlur}>
+          <BlurView experimentalBlurMethod="dimezisBlurView" intensity={Platform.OS === 'ios' ? 10 : 30} tint={Platform.OS === 'ios' ? 'default' : 'dark'} style={styles.cardBlur}>
             <View style={styles.stepsContent}>
               {/* Step 1: Photo */}
               <View style={styles.stepItem}>

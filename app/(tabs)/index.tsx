@@ -13,6 +13,7 @@ import {
   Platform,
   Alert,
   Animated,
+  StatusBar,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { BlurView } from 'expo-blur';
@@ -505,7 +506,10 @@ export default function HomeScreen() {
   const measureButton = useCallback(() => {
     if (imageButtonRef.current) {
       imageButtonRef.current.measureInWindow((x, y, buttonWidth, buttonHeight) => {
-        setButtonPosition({ x, y, width: buttonWidth, height: buttonHeight });
+        // On Android, Modal renders from screen top, but measureInWindow measures from content area
+        // Add status bar height to correct the y position
+        const statusBarOffset = Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0;
+        setButtonPosition({ x, y: y + statusBarOffset, width: buttonWidth, height: buttonHeight });
       });
     }
   }, []);

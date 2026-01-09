@@ -39,7 +39,7 @@ import ReanimatedModule, {
 } from 'react-native-reanimated';
 import { useTranslation } from 'react-i18next';
 
-import { COLORS, SPACING, IS_TABLET, scale, scaleFont } from '@/constants/design';
+import { COLORS, SPACING, IS_TABLET, IS_FOLDABLE, scale, scaleFont } from '@/constants/design';
 import { useMemoryStore, SAMPLE_MEMORIES } from '@/stores/memoryStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useOnboardingStore } from '@/stores/onboardingStore';
@@ -4018,7 +4018,7 @@ const styles = StyleSheet.create({
     gap: scale(2),
   },
   monthModalItem: {
-    width: (width - scale(SPACING.lg) * 2 - scale(4)) / 3,
+    width: IS_FOLDABLE ? (width - scale(SPACING.lg) * 2 - scale(8)) / 5 : (width - scale(SPACING.lg) * 2 - scale(4)) / 3,
     aspectRatio: 1,
   },
   monthModalItemInner: {
@@ -4139,7 +4139,7 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   photoDetailCard: {
-    width: '90%',
+    width: IS_FOLDABLE ? '60%' : '90%',
     aspectRatio: 3 / 4,
     borderRadius: scale(16),
     overflow: 'hidden',
@@ -4154,7 +4154,7 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   photoInfoCard: {
-    width: '90%',
+    width: IS_FOLDABLE ? '60%' : '90%',
     marginTop: scale(SPACING.lg),
     padding: scale(SPACING.lg),
     borderRadius: scale(16),
@@ -4235,7 +4235,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: width * 0.05,
   },
   flipCardContainer: {
-    width: '90%',
+    width: IS_FOLDABLE ? '60%' : '90%',
     aspectRatio: 3 / 4,
   },
   flipCardPressable: {
@@ -5690,7 +5690,7 @@ const styles = StyleSheet.create({
     gap: scale(2),
   },
   addPhotoButton: {
-    width: (width - scale(SPACING.lg) * 2 - scale(4)) / 3,
+    width: IS_FOLDABLE ? (width - scale(SPACING.lg) * 2 - scale(8)) / 5 : (width - scale(SPACING.lg) * 2 - scale(4)) / 3,
     aspectRatio: 1,
     borderRadius: scale(12),
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
@@ -5700,8 +5700,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   emptyAddPhotoButton: {
-    width: (width - scale(SPACING.lg) * 2 - scale(4)) / 3,
-    height: (width - scale(SPACING.lg) * 2 - scale(4)) / 3 + scale(24),
+    width: IS_FOLDABLE ? (width - scale(SPACING.lg) * 2 - scale(8)) / 5 : (width - scale(SPACING.lg) * 2 - scale(4)) / 3,
+    height: IS_FOLDABLE ? (width - scale(SPACING.lg) * 2 - scale(8)) / 5 + scale(24) : (width - scale(SPACING.lg) * 2 - scale(4)) / 3 + scale(24),
     borderRadius: scale(12),
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
@@ -5719,8 +5719,8 @@ const styles = StyleSheet.create({
     marginTop: scale(8),
   },
   missionPhotoItem: {
-    width: (width - scale(SPACING.lg) * 2 - scale(4)) / 3,
-    height: (width - scale(SPACING.lg) * 2 - scale(4)) / 3 + scale(24),
+    width: IS_FOLDABLE ? (width - scale(SPACING.lg) * 2 - scale(8)) / 5 : (width - scale(SPACING.lg) * 2 - scale(4)) / 3,
+    height: IS_FOLDABLE ? (width - scale(SPACING.lg) * 2 - scale(8)) / 5 + scale(24) : (width - scale(SPACING.lg) * 2 - scale(4)) / 3 + scale(24),
     borderRadius: scale(12),
     overflow: 'hidden',
     position: 'relative',

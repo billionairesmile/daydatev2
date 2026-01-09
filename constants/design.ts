@@ -1,27 +1,40 @@
 // Daydate Design Tokens - Glassmorphism UI System
 // Based on Figma designs - aligned with figma-designs/src/styles/globals.css
 
-import { Dimensions } from 'react-native';
+import { Dimensions, Platform } from 'react-native';
 import * as Device from 'expo-device';
 
-// iPad detection
-// For testing: Force IS_TABLET = true to test iPad scaling in simulator
-// For production: Use Device.deviceType or modelName detection
+// Get screen dimensions
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const aspectRatio = SCREEN_HEIGHT / SCREEN_WIDTH;
+
+// Device detection
 const deviceModel = Device.modelName || '';
 const isRealIPad = deviceModel.toLowerCase().includes('ipad');
+
+// Foldable detection: aspect ratio close to 1:1 (between 0.8 and 1.4) on Android
+// Z Fold unfolded: ~1.2 aspect ratio (2176/1812)
+// Normal phones: ~2.0+ aspect ratio
+// iPads: ~1.3-1.4 aspect ratio but larger screen
+const isFoldableDevice = Platform.OS === 'android' &&
+  aspectRatio >= 0.8 &&
+  aspectRatio <= 1.5 &&
+  SCREEN_WIDTH > 600; // Foldables have wide screens when unfolded
 
 // TODO: Change to false for iPhone testing, true for iPad testing
 const FORCE_TABLET_MODE = false; // Set to true for iPad simulator testing
 
-export const IS_TABLET = FORCE_TABLET_MODE || isRealIPad || Device.deviceType === Device.DeviceType.TABLET;
+// Only real iPads should be treated as tablets (with 50% scaling)
+// Foldables should use phone UI without aggressive scaling
+export const IS_TABLET = FORCE_TABLET_MODE || isRealIPad;
+export const IS_FOLDABLE = isFoldableDevice;
 
-// DEBUG: Log iPad detection
+// DEBUG: Log device detection
 console.log('[DESIGN] Device.modelName:', Device.modelName);
 console.log('[DESIGN] IS_TABLET:', IS_TABLET);
+console.log('[DESIGN] IS_FOLDABLE:', IS_FOLDABLE);
+console.log('[DESIGN] Aspect Ratio:', aspectRatio.toFixed(2));
 console.log('[DESIGN] Screen:', Dimensions.get('window'));
-
-// Get screen dimensions for additional calculations
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // iPad scale factor - 50% size reduction on iPad (scale = 0.5 means 50% of original)
 export const TABLET_SCALE = 0.5;
