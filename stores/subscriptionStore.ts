@@ -18,6 +18,16 @@ if (!isExpoGo) {
     const revenueCat = require('react-native-purchases');
     Purchases = revenueCat.default;
     LOG_LEVEL = revenueCat.LOG_LEVEL;
+
+    // CRITICAL: Set a no-op log handler IMMEDIATELY after loading the SDK
+    // The SDK registers an event listener that emits log events, and if customLogHandler
+    // is not defined, it throws "customLogHandler is not a function" error on Android
+    // This must be done at module load time, not during initialization
+    if (Purchases && Purchases.setLogHandler) {
+      Purchases.setLogHandler(() => {
+        // No-op: Silently ignore all log messages
+      });
+    }
   } catch (e) {
     console.log('[Subscription] RevenueCat not available');
   }
@@ -196,7 +206,8 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
           }
 
           // Configure RevenueCat
-          Purchases.setLogLevel(LOG_LEVEL.DEBUG);
+          // Note: setLogHandler is called at module load time (see top of file)
+          // to prevent 'customLogHandler is not a function' error on Android
           await Purchases.configure({ apiKey, appUserID: userId });
 
           // Get initial customer info
@@ -240,34 +251,42 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
           await get().loadFromDatabase();
 
           // Set up customer info listener
-          Purchases.addCustomerInfoUpdateListener((info: CustomerInfo) => {
-            const isPremiumNow = info.entitlements.active[ENTITLEMENT_ID] !== undefined;
-            const entitlement = info.entitlements.active[ENTITLEMENT_ID];
+          try {
+            Purchases.addCustomerInfoUpdateListener((info: CustomerInfo) => {
+              try {
+                const isPremiumNow = info.entitlements.active[ENTITLEMENT_ID] !== undefined;
+                const entitlement = info.entitlements.active[ENTITLEMENT_ID];
 
-            let newPlan: SubscriptionPlan = 'free';
-            let newExpiryDate: Date | null = null;
+                let newPlan: SubscriptionPlan = 'free';
+                let newExpiryDate: Date | null = null;
 
-            if (isPremiumNow && entitlement) {
-              if (entitlement.productIdentifier.includes('annual')) {
-                newPlan = 'annual';
-              } else if (entitlement.productIdentifier.includes('month')) {
-                newPlan = 'monthly';
+                if (isPremiumNow && entitlement) {
+                  if (entitlement.productIdentifier.includes('annual')) {
+                    newPlan = 'annual';
+                  } else if (entitlement.productIdentifier.includes('month')) {
+                    newPlan = 'monthly';
+                  }
+                  newExpiryDate = entitlement.expirationDate
+                    ? new Date(entitlement.expirationDate)
+                    : null;
+                }
+
+                set({
+                  isPremium: isPremiumNow,
+                  plan: newPlan,
+                  expiryDate: newExpiryDate,
+                  customerInfo: info,
+                });
+
+                // Sync with database on update
+                get().syncWithDatabase();
+              } catch (listenerError) {
+                console.warn('[Subscription] Error in customer info listener:', listenerError);
               }
-              newExpiryDate = entitlement.expirationDate
-                ? new Date(entitlement.expirationDate)
-                : null;
-            }
-
-            set({
-              isPremium: isPremiumNow,
-              plan: newPlan,
-              expiryDate: newExpiryDate,
-              customerInfo: info,
             });
-
-            // Sync with database on update
-            get().syncWithDatabase();
-          });
+          } catch (listenerSetupError) {
+            console.warn('[Subscription] Failed to set up customer info listener:', listenerSetupError);
+          }
         } catch (error) {
           console.error('[Subscription] Init error:', error);
           set({

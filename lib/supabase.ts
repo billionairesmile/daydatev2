@@ -2886,49 +2886,10 @@ export const db = {
       const errors: string[] = [];
 
       try {
-        // FIRST: Delete user from auth.users via Edge Function (MUST be done while session is still valid)
-        // This is critical - doing this first ensures the session token is still valid
-        try {
-          console.log('[Account Delete] Step 0: Deleting from auth.users FIRST (while session is valid)');
-          console.log('[Account Delete] supabaseUrl:', supabaseUrl);
-
-          const { data: sessionData, error: sessionError } = await client.auth.getSession();
-          console.log('[Account Delete] Session check - has session:', !!sessionData?.session, 'error:', sessionError?.message);
-
-          if (sessionData?.session?.access_token) {
-            console.log('[Account Delete] Calling Edge Function delete-user-account...');
-            const edgeFunctionUrl = `${supabaseUrl}/functions/v1/delete-user-account`;
-            console.log('[Account Delete] Edge Function URL:', edgeFunctionUrl);
-
-            const response = await fetch(
-              edgeFunctionUrl,
-              {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${sessionData.session.access_token}`,
-                  'Content-Type': 'application/json',
-                },
-              }
-            );
-
-            console.log('[Account Delete] Edge Function response status:', response.status);
-
-            if (!response.ok) {
-              const errorData = await response.json();
-              console.error('[Account Delete] Edge function error:', errorData);
-              errors.push(`auth.users: ${errorData.error || 'Failed to delete auth user'}`);
-            } else {
-              const successData = await response.json();
-              console.log('[Account Delete] Successfully deleted from auth.users:', successData);
-            }
-          } else {
-            console.warn('[Account Delete] No session/access_token available - cannot delete from auth.users');
-            errors.push('auth.users: No session available for deletion');
-          }
-        } catch (authDeleteError) {
-          console.error('[Account Delete] Auth user deletion error:', authDeleteError);
-          errors.push(`auth.users: ${String(authDeleteError)}`);
-        }
+        // Get session first (needed for Edge Function call later)
+        const { data: sessionData } = await client.auth.getSession();
+        const accessToken = sessionData?.session?.access_token;
+        console.log('[Account Delete] Starting deletion, has session:', !!accessToken);
 
         // 1. Delete mission completions (depends on daily_missions)
         if (coupleId) {
@@ -3030,7 +2991,41 @@ export const db = {
           .eq('id', userId);
         if (profileError) errors.push(`profiles: ${profileError.message}`);
 
-        // 11. Delete storage files (photos, backgrounds, etc.)
+        // 11. Delete from auth.users via Edge Function (AFTER all public data is deleted)
+        // This must be done while session is still valid
+        if (accessToken) {
+          try {
+            console.log('[Account Delete] Step 11: Deleting from auth.users (after public data cleanup)');
+            const edgeFunctionUrl = `${supabaseUrl}/functions/v1/delete-user-account`;
+
+            const response = await fetch(edgeFunctionUrl, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+              },
+            });
+
+            console.log('[Account Delete] Edge Function response status:', response.status);
+
+            if (!response.ok) {
+              const errorData = await response.json();
+              console.error('[Account Delete] Edge function error:', errorData);
+              errors.push(`auth.users: ${errorData.error || 'Failed to delete auth user'}`);
+            } else {
+              const successData = await response.json();
+              console.log('[Account Delete] Successfully deleted from auth.users:', successData);
+            }
+          } catch (authDeleteError) {
+            console.error('[Account Delete] Auth user deletion error:', authDeleteError);
+            errors.push(`auth.users: ${String(authDeleteError)}`);
+          }
+        } else {
+          console.warn('[Account Delete] No access token - cannot delete from auth.users');
+          errors.push('auth.users: No session available for deletion');
+        }
+
+        // 12. Delete storage files (photos, backgrounds, etc.)
         if (coupleId) {
           try {
             // Delete memories folder
@@ -3065,7 +3060,7 @@ export const db = {
           }
         }
 
-        // 12. Sign out from Supabase Auth (auth.users deletion was done in Step 0)
+        // 13. Sign out from Supabase Auth
         const { error: signOutError } = await client.auth.signOut();
         if (signOutError) errors.push(`auth.signOut: ${signOutError.message}`);
 
@@ -3083,11 +3078,48 @@ export const db = {
     },
 
     /**
-     * Clear all AsyncStorage data
+     * Clear Zustand store data from AsyncStorage
+     * Note: We only clear our app's Zustand store keys, NOT everything
+     * Clearing everything (AsyncStorage.clear()) corrupts expo-router's navigation state
+     * which causes "Page not found" errors on Android after account deletion
      */
     async clearLocalStorage() {
       try {
-        await AsyncStorage.clear();
+        // Only clear our Zustand store keys, preserve expo-router and other system data
+        // Note: Some stores use 'daydate-' prefix, others don't - must match exact key names
+        const zustandKeys = [
+          'daydate-auth-storage',
+          'daydate-subscription-storage',
+          'daydate-onboarding-storage',
+          'daydate-mission-storage',
+          'daydate-memory-storage',
+          'daydate-couple-sync-storage',
+          'language-storage',  // No daydate- prefix
+          'timezone-storage',  // No daydate- prefix
+        ];
+
+        // Also clear any other app-specific keys
+        const otherAppKeys = [
+          'hasSeenHomeTutorial',
+          'hasRequestedInitialPermissions',
+          // Anniversary-related keys
+          'anniversaries_local',
+          'anniversaries_pending_sync',
+          'anniversaries_last_sync',
+          // Offline queue
+          '@daydate_offline_queue',
+          // Background image
+          '@daydate_background_image',
+          // Read announcements state
+          '@daydate/read_announcements',
+          // Test pairing codes (dev)
+          'test_pairing_codes',
+        ];
+
+        const allKeysToRemove = [...zustandKeys, ...otherAppKeys];
+        await AsyncStorage.multiRemove(allKeysToRemove);
+
+        console.log('[Account Delete] Cleared app storage keys:', allKeysToRemove.length);
         return { success: true };
       } catch (error) {
         console.error('[Account Delete] AsyncStorage clear error:', error);

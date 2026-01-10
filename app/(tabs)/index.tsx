@@ -14,6 +14,8 @@ import {
   Alert,
   Animated,
   StatusBar,
+  InteractionManager,
+  ActivityIndicator,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { BlurView } from 'expo-blur';
@@ -28,7 +30,7 @@ import { useTranslation } from 'react-i18next';
 
 // Pre-load static images (outside component to avoid re-creation)
 const LOGO_IMAGE = require('@/assets/images/daydate-logo.png');
-const DEFAULT_BACKGROUND_IMAGE = require('@/assets/images/backgroundimage.png');
+const DEFAULT_BACKGROUND_IMAGE = require('@/assets/images/backgroundimage.jpg');
 
 // Preload images at module level
 Asset.fromModule(LOGO_IMAGE).downloadAsync();
@@ -364,8 +366,23 @@ export default function HomeScreen() {
   const [customAnniversaries, setCustomAnniversaries] = useState<Anniversary[]>([]);
   const [isLoadingAnniversaries, setIsLoadingAnniversaries] = useState(true);
 
-  // Fetch latest partner and couple data on mount for real-time sync
+  // Track if navigation/interaction is complete for deferred rendering
+  const [isInteractionComplete, setIsInteractionComplete] = useState(false);
+
+  // Defer heavy operations until after navigation completes
+  // This prevents the black screen flash on Android
   useEffect(() => {
+    const handle = InteractionManager.runAfterInteractions(() => {
+      setIsInteractionComplete(true);
+    });
+    return () => handle.cancel();
+  }, []);
+
+  // Fetch latest partner and couple data on mount for real-time sync
+  // Only run after interaction is complete to avoid blocking navigation
+  useEffect(() => {
+    if (!isInteractionComplete) return;
+
     const fetchLatestData = async () => {
       if (!couple?.id || !user?.id) return;
 
@@ -413,7 +430,10 @@ export default function HomeScreen() {
   }, [couple?.id, user?.id, couple?.user1Id, couple?.user2Id, setCouple, setPartner]);
 
   // Load custom anniversaries from service on mount
+  // Only run after interaction is complete to avoid blocking navigation
   useEffect(() => {
+    if (!isInteractionComplete) return;
+
     const loadAnniversaries = async () => {
       if (!coupleId) {
         setIsLoadingAnniversaries(false);
@@ -463,10 +483,13 @@ export default function HomeScreen() {
     return () => {
       if (unsubscribe) unsubscribe();
     };
-  }, [coupleId]);
+  }, [coupleId, isInteractionComplete]);
 
   // Sync pending changes when coming online
+  // Only run after interaction is complete to avoid blocking navigation
   useEffect(() => {
+    if (!isInteractionComplete) return;
+
     const unsubscribe = NetInfo.addEventListener(async (state) => {
       if (state.isConnected && coupleId) {
         const { synced, failed } = await anniversaryService.syncPending(coupleId);
@@ -490,7 +513,7 @@ export default function HomeScreen() {
     });
 
     return () => unsubscribe();
-  }, [coupleId]);
+  }, [coupleId, isInteractionComplete]);
 
   // Tutorial overlay state
   const [showTutorial, setShowTutorial] = useState(false);
@@ -1825,7 +1848,7 @@ const styles = StyleSheet.create({
   },
   bannerAd: {
     position: 'absolute',
-    bottom: scale(94),
+    bottom: scale(88),
     left: 0,
     right: 0,
     alignItems: 'center',

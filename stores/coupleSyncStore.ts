@@ -1162,45 +1162,26 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     const { sharedMissionsDate, sharedMissions, allMissionProgress, lastMissionUpdate } = get();
     const today = getTodayInTimezone();
 
-    // ANTI-ABUSE: Prevent timezone manipulation to reset missions early
-    // Only reset if BOTH conditions are met:
-    // 1. Date changed in current timezone (normal midnight reset)
-    // 2. At least 24 hours have passed in real time (UTC-based check)
-
+    // Check if date changed in the user's effective timezone
     const dateChanged = sharedMissionsDate !== null && sharedMissionsDate !== today;
-
-    // Check if at least 24 hours have passed since mission generation (UTC-based)
-    const generatedAtMs = lastMissionUpdate?.getTime() || 0;
-    const nowMs = Date.now();
-    const hours24InMs = 24 * 60 * 60 * 1000;
-    const hasBeenAtLeast24Hours = (nowMs - generatedAtMs) >= hours24InMs;
 
     // IMPORTANT: If sharedMissionsDate is null but missions exist, we should NOT reset
     // This protects against hydration timing issues or partial state restoration
-    const shouldReset = sharedMissions.length > 0 &&
-      dateChanged &&
-      hasBeenAtLeast24Hours;
+    // Trust the timezone-aware date comparison for midnight resets
+    const shouldReset = sharedMissions.length > 0 && dateChanged;
 
     if (shouldReset) {
-      console.log('[CoupleSyncStore] Resetting shared missions.');
-      console.log('[CoupleSyncStore] - Date changed:', sharedMissionsDate, '→', today);
-      console.log('[CoupleSyncStore] - Generated at:', lastMissionUpdate?.toISOString());
-      console.log('[CoupleSyncStore] - Hours elapsed:', Math.floor((nowMs - generatedAtMs) / (60 * 60 * 1000)));
+      const generatedAtMs = lastMissionUpdate?.getTime() || 0;
+      const nowMs = Date.now();
+      console.log('[CoupleSyncStore] Resetting shared missions - date changed.');
+      console.log('[CoupleSyncStore] - Date:', sharedMissionsDate, '→', today);
+      console.log('[CoupleSyncStore] - Hours since generation:', Math.floor((nowMs - generatedAtMs) / (60 * 60 * 1000)));
       set({
         sharedMissions: [],
         sharedMissionsDate: null,
         missionGenerationStatus: 'idle',
         generatingUserId: null,
       });
-    } else if (sharedMissions.length > 0 && dateChanged && !hasBeenAtLeast24Hours) {
-      // Timezone abuse attempt detected!
-      console.warn('[CoupleSyncStore] ⚠️ Timezone manipulation detected!');
-      console.warn('[CoupleSyncStore] - Date appears changed but <24hrs elapsed');
-      console.warn('[CoupleSyncStore] - Generated at:', lastMissionUpdate?.toISOString());
-      console.warn('[CoupleSyncStore] - Hours elapsed:', Math.floor((nowMs - generatedAtMs) / (60 * 60 * 1000)));
-      console.warn('[CoupleSyncStore] - Keeping existing missions');
-      // Update the date to today to prevent repeated warnings
-      set({ sharedMissionsDate: today });
     }
 
     // If missions exist but date is null (shouldn't happen normally), set the date to today

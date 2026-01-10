@@ -579,6 +579,13 @@ export default function OnboardingScreen() {
               // Profile is incomplete - user needs to complete onboarding
               console.log('[Onboarding] Profile incomplete, continuing onboarding from basic_info');
 
+              // Only set to false if it was true (avoid unnecessary state updates)
+              // This prevents _layout.tsx from redirecting to tabs when profile is incomplete
+              if (isOnboardingComplete) {
+                console.log('[Onboarding] Resetting isOnboardingComplete to false for incomplete profile');
+                setIsOnboardingComplete(false);
+              }
+
               // Set isPairingConnected so the auto-skip useEffect will work
               updateData({ isPairingConnected: true });
 
@@ -598,6 +605,15 @@ export default function OnboardingScreen() {
 
           // Go directly to pairing (terms removed from flow)
           console.log('[Onboarding] User login success, going to pairing');
+
+          // CRITICAL: Ensure isOnboardingComplete is false for new users
+          // This prevents _layout.tsx from redirecting to tabs if the state was somehow true
+          // (e.g., from previous session, race condition, or hydration issues on Android)
+          if (isOnboardingComplete) {
+            console.log('[Onboarding] Resetting isOnboardingComplete to false for new user');
+            setIsOnboardingComplete(false);
+          }
+
           const providerName = provider === 'google' ? 'Google' : provider === 'kakao' ? 'Kakao' : 'Apple';
           Alert.alert(
             t('onboarding.login.success'),
@@ -611,6 +627,10 @@ export default function OnboardingScreen() {
           );
         } catch (dbError) {
           console.error('[Onboarding] DB error:', dbError);
+          // Ensure isOnboardingComplete is false on error
+          if (isOnboardingComplete) {
+            setIsOnboardingComplete(false);
+          }
           // On error, fallback to pairing step for safety
           animateTransition(() => setStep('pairing'));
         }
@@ -2136,27 +2156,43 @@ function PairingStep({
       setupInProgressRef.current = true; // Set mutex immediately before any async work
       const setupPairing = async (codeToUse: string, retryCount = 0) => {
         try {
-          // Get actual auth.uid() from Supabase for RLS compliance
-          let creatorUserId = currentUser?.id;
-          let isExistingUser = !!currentUser?.id;
+          // CRITICAL: Always verify Supabase auth session first for RLS compliance
+          // Store userId might be stale if session expired
+          let creatorUserId: string | undefined;
+          let isExistingUser = false;
 
-          if (!creatorUserId && supabase) {
-            const { data: authData } = await supabase.auth.getUser();
-            if (authData?.user?.id) {
+          if (supabase) {
+            const { data: authData, error: authError } = await supabase.auth.getUser();
+
+            if (authError || !authData?.user?.id) {
+              // Session expired or invalid - try to refresh
+              console.log('[PairingStep] Auth session invalid, attempting refresh...');
+              const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+
+              if (refreshError || !refreshData?.user?.id) {
+                console.log('[PairingStep] Session refresh failed, waiting for re-authentication');
+                setupInProgressRef.current = false;
+                setupStartedRef.current = '';
+                // Clear stale user data and redirect to login
+                if (currentUser?.id) {
+                  console.log('[PairingStep] Clearing stale user data');
+                }
+                return;
+              }
+
+              creatorUserId = refreshData.user.id;
+              console.log('[PairingStep] Session refreshed, using auth.uid():', creatorUserId);
+            } else {
               creatorUserId = authData.user.id;
-              isExistingUser = false; // User exists in auth but not in our store yet
-              console.log('[PairingStep] Using auth.uid():', creatorUserId);
+              isExistingUser = !!currentUser?.id && currentUser.id === creatorUserId;
             }
           }
 
           // If still no userId, user needs to authenticate first
-          // DO NOT create code with temporary UUID - it will cause issues when user logs in
           if (!creatorUserId) {
             console.log('[PairingStep] No authenticated user, waiting for authentication');
-            // Reset mutex so we can retry when user is authenticated
             setupInProgressRef.current = false;
             setupStartedRef.current = '';
-            // Don't create code - wait for authentication
             return;
           }
 
@@ -2204,7 +2240,13 @@ function PairingStep({
             console.log('[PairingStep] Found existing valid code:', existingCode.code);
             finalCode = existingCode.code;
             setGeneratedCode(finalCode);
+            // Parse timestamp - Supabase returns ISO 8601 format with timezone
             codeCreatedAt = new Date(existingCode.created_at);
+            // Fallback to current time if parsing fails
+            if (isNaN(codeCreatedAt.getTime())) {
+              console.warn('[PairingStep] Invalid created_at, using current time');
+              codeCreatedAt = new Date();
+            }
           } else {
             // No existing valid code, create a new one
             console.log('[PairingStep] No existing valid code, creating new one');
@@ -2218,21 +2260,59 @@ function PairingStep({
             // Save code to DB
             const { data: createdCode, error: createError } = await db.pairingCodes.create(codeToUse, creatorUserId);
             if (createError) {
-              // Handle duplicate key error by generating a new code
-              if (createError.code === '23505' && retryCount < 3) {
+              console.error('Error creating pairing code:', createError);
+
+              // Handle duplicate key error or any other error by generating a new code and retrying
+              if (retryCount < 3) {
+                console.log(`[PairingStep] Code creation failed, retrying... (attempt ${retryCount + 1}/3)`);
                 const newCode = generatePairingCode();
                 setGeneratedCode(newCode);
+                // Reset mutex to allow retry
+                setupStartedRef.current = newCode;
                 // Retry with new code
                 setupPairing(newCode, retryCount + 1);
                 return;
               }
-              console.error('Error creating pairing code:', createError);
+
+              // All retries failed - show error to user
+              console.error('[PairingStep] All retry attempts failed for pairing code creation');
+              setError(t('onboarding.pairing.codeCreationError'));
+              // Reset mutex to allow user to try again
+              setupInProgressRef.current = false;
+              setupStartedRef.current = '';
+
+              // Show alert to user
+              Alert.alert(
+                t('common.error'),
+                t('onboarding.pairing.codeCreationError'),
+                [
+                  {
+                    text: t('common.retry'),
+                    onPress: () => {
+                      // Generate a new code and try again
+                      const newCode = generatePairingCode();
+                      setGeneratedCode(newCode);
+                      setError(null);
+                    },
+                  },
+                ],
+              );
               return;
             }
             // Ensure displayed code matches the saved code
             console.log('[PairingStep] Successfully saved code to database:', codeToUse);
             finalCode = codeToUse;
-            codeCreatedAt = createdCode?.created_at ? new Date(createdCode.created_at) : new Date();
+            // Parse timestamp - Supabase returns ISO 8601 format with timezone
+            if (createdCode?.created_at) {
+              codeCreatedAt = new Date(createdCode.created_at);
+              // Fallback to current time if parsing fails
+              if (isNaN(codeCreatedAt.getTime())) {
+                console.warn('[PairingStep] Invalid created_at, using current time');
+                codeCreatedAt = new Date();
+              }
+            } else {
+              codeCreatedAt = new Date();
+            }
           }
 
           // Set expiration time (24 hours from code creation)
@@ -2490,6 +2570,30 @@ function PairingStep({
             }
             // === END RACE CONDITION PREVENTION ===
 
+            // CRITICAL: Verify auth session is still valid before couple creation
+            // This prevents RLS policy failures if session expired
+            if (supabase) {
+              const { data: currentAuthData } = await supabase.auth.getUser();
+              const currentAuthUid = currentAuthData?.user?.id;
+
+              if (!currentAuthUid) {
+                console.error('[PairingStep] Auth session expired before couple creation');
+                coupleCreationInProgressRef.current = false;
+                setError(t('onboarding.pairing.coupleConnectionError'));
+                setupInProgressRef.current = false;
+                setupStartedRef.current = '';
+                Alert.alert(t('common.error'), t('onboarding.pairing.coupleConnectionError'));
+                return;
+              }
+
+              if (currentAuthUid !== creatorUserId) {
+                console.warn('[PairingStep] Auth.uid() mismatch detected, updating creatorUserId');
+                console.log('[PairingStep] Store userId:', creatorUserId, 'Auth.uid():', currentAuthUid);
+                // Use the current auth.uid() to ensure RLS compliance
+                creatorUserId = currentAuthUid;
+              }
+            }
+
             // Get device timezone for the couple (creator's timezone)
             let deviceTimezone = 'Asia/Seoul'; // fallback
             try {
@@ -2503,14 +2607,62 @@ function PairingStep({
               console.log('[PairingStep] Failed to get device timezone, using fallback');
             }
 
-            const { data: newCouple, error: coupleError } = await db.couples.create({
-              user1_id: creatorUserId,
-              timezone: deviceTimezone,
-            });
+            console.log('[PairingStep] About to create couple with user1_id:', creatorUserId, 'timezone:', deviceTimezone);
 
-            if (coupleError) {
-              console.error('Error creating couple:', coupleError);
-            } else if (newCouple) {
+            // Try to create couple with retry logic
+            let newCouple: any = null;
+            let coupleError: any = null;
+            const maxCoupleRetries = 3;
+
+            for (let coupleRetry = 0; coupleRetry < maxCoupleRetries; coupleRetry++) {
+              const result = await db.couples.create({
+                user1_id: creatorUserId,
+                timezone: deviceTimezone,
+              });
+              newCouple = result.data;
+              coupleError = result.error;
+
+              if (!coupleError && newCouple) {
+                console.log(`[PairingStep] Couple created successfully on attempt ${coupleRetry + 1}`);
+                break;
+              }
+
+              console.error(`[PairingStep] Couple creation failed (attempt ${coupleRetry + 1}/${maxCoupleRetries}):`, coupleError);
+
+              if (coupleRetry < maxCoupleRetries - 1) {
+                // Wait a bit before retrying
+                await new Promise(resolve => setTimeout(resolve, 500));
+              }
+            }
+
+            if (coupleError || !newCouple) {
+              console.error('[PairingStep] All couple creation attempts failed. Error:', JSON.stringify(coupleError));
+              // Reset mutex to allow retry
+              coupleCreationInProgressRef.current = false;
+              // Clean up the pairing code since couple creation failed
+              await db.pairingCodes.deleteByCreatorId(creatorUserId);
+              setError(t('onboarding.pairing.coupleConnectionError'));
+              setupInProgressRef.current = false;
+              setupStartedRef.current = '';
+
+              Alert.alert(
+                t('common.error'),
+                t('onboarding.pairing.coupleConnectionError'),
+                [
+                  {
+                    text: t('common.retry'),
+                    onPress: () => {
+                      const newCode = generatePairingCode();
+                      setGeneratedCode(newCode);
+                      setError(null);
+                    },
+                  },
+                ],
+              );
+              return;
+            }
+
+            if (newCouple) {
               // Link couple_id to pairing code
               console.log('[PairingStep] Created couple:', newCouple.id, 'linking to code:', finalCode);
               const { error: linkError } = await db.pairingCodes.setCoupleId(finalCode, newCouple.id);
@@ -3811,6 +3963,10 @@ function PairingStep({
               {isPairingConnected ? (
                 <Text style={[styles.codeHint, { color: '#4CAF50' }]}>
                   {t('onboarding.pairing.connected')}
+                </Text>
+              ) : error ? (
+                <Text style={[styles.codeHint, { color: '#FF6B6B' }]}>
+                  {error}
                 </Text>
               ) : isCodeSaved ? (
                 <Text style={styles.codeHint}>

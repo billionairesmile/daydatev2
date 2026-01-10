@@ -14,6 +14,7 @@ import {
   TouchableWithoutFeedback,
   Platform,
   Alert,
+  InteractionManager,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -103,7 +104,8 @@ function SwipeableTodoItem({
   todo,
   onToggle,
   onEdit,
-  onDelete,
+  onRequestDelete,
+  onConfirmDelete,
   onSwipeStart,
   onSwipeEnd,
   editLabel,
@@ -112,7 +114,8 @@ function SwipeableTodoItem({
   todo: Todo;
   onToggle: () => void;
   onEdit: () => void;
-  onDelete: () => void;
+  onRequestDelete: () => Promise<boolean>;
+  onConfirmDelete: () => void;
   onSwipeStart?: () => void;
   onSwipeEnd?: () => void;
   editLabel: string;
@@ -232,27 +235,33 @@ function SwipeableTodoItem({
     })
   ).current;
 
-  const handleDelete = () => {
-    // Smooth delete animation: fade out + scale down + collapse
-    Animated.parallel([
-      Animated.timing(itemOpacity, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: false,
-      }),
-      Animated.timing(itemScale, {
-        toValue: 0.8,
-        duration: 200,
-        useNativeDriver: false,
-      }),
-      Animated.timing(itemHeight, {
-        toValue: 0,
-        duration: 250,
-        useNativeDriver: false,
-      }),
-    ]).start(() => {
-      onDelete();
-    });
+  const handleDelete = async () => {
+    // First confirm deletion - wait for user response
+    const confirmed = await onRequestDelete();
+
+    if (confirmed) {
+      // Run animation after user confirms, then actually delete
+      Animated.parallel([
+        Animated.timing(itemOpacity, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: false,
+        }),
+        Animated.timing(itemScale, {
+          toValue: 0.8,
+          duration: 200,
+          useNativeDriver: false,
+        }),
+        Animated.timing(itemHeight, {
+          toValue: 0,
+          duration: 250,
+          useNativeDriver: false,
+        }),
+      ]).start(() => {
+        // Actually delete after animation completes
+        onConfirmDelete();
+      });
+    }
   };
 
   const handleEdit = () => {
@@ -344,6 +353,18 @@ export default function CalendarScreen() {
   const { memories, loadFromDB } = useMemoryStore();
   const { couple } = useAuthStore();
   const { getEffectiveTimezone } = useTimezoneStore();
+
+  // Track if navigation/interaction is complete for deferred operations
+  const [isInteractionComplete, setIsInteractionComplete] = useState(false);
+
+  // Defer heavy operations until after navigation completes
+  useEffect(() => {
+    const handle = InteractionManager.runAfterInteractions(() => {
+      setIsInteractionComplete(true);
+    });
+    return () => handle.cancel();
+  }, []);
+
   const [currentDate, setCurrentDate] = useState(new Date());
   // Store full date to keep selection when navigating months
   const [selectedDate, setSelectedDate] = useState<{ year: number; month: number; day: number } | null>(null);
@@ -910,30 +931,36 @@ export default function CalendarScreen() {
     }
   };
 
-  const handleDeleteTodo = (todo: Todo) => {
-    Alert.alert(
-      t('calendar.todo.deleteConfirmTitle'),
-      t('calendar.todo.deleteConfirmMessage'),
-      [
-        {
-          text: t('calendar.todo.deleteConfirmCancel'),
-          style: 'cancel',
-        },
-        {
-          text: t('calendar.todo.deleteConfirmOk'),
-          style: 'destructive',
-          onPress: async () => {
-            if (isSyncInitialized && 'couple_id' in todo) {
-              // Synced todo
-              await deleteSyncedTodo(todo.id);
-            } else {
-              // Local todo
-              setLocalTodos(localTodos.filter((t) => t.id !== todo.id));
-            }
+  const confirmDeleteTodo = (): Promise<boolean> => {
+    return new Promise((resolve) => {
+      Alert.alert(
+        t('calendar.todo.deleteConfirmTitle'),
+        t('calendar.todo.deleteConfirmMessage'),
+        [
+          {
+            text: t('calendar.todo.deleteConfirmCancel'),
+            style: 'cancel',
+            onPress: () => resolve(false),
           },
-        },
-      ]
-    );
+          {
+            text: t('calendar.todo.deleteConfirmOk'),
+            style: 'destructive',
+            onPress: () => resolve(true),
+          },
+        ],
+        { cancelable: false }
+      );
+    });
+  };
+
+  const executeDeleteTodo = async (todo: Todo) => {
+    if (isSyncInitialized && 'couple_id' in todo) {
+      // Synced todo
+      await deleteSyncedTodo(todo.id);
+    } else {
+      // Local todo
+      setLocalTodos(localTodos.filter((t) => t.id !== todo.id));
+    }
   };
 
   const handleUpdateTodo = async () => {
@@ -1205,7 +1232,8 @@ export default function CalendarScreen() {
                   todo={todo}
                   onToggle={() => handleToggleTodo(todo)}
                   onEdit={() => openEditTodoModal(todo)}
-                  onDelete={() => handleDeleteTodo(todo)}
+                  onRequestDelete={confirmDeleteTodo}
+                  onConfirmDelete={() => executeDeleteTodo(todo)}
                   onSwipeStart={() => setScrollEnabled(false)}
                   onSwipeEnd={() => setScrollEnabled(true)}
                   editLabel={t('calendar.todo.edit')}
@@ -1707,7 +1735,7 @@ const styles = StyleSheet.create({
   },
   bannerAd: {
     position: 'absolute',
-    bottom: scale(94),
+    bottom: scale(88),
     left: 0,
     right: 0,
     alignItems: 'center',

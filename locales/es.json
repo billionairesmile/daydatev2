@@ -727,7 +727,8 @@
       "copied": "Copiado",
       "reconnected": "¡Qué bueno verte de nuevo! 💕",
       "reconnectedMessage": "Tus datos fueron restaurados desde la reconexión en 30 días.",
-      "shareMessage": "¡Creemos citas especiales juntos en Daydate! 💕\nMi código de invitación: {{code}}"
+      "shareMessage": "¡Creemos citas especiales juntos en Daydate! 💕\nMi código de invitación: {{code}}",
+      "codeCreationError": "Error al crear el código de emparejamiento. Por favor, inténtalo de nuevo."
     },
     "preferences": {
       "title": "Selecciona tus actividades\npreferidas",

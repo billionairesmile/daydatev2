@@ -935,7 +935,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: scale(SPACING.lg),
     fontSize: scaleFont(16),
     color: COLORS.black,
-    textAlign: 'center',
+    textAlign: Platform.OS === 'ios' ? 'center' : 'left',
     marginBottom: scale(SPACING.lg),
   },
   confirmButtonRow: {

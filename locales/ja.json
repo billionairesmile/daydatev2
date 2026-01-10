@@ -730,7 +730,8 @@
       "copied": "コピーされました",
       "reconnected": "またお会いできて嬉しいです！",
       "reconnectedMessage": "30日以内の再接続により既存データが復旧されました。",
-      "shareMessage": "Daydateで一緒に特別なデートを作りましょう！💕\n招待コード: {{code}}"
+      "shareMessage": "Daydateで一緒に特別なデートを作りましょう！💕\n招待コード: {{code}}",
+      "codeCreationError": "ペアリングコードの作成に失敗しました。もう一度お試しください。"
     },
     "preferences": {
       "title": "好きな活動を\n選択してください",

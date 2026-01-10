@@ -732,7 +732,8 @@
       "copied": "Copied",
       "reconnected": "Nice to see you again! 💕",
       "reconnectedMessage": "Your data has been restored from reconnection within 30 days.",
-      "shareMessage": "Let's create special dates together on Daydate! 💕\nMy invite code: {{code}}"
+      "shareMessage": "Let's create special dates together on Daydate! 💕\nMy invite code: {{code}}",
+      "codeCreationError": "Failed to create pairing code. Please try again."
     },
     "preferences": {
       "title": "Select your preferred\nactivities",

@@ -12,6 +12,7 @@ import {
   Linking,
   useWindowDimensions,
   AppState,
+  InteractionManager,
   type AppStateStatus,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -65,6 +66,17 @@ export default function MissionScreen() {
   const { backgroundImage } = useBackground();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showBookmarkedMissions, setShowBookmarkedMissions] = useState(false);
+
+  // Track if navigation/interaction is complete for deferred operations
+  const [isInteractionComplete, setIsInteractionComplete] = useState(false);
+
+  // Defer heavy operations until after navigation completes
+  useEffect(() => {
+    const handle = InteractionManager.runAfterInteractions(() => {
+      setIsInteractionComplete(true);
+    });
+    return () => handle.cancel();
+  }, []);
 
   // Hide tab bar when bookmarked missions page is shown
   useEffect(() => {

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   Platform,
   LayoutChangeEvent,
@@ -38,13 +39,11 @@ if (!isExpoGo) {
   }
 }
 
-// Ad unit ID - replace with actual ID in production
+// Ad unit ID (iOS: production, Android: test until approved)
 const getNativeAdUnitId = () => {
-  if (!TestIds) return '';
-  return Platform.select({
-    ios: TestIds.NATIVE,
-    android: TestIds.NATIVE,
-  }) || TestIds.NATIVE;
+  return Platform.OS === 'ios'
+    ? 'ca-app-pub-9357146388578422/7715290092'
+    : TestIds?.NATIVE || '';
 };
 
 interface NativeAdMissionCardProps {
@@ -132,12 +131,13 @@ export default function NativeAdMissionCard({
     return null;
   }
 
-  // Calculate dimensions - larger media size
-  const contentPadding = 20;
-  const mediaSize = Math.min(adViewDimensions.width - contentPadding * 2, 240); // Increased from 200 to 240
+  // Calculate dimensions - full width media for landscape ads
+  const contentPadding = 16;
   const contentWidth = adViewDimensions.width - contentPadding * 2;
-  // Calculate media left position (media is centered)
-  const mediaLeft = (adViewDimensions.width - mediaSize) / 2;
+  // Media takes full width, use most of available height
+  const mediaWidth = contentWidth;
+  // Reserve space for: paddingTop(48) + row(40) + body(30) + cta(50) + paddingBottom(20) = ~188
+  const mediaHeight = Math.max(Math.floor(adViewDimensions.height - 200), 180);
 
   return (
     <View style={styles.wrapper} onLayout={handleLayout}>
@@ -149,44 +149,61 @@ export default function NativeAdMissionCard({
             height: adViewDimensions.height,
           }}
         >
-          {/* AD Badge - aligned with media left edge, AdChoices auto-added at top-right by SDK */}
-          <View style={[styles.adBadge, { left: mediaLeft }]}>
+          {/* AD Badge - top left */}
+          <View style={[styles.adBadge, { left: contentPadding }]}>
             <Text style={styles.adBadgeText}>AD</Text>
           </View>
 
           {/* Main content */}
           <View style={[styles.content, { width: adViewDimensions.width, paddingHorizontal: contentPadding }]}>
-            {/* Media - larger size */}
-            <View style={[styles.mediaContainer, { width: mediaSize, height: mediaSize }]}>
-              <NativeMediaView style={{ width: mediaSize, height: mediaSize }} resizeMode="contain" />
+            {/* Media - full width, landscape friendly */}
+            <View style={[styles.mediaContainer, { width: mediaWidth, height: mediaHeight }]}>
+              <NativeMediaView style={{ width: mediaWidth, height: mediaHeight }} resizeMode="contain" />
             </View>
 
             {/* Icon + Headline */}
             <View style={[styles.row, { width: contentWidth }]}>
-              <NativeAsset assetType={NativeAssetType.ICON}>
-                <View style={styles.icon} />
-              </NativeAsset>
+              {nativeAd.icon && (
+                <NativeAsset assetType={NativeAssetType.ICON}>
+                  <Image
+                    source={{ uri: nativeAd.icon.url }}
+                    style={styles.icon}
+                  />
+                </NativeAsset>
+              )}
               <View style={styles.textWrap}>
                 <NativeAsset assetType={NativeAssetType.HEADLINE}>
-                  <Text style={styles.headline} numberOfLines={1} />
+                  <Text style={styles.headline} numberOfLines={1}>
+                    {nativeAd.headline}
+                  </Text>
                 </NativeAsset>
-                <NativeAsset assetType={NativeAssetType.ADVERTISER}>
-                  <Text style={styles.advertiser} numberOfLines={1} />
-                </NativeAsset>
+                {nativeAd.advertiser && (
+                  <NativeAsset assetType={NativeAssetType.ADVERTISER}>
+                    <Text style={styles.advertiser} numberOfLines={1}>
+                      {nativeAd.advertiser}
+                    </Text>
+                  </NativeAsset>
+                )}
               </View>
             </View>
 
             {/* Body */}
-            <NativeAsset assetType={NativeAssetType.BODY}>
-              <Text style={[styles.body, { width: contentWidth }]} numberOfLines={2} />
-            </NativeAsset>
+            {nativeAd.body && (
+              <NativeAsset assetType={NativeAssetType.BODY}>
+                <Text style={[styles.body, { width: contentWidth }]} numberOfLines={2}>
+                  {nativeAd.body}
+                </Text>
+              </NativeAsset>
+            )}
 
             {/* CTA Button */}
-            <NativeAsset assetType={NativeAssetType.CALL_TO_ACTION}>
-              <View style={[styles.ctaContainer, { width: contentWidth }]}>
-                <Text style={styles.ctaText} />
-              </View>
-            </NativeAsset>
+            {nativeAd.callToAction && (
+              <NativeAsset assetType={NativeAssetType.CALL_TO_ACTION}>
+                <Text style={[styles.ctaButton, { width: contentWidth }]} numberOfLines={1}>
+                  {nativeAd.callToAction}
+                </Text>
+              </NativeAsset>
+            )}
           </View>
         </NativeAdView>
       ) : (
@@ -201,18 +218,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000000',
     borderRadius: 45,
-    overflow: 'hidden', // Clip content to rounded corners
+    overflow: 'hidden',
   },
   content: {
-    paddingTop: 54, // Space for AD badge (moved down +10)
-    paddingBottom: 24,
+    paddingTop: 48,
+    paddingBottom: 16,
     alignItems: 'center',
   },
-  // AD Badge - left position set dynamically to align with media
   adBadge: {
     position: 'absolute',
-    top: 26, // Moved down +10
-    // left is set inline to align with media container
+    top: 20,
     backgroundColor: 'rgba(255,255,255,0.95)',
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -227,13 +242,13 @@ const styles = StyleSheet.create({
   mediaContainer: {
     borderRadius: 12,
     backgroundColor: '#1a1a1a',
-    overflow: 'hidden', // Clip landscape images to container bounds
+    overflow: 'hidden',
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginTop: 10,
+    marginTop: 12,
   },
   icon: {
     width: 28,
@@ -259,19 +274,16 @@ const styles = StyleSheet.create({
     lineHeight: 14,
     marginTop: 6,
   },
-  ctaContainer: {
+  ctaButton: {
     backgroundColor: '#4285F4',
     paddingVertical: 12,
-    marginTop: 16,
+    marginTop: 12,
     borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ctaText: {
     color: COLORS.white,
     fontSize: 13,
     fontWeight: '700',
     textAlign: 'center',
+    overflow: 'hidden',
   },
   placeholder: {
     flex: 1,

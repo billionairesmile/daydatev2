@@ -166,6 +166,7 @@ export default function TabLayout() {
           headerShown: false,
           tabBarStyle: { display: 'none' },
           animation: 'none', // 탭 전환 애니메이션 제거로 플래시 감소
+          lazy: false, // 모든 탭을 미리 렌더링하여 탭 전환 시 플래시 방지
         }}
         initialRouteName="index"
       >

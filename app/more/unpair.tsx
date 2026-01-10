@@ -583,7 +583,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.lg,
     fontSize: 16,
     color: COLORS.black,
-    textAlign: 'center',
+    textAlign: Platform.OS === 'ios' ? 'center' : 'left',
     marginBottom: SPACING.lg,
   },
   confirmButtonRow: {

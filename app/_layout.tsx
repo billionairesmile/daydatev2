@@ -26,6 +26,7 @@ import { BackgroundProvider, useBackground } from '@/contexts';
 import { preloadCharacterAssets } from '@/utils';
 import { CharacterPreloader } from '@/components/ransom';
 import { db, isDemoMode, supabase } from '@/lib/supabase';
+import { onAuthStateChange, signOut as supabaseSignOut } from '@/lib/socialAuth';
 import { updateUserLocationInDB, checkLocationPermission } from '@/lib/locationUtils';
 import { initializeNetworkMonitoring, subscribeToNetwork } from '@/lib/useNetwork';
 import { offlineQueue } from '@/lib/offlineQueue';
@@ -215,6 +216,96 @@ function RootLayoutNav() {
 
   // Initialize push notifications
   usePushNotifications();
+
+  // Get signOut function from authStore
+  const authSignOut = useAuthStore((state) => state.signOut);
+
+  // Listen for Supabase auth state changes (session expiry, token refresh failures)
+  useEffect(() => {
+    if (isDemoMode || !supabase) return;
+
+    const { data: { subscription } } = onAuthStateChange(async (event, session) => {
+      console.log('[Layout] Auth state changed:', event, 'hasSession:', !!session);
+
+      if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+        // If session is null after SIGNED_OUT or TOKEN_REFRESHED, user is logged out
+        if (!session) {
+          console.log('[Layout] Session is null - clearing local auth state');
+
+          // Get current auth state to check if we need to clean up
+          const { isAuthenticated, user: currentUser } = useAuthStore.getState();
+
+          if (isAuthenticated || currentUser) {
+            console.log('[Layout] Clearing stale auth state due to session expiry');
+
+            // Cleanup realtime subscriptions
+            cleanupSync();
+
+            // Clear local auth state
+            authSignOut();
+
+            // Set onboarding incomplete to trigger navigation to login
+            setIsOnboardingComplete(false);
+          }
+        }
+      }
+
+      // Handle refresh token errors
+      if (event === 'USER_UPDATED' || event === 'INITIAL_SESSION') {
+        // Verify the session is still valid
+        if (session?.user?.id) {
+          const { user: currentUser, isAuthenticated } = useAuthStore.getState();
+
+          // If we have a local user but it doesn't match the session, or session is invalid
+          if (currentUser && currentUser.id !== session.user.id) {
+            console.log('[Layout] Session user mismatch - clearing local state');
+            cleanupSync();
+            authSignOut();
+            setIsOnboardingComplete(false);
+          }
+        }
+      }
+    });
+
+    return () => {
+      subscription?.unsubscribe();
+    };
+  }, [authSignOut, cleanupSync, setIsOnboardingComplete]);
+
+  // Verify session on app startup (catches stale sessions from previous launches)
+  useEffect(() => {
+    if (isDemoMode || !supabase || !authHydrated) return;
+
+    const verifyInitialSession = async () => {
+      const { isAuthenticated, user: currentUser } = useAuthStore.getState();
+
+      // Only verify if we think we're authenticated
+      if (!isAuthenticated || !currentUser?.id) return;
+
+      console.log('[Layout] Verifying initial session for user:', currentUser.id);
+
+      try {
+        const { data: { session }, error } = await supabase!.auth.getSession();
+
+        if (error || !session) {
+          console.log('[Layout] Initial session invalid:', error?.message || 'No session');
+          // Session is invalid, clear local state
+          cleanupSync();
+          authSignOut();
+          setIsOnboardingComplete(false);
+        } else {
+          console.log('[Layout] Initial session valid');
+        }
+      } catch (err) {
+        console.error('[Layout] Initial session verification failed:', err);
+        cleanupSync();
+        authSignOut();
+        setIsOnboardingComplete(false);
+      }
+    };
+
+    verifyInitialSession();
+  }, [authHydrated, authSignOut, cleanupSync, setIsOnboardingComplete]);
 
   // Initialize subscription/premium status when user is authenticated
   useEffect(() => {
@@ -618,11 +709,56 @@ function RootLayoutNav() {
     updateUserLocation();
   }, [updateUserLocation]);
 
+  // Verify session validity and refresh data when app comes to foreground
+  const verifySessionAndRefresh = useCallback(async () => {
+    // Skip if in demo mode or no supabase
+    if (isDemoMode || !supabase) return;
+
+    const { isAuthenticated, user: currentUser } = useAuthStore.getState();
+
+    // Only verify if we think we're authenticated
+    if (!isAuthenticated || !currentUser?.id) return;
+
+    try {
+      // Try to get the current session - this will fail if refresh token is invalid
+      const { data: { session }, error } = await supabase.auth.getSession();
+
+      if (error) {
+        console.log('[Layout] Session verification error:', error.message);
+        // Session is invalid, clear local state
+        cleanupSync();
+        authSignOut();
+        setIsOnboardingComplete(false);
+        return;
+      }
+
+      if (!session) {
+        console.log('[Layout] No session found during verification - clearing local state');
+        cleanupSync();
+        authSignOut();
+        setIsOnboardingComplete(false);
+        return;
+      }
+
+      // Session is valid, proceed with data refresh
+      console.log('[Layout] Session verified, refreshing data...');
+    } catch (err) {
+      console.error('[Layout] Session verification failed:', err);
+      // On any error, clear local state for safety
+      cleanupSync();
+      authSignOut();
+      setIsOnboardingComplete(false);
+    }
+  }, [authSignOut, cleanupSync, setIsOnboardingComplete]);
+
   // Refresh partner data, location, mission progress, albums, and subscription when app comes to foreground
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+    const subscription = AppState.addEventListener('change', async (nextAppState: AppStateStatus) => {
       if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
-        // App has come to the foreground, refresh all synced data
+        // App has come to the foreground - first verify session is still valid
+        await verifySessionAndRefresh();
+
+        // Then refresh all synced data
         fetchCoupleAndPartnerData();
         updateUserLocation();
         // Check and reset missions if date changed (CRITICAL: Must be called before loading missions)
@@ -644,7 +780,65 @@ function RootLayoutNav() {
     return () => {
       subscription.remove();
     };
-  }, [fetchCoupleAndPartnerData, updateUserLocation, checkAndResetMissions, loadMissionProgress, loadSharedMissions, loadAlbums, loadTodos, loadMenstrualSettings, loadFromDatabase]);
+  }, [fetchCoupleAndPartnerData, updateUserLocation, checkAndResetMissions, loadMissionProgress, loadSharedMissions, loadAlbums, loadTodos, loadMenstrualSettings, loadFromDatabase, verifySessionAndRefresh]);
+
+  // Midnight timer - automatically reset missions when date changes (12:00 AM in user's timezone)
+  useEffect(() => {
+    if (!isOnboardingComplete) return;
+
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleMidnightReset = () => {
+      // Get next midnight in user's effective timezone
+      const { getEffectiveTimezone } = useTimezoneStore.getState();
+      const timezone = getEffectiveTimezone();
+
+      // Calculate midnight in the user's timezone
+      const now = new Date();
+      const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+      });
+
+      // Get current time in timezone
+      const parts = formatter.formatToParts(now);
+      const hour = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10);
+      const minute = parseInt(parts.find(p => p.type === 'minute')?.value || '0', 10);
+      const second = parseInt(parts.find(p => p.type === 'second')?.value || '0', 10);
+
+      // Calculate milliseconds until midnight in that timezone
+      const msUntilMidnight = ((24 - hour - 1) * 60 * 60 * 1000) +
+        ((60 - minute - 1) * 60 * 1000) +
+        ((60 - second) * 1000);
+
+      console.log('[Layout] Scheduling midnight reset in', Math.round(msUntilMidnight / 1000 / 60), 'minutes (timezone:', timezone, ')');
+
+      timeoutId = setTimeout(() => {
+        console.log('[Layout] Midnight reached - resetting missions');
+        // Reset missions
+        checkAndResetMissions();
+        // Reload mission data
+        loadMissionProgress();
+        loadSharedMissions();
+        // Schedule next midnight reset (add small delay to ensure we're past midnight)
+        setTimeout(() => scheduleMidnightReset(), 1000);
+      }, msUntilMidnight);
+    };
+
+    scheduleMidnightReset();
+
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [isOnboardingComplete, checkAndResetMissions, loadMissionProgress, loadSharedMissions]);
 
   // Also refresh if partner data is incomplete (partner might have completed onboarding)
   useEffect(() => {
@@ -1029,6 +1223,13 @@ function RootLayoutNav() {
       >
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="auth/callback"
+          options={{
+            headerShown: false,
+            animation: 'none',
+          }}
+        />
         <Stack.Screen
           name="mission/[id]"
           options={{

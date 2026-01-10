@@ -22,14 +22,11 @@ if (!isExpoGo) {
   }
 }
 
-// Ad unit IDs - replace with actual IDs in production
+// Ad unit ID (iOS: production, Android: test until approved)
 const getRewardedAdUnitId = () => {
-  if (!TestIds) return '';
-  // TODO: Replace with actual production ad unit IDs
-  return Platform.select({
-    ios: TestIds.REWARDED,
-    android: TestIds.REWARDED,
-  }) || TestIds.REWARDED;
+  return Platform.OS === 'ios'
+    ? 'ca-app-pub-9357146388578422/5381012045'
+    : TestIds?.REWARDED || '';
 };
 
 interface RewardedAdCallbacks {

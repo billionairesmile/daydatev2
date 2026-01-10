@@ -25,22 +25,19 @@ if (!isExpoGo) {
   }
 }
 
-// Ad unit IDs - replace with actual IDs in production
+// Ad unit IDs (iOS: production, Android: test until approved)
 const getAdUnitIds = () => {
-  if (!TestIds) return { HOME_BANNER: '', CALENDAR_BANNER: '', MEMORIES_BANNER: '' };
+  const isIOS = Platform.OS === 'ios';
   return {
-    HOME_BANNER: Platform.select({
-      ios: TestIds.BANNER,
-      android: TestIds.BANNER,
-    }) || TestIds.BANNER,
-    CALENDAR_BANNER: Platform.select({
-      ios: TestIds.BANNER,
-      android: TestIds.BANNER,
-    }) || TestIds.BANNER,
-    MEMORIES_BANNER: Platform.select({
-      ios: TestIds.BANNER,
-      android: TestIds.BANNER,
-    }) || TestIds.BANNER,
+    HOME_BANNER: isIOS
+      ? 'ca-app-pub-9357146388578422/7136705590'
+      : TestIds?.BANNER || '',
+    CALENDAR_BANNER: isIOS
+      ? 'ca-app-pub-9357146388578422/5280698445'
+      : TestIds?.BANNER || '',
+    MEMORIES_BANNER: isIOS
+      ? 'ca-app-pub-9357146388578422/7906861781'
+      : TestIds?.BANNER || '',
   };
 };
 

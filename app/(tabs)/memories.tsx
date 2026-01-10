@@ -18,6 +18,7 @@ import {
   NativeScrollEvent,
   LayoutChangeEvent,
   ActivityIndicator,
+  InteractionManager,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -152,6 +153,17 @@ export default function MemoriesScreen() {
   const { memories, deleteMemory, loadFromDB } = useMemoryStore();
   const { user, partner, couple } = useAuthStore();
   const insets = useSafeAreaInsets();
+
+  // Track if navigation/interaction is complete for deferred operations
+  const [isInteractionComplete, setIsInteractionComplete] = useState(false);
+
+  // Defer heavy operations until after navigation completes
+  useEffect(() => {
+    const handle = InteractionManager.runAfterInteractions(() => {
+      setIsInteractionComplete(true);
+    });
+    return () => handle.cancel();
+  }, []);
 
   // Album sync store
   const {
@@ -2552,6 +2564,7 @@ export default function MemoriesScreen() {
               missions={albumPhotos[selectedAlbum.id] || []}
               initialPhoto={selectedAlbumPhoto}
               onClose={() => setSelectedAlbumPhoto(null)}
+              hideMenu={true}
               onDelete={async (memoryId) => {
                 console.log('[AlbumPhotoDelete] Starting deletion for memoryId:', memoryId);
                 // UUID validation - check if it's a sample memory
@@ -3162,7 +3175,7 @@ function FlipCardItem({
   return (
     <View style={styles.flatListCardWrapper}>
       <View style={styles.flipCardContainer}>
-        <Pressable onPress={handleFlip} style={styles.flipCardPressable}>
+        <Pressable onPress={handleFlip} style={styles.flipCardPressable} android_ripple={null}>
           {/* Front - Photo */}
           <Animated.View
             style={[
@@ -3335,11 +3348,13 @@ function PhotoDetailView({
   initialPhoto,
   onClose,
   onDelete,
+  hideMenu = false,
 }: {
   missions: MemoryType[];
   initialPhoto: MemoryType;
   onClose: () => void;
   onDelete: (memoryId: string) => void | Promise<void>;
+  hideMenu?: boolean;
 }) {
   const { t } = useTranslation();
   const initialIndex = missions.findIndex((m) => m.id === initialPhoto.id);
@@ -3535,12 +3550,14 @@ function PhotoDetailView({
         <Pressable style={styles.photoDetailButton} onPress={onClose}>
           <X color={COLORS.white} size={20} />
         </Pressable>
-        <Pressable
-          style={styles.photoDetailButton}
-          onPress={() => setShowPhotoDetailMenu(!showPhotoDetailMenu)}
-        >
-          <MoreHorizontal color={COLORS.white} size={20} />
-        </Pressable>
+        {!hideMenu && (
+          <Pressable
+            style={styles.photoDetailButton}
+            onPress={() => setShowPhotoDetailMenu(!showPhotoDetailMenu)}
+          >
+            <MoreHorizontal color={COLORS.white} size={20} />
+          </Pressable>
+        )}
       </View>
 
       {/* Photo Detail Dropdown Menu */}
@@ -3643,6 +3660,7 @@ function PhotoDetailView({
           bounces={true}
           alwaysBounceHorizontal={true}
           contentContainerStyle={styles.carouselScrollContent}
+          overScrollMode={Platform.OS === 'android' ? 'never' : undefined}
         >
           {localMissions.map((mission, index) => (
             <CarouselCardWrapper
@@ -3674,7 +3692,7 @@ const styles = StyleSheet.create({
   },
   bannerAd: {
     position: 'absolute',
-    bottom: scale(94),
+    bottom: scale(88),
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -4076,9 +4094,9 @@ const styles = StyleSheet.create({
   },
   photoDetailTopButtonsContainer: {
     position: 'absolute',
-    top: scale(48),
-    left: scale(24),
-    right: scale(24),
+    top: scale(60),
+    left: scale(20),
+    right: scale(20),
     flexDirection: 'row',
     justifyContent: 'space-between',
     zIndex: 10,
@@ -4093,8 +4111,8 @@ const styles = StyleSheet.create({
   },
   photoDetailMenuDropdown: {
     position: 'absolute',
-    top: scale(96),
-    right: scale(24),
+    top: scale(108),
+    right: scale(20),
     borderRadius: scale(12),
     paddingVertical: scale(6),
     minWidth: scale(120),
@@ -4128,8 +4146,8 @@ const styles = StyleSheet.create({
   },
   photoDetailCloseButton: {
     position: 'absolute',
-    top: scale(48),
-    right: scale(24),
+    top: scale(60),
+    right: scale(20),
     width: scale(40),
     height: scale(40),
     borderRadius: scale(20),
@@ -4254,7 +4272,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: scale(8) },
     shadowOpacity: 0.4,
     shadowRadius: scale(16),
-    elevation: 10,
+    ...(Platform.OS === 'ios' ? { elevation: 10 } : {}),
   },
   flipCardBack: {
     backgroundColor: '#1a1a1a',
