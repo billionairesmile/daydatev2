@@ -435,6 +435,14 @@ export default function MissionScreen() {
         coupleId
       ) {
         console.log('[MissionScreen] App came to foreground, refreshing mission data');
+
+        // Reset any stuck loading states (e.g., if app was backgrounded during ad loading)
+        setIsGenerating(false);
+        setIsLoadingAd(false);
+        setIsWaitingForImages(false);
+        isWaitingForImagesRef.current = false;
+        setPartnerGeneratingMessage(null);
+
         // Reload shared missions to ensure data is fresh
         await loadSharedMissions();
         // Also check for date reset
@@ -487,6 +495,15 @@ export default function MissionScreen() {
 
         // Reset missions
         checkAndResetMissions();
+
+        // Reset ALL loading states to prevent stuck UI
+        setIsGenerating(false);
+        setIsLoadingAd(false);
+        setIsWaitingForImages(false);
+        isWaitingForImagesRef.current = false;
+        setPartnerGeneratingMessage(null);
+        setLoadedImagesCount(0);
+        setTotalImagesToLoad(0);
 
         // Reset carousel state so it shows the empty state / generate button
         hasInitializedCarousel.current = false;
@@ -661,7 +678,7 @@ export default function MissionScreen() {
           await setRefreshUsedToday();
         }
 
-        // Prefetch and load images
+        // Prefetch all mission images before showing cards
         if (newMissions.length > 0) {
           const imagesToLoad = newMissions.filter(mission => mission.imageUrl);
 
@@ -670,28 +687,24 @@ export default function MissionScreen() {
               ExpoImage.prefetch(`${mission.imageUrl}?w=800&h=1000&fit=crop`)
             );
 
+            // Wait for all images to prefetch (with timeout fallback)
             await Promise.race([
               Promise.all(imagePromises),
-              new Promise(resolve => setTimeout(resolve, 8000)),
+              new Promise(resolve => setTimeout(resolve, 10000)), // 10초 타임아웃
             ]);
+
+            console.log('[Mission Refresh] Premium - Image prefetch completed, images are cached');
           } catch (error) {
             console.log('Image prefetch error:', error);
           }
 
-          setLoadedImagesCount(0);
-          setTotalImagesToLoad(imagesToLoad.length);
-          setIsWaitingForImages(true);
-          isWaitingForImagesRef.current = true;
+          // Small delay for smooth transition after prefetch
+          await new Promise(resolve => setTimeout(resolve, 300));
 
-          setTimeout(() => {
-            if (isWaitingForImagesRef.current) {
-              setIsGenerating(false);
-              setIsWaitingForImages(false);
-              isWaitingForImagesRef.current = false;
-              setLoadedImagesCount(0);
-              setTotalImagesToLoad(0);
-            }
-          }, 10000);
+          // Hide loading - images are now cached and will render instantly
+          setIsGenerating(false);
+          setIsWaitingForImages(false);
+          isWaitingForImagesRef.current = false;
         } else {
           setIsGenerating(false);
         }
@@ -785,7 +798,7 @@ export default function MissionScreen() {
             await setRefreshUsedToday();
           }
 
-          // Prefetch and load images
+          // Prefetch all mission images before showing cards
           if (newMissions.length > 0) {
             const imagesToLoad = newMissions.filter(mission => mission.imageUrl);
 
@@ -794,28 +807,24 @@ export default function MissionScreen() {
                 ExpoImage.prefetch(`${mission.imageUrl}?w=800&h=1000&fit=crop`)
               );
 
+              // Wait for all images to prefetch (with timeout fallback)
               await Promise.race([
                 Promise.all(imagePromises),
-                new Promise(resolve => setTimeout(resolve, 8000)),
+                new Promise(resolve => setTimeout(resolve, 10000)), // 10초 타임아웃
               ]);
+
+              console.log('[Mission Refresh] Free user ad - Image prefetch completed, images are cached');
             } catch (error) {
               console.log('Image prefetch error:', error);
             }
 
-            setLoadedImagesCount(0);
-            setTotalImagesToLoad(imagesToLoad.length);
-            setIsWaitingForImages(true);
-            isWaitingForImagesRef.current = true;
+            // Small delay for smooth transition after prefetch
+            await new Promise(resolve => setTimeout(resolve, 300));
 
-            setTimeout(() => {
-              if (isWaitingForImagesRef.current) {
-                setIsGenerating(false);
-                setIsWaitingForImages(false);
-                isWaitingForImagesRef.current = false;
-                setLoadedImagesCount(0);
-                setTotalImagesToLoad(0);
-              }
-            }, 10000);
+            // Hide loading - images are now cached and will render instantly
+            setIsGenerating(false);
+            setIsWaitingForImages(false);
+            isWaitingForImagesRef.current = false;
           } else {
             setIsGenerating(false);
           }
@@ -839,78 +848,71 @@ export default function MissionScreen() {
       // If ad loading failed or was not shown (e.g., in Expo Go), handle fallback
       if (!adShown) {
         setIsLoadingAd(false);
-        // For Expo Go / development, skip ad and wait for generation to complete
-        if (__DEV__) {
-          // Modal already closed above, show loading animation
-          setIsGenerating(true);
-          setPartnerGeneratingMessage(null);
 
-          // Wait for mission generation to complete and get result
-          const devResult = await missionGenerationPromise;
+        // Wait for mission generation to complete and get result
+        // This applies to both __DEV__ and production when ad fails
+        const fallbackResult = await missionGenerationPromise;
 
-          if (missionGenerationError || !devResult) {
-            setIsGenerating(false);
-            return;
-          }
-
-          if (devResult.status === 'locked') {
-            setPartnerGeneratingMessage(t('mission.refresh.partnerGenerating'));
-            return;
-          }
-
-          if (devResult.status === 'exists' || devResult.status === 'success') {
-            // Success - continue to show missions
-          } else if (devResult.status === 'location_required' || devResult.status === 'preferences_required') {
-            setIsGenerating(false);
-            setPartnerGeneratingMessage(null);
-            return;
-          }
-
-          const newMissions = getTodayMissions();
-
-          // Mark refresh as used for today (only once per day)
-          if (newMissions.length > 0) {
-            await setRefreshUsedToday();
-          }
-
-          if (newMissions.length > 0) {
-            const imagesToLoad = newMissions.filter(mission => mission.imageUrl);
-
-            try {
-              const imagePromises = imagesToLoad.map(mission =>
-                ExpoImage.prefetch(`${mission.imageUrl}?w=800&h=1000&fit=crop`)
-              );
-
-              await Promise.race([
-                Promise.all(imagePromises),
-                new Promise(resolve => setTimeout(resolve, 8000)),
-              ]);
-            } catch (error) {
-              console.log('Image prefetch error:', error);
-            }
-
-            setLoadedImagesCount(0);
-            setTotalImagesToLoad(imagesToLoad.length);
-            setIsWaitingForImages(true);
-            isWaitingForImagesRef.current = true;
-
-            setTimeout(() => {
-              if (isWaitingForImagesRef.current) {
-                setIsGenerating(false);
-                setIsWaitingForImages(false);
-                isWaitingForImagesRef.current = false;
-                setLoadedImagesCount(0);
-                setTotalImagesToLoad(0);
-              }
-            }, 10000);
-          } else {
-            setIsGenerating(false);
-          }
-
-          setCanMeetToday(null);
-          setAvailableTime(null);
-          setSelectedMoods([]);
+        if (missionGenerationError || !fallbackResult) {
+          setIsGenerating(false);
+          return;
         }
+
+        if (fallbackResult.status === 'locked') {
+          setPartnerGeneratingMessage(t('mission.refresh.partnerGenerating'));
+          return;
+        }
+
+        if (fallbackResult.status === 'exists' || fallbackResult.status === 'success') {
+          // Success - continue to show missions
+        } else if (fallbackResult.status === 'location_required' || fallbackResult.status === 'preferences_required') {
+          setIsGenerating(false);
+          setPartnerGeneratingMessage(null);
+          return;
+        }
+
+        const newMissions = getTodayMissions();
+
+        // Mark refresh as used for today (only once per day)
+        // This is critical - even if ad failed, missions were generated so refresh should be marked as used
+        if (newMissions.length > 0) {
+          await setRefreshUsedToday();
+        }
+
+        // Prefetch all mission images before showing cards
+        if (newMissions.length > 0) {
+          const imagesToLoad = newMissions.filter(mission => mission.imageUrl);
+
+          try {
+            const imagePromises = imagesToLoad.map(mission =>
+              ExpoImage.prefetch(`${mission.imageUrl}?w=800&h=1000&fit=crop`)
+            );
+
+            // Wait for all images to prefetch (with timeout fallback)
+            await Promise.race([
+              Promise.all(imagePromises),
+              new Promise(resolve => setTimeout(resolve, 10000)), // 10초 타임아웃
+            ]);
+
+            console.log('[Mission Refresh] Fallback - Image prefetch completed, images are cached');
+          } catch (error) {
+            console.log('Image prefetch error:', error);
+          }
+
+          // Small delay for smooth transition after prefetch
+          await new Promise(resolve => setTimeout(resolve, 300));
+
+          // Hide loading - images are now cached and will render instantly
+          setIsGenerating(false);
+          setIsWaitingForImages(false);
+          isWaitingForImagesRef.current = false;
+        } else {
+          setIsGenerating(false);
+        }
+
+        setCanMeetToday(null);
+        setAvailableTime(null);
+        setSelectedMoods([]);
       }
 
       return;
@@ -984,30 +986,22 @@ export default function MissionScreen() {
         // Wait for all images to prefetch (with timeout fallback)
         await Promise.race([
           Promise.all(imagePromises),
-          new Promise(resolve => setTimeout(resolve, 8000)), // 8초 타임아웃
+          new Promise(resolve => setTimeout(resolve, 10000)), // 10초 타임아웃
         ]);
+
+        console.log('[Mission] Image prefetch completed, images are cached');
       } catch (error) {
         console.log('Image prefetch error:', error);
         // Continue even if prefetch fails
       }
 
-      // Set up image loading tracking - wait for actual render
-      // The loading will hide when all images call onLoad
-      setLoadedImagesCount(0);
-      setTotalImagesToLoad(imagesToLoad.length);
-      setIsWaitingForImages(true);
-      isWaitingForImagesRef.current = true;
+      // Small delay for smooth transition after prefetch
+      await new Promise(resolve => setTimeout(resolve, 300));
 
-      // Set a maximum wait time (10 seconds) as fallback
-      setTimeout(() => {
-        if (isWaitingForImagesRef.current) {
-          setIsGenerating(false);
-          setIsWaitingForImages(false);
-          isWaitingForImagesRef.current = false;
-          setLoadedImagesCount(0);
-          setTotalImagesToLoad(0);
-        }
-      }, 10000);
+      // Hide loading - images are now cached and will render instantly
+      setIsGenerating(false);
+      setIsWaitingForImages(false);
+      isWaitingForImagesRef.current = false;
     } else {
       // No missions generated, hide loading immediately
       setIsGenerating(false);
@@ -1211,7 +1205,8 @@ export default function MissionScreen() {
 
       {/* Card Carousel or Empty State */}
       <View style={styles.cardContainer}>
-        {hasGeneratedMissions ? (
+        {/* Show carousel only when missions exist AND images are loaded (not generating/waiting) */}
+        {hasGeneratedMissions && !isGenerating && !isWaitingForImages ? (
           <View style={styles.carouselWrapper}>
             <Animated.FlatList
               key={`mission-list-${allMissions.length}`}
@@ -1265,7 +1260,7 @@ export default function MissionScreen() {
         ) : (
           /* Empty State - Generate Button or Loading Animation */
           <View style={styles.emptyStateContainer}>
-            {isGenerating || isLoadingAd ? (
+            {isGenerating || isLoadingAd || isWaitingForImages ? (
               <View style={styles.loadingAnimationWrapper}>
                 <CircularLoadingAnimation size={scale(100)} strokeWidth={scale(6)} color={COLORS.white} />
                 <Text style={styles.loadingAnimationText}>

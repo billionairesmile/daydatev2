@@ -277,13 +277,13 @@ const styles = StyleSheet.create({
   ctaButton: {
     backgroundColor: '#4285F4',
     paddingVertical: 12,
+    paddingHorizontal: 16,
     marginTop: 12,
     borderRadius: 8,
     color: COLORS.white,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
     textAlign: 'center',
-    overflow: 'hidden',
   },
   placeholder: {
     flex: 1,
