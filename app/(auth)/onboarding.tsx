@@ -46,7 +46,7 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import { Ionicons } from '@expo/vector-icons';
 
 import { GoogleLogo, KakaoLogo } from '@/components/icons/SocialLogos';
-import { COLORS, SPACING, RADIUS, TYPOGRAPHY, IS_TABLET, scale, scaleFont } from '@/constants/design';
+import { COLORS, SPACING, RADIUS, TYPOGRAPHY, IS_TABLET, scale, scaleFont, ANDROID_BOTTOM_PADDING } from '@/constants/design';
 import { useAuthStore } from '@/stores';
 import { useTimezoneStore } from '@/stores/timezoneStore';
 import {
@@ -980,7 +980,7 @@ export default function OnboardingScreen() {
       style={[styles.container, styles.whiteContainer]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-      enabled={effectiveStep !== 'basic_info' && effectiveStep !== 'pairing'}
+      enabled={effectiveStep !== 'basic_info' && effectiveStep !== 'pairing' && effectiveStep !== 'welcome'}
     >
       {/* Status bar style - dark for all screens (white bg) */}
       <StatusBar barStyle="dark-content" />
@@ -1241,6 +1241,40 @@ function WelcomeStep({ onSocialLogin, onEmailLogin }: {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
+  // Keyboard animation for modal
+  const modalTranslateY = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const keyboardWillShow = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        if (showEmailModal) {
+          Animated.timing(modalTranslateY, {
+            toValue: -e.endCoordinates.height / 2.5,
+            duration: Platform.OS === 'ios' ? 250 : 100,
+            useNativeDriver: true,
+          }).start();
+        }
+      }
+    );
+
+    const keyboardWillHide = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        Animated.timing(modalTranslateY, {
+          toValue: 0,
+          duration: Platform.OS === 'ios' ? 250 : 100,
+          useNativeDriver: true,
+        }).start();
+      }
+    );
+
+    return () => {
+      keyboardWillShow.remove();
+      keyboardWillHide.remove();
+    };
+  }, [showEmailModal, modalTranslateY]);
+
   // Font and style settings per language
   // English/Spanish: Poetsen One, Japanese: Mochiy Pop One, Chinese: Chiron GoRound TC, Korean: Jua
   const getTaglineStyle = () => {
@@ -1447,19 +1481,34 @@ function WelcomeStep({ onSocialLogin, onEmailLogin }: {
         visible={showEmailModal}
         animationType="fade"
         transparent={true}
-        onRequestClose={() => setShowEmailModal(false)}
+        onRequestClose={() => {
+          Keyboard.dismiss();
+          setShowEmailModal(false);
+        }}
+        statusBarTranslucent={true}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        <Pressable
           style={styles.emailModalOverlay}
+          onPress={() => {
+            Keyboard.dismiss();
+            setShowEmailModal(false);
+          }}
         >
-          <View style={styles.emailModalContent}>
+          <Animated.View
+            style={[
+              styles.emailModalContent,
+              { transform: [{ translateY: modalTranslateY }] }
+            ]}
+          >
             <View style={styles.emailModalHeader}>
               <Text style={styles.emailModalTitle}>
                 {t('auth.email.loginTitle')}
               </Text>
               <Pressable
-                onPress={() => setShowEmailModal(false)}
+                onPress={() => {
+                  Keyboard.dismiss();
+                  setShowEmailModal(false);
+                }}
                 style={styles.emailModalCloseButton}
               >
                 <X size={24} color={COLORS.black} />
@@ -1496,8 +1545,8 @@ function WelcomeStep({ onSocialLogin, onEmailLogin }: {
                 {isLoading === 'email' ? t('common.loading') : t('auth.email.login')}
               </Text>
             </TouchableOpacity>
-          </View>
-        </KeyboardAvoidingView>
+          </Animated.View>
+        </Pressable>
       </Modal>
     </View>
   );
@@ -4230,7 +4279,7 @@ function PreferencesIntroStep({
       </View>
 
       {/* Centered content */}
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 300, width: '100%', paddingHorizontal: SPACING.xl }}>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', width: '100%', paddingHorizontal: SPACING.xl }}>
         <View style={[styles.preferencesInfoBoxInline, { alignItems: 'center' }]}>
           <Text style={[styles.preferencesInfoText, { textAlign: 'center' }]}>
             {t('onboarding.preferencesIntro.hint')}
@@ -4238,9 +4287,9 @@ function PreferencesIntroStep({
         </View>
       </View>
 
-      {/* Bottom button */}
-      <View style={{ width: '100%', paddingBottom: SPACING.lg, paddingHorizontal: SPACING.xl }}>
-        <Pressable style={styles.primaryButton} onPress={onNext}>
+      {/* Bottom button - consistent position with other steps */}
+      <View style={{ width: '100%', paddingBottom: SPACING.lg + ANDROID_BOTTOM_PADDING }}>
+        <Pressable style={[styles.primaryButton, styles.primaryButtonFullWidth]} onPress={onNext}>
           <Text style={styles.primaryButtonText}>{t('onboarding.preferencesIntro.startAnalysis')}</Text>
         </Pressable>
       </View>
@@ -4285,7 +4334,7 @@ function MBTIStep({
         </View>
       </View>
 
-      {/* Bottom button */}
+      {/* Bottom button - consistent position */}
       <View style={{ width: '100%', paddingBottom: SPACING.lg }}>
         <View style={styles.buttonRow}>
           <Pressable style={styles.secondaryButton} onPress={onBack}>
@@ -4363,7 +4412,7 @@ function ActivityTypeStep({
         </ScrollView>
       </View>
 
-      {/* Bottom button */}
+      {/* Bottom button - consistent position */}
       <View style={{ width: '100%', paddingBottom: SPACING.lg }}>
         <View style={styles.buttonRow}>
           <Pressable style={styles.secondaryButton} onPress={onBack}>
@@ -4566,9 +4615,11 @@ function CompleteStep({
         </Text>
       </View>
 
-      <Pressable style={styles.primaryButton} onPress={onComplete}>
-        <Text style={styles.primaryButtonText}>{t('onboarding.start')}</Text>
-      </Pressable>
+      <View style={{ width: '100%', paddingBottom: SPACING.lg + ANDROID_BOTTOM_PADDING }}>
+        <Pressable style={[styles.primaryButton, styles.primaryButtonFullWidth]} onPress={onComplete}>
+          <Text style={styles.primaryButtonText}>{t('onboarding.start')}</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -4716,7 +4767,7 @@ const styles = StyleSheet.create({
   },
   welcomeBottomContainer: {
     width: '100%',
-    paddingBottom: scale(SPACING.lg),
+    paddingBottom: scale(SPACING.lg) + ANDROID_BOTTOM_PADDING,
   },
   welcomeSubtitle: {
     fontFamily: TYPOGRAPHY.fontFamily.display,
@@ -4751,7 +4802,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingBottom: scale(SPACING.lg),
+    paddingBottom: scale(SPACING.lg) + ANDROID_BOTTOM_PADDING,
   },
   welcomeContent: {
     flex: 1,
@@ -4858,18 +4909,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: scale(12),
     width: '100%',
+    paddingBottom: ANDROID_BOTTOM_PADDING,
   },
   buttonFlex: {
     flex: 1,
   },
   primaryButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    width: '100%',
     height: scale(52),
     backgroundColor: COLORS.black,
     borderRadius: scale(RADIUS.full),
+  },
+  primaryButtonFullWidth: {
+    width: '100%',
+    flex: undefined,
   },
   primaryButtonDisabled: {
     backgroundColor: 'rgba(0, 0, 0, 0.1)',
@@ -4889,7 +4945,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: scale(16),
+    height: scale(52),
     backgroundColor: '#f5f5f5',
     borderRadius: scale(RADIUS.full),
     borderWidth: scale(1),

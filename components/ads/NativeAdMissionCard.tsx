@@ -134,10 +134,28 @@ export default function NativeAdMissionCard({
   // Calculate dimensions - full width media for landscape ads
   const contentPadding = 16;
   const contentWidth = adViewDimensions.width - contentPadding * 2;
-  // Media takes full width, use most of available height
+  // Media container dimensions
   const mediaWidth = contentWidth;
   // Reserve space for: paddingTop(48) + row(40) + body(30) + cta(50) + paddingBottom(20) = ~188
   const mediaHeight = Math.max(Math.floor(adViewDimensions.height - 200), 180);
+
+  // Calculate optimal NativeMediaView size based on ad's aspect ratio
+  // This ensures the entire ad image is visible within the container
+  const adAspectRatio = nativeAd.mediaContent?.aspectRatio || 1.91; // Default to 1.91:1 (common ad ratio)
+  const containerAspectRatio = mediaWidth / mediaHeight;
+
+  let scaledMediaWidth: number;
+  let scaledMediaHeight: number;
+
+  if (adAspectRatio > containerAspectRatio) {
+    // Ad is wider than container - fit by width
+    scaledMediaWidth = Math.floor(mediaWidth);
+    scaledMediaHeight = Math.floor(mediaWidth / adAspectRatio);
+  } else {
+    // Ad is taller than container - fit by height
+    scaledMediaHeight = Math.floor(mediaHeight);
+    scaledMediaWidth = Math.floor(mediaHeight * adAspectRatio);
+  }
 
   return (
     <View style={styles.wrapper} onLayout={handleLayout}>
@@ -156,9 +174,12 @@ export default function NativeAdMissionCard({
 
           {/* Main content */}
           <View style={[styles.content, { width: adViewDimensions.width, paddingHorizontal: contentPadding }]}>
-            {/* Media - full width, landscape friendly */}
+            {/* Media - full width, landscape friendly with centered content */}
             <View style={[styles.mediaContainer, { width: mediaWidth, height: mediaHeight }]}>
-              <NativeMediaView style={{ width: mediaWidth, height: mediaHeight }} resizeMode="contain" />
+              <NativeMediaView
+                style={{ width: scaledMediaWidth, height: scaledMediaHeight }}
+                resizeMode="contain"
+              />
             </View>
 
             {/* Icon + Headline */}
@@ -241,8 +262,10 @@ const styles = StyleSheet.create({
   },
   mediaContainer: {
     borderRadius: 12,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#000000',
     overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   row: {
     flexDirection: 'row',
@@ -276,12 +299,12 @@ const styles = StyleSheet.create({
   },
   ctaButton: {
     backgroundColor: '#4285F4',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    marginTop: 12,
-    borderRadius: 8,
+    paddingVertical: Platform.OS === 'android' ? 10 : 12,
+    paddingHorizontal: Platform.OS === 'android' ? 14 : 16,
+    marginTop: Platform.OS === 'android' ? 10 : 12,
+    borderRadius: Platform.OS === 'android' ? 7 : 8,
     color: COLORS.white,
-    fontSize: 14,
+    fontSize: Platform.OS === 'android' ? 12 : 14,
     fontWeight: '700',
     textAlign: 'center',
   },

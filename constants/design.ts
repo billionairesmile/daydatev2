@@ -8,6 +8,11 @@ import * as Device from 'expo-device';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const aspectRatio = SCREEN_HEIGHT / SCREEN_WIDTH;
 
+// Android Navigation Bar Height (3-button navigation)
+// Most Android devices have ~48dp navigation bar, we add extra padding for safety
+export const ANDROID_NAV_BAR_HEIGHT = Platform.OS === 'android' ? 48 : 0;
+export const ANDROID_BOTTOM_PADDING = Platform.OS === 'android' ? 32 : 0;
+
 // Device detection
 const deviceModel = Device.modelName || '';
 const isRealIPad = deviceModel.toLowerCase().includes('ipad');

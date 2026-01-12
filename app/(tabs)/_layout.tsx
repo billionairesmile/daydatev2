@@ -1,17 +1,20 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Tabs } from 'expo-router';
-import { StyleSheet, View, Pressable, Text, Animated, LayoutChangeEvent } from 'react-native';
+import { StyleSheet, View, Pressable, Text, Animated, LayoutChangeEvent, Platform } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Target, BookHeart, Home, Calendar, Menu } from 'lucide-react-native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useTranslation } from 'react-i18next';
 
-import { COLORS, IS_TABLET, scale, scaleFont } from '@/constants/design';
+import { COLORS, IS_TABLET, scale, scaleFont, ANDROID_BOTTOM_PADDING } from '@/constants/design';
 import { useUIStore } from '@/stores/uiStore';
 
-// Scaled icon size for iPad
-const TAB_ICON_SIZE = scale(28);
-const TAB_LABEL_SIZE = scaleFont(11);
+// Platform-specific sizes to match visual appearance between Android and iOS
+// Android renders slightly larger, so we reduce Android sizes
+const TAB_ICON_SIZE = Platform.OS === 'android' ? scale(24) : scale(28);
+const TAB_LABEL_SIZE = Platform.OS === 'android' ? scaleFont(10) : scaleFont(11);
+const TAB_PADDING_VERTICAL = Platform.OS === 'android' ? scale(5) : scale(6);
+const TAB_INNER_PADDING = Platform.OS === 'android' ? scale(5) : scale(6);
 
 function TabBarIcon({
   Icon,
@@ -212,7 +215,7 @@ const styles = StyleSheet.create({
   },
   tabBarContainer: {
     position: 'absolute',
-    bottom: scale(24),
+    bottom: scale(24) + ANDROID_BOTTOM_PADDING,
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -238,7 +241,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   tabBarInner: {
-    padding: scale(6),
+    padding: TAB_INNER_PADDING,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
   tabsContainer: {
@@ -257,7 +260,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: scale(6),
+    paddingVertical: TAB_PADDING_VERTICAL,
     paddingHorizontal: scale(2),
     borderRadius: scale(100),
   },

@@ -37,7 +37,7 @@ import {
 
 import { useTranslation } from 'react-i18next';
 import { useFocusEffect } from 'expo-router';
-import { COLORS, SPACING, RADIUS, IS_TABLET, scale, scaleFont } from '@/constants/design';
+import { COLORS, SPACING, RADIUS, IS_TABLET, scale, scaleFont, ANDROID_BOTTOM_PADDING } from '@/constants/design';
 import { useBackground } from '@/contexts';
 import { useMemoryStore, SAMPLE_MEMORIES } from '@/stores/memoryStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -1735,7 +1735,7 @@ const styles = StyleSheet.create({
   },
   bannerAd: {
     position: 'absolute',
-    bottom: scale(88),
+    bottom: scale(90) + ANDROID_BOTTOM_PADDING - 4,
     left: 0,
     right: 0,
     alignItems: 'center',

@@ -79,10 +79,56 @@ export default function SettingsScreen() {
 
   // Version information
   const currentVersion = Constants.expoConfig?.version || '1.0.0';
-  const latestVersion = '1.0.0'; // TODO: Fetch from Supabase after Play Store release
+  const [latestVersion, setLatestVersion] = useState<string | null>(null);
+  const [isCheckingVersion, setIsCheckingVersion] = useState(true);
+
+  // Fetch latest version from Supabase (primary) or App Store (fallback)
+  useEffect(() => {
+    const checkLatestVersion = async () => {
+      try {
+        // Primary: Check Supabase app_config table (instantly updated after app upload)
+        const { data: configData, error: configError } = await db.client
+          .from('app_config')
+          .select('ios_latest_version, android_latest_version')
+          .eq('id', 'main')
+          .single();
+
+        if (!configError && configData) {
+          const version = Platform.OS === 'ios'
+            ? configData.ios_latest_version
+            : configData.android_latest_version;
+          if (version) {
+            setLatestVersion(version);
+            setIsCheckingVersion(false);
+            return;
+          }
+        }
+
+        // Fallback for iOS: Use iTunes Lookup API (may have 24-48h cache delay)
+        if (Platform.OS === 'ios') {
+          const response = await fetch(
+            'https://itunes.apple.com/lookup?bundleId=com.daydate.app&country=kr'
+          );
+          const data = await response.json();
+          if (data.resultCount > 0 && data.results[0]?.version) {
+            setLatestVersion(data.results[0].version);
+          }
+        }
+      } catch (error) {
+        console.log('[Settings] Failed to fetch latest version:', error);
+        setLatestVersion(null);
+      } finally {
+        setIsCheckingVersion(false);
+      }
+    };
+
+    checkLatestVersion();
+  }, []);
 
   // Check if update is available
   const isUpdateAvailable = () => {
+    if (!latestVersion) return false;
+
     const current = currentVersion.split('.').map(Number);
     const latest = latestVersion.split('.').map(Number);
 
@@ -570,7 +616,9 @@ export default function SettingsScreen() {
               </View>
               <Text style={styles.settingItemLabel}>{t('settings.other.version', { version: currentVersion })}</Text>
             </View>
-            {isUpdateAvailable() ? (
+            {isCheckingVersion ? (
+              <Text style={styles.versionStatus}>...</Text>
+            ) : isUpdateAvailable() ? (
               <Pressable style={styles.updateButton} onPress={handleUpdate}>
                 <Text style={styles.updateButtonText}>{t('settings.other.updateAvailable')}</Text>
               </Pressable>

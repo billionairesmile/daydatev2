@@ -709,13 +709,7 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
       },
 
       shouldShowAds: () => {
-        // Android: Disabled for Play Store review
-        // iOS: Enabled (App Store approved)
-        if (Platform.OS === 'android') {
-          return false; // Disabled for Play Store review
-        }
-
-        // iOS: Show ads for free users
+        // Show ads for free users on both platforms
         const state = get();
         const isCouplePremium = state.isPremium || state.partnerIsPremium;
         return !isCouplePremium;

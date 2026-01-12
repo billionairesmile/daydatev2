@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "439004900192",
+    "project_id": "daydate-project",
+    "storage_bucket": "daydate-project.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:439004900192:android:f4d0c78a5481b2dbac8c05",
+        "android_client_info": {
+          "package_name": "com.daydate.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDq6KhBz8aCp_jgaLWKJHlLPl3PBUHMgpU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
