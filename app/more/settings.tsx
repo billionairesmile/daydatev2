@@ -43,7 +43,7 @@ import { useOnboardingStore, useAuthStore, useMemoryStore, useLanguageStore, get
 import type { SupportedLanguage, TimezoneId } from '@/stores';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
 import { useMissionStore } from '@/stores/missionStore';
-import { db, isDemoMode } from '@/lib/supabase';
+import { db, isDemoMode, supabase } from '@/lib/supabase';
 import { signOut as supabaseSignOut } from '@/lib/socialAuth';
 import { notifyPartnerUnpaired, getNotificationPermissionStatus } from '@/lib/pushNotifications';
 
@@ -86,17 +86,27 @@ export default function SettingsScreen() {
   useEffect(() => {
     const checkLatestVersion = async () => {
       try {
+        console.log('[Settings] Checking version... currentVersion:', currentVersion, 'Platform:', Platform.OS);
+
         // Primary: Check Supabase app_config table (instantly updated after app upload)
-        const { data: configData, error: configError } = await db.client
+        if (!supabase) {
+          console.log('[Settings] Supabase client not initialized (demo mode)');
+          return;
+        }
+
+        const { data: configData, error: configError } = await supabase
           .from('app_config')
           .select('ios_latest_version, android_latest_version')
           .eq('id', 'main')
           .single();
 
+        console.log('[Settings] Supabase response:', { configData, configError });
+
         if (!configError && configData) {
           const version = Platform.OS === 'ios'
             ? configData.ios_latest_version
             : configData.android_latest_version;
+          console.log('[Settings] Latest version from DB:', version);
           if (version) {
             setLatestVersion(version);
             setIsCheckingVersion(false);
@@ -127,10 +137,15 @@ export default function SettingsScreen() {
 
   // Check if update is available
   const isUpdateAvailable = () => {
-    if (!latestVersion) return false;
+    if (!latestVersion) {
+      console.log('[Settings] isUpdateAvailable: No latestVersion');
+      return false;
+    }
 
     const current = currentVersion.split('.').map(Number);
     const latest = latestVersion.split('.').map(Number);
+
+    console.log('[Settings] Version comparison:', { current, latest, currentVersion, latestVersion });
 
     for (let i = 0; i < 3; i++) {
       if (latest[i] > current[i]) return true;
@@ -926,12 +941,12 @@ const styles = StyleSheet.create({
   },
   updateButton: {
     backgroundColor: '#2196F3',
-    paddingHorizontal: scale(16),
+    paddingHorizontal: scale(12),
     paddingVertical: scale(8),
-    borderRadius: scale(8),
+    borderRadius: scale(100),
   },
   updateButtonText: {
-    fontSize: scaleFont(13),
+    fontSize: scaleFont(15),
     color: '#FFFFFF',
     fontWeight: '600',
   },

@@ -239,15 +239,18 @@ export default function MemoriesScreen() {
     return localAlbumPhotos;
   }, [isSyncInitialized, syncedAlbums, syncedAlbumPhotosMap, localAlbumPhotos, allMemories]);
 
-  // Prefetch album cover photos for instant display
+  // Prefetch album cover photos for instant display - batch prefetch for better performance
   useEffect(() => {
-    albums.forEach(album => {
-      if (album.coverPhoto) {
-        ExpoImage.prefetch(album.coverPhoto).catch(() => {
-          // Ignore prefetch errors silently
-        });
-      }
-    });
+    const coverUrls = albums
+      .map(album => album.coverPhoto)
+      .filter((url): url is string => !!url);
+
+    if (coverUrls.length > 0) {
+      // Prefetch all cover photos in parallel
+      Promise.all(coverUrls.map(url => ExpoImage.prefetch(url))).catch(() => {
+        // Ignore prefetch errors silently
+      });
+    }
   }, [albums]);
 
   // Prefetch album photos for instant display when opening albums
@@ -270,13 +273,13 @@ export default function MemoriesScreen() {
     }
   }, [couple?.id, isSyncInitialized, loadFromDB]);
 
-  // Load albums and album photos from database to ensure local state is in sync
+  // Load albums only if not already loaded (albums are loaded during initializeSync)
   useEffect(() => {
-    if (isSyncInitialized) {
-      console.log('[Memories] Refreshing albums from database');
+    if (isSyncInitialized && syncedAlbums.length === 0) {
+      console.log('[Memories] Loading albums from database (empty state)');
       syncLoadAlbums();
     }
-  }, [isSyncInitialized, syncLoadAlbums]);
+  }, [isSyncInitialized]);
 
   // Album creation states
   const [showAlbumModal, setShowAlbumModal] = useState(false);
@@ -1284,7 +1287,7 @@ export default function MemoriesScreen() {
                         <View style={styles.hardcoverBook}>
                           {/* Full Photo Background */}
                           {album.coverPhoto ? (
-                            <ExpoImage source={{ uri: album.coverPhoto }} style={styles.bookFullPhoto} contentFit="cover" cachePolicy="memory-disk" transition={100} priority="high" />
+                            <ExpoImage source={{ uri: album.coverPhoto }} style={styles.bookFullPhoto} contentFit="cover" cachePolicy="memory-disk" transition={0} priority="high" />
                           ) : (
                             <View style={styles.bookPlaceholder}>
                               <ImageIcon color="rgba(255,255,255,0.3)" size={scale(24)} />
@@ -1501,7 +1504,7 @@ export default function MemoriesScreen() {
                         <View style={styles.hardcoverBook}>
                           {/* Full Photo Background */}
                           {album.coverPhoto ? (
-                            <ExpoImage source={{ uri: album.coverPhoto }} style={styles.bookFullPhoto} contentFit="cover" cachePolicy="memory-disk" transition={100} priority="high" />
+                            <ExpoImage source={{ uri: album.coverPhoto }} style={styles.bookFullPhoto} contentFit="cover" cachePolicy="memory-disk" transition={0} priority="high" />
                           ) : (
                             <View style={styles.bookPlaceholder}>
                               <ImageIcon color="rgba(255,255,255,0.3)" size={scale(24)} />
@@ -1715,12 +1718,14 @@ export default function MemoriesScreen() {
               <View style={styles.albumModalBackdrop} />
             </TouchableWithoutFeedback>
             <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              behavior="padding"
               style={styles.keyboardAvoidingView}
+              keyboardVerticalOffset={Platform.OS === 'android' ? -100 : 0}
             >
               <Animated.View
                 style={[
                   styles.albumModalContent,
+                  albumStep === 'fontStyle' && styles.albumModalContentFontStyle,
                   {
                     transform: [{ scale: albumModalScaleAnim }],
                   },
@@ -1794,14 +1799,13 @@ export default function MemoriesScreen() {
                               enableYOffset={true}
                             />
                           </View>
-                          <Text style={styles.fontStyleLabel}>{t('memories.album.ransomStyle')}</Text>
+                          <Text style={styles.fontStyleLabel} numberOfLines={1} adjustsFontSizeToFit>{t('memories.album.ransomStyle')}</Text>
                         </Pressable>
                       </View>
 
                       <Pressable
                         style={[
-                          styles.albumModalButton,
-                          { width: '100%' },
+                          styles.albumModalButtonFullWidth,
                           !fontStyle && styles.albumModalButtonDisabled,
                         ]}
                         onPress={() => transitionToNextStep('name')}
@@ -2315,7 +2319,7 @@ export default function MemoriesScreen() {
                         style={styles.albumDetailSpine}
                       />
                       {selectedAlbum.coverPhoto ? (
-                        <ExpoImage source={{ uri: selectedAlbum.coverPhoto }} style={styles.albumDetailCoverImage} contentFit="cover" cachePolicy="memory-disk" transition={100} />
+                        <ExpoImage source={{ uri: selectedAlbum.coverPhoto }} style={styles.albumDetailCoverImage} contentFit="cover" cachePolicy="memory-disk" transition={0} />
                       ) : (
                         <View style={styles.albumDetailCoverPlaceholder}>
                           <ImageIcon color="rgba(255,255,255,0.3)" size={40} />
@@ -2753,10 +2757,14 @@ export default function MemoriesScreen() {
                   <View style={styles.albumModalBackdrop} />
                 </TouchableWithoutFeedback>
                 <KeyboardAvoidingView
-                  behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                  behavior="padding"
                   style={styles.keyboardAvoidingView}
+                  keyboardVerticalOffset={Platform.OS === 'android' ? -100 : 0}
                 >
-                  <View style={styles.albumModalContent}>
+                  <View style={[
+                    styles.albumModalContent,
+                    editAlbumStep === 'fontStyle' && styles.albumModalContentFontStyle,
+                  ]}>
                     {/* Header */}
                     <View style={styles.albumModalHeader}>
                       <Text style={styles.albumModalTitle}>
@@ -2823,14 +2831,13 @@ export default function MemoriesScreen() {
                                 enableYOffset={true}
                               />
                             </View>
-                            <Text style={styles.fontStyleLabel}>{t('memories.album.ransomStyle')}</Text>
+                            <Text style={styles.fontStyleLabel} numberOfLines={1} adjustsFontSizeToFit>{t('memories.album.ransomStyle')}</Text>
                           </Pressable>
                         </View>
 
                         <Pressable
                           style={[
-                            styles.albumModalButton,
-                            { width: '100%' },
+                            styles.albumModalButtonFullWidth,
                             !editFontStyle && styles.albumModalButtonDisabled,
                           ]}
                           onPress={() => setEditAlbumStep('name')}
@@ -2852,10 +2859,10 @@ export default function MemoriesScreen() {
                             editFontStyle === 'basic' ? (
                               <Text style={styles.basicFontPreview}>{editAlbumName}</Text>
                             ) : (
-                              // Ransom Style - assets preloaded
+                              // Ransom Style - assets preloaded with 8-char wrapping
                               editAlbumName.length > 0 ? (
                                 <RansomText
-                                  text={editAlbumName}
+                                  text={wrapLongWordsForRansom(editAlbumName, 8)}
                                   seed={editRansomSeed}
                                   characterSize={36}
                                   spacing={-4}
@@ -3737,6 +3744,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: scaleFont(38),
     textShadowColor: 'transparent',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 0,
   },
   headerSubtitle: {
     fontSize: scaleFont(14),
@@ -4641,8 +4650,10 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
   },
   keyboardAvoidingView: {
+    flex: 1,
     width: '100%',
     alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: scale(24),
   },
   albumModalContent: {
@@ -4651,9 +4662,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
     borderRadius: scale(32),
     padding: scale(24),
-    paddingBottom: scale(32),
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  albumModalContentFontStyle: {
+    paddingBottom: scale(28),
   },
   albumModalHeader: {
     flexDirection: 'row',
@@ -4687,6 +4700,7 @@ const styles = StyleSheet.create({
     marginBottom: scale(20),
   },
   ransomPreviewContainer: {
+    width: '100%',
     minHeight: scale(80),
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: scale(16),
@@ -4779,8 +4793,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.white,
     borderRadius: scale(999),
-    paddingVertical: scale(16),
-    minHeight: scale(52),
+    height: scale(48),
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -4788,12 +4801,23 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
   albumModalButtonText: {
-    fontSize: scaleFont(17),
+    fontSize: scaleFont(16),
     fontWeight: '700',
     color: '#1a1a1a',
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+    ...(Platform.OS === 'android' && { marginTop: -1 }),
   },
   albumModalButtonTextDisabled: {
     color: 'rgba(26, 26, 26, 0.5)',
+  },
+  albumModalButtonFullWidth: {
+    width: '100%',
+    backgroundColor: COLORS.white,
+    borderRadius: scale(999),
+    height: scale(48),
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   coverPhotoContainer: {
     width: '100%',
@@ -5182,21 +5206,26 @@ const styles = StyleSheet.create({
   },
   albumModalButtonRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: scale(12),
   },
   albumModalButtonSecondary: {
     flex: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: scale(999),
-    paddingVertical: scale(14),
+    height: scale(48),
     alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   albumModalButtonSecondaryText: {
-    fontSize: scaleFont(16),
+    fontSize: scaleFont(15),
     fontWeight: '600',
     color: COLORS.white,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+    ...(Platform.OS === 'android' && { marginTop: -1 }),
   },
   // Slider styles
   sliderContainer: {
@@ -5320,7 +5349,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderRadius: scale(16),
-    padding: scale(20),
+    paddingVertical: scale(20),
+    paddingHorizontal: Platform.OS === 'android' ? scale(8) : scale(20),
     alignItems: 'center',
     borderWidth: 2,
     borderColor: 'transparent',

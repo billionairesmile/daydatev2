@@ -1709,6 +1709,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: scaleFont(38),
     textShadowColor: 'transparent',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 0,
   },
   headerSubtitle: {
     fontSize: scaleFont(14),
@@ -1854,7 +1856,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   startActionButtonText: {
-    fontSize: scaleFont(15),
+    fontSize: Platform.OS === 'android' ? scaleFont(12) : scaleFont(15),
     color: COLORS.black,
     fontWeight: '600',
   },

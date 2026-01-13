@@ -102,6 +102,7 @@ const getNextBirthdayDate = (birthDate: Date, isLunar: boolean, today: Date): Da
 };
 
 const { width, height } = Dimensions.get('window');
+const { height: screenHeight } = Dimensions.get('screen');
 
 // Anniversary type definition (local display type, extends service type)
 interface Anniversary {
@@ -1776,17 +1777,18 @@ export default function HomeScreen() {
         visible={showTutorial && buttonPosition !== null}
         transparent
         animationType="fade"
+        statusBarTranslucent
         onRequestClose={closeTutorial}
       >
         <Pressable style={styles.tutorialOverlay} onPress={closeTutorial}>
           {buttonPosition && (
             <>
-              {/* SVG overlay with circular hole */}
-              <Svg width={width} height={height} style={styles.tutorialSvg}>
+              {/* SVG overlay with circular hole - use screenHeight to cover Android nav bar */}
+              <Svg width={width} height={screenHeight} style={styles.tutorialSvg}>
                 <Defs>
                   <Mask id="holeMask">
                     {/* White = visible, Black = hidden */}
-                    <Rect x="0" y="0" width={width} height={height} fill="white" />
+                    <Rect x="0" y="0" width={width} height={screenHeight} fill="white" />
                     <Circle
                       cx={buttonPosition.x + buttonPosition.width / 2}
                       cy={buttonPosition.y + buttonPosition.height / 2}
@@ -1799,7 +1801,7 @@ export default function HomeScreen() {
                   x="0"
                   y="0"
                   width={width}
-                  height={height}
+                  height={screenHeight}
                   fill="rgba(0, 0, 0, 0.85)"
                   mask="url(#holeMask)"
                 />

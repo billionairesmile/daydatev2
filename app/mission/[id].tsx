@@ -44,7 +44,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
-import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '@/constants/design';
+import { COLORS, SPACING, RADIUS, TYPOGRAPHY, ANDROID_BOTTOM_PADDING } from '@/constants/design';
 import { useMissionStore } from '@/stores/missionStore';
 import { useMemoryStore } from '@/stores/memoryStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -2200,7 +2200,7 @@ const styles = StyleSheet.create({
   bottomContent: {
     paddingHorizontal: SPACING.lg,
     paddingTop: SPACING.md,
-    paddingBottom: 28,
+    paddingBottom: 28 + ANDROID_BOTTOM_PADDING,
     backgroundColor: 'rgba(255,255,255,0.1)',
   },
   ctaButton: {

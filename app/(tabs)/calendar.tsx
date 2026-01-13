@@ -1783,6 +1783,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: scaleFont(38),
     textShadowColor: 'transparent',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 0,
   },
   headerSubtitle: {
     fontSize: scaleFont(14),

@@ -6,6 +6,7 @@ import {
   Pressable,
   ScrollView,
   Alert,
+  Platform,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Image } from 'expo-image';
@@ -159,7 +160,8 @@ export function BookmarkedMissionsPage({ onBack }: BookmarkedMissionsPageProps) 
 
             return (
               <View key={bookmarkId} style={styles.missionCard}>
-                <BlurView experimentalBlurMethod="dimezisBlurView" intensity={10} tint="dark" style={StyleSheet.absoluteFill} />
+                <BlurView experimentalBlurMethod="dimezisBlurView" intensity={60} tint="default" style={StyleSheet.absoluteFill} />
+                <View style={styles.cardDarkOverlay} />
 
                 <View style={styles.cardInner}>
                   {/* Thumbnail */}
@@ -299,10 +301,14 @@ const styles = StyleSheet.create({
   },
   missionCard: {
     borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: Platform.OS === 'android' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.05)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(255, 255, 255, 0.2)',
     overflow: 'hidden',
+  },
+  cardDarkOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   cardInner: {
     flexDirection: 'row',
