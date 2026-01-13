@@ -36,7 +36,7 @@ const DEFAULT_BACKGROUND_IMAGE = require('@/assets/images/backgroundimage.jpg');
 Asset.fromModule(LOGO_IMAGE).downloadAsync();
 Asset.fromModule(DEFAULT_BACKGROUND_IMAGE).downloadAsync();
 
-import { COLORS, SPACING, RADIUS, TYPOGRAPHY, scale, scaleFont, IS_TABLET, ANDROID_BOTTOM_PADDING } from '@/constants/design';
+import { COLORS, SPACING, RADIUS, TYPOGRAPHY, scale, scaleFont, IS_TABLET, ANDROID_BOTTOM_PADDING, BANNER_AD_BOTTOM } from '@/constants/design';
 import { useBackground } from '@/contexts';
 import { useOnboardingStore, useAuthStore, useTimezoneStore } from '@/stores';
 import { BannerAdView } from '@/components/ads';
@@ -1850,7 +1850,7 @@ const styles = StyleSheet.create({
   },
   bannerAd: {
     position: 'absolute',
-    bottom: scale(90) + ANDROID_BOTTOM_PADDING - 4,
+    bottom: BANNER_AD_BOTTOM + ANDROID_BOTTOM_PADDING,
     left: 0,
     right: 0,
     alignItems: 'center',

@@ -421,6 +421,24 @@ export const TAB_BAR = {
   blurAmount: BLUR.xl,
 };
 
+// Tab Bar Layout Constants for consistent positioning
+// Calculated from _layout.tsx tab bar styles
+export const TAB_BAR_LAYOUT = {
+  // Bottom position of tab bar from screen edge
+  bottom: scale(24),
+  // Calculated height: TAB_INNER_PADDING*2 + TAB_PADDING_VERTICAL*2 + ICON + MARGIN + LABEL + BORDER
+  // iOS: 6*2 + 6*2 + 28 + 2 + 13 + 1 = 68
+  // We use 70 for safety margin
+  height: scale(70),
+  // Top position of tab bar (bottom + height)
+  get top() { return this.bottom + this.height; },
+};
+
+// Banner Ad placement - always positioned just above the tab bar
+// Works with any banner height (adaptive banners range from 50-90px)
+// iOS: no gap, Android: 4px gap
+export const BANNER_AD_BOTTOM = TAB_BAR_LAYOUT.top + (Platform.OS === 'ios' ? 0 : scale(4));
+
 export default {
   COLORS,
   SPACING,

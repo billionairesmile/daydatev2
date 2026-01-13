@@ -40,7 +40,7 @@ import ReanimatedModule, {
 } from 'react-native-reanimated';
 import { useTranslation } from 'react-i18next';
 
-import { COLORS, SPACING, IS_TABLET, IS_FOLDABLE, scale, scaleFont, ANDROID_BOTTOM_PADDING } from '@/constants/design';
+import { COLORS, SPACING, IS_TABLET, IS_FOLDABLE, scale, scaleFont, ANDROID_BOTTOM_PADDING, BANNER_AD_BOTTOM } from '@/constants/design';
 import { useMemoryStore, SAMPLE_MEMORIES } from '@/stores/memoryStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useOnboardingStore } from '@/stores/onboardingStore';
@@ -3699,7 +3699,7 @@ const styles = StyleSheet.create({
   },
   bannerAd: {
     position: 'absolute',
-    bottom: scale(90) + ANDROID_BOTTOM_PADDING - 4,
+    bottom: BANNER_AD_BOTTOM + ANDROID_BOTTOM_PADDING,
     left: 0,
     right: 0,
     alignItems: 'center',
