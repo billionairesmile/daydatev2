@@ -1735,7 +1735,7 @@ const styles = StyleSheet.create({
   },
   bannerAd: {
     position: 'absolute',
-    bottom: BANNER_AD_BOTTOM + ANDROID_BOTTOM_PADDING,
+    bottom: BANNER_AD_BOTTOM,
     left: 0,
     right: 0,
     alignItems: 'center',

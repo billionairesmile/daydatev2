@@ -15,6 +15,17 @@ import {
   InteractionManager,
   type AppStateStatus,
 } from 'react-native';
+import PagerView from 'react-native-pager-view';
+import ReanimatedModule, {
+  useSharedValue,
+  useAnimatedStyle,
+  interpolate,
+  Extrapolation,
+  withSpring,
+} from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const ReanimatedView = ReanimatedModule.View;
 import { useTranslation } from 'react-i18next';
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -26,7 +37,7 @@ import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useUIStore } from '@/stores/uiStore';
 import * as Location from 'expo-location';
 
-import { COLORS, SPACING, RADIUS, IS_TABLET, scale, scaleFont } from '@/constants/design';
+import { COLORS, SPACING, scale, scaleFont } from '@/constants/design';
 import { useMissionStore, MOOD_OPTIONS, TIME_OPTIONS, type TodayMood, type AvailableTime, type MissionGenerationAnswers } from '@/stores/missionStore';
 import type { ExcludedMission } from '@/services/missionGenerator';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
@@ -58,9 +69,69 @@ const { colors: blurGradientColors, locations: blurGradientLocations } = easeGra
   },
 });
 
+// Android: Animated card wrapper for smooth PagerView transitions
+interface AndroidCardWrapperProps {
+  index: number;
+  scrollPosition: { value: number };
+  scrollOffset: { value: number };
+  cardWidth: number;
+  children: React.ReactNode;
+}
+
+function AndroidCardWrapper({ index, scrollPosition, scrollOffset, cardWidth, children }: AndroidCardWrapperProps) {
+  // Spring config for smooth settling animation
+  const springConfig = {
+    damping: 50,
+    stiffness: 150,
+    mass: 0.5,
+  };
+
+  const animatedStyle = useAnimatedStyle(() => {
+    const position = scrollPosition.value;
+    const offset = scrollOffset.value;
+
+    // Calculate the continuous position (e.g., 1.3 means 30% between page 1 and 2)
+    const continuousPosition = position + offset;
+
+    // Calculate distance from this card's index to the current continuous position
+    const distance = Math.abs(continuousPosition - index);
+
+    // Interpolate scale based on distance: closer = larger
+    const targetScale = interpolate(
+      distance,
+      [0, 0.5, 1],
+      [1, 0.975, 0.95],
+      Extrapolation.CLAMP
+    );
+
+    // Only apply spring to the current/focused card (distance < 0.5)
+    const isCurrentCard = distance < 0.5;
+    const finalScale = isCurrentCard
+      ? withSpring(targetScale, springConfig)
+      : targetScale;
+
+    return {
+      transform: [{ scale: finalScale }],
+    };
+  });
+
+  return (
+    <ReanimatedView
+      style={[
+        styles.androidCard,
+        { width: cardWidth },
+        animatedStyle,
+      ]}
+    >
+      {children}
+    </ReanimatedView>
+  );
+}
+
 export default function MissionScreen() {
   const { t, i18n } = useTranslation();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const setTabBarHidden = useUIStore((s) => s.setTabBarHidden);
   const { showBookmark } = useLocalSearchParams<{ showBookmark?: string }>();
   const { backgroundImage } = useBackground();
@@ -118,6 +189,10 @@ export default function MissionScreen() {
   const isWaitingForImagesRef = useRef(false);
   const scrollX = useRef(new Animated.Value(0)).current;
   const scrollViewRef = useRef<Animated.FlatList<CarouselItem>>(null);
+  const pagerRef = useRef<PagerView>(null);
+  // Android: Use reanimated shared values for smooth scroll animation
+  const androidScrollPosition = useSharedValue(0);
+  const androidScrollOffset = useSharedValue(0);
   // Track if carousel has been initialized to prevent reset during background sync
   const hasInitializedCarousel = useRef(false);
   const previousMissionsLength = useRef(0);
@@ -1024,14 +1099,25 @@ export default function MissionScreen() {
   const isGenerationFormValid = canMeetToday !== null && availableTime !== null && selectedMoods.length > 0;
 
   const handleMissionPress = useCallback((missionId: string) => {
-    router.push(`/mission/${missionId}`);
+    // Use requestAnimationFrame on Android to prevent UI blocking
+    if (Platform.OS === 'android') {
+      requestAnimationFrame(() => {
+        router.push(`/mission/${missionId}`);
+      });
+    } else {
+      router.push(`/mission/${missionId}`);
+    }
   }, [router]);
 
   const handleDotPress = (index: number) => {
-    scrollViewRef.current?.scrollToIndex({
-      index,
-      animated: true,
-    });
+    if (Platform.OS === 'ios') {
+      scrollViewRef.current?.scrollToIndex({
+        index,
+        animated: true,
+      });
+    } else {
+      pagerRef.current?.setPage(index);
+    }
   };
 
   const onViewableItemsChanged = useCallback(
@@ -1208,40 +1294,93 @@ export default function MissionScreen() {
         {/* Show carousel only when missions exist AND images are loaded (not generating/waiting) */}
         {hasGeneratedMissions && !isGenerating && !isWaitingForImages ? (
           <View style={styles.carouselWrapper}>
-            <Animated.FlatList
-              key={`mission-list-${allMissions.length}`}
-              ref={scrollViewRef}
-              data={allMissions}
-              keyExtractor={(item) => item.id}
-              renderItem={renderCard}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              snapToInterval={SNAP_INTERVAL}
-              decelerationRate="fast"
-              disableIntervalMomentum={true}
-              contentContainerStyle={{
-                paddingHorizontal: (screenWidth - CARD_WIDTH) / 2 - CARD_MARGIN,
-                alignItems: 'center',
-              }}
-              onScroll={Animated.event(
-                [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-                { useNativeDriver: true }
-              )}
-              scrollEventThrottle={16}
-              onScrollBeginDrag={onScrollBeginDrag}
-              onViewableItemsChanged={onViewableItemsChanged}
-              viewabilityConfig={viewabilityConfig}
-              getItemLayout={(_, index) => ({
-                length: SNAP_INTERVAL,
-                offset: SNAP_INTERVAL * index,
-                index,
-              })}
-              extraData={[hasGeneratedMissions, allMissions.map(m => m.id).join(','), lockedMissionId, todayCompletedMission, allMissionProgress]}
-              initialNumToRender={3}
-              maxToRenderPerBatch={3}
-              windowSize={5}
-              removeClippedSubviews={false}
-            />
+            {/* iOS: Original Animated.FlatList (don't modify) */}
+            {Platform.OS === 'ios' ? (
+              <Animated.FlatList
+                key={`mission-list-${allMissions.length}`}
+                ref={scrollViewRef}
+                data={allMissions}
+                keyExtractor={(item) => item.id}
+                renderItem={renderCard}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                snapToInterval={SNAP_INTERVAL}
+                decelerationRate="fast"
+                disableIntervalMomentum={true}
+                contentContainerStyle={{
+                  paddingHorizontal: (screenWidth - CARD_WIDTH) / 2 - CARD_MARGIN,
+                  alignItems: 'center',
+                }}
+                onScroll={Animated.event(
+                  [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+                  { useNativeDriver: true }
+                )}
+                scrollEventThrottle={16}
+                onScrollBeginDrag={onScrollBeginDrag}
+                onViewableItemsChanged={onViewableItemsChanged}
+                viewabilityConfig={viewabilityConfig}
+                getItemLayout={(_, index) => ({
+                  length: SNAP_INTERVAL,
+                  offset: SNAP_INTERVAL * index,
+                  index,
+                })}
+                extraData={[hasGeneratedMissions, allMissions.map(m => m.id).join(','), lockedMissionId, todayCompletedMission, allMissionProgress]}
+                initialNumToRender={3}
+                maxToRenderPerBatch={3}
+                windowSize={5}
+                removeClippedSubviews={false}
+              />
+            ) : (
+              /* Android: PagerView for smooth native scrolling */
+              <View style={styles.androidPagerContainer}>
+                <PagerView
+                  ref={pagerRef}
+                  style={styles.androidPagerView}
+                  initialPage={0}
+                  onPageSelected={(e) => setCurrentIndex(e.nativeEvent.position)}
+                  onPageScroll={(e) => {
+                    // Update shared values for smooth reanimated transitions
+                    androidScrollPosition.value = e.nativeEvent.position;
+                    androidScrollOffset.value = e.nativeEvent.offset;
+                  }}
+                  pageMargin={CARD_MARGIN}
+                  offscreenPageLimit={2}
+                  overdrag={true}
+                >
+                  {allMissions.map((item, index) => (
+                    <View key={item.id} style={styles.androidPageWrapper} collapsable={false}>
+                      <AndroidCardWrapper
+                        index={index}
+                        scrollPosition={androidScrollPosition}
+                        scrollOffset={androidScrollOffset}
+                        cardWidth={CARD_WIDTH}
+                      >
+                        {isAdItem(item) ? (
+                          <View style={styles.cardInnerAd}>
+                            <NativeAdMissionCard />
+                          </View>
+                        ) : isRefreshItem(item) ? (
+                          <RefreshMissionCard onRefreshPress={handleRefreshPress} />
+                        ) : (
+                          <View style={styles.cardInner}>
+                            <MissionCardContent
+                              mission={item}
+                              onStartPress={() => handleMissionPress(item.id)}
+                              onKeepPress={() => handleKeepMission(item)}
+                              isKept={checkIsKept(item.id)}
+                              canStart={canStartMission(item.id)}
+                              isCompletedToday={isTodayCompletedMission(item.id)}
+                              isAnotherMissionInProgress={isAnotherMissionInProgress(item.id)}
+                              onImageLoad={handleMissionImageLoad}
+                            />
+                          </View>
+                        )}
+                      </AndroidCardWrapper>
+                    </View>
+                  ))}
+                </PagerView>
+              </View>
+            )}
 
             {/* Dots Indicator - Positioned at bottom of carousel */}
             <View style={styles.dotsContainer}>
@@ -1296,7 +1435,10 @@ export default function MissionScreen() {
         onRequestClose={() => setShowGenerationModal(false)}
       >
         <View style={styles.modalBackdrop}>
-          <View style={styles.whiteModalContainer}>
+          <View style={[
+            styles.whiteModalContainer,
+            Platform.OS === 'android' && { paddingBottom: scale(40) + insets.bottom }
+          ]}>
             {/* Modal Header */}
             <View style={styles.whiteModalHeader}>
               <View style={styles.modalHeaderSpacer} />
@@ -1566,29 +1708,41 @@ function MissionCardContent({ mission, onStartPress, onKeepPress, isKept, canSta
 
       {/* Blur Container with Masked Gradient */}
       <View style={[styles.blurContainer, { height: blurHeight }]}>
-        <MaskedView
-          maskElement={
+        {Platform.OS === 'ios' ? (
+          /* iOS: MaskedView + BlurView for premium blur effect */
+          <>
+            <MaskedView
+              maskElement={
+                <LinearGradient
+                  locations={blurGradientLocations as [number, number, ...number[]]}
+                  colors={blurGradientColors as [string, string, ...string[]]}
+                  style={StyleSheet.absoluteFill}
+                />
+              }
+              style={StyleSheet.absoluteFill}
+            >
+              <BlurView
+                experimentalBlurMethod="dimezisBlurView"
+                intensity={50}
+                tint="systemChromeMaterialDark"
+                style={StyleSheet.absoluteFill}
+              />
+            </MaskedView>
+            {/* Dark Gradient Overlay */}
             <LinearGradient
-              locations={blurGradientLocations as [number, number, ...number[]]}
-              colors={blurGradientColors as [string, string, ...string[]]}
+              colors={['transparent', 'rgba(0, 0, 0, 0.6)']}
+              locations={[0, 1]}
               style={StyleSheet.absoluteFill}
             />
-          }
-          style={StyleSheet.absoluteFill}
-        >
-          <BlurView
-            experimentalBlurMethod="dimezisBlurView"
-            intensity={50}
-            tint={Platform.OS === 'ios' ? 'systemChromeMaterialDark' : 'dark'}
+          </>
+        ) : (
+          /* Android: Simple LinearGradient for better performance */
+          <LinearGradient
+            colors={['transparent', 'rgba(0, 0, 0, 0.85)']}
+            locations={[0, 0.5]}
             style={StyleSheet.absoluteFill}
           />
-        </MaskedView>
-        {/* Dark Gradient Overlay */}
-        <LinearGradient
-          colors={['transparent', 'rgba(0, 0, 0, 0.6)']}
-          locations={[0, 1]}
-          style={StyleSheet.absoluteFill}
-        />
+        )}
       </View>
 
       {/* Content */}
@@ -1617,6 +1771,7 @@ function MissionCardContent({ mission, onStartPress, onKeepPress, isKept, canSta
                 (isKept || isCompletedToday) && styles.keepActionButtonKept,
               ]}
               onPress={handleKeepPress}
+              android_ripple={{ color: 'rgba(255, 255, 255, 0.2)', borderless: false }}
             >
               <BlurView
                 experimentalBlurMethod="dimezisBlurView"
@@ -1645,6 +1800,7 @@ function MissionCardContent({ mission, onStartPress, onKeepPress, isKept, canSta
                 !canStart && !isCompletedToday && styles.startActionButtonDisabled,
               ]}
               onPress={handleStartPress}
+              android_ripple={{ color: 'rgba(255, 255, 255, 0.3)', borderless: false }}
             >
               <Text style={[
                 styles.startActionButtonText,
@@ -1663,6 +1819,24 @@ function MissionCardContent({ mission, onStartPress, onKeepPress, isKept, canSta
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  // Android PagerView styles
+  androidPagerContainer: {
+    flex: 1,
+    overflow: 'visible',
+  },
+  androidPagerView: {
+    flex: 1,
+  },
+  androidPageWrapper: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  androidCard: {
+    height: CARD_HEIGHT,
+    borderRadius: scale(45),
+    overflow: 'hidden',
   },
   bookmarkedOverlay: {
     position: 'absolute',

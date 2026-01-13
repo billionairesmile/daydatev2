@@ -12,7 +12,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { StyleSheet, AppState, AppStateStatus, Alert } from 'react-native';
+import { StyleSheet, AppState, AppStateStatus, Alert, Platform } from 'react-native';
 import 'react-native-reanimated';
 
 // Initialize i18n (must be imported before any component that uses translations)
@@ -1234,8 +1234,8 @@ function RootLayoutNav() {
           name="mission/[id]"
           options={{
             presentation: 'card',
-            animation: 'fade',
-            animationDuration: 150,
+            animation: Platform.OS === 'android' ? 'none' : 'fade',
+            animationDuration: Platform.OS === 'android' ? 0 : 150,
           }}
         />
         <Stack.Screen

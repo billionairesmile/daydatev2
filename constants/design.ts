@@ -436,8 +436,8 @@ export const TAB_BAR_LAYOUT = {
 
 // Banner Ad placement - always positioned just above the tab bar
 // Works with any banner height (adaptive banners range from 50-90px)
-// iOS: no gap, Android: 4px gap
-export const BANNER_AD_BOTTOM = TAB_BAR_LAYOUT.top + (Platform.OS === 'ios' ? 0 : scale(4));
+// iOS: no gap, Android: 24px gap
+export const BANNER_AD_BOTTOM = TAB_BAR_LAYOUT.top + (Platform.OS === 'ios' ? 0 : scale(24));
 
 export default {
   COLORS,

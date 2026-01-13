@@ -53,26 +53,37 @@ export default function MoreScreen() {
   // Premium modal state
   const [showPremiumModal, setShowPremiumModal] = React.useState(false);
 
+  // Helper function to navigate with requestAnimationFrame on Android
+  const navigateTo = (path: string) => {
+    if (Platform.OS === 'android') {
+      requestAnimationFrame(() => {
+        router.push(path as any);
+      });
+    } else {
+      router.push(path as any);
+    }
+  };
+
   const menuSections: MenuSectionType[] = [
     {
       title: t('more.sections.profile'),
       items: [
-        { icon: User, label: t('more.menu.myProfile'), onPress: () => router.push('/more/my-profile') },
-        { icon: Heart, label: t('more.menu.coupleProfile'), onPress: () => router.push('/more/couple-profile') },
+        { icon: User, label: t('more.menu.myProfile'), onPress: () => navigateTo('/more/my-profile') },
+        { icon: Heart, label: t('more.menu.coupleProfile'), onPress: () => navigateTo('/more/couple-profile') },
       ],
     },
     {
       title: t('more.sections.settings'),
       items: [
-        { icon: Settings, label: t('more.menu.settings'), onPress: () => router.push('/more/settings') },
+        { icon: Settings, label: t('more.menu.settings'), onPress: () => navigateTo('/more/settings') },
       ],
     },
     {
       title: t('more.sections.support'),
       items: [
-        { icon: Megaphone, label: t('more.menu.announcements'), onPress: () => router.push('/more/announcements') },
-        { icon: Headphones, label: t('more.menu.customerService'), onPress: () => router.push('/more/customer-service') },
-        { icon: FileText, label: t('settings.other.termsAndPolicies'), onPress: () => router.push('/more/terms') },
+        { icon: Megaphone, label: t('more.menu.announcements'), onPress: () => navigateTo('/more/announcements') },
+        { icon: Headphones, label: t('more.menu.customerService'), onPress: () => navigateTo('/more/customer-service') },
+        { icon: FileText, label: t('settings.other.termsAndPolicies'), onPress: () => navigateTo('/more/terms') },
       ],
     },
   ];
@@ -92,6 +103,7 @@ export default function MoreScreen() {
           !isLast && styles.menuItemBorder,
         ]}
         onPress={item.onPress}
+        android_ripple={{ color: 'rgba(255, 255, 255, 0.15)', borderless: false }}
       >
         <View style={styles.menuItemLeft}>
           <IconComponent color="rgba(255, 255, 255, 0.8)" size={scale(22)} />

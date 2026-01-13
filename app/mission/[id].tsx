@@ -16,6 +16,7 @@ import {
   useWindowDimensions,
   Animated,
   Linking,
+  InteractionManager,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { BlurView } from 'expo-blur';
@@ -84,6 +85,18 @@ export default function MissionDetailScreen() {
   const [flashEnabled, setFlashEnabled] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
   const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
+
+  // Android: Defer heavy initialization until navigation transition completes
+  const [isReady, setIsReady] = useState(Platform.OS === 'ios');
+
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      const interactionPromise = InteractionManager.runAfterInteractions(() => {
+        setIsReady(true);
+      });
+      return () => interactionPromise.cancel();
+    }
+  }, []);
 
   // Track if current user is the photo taker (user1 in mission progress)
   const [isPhotoTaker, setIsPhotoTaker] = useState(true);
@@ -181,9 +194,10 @@ export default function MissionDetailScreen() {
     bookmarkedMission;
 
   // Load featured mission from DB if not found in local stores
+  // On Android, wait for interaction to complete before loading
   useEffect(() => {
     const loadFeaturedMission = async () => {
-      if (localMission || !id || isDemoMode) return;
+      if (localMission || !id || isDemoMode || !isReady) return;
 
       setIsLoadingFeaturedMission(true);
       try {
@@ -221,7 +235,7 @@ export default function MissionDetailScreen() {
     };
 
     loadFeaturedMission();
-  }, [id, localMission, i18n.language]);
+  }, [id, localMission, i18n.language, isReady]);
 
   const mission: Mission =
     localMission ||
@@ -1507,6 +1521,15 @@ export default function MissionDetailScreen() {
             </Pressable>
           </View>
         </View>
+      </View>
+    );
+  }
+
+  // Android: Show lightweight loading while interaction completes
+  if (!isReady) {
+    return (
+      <View style={[styles.container, { backgroundColor: '#000' }]}>
+        <ActivityIndicator size="large" color={COLORS.white} style={{ flex: 1 }} />
       </View>
     );
   }

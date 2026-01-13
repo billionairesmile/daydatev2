@@ -36,8 +36,10 @@ import ReanimatedModule, {
   interpolate,
   Extrapolation,
   withTiming,
+  withSpring,
   Easing,
 } from 'react-native-reanimated';
+import PagerView from 'react-native-pager-view';
 import { useTranslation } from 'react-i18next';
 
 import { COLORS, SPACING, IS_TABLET, IS_FOLDABLE, scale, scaleFont, ANDROID_BOTTOM_PADDING, BANNER_AD_BOTTOM } from '@/constants/design';
@@ -3262,7 +3264,7 @@ function FlipCardItem({
   );
 }
 
-// Background image component with animated opacity and scale
+// Background image component with animated opacity and scale (iOS - uses scrollX in pixels)
 function CarouselBackgroundImage({
   image,
   index,
@@ -3283,6 +3285,58 @@ function CarouselBackgroundImage({
     const scale = interpolate(
       scrollX.value,
       [(index - 1) * width, index * width, (index + 1) * width],
+      [1.2, 1, 1.2],
+      Extrapolation.CLAMP
+    );
+
+    return {
+      opacity,
+      transform: [{ scale }],
+    };
+  });
+
+  return (
+    <ReanimatedModule.View style={[StyleSheet.absoluteFill, animatedStyle]}>
+      <ExpoImage
+        source={{ uri: image }}
+        style={StyleSheet.absoluteFill}
+        blurRadius={18}
+        contentFit="cover"
+        cachePolicy="memory-disk"
+        transition={100}
+        placeholder="L6PZfSi_.AyE_3t7t7R**0LTIpIp"
+      />
+    </ReanimatedModule.View>
+  );
+}
+
+// Android: Background image component using PagerView position (uses page index)
+function AndroidCarouselBackgroundImage({
+  image,
+  index,
+  scrollPosition,
+  scrollOffset,
+}: {
+  image: string;
+  index: number;
+  scrollPosition: { value: number };
+  scrollOffset: { value: number };
+}) {
+  const animatedStyle = useAnimatedStyle(() => {
+    const position = scrollPosition.value;
+    const offset = scrollOffset.value;
+    const continuousPosition = position + offset;
+
+    const opacity = interpolate(
+      continuousPosition,
+      [index - 1, index, index + 1],
+      [0, 1, 0],
+      Extrapolation.CLAMP
+    );
+
+    const scale = interpolate(
+      continuousPosition,
+      [index - 1, index, index + 1],
       [1.2, 1, 1.2],
       Extrapolation.CLAMP
     );
@@ -3350,6 +3404,66 @@ function CarouselCardWrapper({
   );
 }
 
+// Android: Animated card wrapper for smooth PagerView transitions
+interface AndroidPhotoCardWrapperProps {
+  index: number;
+  scrollPosition: { value: number };
+  scrollOffset: { value: number };
+  children: React.ReactNode;
+  currentIndex: number;
+  mission: MemoryType;
+}
+
+function AndroidPhotoCardWrapper({ index, scrollPosition, scrollOffset, children, currentIndex, mission }: AndroidPhotoCardWrapperProps) {
+  const springConfig = {
+    damping: 50,
+    stiffness: 150,
+    mass: 0.5,
+    overshootClamping: true, // Prevent spring from overshooting (scale > 1.0)
+  };
+
+  const animatedStyle = useAnimatedStyle(() => {
+    const position = scrollPosition.value;
+    const offset = scrollOffset.value;
+    const continuousPosition = position + offset;
+    const distance = Math.abs(continuousPosition - index);
+
+    // Scale animation - clamp to prevent stretching
+    const targetScale = interpolate(
+      distance,
+      [0, 0.5, 1],
+      [1, 0.975, 0.95],
+      Extrapolation.CLAMP
+    );
+
+    // Opacity animation
+    const targetOpacity = interpolate(
+      distance,
+      [0, 0.5, 1],
+      [1, 0.7, 0.3],
+      Extrapolation.CLAMP
+    );
+
+    // Apply spring only to current card to avoid wobble on neighbors
+    // overshootClamping: true prevents scale from exceeding target value
+    const isCurrentCard = distance < 0.5;
+    const finalScale = isCurrentCard
+      ? withSpring(targetScale, springConfig)
+      : targetScale;
+
+    return {
+      transform: [{ scale: finalScale }],
+      opacity: targetOpacity,
+    };
+  });
+
+  return (
+    <ReanimatedModule.View style={[styles.androidPhotoCardWrapper, animatedStyle]}>
+      <FlipCardItem mission={mission} isActive={index === currentIndex} />
+    </ReanimatedModule.View>
+  );
+}
+
 function PhotoDetailView({
   missions,
   initialPhoto,
@@ -3370,6 +3484,11 @@ function PhotoDetailView({
   );
   const [localMissions, setLocalMissions] = useState<MemoryType[]>(missions);
   const scrollViewRef = useRef<any>(null);
+  const pagerRef = useRef<PagerView>(null);
+
+  // Android: PagerView scroll position tracking
+  const androidScrollPosition = useSharedValue(initialIndex >= 0 ? initialIndex : 0);
+  const androidScrollOffset = useSharedValue(0);
 
   // Prefetch all photos for instant display when swiping
   useEffect(() => {
@@ -3407,7 +3526,11 @@ function PhotoDetailView({
 
       // Scroll to the adjusted position
       setTimeout(() => {
-        if (scrollViewRef.current) {
+        if (Platform.OS === 'android') {
+          pagerRef.current?.setPageWithoutAnimation(newIndex);
+          androidScrollPosition.value = newIndex;
+          androidScrollOffset.value = 0;
+        } else if (scrollViewRef.current) {
           scrollViewRef.current?.scrollTo({
             x: newIndex * width,
             animated: false,
@@ -3423,7 +3546,11 @@ function PhotoDetailView({
       setCurrentIndex(newIndex);
       // Scroll to the adjusted position
       setTimeout(() => {
-        if (scrollViewRef.current) {
+        if (Platform.OS === 'android') {
+          pagerRef.current?.setPageWithoutAnimation(newIndex);
+          androidScrollPosition.value = newIndex;
+          androidScrollOffset.value = 0;
+        } else if (scrollViewRef.current) {
           scrollViewRef.current?.scrollTo({
             x: newIndex * width,
             animated: false,
@@ -3500,11 +3627,19 @@ function PhotoDetailView({
 
   // Scroll to initial index after mount and trigger entrance animation
   useEffect(() => {
-    if (scrollViewRef.current && initialIndex > 0) {
-      scrollViewRef.current?.scrollTo({
-        x: initialIndex * width,
-        animated: false,
-      });
+    if (Platform.OS === 'android') {
+      // Android uses PagerView - set initial page
+      if (pagerRef.current && initialIndex > 0) {
+        pagerRef.current?.setPageWithoutAnimation(initialIndex);
+      }
+    } else {
+      // iOS uses ScrollView
+      if (scrollViewRef.current && initialIndex > 0) {
+        scrollViewRef.current?.scrollTo({
+          x: initialIndex * width,
+          animated: false,
+        });
+      }
     }
     // Start entrance animation with natural easing
     const timer = setTimeout(() => {
@@ -3516,7 +3651,25 @@ function PhotoDetailView({
     return () => clearTimeout(timer);
   }, []);
 
-  // Handle scroll end to update current index
+  // Android: Handle PagerView page scroll
+  const handleAndroidPageScroll = useCallback((e: any) => {
+    const { position, offset } = e.nativeEvent;
+    androidScrollPosition.value = position;
+    androidScrollOffset.value = offset;
+  }, []);
+
+  // Android: Handle PagerView page selected
+  const handleAndroidPageSelected = useCallback((e: any) => {
+    const newIndex = e.nativeEvent.position;
+    if (newIndex !== currentIndex && newIndex >= 0 && newIndex < localMissions.length) {
+      setCurrentIndex(newIndex);
+      setIsFlipped(false);
+      androidScrollPosition.value = newIndex;
+      androidScrollOffset.value = 0;
+    }
+  }, [currentIndex, localMissions.length]);
+
+  // Handle scroll end to update current index (iOS)
   const handleMomentumScrollEnd = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       const offsetX = event.nativeEvent.contentOffset.x;
@@ -3536,16 +3689,30 @@ function PhotoDetailView({
 
       {/* Background with smooth fade animation */}
       <ReanimatedModule.View style={[StyleSheet.absoluteFill, backgroundFadeStyle]}>
-        {/* Animated Background Images with Blur */}
+        {/* Animated Background Images with Blur - Platform-specific */}
         <View style={StyleSheet.absoluteFill}>
-          {localMissions.map((mission, index) => (
-            <CarouselBackgroundImage
-              key={`background_${mission.id}`}
-              image={mission.photoUrl}
-              index={index}
-              scrollX={scrollX}
-            />
-          ))}
+          {Platform.OS === 'android' ? (
+            /* Android: Use PagerView position for background animation */
+            localMissions.map((mission, index) => (
+              <AndroidCarouselBackgroundImage
+                key={`background_${mission.id}`}
+                image={mission.photoUrl}
+                index={index}
+                scrollPosition={androidScrollPosition}
+                scrollOffset={androidScrollOffset}
+              />
+            ))
+          ) : (
+            /* iOS: Use ScrollView scrollX for background animation */
+            localMissions.map((mission, index) => (
+              <CarouselBackgroundImage
+                key={`background_${mission.id}`}
+                image={mission.photoUrl}
+                index={index}
+                scrollX={scrollX}
+              />
+            ))
+          )}
         </View>
 
         {/* Dark overlay for better card visibility */}
@@ -3573,7 +3740,7 @@ function PhotoDetailView({
           style={styles.photoDetailMenuOverlay}
           onPress={() => setShowPhotoDetailMenu(false)}
         >
-          <BlurView experimentalBlurMethod="dimezisBlurView" intensity={50} tint="dark" style={styles.photoDetailMenuDropdown}>
+          <View style={styles.photoDetailMenuDropdown}>
             <Pressable
               style={styles.photoDetailMenuItem}
               onPress={() => {
@@ -3639,56 +3806,82 @@ function PhotoDetailView({
               <Trash2 color="#FF6B6B" size={18} />
               <Text style={[styles.photoDetailMenuItemText, { color: '#FF6B6B' }]}>{t('memories.photo.delete')}</Text>
             </Pressable>
-          </BlurView>
+          </View>
         </Pressable>
       )}
 
-      {/* Content with smooth entrance animation (fade + scale + slide) */}
+      {/* Instruction Text - No animation */}
+      <View style={styles.flipInstructionContainer}>
+        <View style={styles.flipInstructionBadge}>
+          <Text style={styles.flipInstructionText}>
+            {isFlipped ? t('memories.photo.tapToView') : t('memories.photo.tapToFlip')}
+          </Text>
+        </View>
+      </View>
+
+      {/* Carousel with smooth entrance animation (fade + scale + slide) */}
       <ReanimatedModule.View style={[{ flex: 1 }, contentAnimStyle]}>
-        {/* Instruction Text */}
-        <View style={styles.flipInstructionContainer}>
-          <View style={styles.flipInstructionBadge}>
-            <Text style={styles.flipInstructionText}>
-              {isFlipped ? t('memories.photo.tapToView') : t('memories.photo.tapToFlip')}
-            </Text>
-          </View>
-        </View>
-
-        {/* Carousel ScrollView */}
-        <ReanimatedModule.ScrollView
-          ref={scrollViewRef}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          onScroll={onScrollHandler}
-          onMomentumScrollEnd={handleMomentumScrollEnd}
-          scrollEventThrottle={16}
-          decelerationRate="fast"
-          bounces={true}
-          alwaysBounceHorizontal={true}
-          contentContainerStyle={styles.carouselScrollContent}
-          overScrollMode={Platform.OS === 'android' ? 'never' : undefined}
-        >
-          {localMissions.map((mission, index) => (
-            <CarouselCardWrapper
-              key={`card_${mission.id}`}
-              mission={mission}
-              index={index}
-              scrollX={scrollX}
-              currentIndex={currentIndex}
-            />
-          ))}
-        </ReanimatedModule.ScrollView>
-
-        {/* Photo Counter */}
-        <View style={styles.photoCounterContainer}>
-          <View style={styles.photoCounterBadge}>
-            <Text style={styles.photoCounterText}>
-              {currentIndex + 1} / {localMissions.length}
-            </Text>
-          </View>
-        </View>
+        {Platform.OS === 'android' ? (
+          /* Android: PagerView for smooth native scrolling */
+          <PagerView
+            ref={pagerRef}
+            style={styles.androidPhotoPagerView}
+            initialPage={initialIndex >= 0 ? initialIndex : 0}
+            onPageScroll={handleAndroidPageScroll}
+            onPageSelected={handleAndroidPageSelected}
+            overScrollMode="always"
+            offscreenPageLimit={2}
+          >
+            {localMissions.map((mission, index) => (
+              <View key={`android_card_${mission.id}`} style={styles.androidPhotoPageWrapper}>
+                <AndroidPhotoCardWrapper
+                  index={index}
+                  scrollPosition={androidScrollPosition}
+                  scrollOffset={androidScrollOffset}
+                  currentIndex={currentIndex}
+                  mission={mission}
+                >
+                  <FlipCardItem mission={mission} isActive={index === currentIndex} />
+                </AndroidPhotoCardWrapper>
+              </View>
+            ))}
+          </PagerView>
+        ) : (
+          /* iOS: ScrollView for smooth scrolling */
+          <ReanimatedModule.ScrollView
+            ref={scrollViewRef}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onScroll={onScrollHandler}
+            onMomentumScrollEnd={handleMomentumScrollEnd}
+            scrollEventThrottle={16}
+            decelerationRate="fast"
+            bounces={true}
+            alwaysBounceHorizontal={true}
+            contentContainerStyle={styles.carouselScrollContent}
+          >
+            {localMissions.map((mission, index) => (
+              <CarouselCardWrapper
+                key={`card_${mission.id}`}
+                mission={mission}
+                index={index}
+                scrollX={scrollX}
+                currentIndex={currentIndex}
+              />
+            ))}
+          </ReanimatedModule.ScrollView>
+        )}
       </ReanimatedModule.View>
+
+      {/* Photo Counter - No animation */}
+      <View style={styles.photoCounterContainer}>
+        <View style={styles.photoCounterBadge}>
+          <Text style={styles.photoCounterText}>
+            {currentIndex + 1} / {localMissions.length}
+          </Text>
+        </View>
+      </View>
     </View>
   );
 }
@@ -3699,7 +3892,7 @@ const styles = StyleSheet.create({
   },
   bannerAd: {
     position: 'absolute',
-    bottom: BANNER_AD_BOTTOM + ANDROID_BOTTOM_PADDING,
+    bottom: BANNER_AD_BOTTOM,
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -4089,6 +4282,28 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.5,
     elevation: 10,
   },
+  // Android PagerView styles for photo carousel
+  androidPhotoPagerView: {
+    flex: 1,
+  },
+  androidPhotoPageWrapper: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  androidPhotoCardWrapper: {
+    width: width,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 0,
+    },
+    shadowRadius: scale(20),
+    shadowOpacity: 0.5,
+    elevation: 10,
+  },
   photoDetailBackgroundOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
@@ -4120,28 +4335,30 @@ const styles = StyleSheet.create({
   },
   photoDetailMenuDropdown: {
     position: 'absolute',
-    top: scale(108),
+    top: scale(100),
     right: scale(20),
-    borderRadius: scale(12),
-    paddingVertical: scale(6),
-    minWidth: scale(120),
+    borderRadius: scale(10),
+    paddingVertical: scale(5),
+    minWidth: scale(95),
     zIndex: 100,
     overflow: 'hidden',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   photoDetailMenuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: scale(12),
-    paddingHorizontal: scale(16),
-    gap: scale(10),
+    paddingVertical: scale(10),
+    paddingHorizontal: scale(13),
+    gap: scale(8),
   },
   photoDetailMenuItemDanger: {
-    marginTop: scale(4),
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.1)',
   },
   photoDetailMenuItemText: {
-    fontSize: scaleFont(16),
+    fontSize: scaleFont(14),
     color: COLORS.white,
     fontWeight: '500',
   },
@@ -4150,6 +4367,8 @@ const styles = StyleSheet.create({
     height: scale(40),
     borderRadius: scale(20),
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -4352,7 +4571,7 @@ const styles = StyleSheet.create({
   },
   photoCounterContainer: {
     position: 'absolute',
-    bottom: scale(80),
+    bottom: Platform.OS === 'android' ? scale(130) : scale(90),
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -5556,7 +5775,9 @@ const styles = StyleSheet.create({
     width: scale(40),
     height: scale(40),
     borderRadius: scale(20),
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -5572,29 +5793,29 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: scale(100),
     right: scale(20),
-    borderRadius: scale(16),
-    paddingVertical: scale(8),
-    minWidth: scale(160),
+    borderRadius: scale(12),
+    paddingVertical: scale(6),
+    minWidth: scale(120),
     zIndex: 100,
     overflow: 'hidden',
-    backgroundColor: 'rgba(40, 40, 40, 0.98)',
+    backgroundColor: 'rgba(30, 30, 30, 0.95)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   albumMenuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: scale(14),
-    paddingHorizontal: scale(18),
-    gap: scale(14),
+    paddingVertical: scale(11),
+    paddingHorizontal: scale(14),
+    gap: scale(11),
   },
   albumMenuItemDanger: {
-    marginTop: scale(4),
+    marginTop: scale(3),
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.1)',
   },
   albumMenuItemText: {
-    fontSize: scaleFont(16),
+    fontSize: scaleFont(14),
     color: '#FFFFFF',
     fontWeight: '500',
   },
