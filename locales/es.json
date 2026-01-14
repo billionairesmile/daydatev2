@@ -720,6 +720,7 @@
       "connected": "¡Conectado con tu pareja!\nProcede al siguiente paso",
       "invalidCode": "Código inválido. Por favor revisa el código.",
       "alreadyPaired": "Este código ya fue usado.",
+      "cannotUseSelfCode": "No puedes usar tu propio código.\nPor favor comparte el código con tu pareja.",
       "partnerNotReady": "Tu pareja aún no está lista. Inténtalo más tarde.",
       "connectionError": "Ocurrió un error al conectar. Inténtalo de nuevo.",
       "coupleRestoreError": "Ocurrió un error al restaurar datos de pareja.",

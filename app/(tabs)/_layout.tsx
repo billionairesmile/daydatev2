@@ -6,7 +6,8 @@ import { Target, BookHeart, Home, Calendar, Menu } from 'lucide-react-native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useTranslation } from 'react-i18next';
 
-import { COLORS, IS_TABLET, scale, scaleFont, ANDROID_BOTTOM_PADDING } from '@/constants/design';
+import { COLORS, IS_TABLET, scale, scaleFont } from '@/constants/design';
+import { useTabBarBottom } from '@/hooks/useConsistentBottomInset';
 import { useUIStore } from '@/stores/uiStore';
 
 // Platform-specific sizes to match visual appearance between Android and iOS
@@ -50,6 +51,7 @@ const TAB_ICONS: Record<string, React.ComponentType<{ color: string; size: numbe
 function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const { t } = useTranslation();
   const isTabBarHidden = useUIStore((s) => s.isTabBarHidden);
+  const tabBarBottom = useTabBarBottom();
   const [tabWidth, setTabWidth] = useState(0);
   const indicatorPosition = useRef(new Animated.Value(0)).current;
   const indicatorOpacity = useRef(new Animated.Value(0)).current;
@@ -88,7 +90,7 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   }
 
   return (
-    <View style={styles.tabBarContainer}>
+    <View style={[styles.tabBarContainer, { bottom: tabBarBottom }]}>
       <View style={styles.tabBarOuter}>
         <BlurView experimentalBlurMethod="dimezisBlurView" intensity={50} tint="dark" style={styles.tabBarBlur}>
           <View style={styles.tabBarInner}>
@@ -215,7 +217,6 @@ const styles = StyleSheet.create({
   },
   tabBarContainer: {
     position: 'absolute',
-    bottom: scale(24) + ANDROID_BOTTOM_PADDING,
     left: 0,
     right: 0,
     alignItems: 'center',

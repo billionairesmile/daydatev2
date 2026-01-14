@@ -136,8 +136,11 @@ export default function NativeAdMissionCard({
   const contentWidth = adViewDimensions.width - contentPadding * 2;
   // Media container dimensions
   const mediaWidth = contentWidth;
-  // Reserve space for: paddingTop(48) + row(40) + body(30) + cta(50) + paddingBottom(20) = ~188
-  const mediaHeight = Math.max(Math.floor(adViewDimensions.height - 200), 180);
+  // Reserve space for: paddingTop + row + body + cta + paddingBottom
+  // Android: increased to ensure CTA button is visible in smaller card
+  const reservedSpace = Platform.OS === 'android' ? 200 : 200;
+  const minMediaHeight = Platform.OS === 'android' ? 120 : 180;
+  const mediaHeight = Math.max(Math.floor(adViewDimensions.height - reservedSpace), minMediaHeight);
 
   // Calculate optimal NativeMediaView size based on ad's aspect ratio
   // This ensures the entire ad image is visible within the container
@@ -168,7 +171,7 @@ export default function NativeAdMissionCard({
           }}
         >
           {/* AD Badge - top left */}
-          <View style={[styles.adBadge, { left: contentPadding }]}>
+          <View style={[styles.adBadge, { left: contentPadding + 8 }]}>
             <Text style={styles.adBadgeText}>AD</Text>
           </View>
 
@@ -242,13 +245,13 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   content: {
-    paddingTop: 48,
-    paddingBottom: 16,
+    paddingTop: Platform.OS === 'android' ? 40 : 48,
+    paddingBottom: Platform.OS === 'android' ? 12 : 16,
     alignItems: 'center',
   },
   adBadge: {
     position: 'absolute',
-    top: 20,
+    top: Platform.OS === 'android' ? 16 : 20,
     backgroundColor: 'rgba(255,255,255,0.95)',
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -271,7 +274,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginTop: 12,
+    marginTop: Platform.OS === 'android' ? 10 : 12,
   },
   icon: {
     width: 28,
@@ -295,7 +298,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: 'rgba(255,255,255,0.7)',
     lineHeight: 14,
-    marginTop: 6,
+    marginTop: Platform.OS === 'android' ? 4 : 6,
   },
   ctaButton: {
     backgroundColor: '#4285F4',

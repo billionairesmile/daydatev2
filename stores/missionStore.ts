@@ -240,12 +240,12 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
           keptMissions: updatedKeptMissions,
         });
 
-        // Also remove from Supabase couple_bookmarks if bookmarked
+        // Mark bookmark as completed in Supabase (will be removed at noon the next day)
         // This is async but we don't need to wait for it
         const syncStore = useCoupleSyncStore.getState();
         if (syncStore.isInitialized && syncStore.coupleId) {
-          syncStore.removeBookmark(missionId).catch((err) => {
-            console.warn('[Mission] Failed to remove bookmark from Supabase:', err);
+          syncStore.markBookmarkCompleted(missionId).catch((err) => {
+            console.warn('[Mission] Failed to mark bookmark as completed:', err);
           });
         }
       },

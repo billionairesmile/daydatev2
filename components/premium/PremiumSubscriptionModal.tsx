@@ -11,7 +11,7 @@ import {
   StatusBar,
   Alert,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useConsistentBottomInset } from '@/hooks/useConsistentBottomInset';
 import {
   Crown,
   Target,
@@ -41,7 +41,7 @@ export default function PremiumSubscriptionModal({
   onClose,
 }: PremiumSubscriptionModalProps) {
   const { t } = useTranslation();
-  const insets = useSafeAreaInsets();
+  const insets = useConsistentBottomInset();
   const {
     isPremium,
     partnerIsPremium,

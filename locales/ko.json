@@ -725,6 +725,7 @@
       "connected": "파트너와 연결되었습니다!\n다음으로 진행하세요",
       "invalidCode": "유효하지 않은 코드입니다. 코드를 확인해주세요.",
       "alreadyPaired": "이미 사용된 코드입니다.",
+      "cannotUseSelfCode": "자신이 생성한 코드는 사용할 수 없습니다.\n파트너에게 코드를 공유해주세요.",
       "partnerNotReady": "파트너가 아직 준비되지 않았습니다. 잠시 후 다시 시도해주세요.",
       "connectionError": "연결 중 오류가 발생했습니다. 다시 시도해주세요.",
       "coupleRestoreError": "커플 복구 중 오류가 발생했습니다.",

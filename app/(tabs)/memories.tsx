@@ -23,7 +23,7 @@ import {
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useConsistentBottomInset, useBannerAdBottom } from '@/hooks/useConsistentBottomInset';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as MediaLibrary from 'expo-media-library';
@@ -42,7 +42,7 @@ import ReanimatedModule, {
 import PagerView from 'react-native-pager-view';
 import { useTranslation } from 'react-i18next';
 
-import { COLORS, SPACING, IS_TABLET, IS_FOLDABLE, scale, scaleFont, ANDROID_BOTTOM_PADDING, BANNER_AD_BOTTOM } from '@/constants/design';
+import { COLORS, SPACING, IS_TABLET, IS_FOLDABLE, scale, scaleFont, ANDROID_BOTTOM_PADDING } from '@/constants/design';
 import { useMemoryStore, SAMPLE_MEMORIES } from '@/stores/memoryStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useOnboardingStore } from '@/stores/onboardingStore';
@@ -154,7 +154,8 @@ export default function MemoriesScreen() {
   const { backgroundImage } = useBackground();
   const { memories, deleteMemory, loadFromDB } = useMemoryStore();
   const { user, partner, couple } = useAuthStore();
-  const insets = useSafeAreaInsets();
+  const insets = useConsistentBottomInset();
+  const bannerAdBottom = useBannerAdBottom();
 
   // Track if navigation/interaction is complete for deferred operations
   const [isInteractionComplete, setIsInteractionComplete] = useState(false);
@@ -1226,14 +1227,12 @@ export default function MemoriesScreen() {
         </View>
       </View>
 
+
       {/* Content */}
       {completedMemories.length === 0 ? (
         <ScrollView
           style={styles.mainContent}
           contentContainerStyle={styles.mainContentContainer}
-          showsVerticalScrollIndicator={false}
-          bounces={true}
-          alwaysBounceVertical={true}
         >
           {/* Year Section - Current Year */}
           <View style={styles.yearSection}>
@@ -1354,9 +1353,6 @@ export default function MemoriesScreen() {
         <ScrollView
           style={styles.mainContent}
           contentContainerStyle={styles.mainContentContainer}
-          showsVerticalScrollIndicator={false}
-          bounces={true}
-          alwaysBounceVertical={true}
         >
           {/* Selected Year Section */}
           {selectedYear && groupedMissions[selectedYear] && (
@@ -1563,8 +1559,8 @@ export default function MemoriesScreen() {
         </ScrollView>
       )}
 
-      {/* Banner Ad - Fixed at bottom above nav bar */}
-      <BannerAdView placement="memories" style={styles.bannerAd} />
+      {/* Banner Ad - Fixed at bottom */}
+      <BannerAdView placement="memories" style={[styles.bannerAd, { bottom: bannerAdBottom }]} />
 
       {/* Month Album Modal */}
       <Modal
@@ -3892,10 +3888,16 @@ const styles = StyleSheet.create({
   },
   bannerAd: {
     position: 'absolute',
-    bottom: BANNER_AD_BOTTOM,
     left: 0,
     right: 0,
     alignItems: 'center',
+  },
+  inlineBannerContainer: {
+    alignItems: 'center',
+    paddingVertical: scale(8),
+  },
+  premiumSpacer: {
+    height: scale(16),
   },
   backgroundImage: {
     position: 'absolute',

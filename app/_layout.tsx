@@ -575,16 +575,18 @@ function RootLayoutNav() {
         }
         disconnectAlertShownRef.current = true;
 
-        // Get disconnected_by to show appropriate message
-        const wasDisconnectedByPartner = coupleData.disconnected_by && coupleData.disconnected_by !== user?.id;
+        // Use disconnect_reason to show appropriate message (consistent with realtime handler)
+        // disconnect_reason === 'account_deleted' means partner deleted their account
+        // disconnect_reason === 'unpaired' (or null) means partner just unpaired
+        const isAccountDeleted = coupleData.disconnect_reason === 'account_deleted';
 
         Alert.alert(
-          wasDisconnectedByPartner
-            ? t('settings.unpair.partnerDisconnectedTitle')
-            : t('settings.unpair.partnerDeletedAccountTitle'),
-          wasDisconnectedByPartner
-            ? t('settings.unpair.partnerDisconnectedMessage')
-            : t('settings.unpair.partnerDeletedAccountMessage'),
+          isAccountDeleted
+            ? t('settings.unpair.partnerDeletedAccountTitle')
+            : t('settings.unpair.partnerDisconnectedTitle'),
+          isAccountDeleted
+            ? t('settings.unpair.partnerDeletedAccountMessage')
+            : t('settings.unpair.partnerDisconnectedMessage'),
           [
             {
               text: t('common.confirm'),
@@ -1241,8 +1243,8 @@ function RootLayoutNav() {
         <Stack.Screen
           name="more"
           options={{
-            animation: 'fade',
-            animationDuration: 100,
+            animation: Platform.OS === 'android' ? 'none' : 'fade',
+            animationDuration: Platform.OS === 'android' ? 0 : 100,
             gestureEnabled: false,
           }}
         />

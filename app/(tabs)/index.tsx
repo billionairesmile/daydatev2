@@ -36,10 +36,11 @@ const DEFAULT_BACKGROUND_IMAGE = require('@/assets/images/backgroundimage.jpg');
 Asset.fromModule(LOGO_IMAGE).downloadAsync();
 Asset.fromModule(DEFAULT_BACKGROUND_IMAGE).downloadAsync();
 
-import { COLORS, SPACING, RADIUS, TYPOGRAPHY, scale, scaleFont, IS_TABLET, ANDROID_BOTTOM_PADDING, BANNER_AD_BOTTOM } from '@/constants/design';
+import { COLORS, SPACING, RADIUS, TYPOGRAPHY, scale, scaleFont, IS_TABLET, ANDROID_BOTTOM_PADDING } from '@/constants/design';
 import { useBackground } from '@/contexts';
 import { useOnboardingStore, useAuthStore, useTimezoneStore } from '@/stores';
 import { BannerAdView } from '@/components/ads';
+import { useBannerAdBottom } from '@/hooks/useConsistentBottomInset';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
 import { db } from '@/lib/supabase';
 import { anniversaryService } from '@/services/anniversaryService';
@@ -344,6 +345,7 @@ export default function HomeScreen() {
   const { user, partner, couple, setPartner, setCouple } = useAuthStore();
   const { getEffectiveTimezone } = useTimezoneStore();
   const { coupleId } = useCoupleSyncStore();
+  const bannerAdBottom = useBannerAdBottom();
 
   // Determine nicknames - always show "나 ❤️ 파트너" from current user's perspective
   const isCurrentUserCoupleUser1 = user?.id === couple?.user1Id;
@@ -1229,8 +1231,8 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Banner Ad - Fixed at bottom */}
-      <BannerAdView placement="home" style={styles.bannerAd} />
+      {/* Banner Ad - Fixed at bottom, dynamically positioned above tab bar */}
+      <BannerAdView placement="home" style={[styles.bannerAd, { bottom: bannerAdBottom }]} />
 
       {/* Anniversary Modal with Blur - Single modal with step-based content */}
       <Modal
@@ -1850,7 +1852,6 @@ const styles = StyleSheet.create({
   },
   bannerAd: {
     position: 'absolute',
-    bottom: BANNER_AD_BOTTOM,
     left: 0,
     right: 0,
     alignItems: 'center',

@@ -1044,6 +1044,7 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
 
       // Load premium status from database (for admin-granted premium or testing)
       // Also syncs local state if database says free but local says premium
+      // Automatically handles subscription expiration via RPC function
       loadFromDatabase: async () => {
         try {
           if (!supabase) return;
@@ -1051,6 +1052,26 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
           const { data: { user } } = await supabase.auth.getUser();
           if (!user) return;
 
+          // First, check and expire subscription if needed (updates DB automatically)
+          try {
+            const { data: expirationResult, error: rpcError } = await supabase
+              .rpc('check_and_expire_subscription', { p_user_id: user.id });
+
+            if (!rpcError && expirationResult?.expired) {
+              console.log('[Subscription] Subscription expired via RPC:', expirationResult);
+              set({
+                isPremium: false,
+                plan: 'free',
+                expiryDate: null,
+              });
+              return; // Already handled
+            }
+          } catch (rpcErr) {
+            // RPC function might not exist yet, continue with regular check
+            console.log('[Subscription] RPC check_and_expire_subscription not available, using fallback');
+          }
+
+          // Fallback: Regular profile check
           const { data: profile, error } = await supabase
             .from('profiles')
             .select('subscription_plan, subscription_expires_at')
@@ -1095,14 +1116,27 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
               plan: 'free',
               expiryDate: null,
             });
-          } else if (state.isPremium && dbExpiryDate && dbExpiryDate <= new Date()) {
-            // Database shows expired subscription
-            console.log('[Subscription] Downgrading to free - subscription expired in database');
+          } else if (dbPlan !== 'free' && dbExpiryDate && dbExpiryDate <= new Date()) {
+            // Database shows expired subscription - update both local state and DB
+            console.log('[Subscription] Downgrading to free - subscription expired');
+
+            // Update local state
             set({
               isPremium: false,
               plan: 'free',
               expiryDate: null,
             });
+
+            // Update database
+            await supabase
+              .from('profiles')
+              .update({
+                subscription_plan: 'free',
+                subscription_expires_at: null,
+              })
+              .eq('id', user.id);
+
+            console.log('[Subscription] Updated database to free plan');
           }
         } catch (error) {
           console.error('[Subscription] Load from database error:', error);

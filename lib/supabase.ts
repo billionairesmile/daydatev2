@@ -1764,6 +1764,27 @@ export const db = {
       return { error };
     },
 
+    // Mark a bookmark as completed (instead of removing immediately)
+    async markCompleted(coupleId: string, missionId: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('couple_bookmarks')
+        .update({ completed_at: new Date().toISOString() })
+        .eq('couple_id', coupleId)
+        .eq('mission_id', missionId)
+        .select()
+        .single();
+      return { data, error };
+    },
+
+    // Cleanup completed bookmarks that have passed the noon threshold
+    async cleanupCompleted(coupleId: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .rpc('cleanup_couple_completed_bookmarks', { p_couple_id: coupleId });
+      return { data, error };
+    },
+
     async exists(coupleId: string, missionId: string) {
       const client = getSupabase();
       const { data, error } = await client

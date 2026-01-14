@@ -3431,6 +3431,14 @@ function PairingStep({
 
       // Use existing user ID if logged in via social login, otherwise generate new one
       const joinerId = currentUser?.id || generateUUID();
+
+      // Prevent self-pairing: check if joiner is the same as creator
+      if (creatorId === joinerId) {
+        console.log('[PairingStep] Self-pairing attempt detected:', { creatorId, joinerId });
+        setError(t('onboarding.pairing.cannotUseSelfCode'));
+        setIsLoading(false);
+        return;
+      }
       const isExistingUser = !!currentUser?.id;
 
       // Check for disconnected couple within 30 days (reconnection scenario)
@@ -4754,7 +4762,7 @@ const styles = StyleSheet.create({
   },
   welcomeTaglineContainer: {
     width: '100%',
-    paddingHorizontal: scale(SPACING.xl),
+    paddingHorizontal: '7.5%', // Match social login button left margin (85% width centered)
     paddingTop: height * 0.10, // Responsive 10% from top
     alignItems: 'flex-start',
   },

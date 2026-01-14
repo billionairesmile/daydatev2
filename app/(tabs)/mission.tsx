@@ -23,7 +23,7 @@ import ReanimatedModule, {
   Extrapolation,
   withSpring,
 } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useConsistentBottomInset, useBannerAdBottom } from '@/hooks/useConsistentBottomInset';
 
 const ReanimatedView = ReanimatedModule.View;
 import { useTranslation } from 'react-i18next';
@@ -47,6 +47,7 @@ import { useBackground } from '@/contexts';
 import { BookmarkedMissionsPage } from '@/components/BookmarkedMissionsPage';
 import { CircularLoadingAnimation } from '@/components/CircularLoadingAnimation';
 import NativeAdMissionCard from '@/components/ads/NativeAdMissionCard';
+import { BannerAdView } from '@/components/ads';
 import RefreshMissionCard from '@/components/RefreshMissionCard';
 import type { Mission, FeaturedMission } from '@/types';
 import { db, isDemoMode } from '@/lib/supabase';
@@ -57,7 +58,8 @@ import { cancelHourlyReminders, cancelMissionReminderNotification } from '@/lib/
 type CarouselItem = Mission | { type: 'ad'; id: string } | { type: 'refresh'; id: string };
 
 // Fixed card dimensions (width is calculated dynamically in component)
-const CARD_HEIGHT = scale(468);
+// Android uses smaller height to match iOS aspect ratio visually
+const CARD_HEIGHT = Platform.OS === 'android' ? scale(420) : scale(468);
 const CARD_MARGIN = scale(10);
 
 // Easing gradient for smooth blur transition
@@ -131,7 +133,8 @@ function AndroidCardWrapper({ index, scrollPosition, scrollOffset, cardWidth, ch
 export default function MissionScreen() {
   const { t, i18n } = useTranslation();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const insets = useConsistentBottomInset();
+  const bannerAdBottom = useBannerAdBottom();
   const setTabBarHidden = useUIStore((s) => s.setTabBarHidden);
   const { showBookmark } = useLocalSearchParams<{ showBookmark?: string }>();
   const { backgroundImage } = useBackground();
@@ -319,30 +322,37 @@ export default function MissionScreen() {
       ];
     }
 
-    // Add refresh card at the end for ALL users (both free and premium)
-    // Only show if missions exist and refresh not used today
-    // Refresh is available once per day for everyone
-    // Use synced sharedMissionsRefreshedAt (from DB) if sync is initialized, otherwise fallback to local refreshUsedDate
-    // This ensures both users see the same refresh card status
-    const now = new Date();
-    const todayDateString = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    // Add refresh card at the end
+    // Premium users: always show refresh card (unlimited regenerations)
+    // Free users: only show if refresh not used today (1 refresh per day)
+    const isPremiumUser = !shouldShowAds();
 
-    // Check if refresh was used today:
-    // 1. If sync is initialized, use sharedMissionsRefreshedAt (synced from DB)
-    // 2. Otherwise, fallback to local refreshUsedDate
-    let hasUsedRefresh = false;
-    if (isSyncInitialized && sharedMissionsRefreshedAt) {
-      // Check if sharedMissionsRefreshedAt is from today
-      const refreshedDate = sharedMissionsRefreshedAt.split('T')[0]; // Get YYYY-MM-DD part
-      hasUsedRefresh = refreshedDate === todayDateString;
-    } else {
-      // Fallback to local state
-      hasUsedRefresh = refreshUsedDate === todayDateString;
-    }
+    if (hasGeneratedMissions && todayMissions.length > 0) {
+      let showRefreshCard = false;
 
-    if (hasGeneratedMissions && todayMissions.length > 0 && !hasUsedRefresh) {
-      const refreshPlaceholder: CarouselItem = { type: 'refresh', id: 'refresh-card' };
-      missions = [...missions, refreshPlaceholder];
+      if (isPremiumUser) {
+        // Premium: always show refresh card
+        showRefreshCard = true;
+      } else {
+        // Free: check if refresh was used today
+        const now = new Date();
+        const todayDateString = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+        let hasUsedRefresh = false;
+        if (isSyncInitialized && sharedMissionsRefreshedAt) {
+          const refreshedDate = sharedMissionsRefreshedAt.split('T')[0];
+          hasUsedRefresh = refreshedDate === todayDateString;
+        } else {
+          hasUsedRefresh = refreshUsedDate === todayDateString;
+        }
+
+        showRefreshCard = !hasUsedRefresh;
+      }
+
+      if (showRefreshCard) {
+        const refreshPlaceholder: CarouselItem = { type: 'refresh', id: 'refresh-card' };
+        missions = [...missions, refreshPlaceholder];
+      }
     }
 
     return missions;
@@ -1578,6 +1588,11 @@ export default function MissionScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Banner Ad - Fixed at bottom (Android only) */}
+      {Platform.OS === 'android' && (
+        <BannerAdView placement="home" style={[styles.bannerAd, { bottom: bannerAdBottom }]} />
+      )}
     </View>
   );
 }
@@ -1903,7 +1918,7 @@ const styles = StyleSheet.create({
   cardContainer: {
     flex: 1,
     justifyContent: 'center',
-    paddingBottom: scale(120),
+    paddingBottom: Platform.OS === 'android' ? scale(160) : scale(120),
   },
   carouselWrapper: {
     height: CARD_HEIGHT + scale(40),
@@ -2091,13 +2106,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: scale(SPACING.xl),
   },
   glassGenerateButton: {
-    paddingVertical: scale(18),
-    paddingHorizontal: scale(48),
+    paddingVertical: Platform.OS === 'android' ? scale(14) : scale(18),
+    paddingHorizontal: Platform.OS === 'android' ? scale(38) : scale(48),
     borderRadius: scale(100),
     overflow: 'hidden',
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: Platform.OS === 'android' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.15)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.25)',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   glassGenerateButtonText: {
     fontSize: scaleFont(16),
@@ -2283,5 +2298,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: scale(10),
+  },
+  bannerAd: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
   },
 });

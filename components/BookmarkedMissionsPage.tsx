@@ -12,7 +12,7 @@ import { useTranslation } from 'react-i18next';
 import { Image } from 'expo-image';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ChevronLeft, Bookmark, Trash2 } from 'lucide-react-native';
+import { ChevronLeft, Bookmark, Trash2, Check } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
 import { COLORS, SPACING } from '@/constants/design';
@@ -33,6 +33,14 @@ export function BookmarkedMissionsPage({ onBack }: BookmarkedMissionsPageProps) 
   // Subscribe to todayCompletedMission to trigger re-render when a mission is completed
   // This ensures Start buttons are properly disabled after completing any mission
   const { keptMissions, removeKeptMissionByKeptId, canStartMission, isTodayCompletedMission, todayCompletedMission } = useMissionStore();
+
+  // Helper to check if a bookmark is completed (has completed_at set)
+  const isBookmarkCompleted = useCallback((bookmark: BookmarkItem): boolean => {
+    if ('mission_data' in bookmark && 'completed_at' in bookmark) {
+      return bookmark.completed_at !== null && bookmark.completed_at !== undefined;
+    }
+    return false;
+  }, []);
   const { sharedBookmarks, removeBookmark, isInitialized: isSyncInitialized, lockedMissionId, allMissionProgress } = useCoupleSyncStore();
 
   // Check if another mission is in progress (locked but not completed)
@@ -157,18 +165,27 @@ export function BookmarkedMissionsPage({ onBack }: BookmarkedMissionsPageProps) 
           {bookmarks.map((bookmark) => {
             const mission = getMissionFromBookmark(bookmark);
             const bookmarkId = getBookmarkId(bookmark);
+            const isCompleted = isBookmarkCompleted(bookmark) || isTodayCompletedMission(mission.id);
 
             return (
               <View key={bookmarkId} style={styles.missionCard}>
                 <BlurView experimentalBlurMethod="dimezisBlurView" intensity={60} tint="default" style={StyleSheet.absoluteFill} />
                 <View style={styles.cardDarkOverlay} />
 
+                {/* Completed Badge */}
+                {isCompleted && (
+                  <View style={styles.completedBadge}>
+                    <Check color={COLORS.white} size={12} strokeWidth={3} />
+                    <Text style={styles.completedBadgeText}>{t('mission.completed')}</Text>
+                  </View>
+                )}
+
                 <View style={styles.cardInner}>
                   {/* Thumbnail */}
                   <View style={styles.thumbnailContainer}>
                     <Image
                       source={{ uri: `${mission.imageUrl}?w=300&h=400&fit=crop` }}
-                      style={styles.thumbnail}
+                      style={[styles.thumbnail, isCompleted && styles.thumbnailCompleted]}
                       contentFit="cover"
                       cachePolicy="memory-disk"
                       transition={200}
@@ -193,19 +210,20 @@ export function BookmarkedMissionsPage({ onBack }: BookmarkedMissionsPageProps) 
 
                     {/* Action Buttons */}
                     <View style={styles.actionButtonsRow}>
-                      {/* Start Button */}
+                      {/* Start Button - disabled if completed */}
                       <Pressable
                         style={[
                           styles.startButton,
-                          !canStartMission(mission.id) && !isTodayCompletedMission(mission.id) && styles.startButtonDisabled,
+                          (isCompleted || (!canStartMission(mission.id) && !isTodayCompletedMission(mission.id))) && styles.startButtonDisabled,
                         ]}
-                        onPress={() => handleMissionPress(mission.id)}
+                        onPress={() => !isCompleted && handleMissionPress(mission.id)}
+                        disabled={isCompleted}
                       >
                         <Text style={[
                           styles.startButtonText,
-                          !canStartMission(mission.id) && !isTodayCompletedMission(mission.id) && styles.startButtonTextDisabled,
+                          (isCompleted || (!canStartMission(mission.id) && !isTodayCompletedMission(mission.id))) && styles.startButtonTextDisabled,
                         ]}>
-                          {isTodayCompletedMission(mission.id)
+                          {isCompleted
                             ? t('mission.completed')
                             : (isAnotherMissionInProgress(mission.id) ? t('mission.anotherInProgress') : t('mission.start'))}
                         </Text>
@@ -384,6 +402,27 @@ const styles = StyleSheet.create({
   },
   startButtonTextDisabled: {
     color: 'rgba(255, 255, 255, 0.5)',
+  },
+  completedBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(76, 175, 80, 0.9)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    zIndex: 10,
+  },
+  completedBadgeText: {
+    fontSize: 11,
+    color: COLORS.white,
+    fontWeight: '700',
+  },
+  thumbnailCompleted: {
+    opacity: 0.5,
   },
 });
 

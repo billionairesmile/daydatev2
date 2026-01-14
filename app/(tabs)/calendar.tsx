@@ -5,7 +5,6 @@ import {
   StyleSheet,
   Dimensions,
   Pressable,
-  ScrollView,
   Animated,
   PanResponder,
   Modal,
@@ -15,6 +14,7 @@ import {
   Platform,
   Alert,
   InteractionManager,
+  ScrollView,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -37,7 +37,7 @@ import {
 
 import { useTranslation } from 'react-i18next';
 import { useFocusEffect } from 'expo-router';
-import { COLORS, SPACING, RADIUS, IS_TABLET, scale, scaleFont, ANDROID_BOTTOM_PADDING, BANNER_AD_BOTTOM } from '@/constants/design';
+import { COLORS, SPACING, RADIUS, IS_TABLET, scale, scaleFont, ANDROID_BOTTOM_PADDING } from '@/constants/design';
 import { useBackground } from '@/contexts';
 import { useMemoryStore, SAMPLE_MEMORIES } from '@/stores/memoryStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -45,6 +45,7 @@ import { useCoupleSyncStore, type SyncedTodo } from '@/stores/coupleSyncStore';
 import { useTimezoneStore } from '@/stores/timezoneStore';
 import { isDemoMode } from '@/lib/supabase';
 import { BannerAdView } from '@/components/ads';
+import { useBannerAdBottom } from '@/hooks/useConsistentBottomInset';
 
 const { width, height } = Dimensions.get('window');
 
@@ -353,6 +354,7 @@ export default function CalendarScreen() {
   const { memories, loadFromDB } = useMemoryStore();
   const { couple } = useAuthStore();
   const { getEffectiveTimezone } = useTimezoneStore();
+  const bannerAdBottom = useBannerAdBottom();
 
   // Track if navigation/interaction is complete for deferred operations
   const [isInteractionComplete, setIsInteractionComplete] = useState(false);
@@ -1041,10 +1043,10 @@ export default function CalendarScreen() {
         </Pressable>
       </View>
 
+
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
         scrollEnabled={scrollEnabled}
       >
         {/* Calendar Header - Month/Year with Navigation */}
@@ -1348,8 +1350,8 @@ export default function CalendarScreen() {
 
       </ScrollView>
 
-      {/* Banner Ad - Fixed at bottom above nav bar */}
-      <BannerAdView placement="calendar" style={styles.bannerAd} />
+      {/* Banner Ad - Fixed at bottom */}
+      <BannerAdView placement="calendar" style={[styles.bannerAd, { bottom: bannerAdBottom }]} />
 
       {/* Settings Modal */}
       <Modal
@@ -1735,10 +1737,16 @@ const styles = StyleSheet.create({
   },
   bannerAd: {
     position: 'absolute',
-    bottom: BANNER_AD_BOTTOM,
     left: 0,
     right: 0,
     alignItems: 'center',
+  },
+  inlineBannerContainer: {
+    alignItems: 'center',
+    paddingVertical: scale(8),
+  },
+  premiumSpacer: {
+    height: scale(16),
   },
   backgroundImage: {
     position: 'absolute',

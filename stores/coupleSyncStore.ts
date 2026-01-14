@@ -44,6 +44,7 @@ export interface SyncedBookmark {
   mission_data: Mission;
   bookmarked_by: string;
   created_at: string;
+  completed_at: string | null; // When the bookmarked mission was completed (null = not completed)
 }
 
 export interface MenstrualSettings {
@@ -194,8 +195,11 @@ interface CoupleSyncActions {
   // Bookmark sync
   addBookmark: (mission: Mission) => Promise<boolean>;
   removeBookmark: (missionId: string) => Promise<boolean>;
+  markBookmarkCompleted: (missionId: string) => Promise<boolean>;
+  cleanupCompletedBookmarks: () => Promise<void>;
   loadBookmarks: () => Promise<void>;
   isBookmarked: (missionId: string) => boolean;
+  isBookmarkCompleted: (missionId: string) => boolean;
 
   // Todo sync
   addTodo: (date: string, text: string) => Promise<SyncedTodo | null>;
@@ -1327,6 +1331,13 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     if (!coupleId || isInTestMode()) return;
 
     set({ isLoadingBookmarks: true });
+
+    // First, cleanup any expired completed bookmarks
+    await db.coupleBookmarks.cleanupCompleted(coupleId).catch((err) => {
+      console.warn('[Bookmark] Failed to cleanup completed bookmarks:', err);
+    });
+
+    // Then load the remaining bookmarks
     const { data, error } = await db.coupleBookmarks.getAll(coupleId);
     set({ isLoadingBookmarks: false });
 
@@ -1340,6 +1351,93 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
 
   isBookmarked: (missionId: string) => {
     return get().sharedBookmarks.some((b) => b.mission_id === missionId);
+  },
+
+  isBookmarkCompleted: (missionId: string) => {
+    const bookmark = get().sharedBookmarks.find((b) => b.mission_id === missionId);
+    return bookmark?.completed_at !== null && bookmark?.completed_at !== undefined;
+  },
+
+  // Mark a bookmark as completed (will be removed at noon the next day)
+  markBookmarkCompleted: async (missionId: string) => {
+    const { coupleId, sharedBookmarks } = get();
+
+    if (!coupleId || isInTestMode()) {
+      // Demo mode: update local state only
+      set({
+        sharedBookmarks: sharedBookmarks.map((b) =>
+          b.mission_id === missionId
+            ? { ...b, completed_at: new Date().toISOString() }
+            : b
+        ),
+      });
+      return true;
+    }
+
+    console.log('[Bookmark] Marking bookmark as completed:', missionId);
+
+    const { data, error } = await db.coupleBookmarks.markCompleted(coupleId, missionId);
+
+    if (error) {
+      console.warn('[Bookmark] DB mark completed failed:', error);
+      // Still update local state
+      set({
+        sharedBookmarks: sharedBookmarks.map((b) =>
+          b.mission_id === missionId
+            ? { ...b, completed_at: new Date().toISOString() }
+            : b
+        ),
+      });
+      return false;
+    }
+
+    // Success - update local state
+    set({
+      sharedBookmarks: sharedBookmarks.map((b) =>
+        b.mission_id === missionId
+          ? { ...b, completed_at: new Date().toISOString() }
+          : b
+      ),
+    });
+    console.log('[Bookmark] Successfully marked bookmark as completed');
+    return true;
+  },
+
+  // Cleanup completed bookmarks that have passed noon the next day
+  cleanupCompletedBookmarks: async () => {
+    const { coupleId, sharedBookmarks } = get();
+
+    if (!coupleId || isInTestMode()) {
+      // Demo mode: cleanup locally based on time threshold
+      const now = new Date();
+      const noonToday = new Date(now);
+      noonToday.setHours(12, 0, 0, 0);
+
+      set({
+        sharedBookmarks: sharedBookmarks.filter((b) => {
+          if (!b.completed_at) return true; // Keep non-completed bookmarks
+          const completedDate = new Date(b.completed_at);
+          const noonNextDay = new Date(completedDate);
+          noonNextDay.setDate(noonNextDay.getDate() + 1);
+          noonNextDay.setHours(12, 0, 0, 0);
+          return now < noonNextDay; // Keep if not yet past noon next day
+        }),
+      });
+      return;
+    }
+
+    console.log('[Bookmark] Cleaning up completed bookmarks...');
+
+    const { data, error } = await db.coupleBookmarks.cleanupCompleted(coupleId);
+
+    if (error) {
+      console.warn('[Bookmark] DB cleanup failed:', error);
+      return;
+    }
+
+    // Reload bookmarks to get updated list
+    await get().loadBookmarks();
+    console.log('[Bookmark] Cleanup complete, removed:', data);
   },
 
   // ============================================
@@ -1797,9 +1895,9 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
           console.error('[CoupleSyncStore] Failed to cancel reminder notifications:', err);
         });
 
-        // Auto-remove from bookmarks when mission is completed
-        get().removeBookmark(targetProgress.mission_id).catch((err) => {
-          console.warn('[CoupleSyncStore] Failed to auto-remove bookmark on mission complete:', err);
+        // Mark bookmark as completed (will be removed at noon the next day)
+        get().markBookmarkCompleted(targetProgress.mission_id).catch((err) => {
+          console.warn('[CoupleSyncStore] Failed to mark bookmark as completed:', err);
         });
       } else {
         updates.status = 'waiting_partner';
@@ -1833,9 +1931,9 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
         console.error('[CoupleSyncStore] Failed to cancel reminder notifications:', err);
       });
 
-      // Auto-remove from bookmarks when mission is completed
-      get().removeBookmark(targetProgress.mission_id).catch((err) => {
-        console.warn('[CoupleSyncStore] Failed to auto-remove bookmark on mission complete:', err);
+      // Mark bookmark as completed (will be removed at noon the next day)
+      get().markBookmarkCompleted(targetProgress.mission_id).catch((err) => {
+        console.warn('[CoupleSyncStore] Failed to mark bookmark as completed:', err);
       });
     } else if (partnerId) {
       // Mission not complete yet - notify partner that message was written

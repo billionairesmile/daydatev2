@@ -5,8 +5,8 @@ import {
   StyleSheet,
   Dimensions,
   Pressable,
-  ScrollView,
   Platform,
+  ScrollView,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Image as ExpoImage } from 'expo-image';
@@ -27,6 +27,8 @@ import { COLORS, SPACING, scale, scaleFont } from '@/constants/design';
 import { useBackground } from '@/contexts';
 import { useSubscriptionStore } from '@/stores';
 import { PremiumSubscriptionModal } from '@/components/premium';
+import { BannerAdView } from '@/components/ads';
+import { useBannerAdBottom } from '@/hooks/useConsistentBottomInset';
 
 const { width, height } = Dimensions.get('window');
 
@@ -46,6 +48,7 @@ export default function MoreScreen() {
   const { t } = useTranslation();
   const { backgroundImage } = useBackground();
   const router = useRouter();
+  const bannerAdBottom = useBannerAdBottom();
   const { isPremium, partnerIsPremium, plan } = useSubscriptionStore();
   // Combined premium status - user has premium benefits if they OR their partner has premium
   const hasPremiumAccess = isPremium || partnerIsPremium;
@@ -139,7 +142,6 @@ export default function MoreScreen() {
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
       >
         {/* Menu Sections */}
         {menuSections.map((section, sectionIndex) => (
@@ -195,6 +197,11 @@ export default function MoreScreen() {
         visible={showPremiumModal}
         onClose={() => setShowPremiumModal(false)}
       />
+
+      {/* Banner Ad - Fixed at bottom (Android only) */}
+      {Platform.OS === 'android' && (
+        <BannerAdView placement="home" style={[styles.bannerAd, { bottom: bannerAdBottom }]} />
+      )}
     </View>
   );
 }
@@ -331,5 +338,11 @@ const styles = StyleSheet.create({
   premiumDescription: {
     fontSize: scaleFont(13),
     color: '#666',
+  },
+  bannerAd: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
   },
 });

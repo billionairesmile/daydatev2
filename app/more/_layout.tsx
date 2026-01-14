@@ -1,12 +1,13 @@
 import { Stack } from 'expo-router';
+import { Platform } from 'react-native';
 
 export default function MoreLayout() {
   return (
     <Stack
       screenOptions={{
         headerShown: false,
-        animation: 'fade',
-        animationDuration: 100,
+        animation: Platform.OS === 'android' ? 'none' : 'fade',
+        animationDuration: Platform.OS === 'android' ? 0 : 100,
         gestureEnabled: false,
       }}
     >

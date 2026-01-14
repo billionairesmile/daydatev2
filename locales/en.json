@@ -725,6 +725,7 @@
       "connected": "Connected with partner!\nProceed to next step",
       "invalidCode": "Invalid code. Please check the code.",
       "alreadyPaired": "This code has already been used.",
+      "cannotUseSelfCode": "You cannot use your own code.\nPlease share the code with your partner.",
       "partnerNotReady": "Partner is not ready yet. Please try again later.",
       "connectionError": "An error occurred while connecting. Please try again.",
       "coupleRestoreError": "An error occurred while restoring couple data.",
