@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Tabs } from 'expo-router';
-import { StyleSheet, View, Pressable, Text, Animated, LayoutChangeEvent, Platform } from 'react-native';
+import { StyleSheet, View, Pressable, Text, Animated, LayoutChangeEvent, Platform, Dimensions } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Target, BookHeart, Home, Calendar, Menu } from 'lucide-react-native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
@@ -10,12 +10,46 @@ import { COLORS, IS_TABLET, scale, scaleFont } from '@/constants/design';
 import { useTabBarBottom } from '@/hooks/useConsistentBottomInset';
 import { useUIStore } from '@/stores/uiStore';
 
-// Platform-specific sizes to match visual appearance between Android and iOS
-// Android renders slightly larger, so we reduce Android sizes
-const TAB_ICON_SIZE = Platform.OS === 'android' ? scale(24) : scale(28);
-const TAB_LABEL_SIZE = Platform.OS === 'android' ? scaleFont(10) : scaleFont(11);
-const TAB_PADDING_VERTICAL = Platform.OS === 'android' ? scale(5) : scale(6);
-const TAB_INNER_PADDING = Platform.OS === 'android' ? scale(5) : scale(6);
+// Android responsive scaling based on screen dimensions
+// Base: 360dp width, 844dp height (standard Android phone)
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const ANDROID_BASE_WIDTH = 360;
+const ANDROID_BASE_HEIGHT = 844;
+
+// Width and height scale factors
+const ANDROID_WIDTH_SCALE = Platform.OS === 'android'
+  ? Math.min(SCREEN_WIDTH / ANDROID_BASE_WIDTH, 1.1)
+  : 1;
+const ANDROID_HEIGHT_SCALE = Platform.OS === 'android'
+  ? Math.max(Math.min(SCREEN_HEIGHT / ANDROID_BASE_HEIGHT, 1), 0.7)
+  : 1;
+
+// Combined scale for compact screens (use the smaller of width/height scale)
+const ANDROID_COMPACT_SCALE = Platform.OS === 'android'
+  ? Math.min(ANDROID_WIDTH_SCALE, ANDROID_HEIGHT_SCALE)
+  : 1;
+
+// Helper function for Android-only responsive scaling
+const androidScale = (size: number): number => {
+  if (Platform.OS !== 'android') return size;
+  return Math.round(size * ANDROID_COMPACT_SCALE);
+};
+
+// Platform-specific sizes with compact screen support
+// For screens with height < 700, use smaller sizes
+const IS_COMPACT_ANDROID = Platform.OS === 'android' && SCREEN_HEIGHT < 700;
+const TAB_ICON_SIZE = Platform.OS === 'android'
+  ? (IS_COMPACT_ANDROID ? scale(20) : androidScale(scale(24)))
+  : scale(28);
+const TAB_LABEL_SIZE = Platform.OS === 'android'
+  ? (IS_COMPACT_ANDROID ? scaleFont(8) : androidScale(scaleFont(10)))
+  : scaleFont(11);
+const TAB_PADDING_VERTICAL = Platform.OS === 'android'
+  ? (IS_COMPACT_ANDROID ? scale(3) : androidScale(scale(5)))
+  : scale(6);
+const TAB_INNER_PADDING = Platform.OS === 'android'
+  ? (IS_COMPACT_ANDROID ? scale(3) : androidScale(scale(5)))
+  : scale(6);
 
 function TabBarIcon({
   Icon,
@@ -223,9 +257,9 @@ const styles = StyleSheet.create({
     zIndex: 50,
   },
   tabBarOuter: {
-    width: IS_TABLET ? '60%' : '90%',
-    maxWidth: scale(400),
-    borderRadius: scale(100),
+    width: IS_TABLET ? '60%' : Platform.OS === 'android' ? (IS_COMPACT_ANDROID ? '82%' : '88%') : '90%',
+    maxWidth: Platform.OS === 'android' ? (IS_COMPACT_ANDROID ? scale(320) : androidScale(scale(380))) : scale(400),
+    borderRadius: Platform.OS === 'android' ? (IS_COMPACT_ANDROID ? scale(80) : androidScale(scale(100))) : scale(100),
     overflow: 'hidden',
     // Glass effect shadow
     shadowColor: '#000',

@@ -213,9 +213,13 @@ export default function MissionScreen() {
     resetGeneratedMissions,
     setRefreshUsedToday,
     hasUsedRefreshToday,
+    canPremiumRefresh,
+    incrementPremiumRefreshCount,
     generatedMissionData, // Subscribe to this state to trigger re-renders
     refreshUsedDate, // Subscribe to refreshUsedDate to trigger re-renders when refresh is used
     todayCompletedMission, // Subscribe to trigger re-renders when mission is completed (disables other Start buttons)
+    premiumRefreshCount, // Subscribe to trigger re-renders when premium refresh count changes
+    premiumRefreshDate, // Subscribe for date changes
   } = useMissionStore();
 
   // Couple sync state
@@ -323,7 +327,7 @@ export default function MissionScreen() {
     }
 
     // Add refresh card at the end
-    // Premium users: always show refresh card (unlimited regenerations)
+    // Premium users: show refresh card up to 5 times per day
     // Free users: only show if refresh not used today (1 refresh per day)
     const isPremiumUser = !shouldShowAds();
 
@@ -331,8 +335,8 @@ export default function MissionScreen() {
       let showRefreshCard = false;
 
       if (isPremiumUser) {
-        // Premium: always show refresh card
-        showRefreshCard = true;
+        // Premium: show refresh card only if under 5 refreshes today
+        showRefreshCard = canPremiumRefresh();
       } else {
         // Free: check if refresh was used today
         const now = new Date();
@@ -357,7 +361,7 @@ export default function MissionScreen() {
 
     return missions;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [todayMissions, featuredMissions, hasGeneratedMissions, shouldShowAds, adPosition, refreshUsedDate, isSyncInitialized, sharedMissionsRefreshedAt]);
+  }, [todayMissions, featuredMissions, hasGeneratedMissions, shouldShowAds, adPosition, refreshUsedDate, isSyncInitialized, sharedMissionsRefreshedAt, canPremiumRefresh, premiumRefreshCount, premiumRefreshDate]);
 
   // Force FlatList to render properly when missions change from empty to populated
   // This handles cases where the list mounts before React has finished updating
@@ -758,9 +762,10 @@ export default function MissionScreen() {
 
         const newMissions = getTodayMissions();
 
-        // Mark refresh as used for today (only once per day - applies to premium too)
+        // Mark refresh as used for today and increment premium refresh count
         if (newMissions.length > 0) {
           await setRefreshUsedToday();
+          incrementPremiumRefreshCount(); // Increment premium user's daily refresh count
         }
 
         // Prefetch all mission images before showing cards
@@ -1096,7 +1101,7 @@ export default function MissionScreen() {
     setCanMeetToday(null);
     setAvailableTime(null);
     setSelectedMoods([]);
-  }, [canMeetToday, availableTime, selectedMoods, isRefreshMode, generateTodayMissions, getTodayMissions, resetGeneratedMissions, resetAllMissions, setRefreshUsedToday, t, scrollX]);
+  }, [canMeetToday, availableTime, selectedMoods, isRefreshMode, generateTodayMissions, getTodayMissions, resetGeneratedMissions, resetAllMissions, setRefreshUsedToday, incrementPremiumRefreshCount, t, scrollX]);
 
   const toggleMood = (mood: TodayMood) => {
     if (selectedMoods.includes(mood)) {

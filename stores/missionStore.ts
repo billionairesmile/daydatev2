@@ -103,6 +103,10 @@ interface MissionActions {
   // Refresh tracking
   setRefreshUsedToday: () => Promise<void>;
   hasUsedRefreshToday: () => boolean;
+  // Premium refresh tracking (5 per day limit)
+  getPremiumRefreshCount: () => number;
+  canPremiumRefresh: () => boolean;
+  incrementPremiumRefreshCount: () => void;
   // In-progress mission actions
   saveInProgressMission: (data: Partial<InProgressMissionData> & { missionId: string }) => void;
   getInProgressMission: (missionId: string) => InProgressMissionData | null;
@@ -114,6 +118,8 @@ interface ExtendedMissionState extends MissionState {
   generatedMissionData: GeneratedMissionData | null;
   inProgressMissions: Record<string, InProgressMissionData>;
   refreshUsedDate: string | null; // Date when refresh was used (YYYY-MM-DD format)
+  premiumRefreshCount: number; // Count of premium user refreshes today
+  premiumRefreshDate: string | null; // Date for premium refresh tracking (YYYY-MM-DD format)
 }
 
 const initialState: ExtendedMissionState = {
@@ -124,6 +130,8 @@ const initialState: ExtendedMissionState = {
   generatedMissionData: null,
   inProgressMissions: {},
   refreshUsedDate: null,
+  premiumRefreshCount: 0,
+  premiumRefreshDate: null,
   isLoading: false,
   error: null,
 };
@@ -693,7 +701,7 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
 
       // Check and reset missions if date changed (called on app focus)
       checkAndResetMissions: () => {
-        const { generatedMissionData, inProgressMissions, refreshUsedDate } = get();
+        const { generatedMissionData, inProgressMissions, refreshUsedDate, premiumRefreshDate } = get();
         const today = getTodayDateString();
 
         // Reset generated missions if date changed
@@ -704,6 +712,11 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
         // Reset refresh used date if date changed
         if (refreshUsedDate && refreshUsedDate !== today) {
           set({ refreshUsedDate: null });
+        }
+
+        // Reset premium refresh count if date changed
+        if (premiumRefreshDate && premiumRefreshDate !== today) {
+          set({ premiumRefreshCount: 0, premiumRefreshDate: null });
         }
 
         // Clean up old in-progress missions (from previous days)
@@ -772,6 +785,52 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
         return refreshUsedDate === getTodayDateString();
       },
 
+      // Get premium user's refresh count for today
+      getPremiumRefreshCount: () => {
+        const { premiumRefreshCount, premiumRefreshDate } = get();
+        const today = getTodayDateString();
+
+        // If date changed, reset count
+        if (premiumRefreshDate !== today) {
+          return 0;
+        }
+        return premiumRefreshCount;
+      },
+
+      // Check if premium user can still refresh (5 per day limit)
+      canPremiumRefresh: () => {
+        const { premiumRefreshCount, premiumRefreshDate } = get();
+        const today = getTodayDateString();
+
+        // If date changed, can refresh (count is 0)
+        if (premiumRefreshDate !== today) {
+          return true;
+        }
+
+        // Premium users get 5 refreshes per day
+        const PREMIUM_REFRESH_LIMIT = 5;
+        return premiumRefreshCount < PREMIUM_REFRESH_LIMIT;
+      },
+
+      // Increment premium user's refresh count
+      incrementPremiumRefreshCount: () => {
+        const { premiumRefreshCount, premiumRefreshDate } = get();
+        const today = getTodayDateString();
+
+        // If date changed, start fresh count at 1
+        if (premiumRefreshDate !== today) {
+          set({
+            premiumRefreshCount: 1,
+            premiumRefreshDate: today,
+          });
+        } else {
+          // Increment existing count
+          set({
+            premiumRefreshCount: premiumRefreshCount + 1,
+          });
+        }
+      },
+
       // Save in-progress mission data (for persistence across navigation)
       saveInProgressMission: (data) => {
         const today = getTodayDateString();
@@ -835,6 +894,8 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
         missionHistory: state.missionHistory,
         inProgressMissions: state.inProgressMissions,
         refreshUsedDate: state.refreshUsedDate,
+        premiumRefreshCount: state.premiumRefreshCount,
+        premiumRefreshDate: state.premiumRefreshDate,
       }),
     }
   )

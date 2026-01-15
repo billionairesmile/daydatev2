@@ -8,6 +8,7 @@ import {
   Modal,
   ScrollView,
   TouchableWithoutFeedback,
+  TouchableOpacity,
   TextInput,
   KeyboardAvoidingView,
   Platform,
@@ -37,6 +38,56 @@ Asset.fromModule(LOGO_IMAGE).downloadAsync();
 Asset.fromModule(DEFAULT_BACKGROUND_IMAGE).downloadAsync();
 
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY, scale, scaleFont, IS_TABLET, ANDROID_BOTTOM_PADDING } from '@/constants/design';
+
+// Responsive Polaroid sizing
+// Base: iPhone 16 (393px width) with 280px polaroid = 71.2% ratio
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const POLAROID_BASE_WIDTH = 280;
+
+// Responsive height scaling for Android
+// Base height: 844 (iPhone 14 Pro / standard modern phone)
+const BASE_HEIGHT = 844;
+const HEIGHT_SCALE = Platform.OS === 'android'
+  ? Math.max(Math.min(SCREEN_HEIGHT / BASE_HEIGHT, 1), 0.75)
+  : 1; // iOS uses fixed sizes
+
+// Android width-based scaling for horizontal elements
+const BASE_WIDTH = 393; // iPhone 14 Pro width
+const WIDTH_SCALE = Platform.OS === 'android'
+  ? Math.max(Math.min(SCREEN_WIDTH / BASE_WIDTH, 1.1), 0.75)
+  : 1;
+
+// Helper function for responsive height scaling (Android only)
+const rh = (size: number): number => {
+  if (Platform.OS !== 'android') return size;
+  return Math.round(size * HEIGHT_SCALE);
+};
+
+// Helper function for responsive width scaling (Android only)
+const rw = (size: number): number => {
+  if (Platform.OS !== 'android') return size;
+  return Math.round(size * WIDTH_SCALE);
+};
+
+// Calculate responsive polaroid width and scale factor
+// For compact screens (height < 700), use smaller ratio
+const POLAROID_WIDTH_RATIO = Platform.OS === 'android' && SCREEN_HEIGHT < 700
+  ? 0.55  // Smaller ratio for compact Android screens
+  : 0.712;
+const POLAROID_WIDTH = IS_TABLET
+  ? Math.round(POLAROID_BASE_WIDTH * 0.75)
+  : Platform.OS === 'android'
+    ? Math.round(SCREEN_WIDTH * POLAROID_WIDTH_RATIO * HEIGHT_SCALE)
+    : Math.round(SCREEN_WIDTH * POLAROID_WIDTH_RATIO);
+const POLAROID_SCALE = POLAROID_WIDTH / POLAROID_BASE_WIDTH;
+
+// Helper to scale polaroid-related values proportionally
+const polaroidScale = (size: number): number => {
+  if (IS_TABLET) {
+    return Math.round(size * 0.75);
+  }
+  return Math.round(size * POLAROID_SCALE);
+};
 import { useBackground } from '@/contexts';
 import { useOnboardingStore, useAuthStore, useTimezoneStore } from '@/stores';
 import { BannerAdView } from '@/components/ads';
@@ -1172,16 +1223,20 @@ export default function HomeScreen() {
               {user2Nickname}
             </Text>
           </View>
-          <Pressable
+          <TouchableOpacity
             onPress={openAnniversaryModal}
             style={styles.anniversaryButton}
+            activeOpacity={0.7}
           >
-            {/* Day count in row - show "-" when anniversary date is not set */}
             <View style={styles.dDayRow}>
-              <Text style={styles.dDayNumber}>{diffDays !== null ? diffDays : '-'}</Text>
-              <Text style={styles.dDayUnit}>{t('common.daysCount')}</Text>
+              <Text style={styles.dDayNumber}>
+                {diffDays !== null ? diffDays : '-'}
+              </Text>
+              <Text style={styles.dDayUnit}>
+                {t('common.daysCount')}
+              </Text>
             </View>
-          </Pressable>
+          </TouchableOpacity>
         </View>
 
         {/* Polaroid centered */}
@@ -1217,7 +1272,7 @@ export default function HomeScreen() {
                   onLayout={measureButton}
                   style={styles.imageChangeButton}
                 >
-                  <ImageIcon color="#333" size={IS_TABLET ? 20 * 0.75 : scale(20)} />
+                  <ImageIcon color="#333" size={polaroidScale(20)} />
                 </Pressable>
               </View>
             </View>
@@ -1877,8 +1932,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: scale(SPACING.lg),
   },
   anniversarySection: {
-    paddingTop: scale(90),
-    paddingBottom: scale(SPACING.lg),
+    paddingTop: Platform.OS === 'android' && SCREEN_HEIGHT < 700
+      ? Math.max(scale(60) * HEIGHT_SCALE, 50)  // Smaller padding for compact screens
+      : Math.max(scale(90) * HEIGHT_SCALE, 70),
+    paddingBottom: Math.max(scale(SPACING.md) * HEIGHT_SCALE, 8),
     alignItems: 'center',
     backgroundColor: 'transparent',
   },
@@ -1886,10 +1943,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: scale(SPACING.xl),
+    marginBottom: Platform.OS === 'android' && SCREEN_HEIGHT < 700
+      ? Math.max(scale(SPACING.md) * HEIGHT_SCALE, 8)
+      : Math.max(scale(SPACING.xl) * HEIGHT_SCALE, 16),
   },
   coupleNameText: {
-    fontSize: scaleFont(18),
+    fontSize: Math.max(scaleFont(18) * HEIGHT_SCALE, 15), // Min 15pt for readability
     color: COLORS.white,
     fontFamily: TYPOGRAPHY.fontFamily.display,
     fontWeight: '400',
@@ -1909,53 +1968,58 @@ const styles = StyleSheet.create({
   },
   heartEmoji: {
     fontFamily: 'System',
-    fontSize: scaleFont(18),
+    fontSize: scaleFont(18) * HEIGHT_SCALE,
   },
   anniversaryButton: {
-    alignItems: 'center',
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'center',
     backgroundColor: 'transparent',
+    paddingVertical: 8,
   },
   dDayRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    backgroundColor: 'transparent',
+    minHeight: 50,
   },
   dDayNumber: {
-    fontSize: scaleFont(56),
-    color: COLORS.white,
-    fontFamily: TYPOGRAPHY.fontFamily.display,
-    fontWeight: '400',
-    letterSpacing: scale(1),
-    backgroundColor: 'transparent',
+    fontSize: Platform.OS === 'android' ? Math.max(rw(44), 36) : scaleFont(52),
+    color: '#FFFFFF',
+    fontFamily: Platform.OS === 'android' ? 'sans-serif' : undefined,
+    fontWeight: '300',
+    letterSpacing: 1,
     includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   dDayUnit: {
-    fontSize: scaleFont(26),
-    color: COLORS.white,
-    fontFamily: TYPOGRAPHY.fontFamily.display,
-    fontWeight: '400',
-    letterSpacing: scale(0.5),
-    marginLeft: scale(8),
-    backgroundColor: 'transparent',
+    fontSize: Platform.OS === 'android' ? Math.max(rw(20), 16) : scaleFont(24),
+    color: '#FFFFFF',
+    fontFamily: Platform.OS === 'android' ? 'sans-serif' : undefined,
+    fontWeight: '300',
+    letterSpacing: 0.5,
+    marginLeft: 6,
     includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   polaroidContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingBottom: scale(240),
+    paddingBottom: Platform.OS === 'android' && SCREEN_HEIGHT < 700
+      ? scale(180) * HEIGHT_SCALE  // Less padding for compact screens
+      : scale(240) * HEIGHT_SCALE,
   },
   polaroid: {
-    width: IS_TABLET ? 280 * 0.75 : scale(280),
+    width: POLAROID_WIDTH,
     backgroundColor: '#F8F6F1',
-    padding: IS_TABLET ? 16 * 0.75 : scale(16),
-    paddingBottom: IS_TABLET ? 60 * 0.75 : scale(60),
-    borderRadius: IS_TABLET ? 2 * 0.75 : scale(2),
+    padding: polaroidScale(16),
+    paddingBottom: polaroidScale(60),
+    borderRadius: polaroidScale(2),
     // Multi-layer shadow for realistic depth
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: IS_TABLET ? 12 * 0.75 : scale(12) },
+    shadowOffset: { width: 0, height: polaroidScale(12) },
     shadowOpacity: 0.25,
-    shadowRadius: IS_TABLET ? 20 * 0.75 : scale(20),
+    shadowRadius: polaroidScale(20),
     elevation: 15,
     position: 'relative',
     // Subtle border for paper edge effect
@@ -1981,19 +2045,19 @@ const styles = StyleSheet.create({
   },
   polaroidBottom: {
     position: 'absolute',
-    bottom: IS_TABLET ? -2 * 0.75 : scale(-2),
-    left: IS_TABLET ? 16 * 0.75 : scale(16),
-    right: IS_TABLET ? 12 * 0.75 : scale(12),
-    height: IS_TABLET ? 72 * 0.75 : scale(72),
+    bottom: polaroidScale(-2),
+    left: polaroidScale(16),
+    right: polaroidScale(12),
+    height: polaroidScale(72),
     justifyContent: 'flex-end',
   },
   sloganStrip: {
     position: 'relative',
-    paddingHorizontal: IS_TABLET ? 6 * 0.75 : scale(6),
-    paddingVertical: IS_TABLET ? 3 * 0.75 : scale(3),
+    paddingHorizontal: polaroidScale(6),
+    paddingVertical: polaroidScale(3),
     alignSelf: 'flex-start',
-    marginBottom: IS_TABLET ? -17 * 0.75 : scale(-17),
-    marginLeft: IS_TABLET ? 4 * 0.75 : scale(4),
+    marginBottom: polaroidScale(-17),
+    marginLeft: polaroidScale(4),
   },
   sloganWords: {
     flexDirection: 'row',
@@ -2015,8 +2079,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: IS_TABLET ? 14 * 0.75 : scale(14),
-    height: IS_TABLET ? 12 * 0.75 : scale(12),
+    bottom: polaroidScale(14),
+    height: polaroidScale(12),
     backgroundColor: '#DFD3C3',
     opacity: 0.7,
     transform: [{ rotate: '1deg' }],
@@ -2027,45 +2091,45 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   polaroidLogo: {
-    width: IS_TABLET ? 110 * 0.75 : scale(110),
-    height: IS_TABLET ? 40 * 0.75 : scale(40),
-    marginLeft: IS_TABLET ? 5 * 0.75 : scale(5),
-    marginBottom: IS_TABLET ? 7 * 0.75 : scale(7)
+    width: polaroidScale(110),
+    height: polaroidScale(40),
+    marginLeft: polaroidScale(5),
+    marginBottom: polaroidScale(7)
   },
   brandStrip: {
     position: 'relative',
-    paddingHorizontal: IS_TABLET ? 6 * 0.75 : scale(6),
-    paddingVertical: IS_TABLET ? 3 * 0.75 : scale(3),
+    paddingHorizontal: polaroidScale(6),
+    paddingVertical: polaroidScale(3),
     transform: [{ rotate: '1deg' }],
-    marginLeft: IS_TABLET ? 8 * 0.75 : scale(8),
+    marginLeft: polaroidScale(8),
   },
   highlighter: {
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: IS_TABLET ? 14 * 0.75 : scale(14),
-    height: IS_TABLET ? 12 * 0.75 : scale(12),
+    bottom: polaroidScale(14),
+    height: polaroidScale(12),
     backgroundColor: '#DFD3C3',
     opacity: 0.7,
     transform: [{ rotate: '-1deg' }],
   },
   polaroidSlogan: {
-    fontSize: IS_TABLET ? 26 * 0.75 : scaleFont(26),
+    fontSize: polaroidScale(26),
     color: '#4A4440',
     fontFamily: 'JustMeAgainDownHere',
     fontWeight: '500',
-    letterSpacing: IS_TABLET ? 0.5 * 0.75 : scale(0.5),
+    letterSpacing: polaroidScale(0.5),
   },
   polaroidBrand: {
-    fontSize: IS_TABLET ? 26 * 0.75 : scaleFont(26),
+    fontSize: polaroidScale(26),
     color: '#4A4440',
     fontFamily: 'JustMeAgainDownHere',
     fontWeight: '500',
-    letterSpacing: IS_TABLET ? 0.5 * 0.75 : scale(0.5),
+    letterSpacing: polaroidScale(0.5),
   },
   imageChangeButton: {
-    padding: IS_TABLET ? 6 * 0.75 : scale(6),
-    marginRight: IS_TABLET ? -4 * 0.75 : scale(-4),
+    padding: polaroidScale(6),
+    marginRight: polaroidScale(-4),
   },
   edgeHighlight: {
     position: 'absolute',

@@ -77,6 +77,15 @@ import { formatDateToLocal, parseDateFromLocal } from '@/lib/dateUtils';
 
 const { width, height } = Dimensions.get('window');
 
+// Responsive scaling for onboarding screens
+// Base height: 844 (iPhone 14 Pro / standard modern phone)
+// Scales down proportionally for smaller screens, caps at 1 for larger screens
+const BASE_HEIGHT = 844;
+const HEIGHT_SCALE = Math.min(height / BASE_HEIGHT, 1);
+
+// Responsive size function - scales any size based on screen height
+const rh = (size: number): number => Math.round(size * HEIGHT_SCALE);
+
 // UUID v4 generator function
 const generateUUID = (): string => {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
@@ -1277,17 +1286,18 @@ function WelcomeStep({ onSocialLogin, onEmailLogin }: {
 
   // Font and style settings per language
   // English/Spanish: Poetsen One, Japanese: Mochiy Pop One, Chinese: Chiron GoRound TC, Korean: Jua
+  // Responsive sizing using HEIGHT_SCALE
   const getTaglineStyle = () => {
     const lang = i18n.language;
     if (['en', 'es'].includes(lang)) {
-      return { font: 'PoetsenOne', letterSpacing: 0, lineHeight: 48, fontSize: 38, fontWeight: '400' as const };
+      return { font: 'PoetsenOne', letterSpacing: 0, lineHeight: rh(48), fontSize: rh(38), fontWeight: '400' as const };
     } else if (lang === 'ja') {
-      return { font: 'MochiyPopOne', letterSpacing: 0, lineHeight: 40, fontSize: 28, fontWeight: '400' as const };
+      return { font: 'MochiyPopOne', letterSpacing: 0, lineHeight: rh(40), fontSize: rh(28), fontWeight: '400' as const };
     } else if (lang === 'zh-TW') {
-      return { font: 'ChironGoRoundTC', letterSpacing: 0, lineHeight: 42, fontSize: 30, fontWeight: '400' as const };
+      return { font: 'ChironGoRoundTC', letterSpacing: 0, lineHeight: rh(42), fontSize: rh(30), fontWeight: '400' as const };
     }
     // Korean default
-    return { font: TYPOGRAPHY.fontFamily.display, letterSpacing: -1, lineHeight: 58, fontSize: 42, fontWeight: '400' as const };
+    return { font: TYPOGRAPHY.fontFamily.display, letterSpacing: -1, lineHeight: rh(58), fontSize: rh(42), fontWeight: '400' as const };
   };
   const taglineStyle = getTaglineStyle();
 
@@ -4277,7 +4287,7 @@ function PreferencesIntroStep({
   return (
     <View style={styles.centeredStepContainer}>
       {/* Title fixed at top */}
-      <View style={[styles.nicknameTitleContainer, { paddingTop: SPACING.xxxl + 60 }]}>
+      <View style={[styles.nicknameTitleContainer, { paddingTop: rh(SPACING.xxxl + 60) }]}>
         <Text style={styles.stepTitle}>
           {t('onboarding.preferencesIntro.title')}
         </Text>
@@ -4296,7 +4306,7 @@ function PreferencesIntroStep({
       </View>
 
       {/* Bottom button - consistent position with other steps */}
-      <View style={{ width: '100%', paddingBottom: SPACING.lg + ANDROID_BOTTOM_PADDING }}>
+      <View style={{ width: '100%', paddingBottom: rh(SPACING.lg) + ANDROID_BOTTOM_PADDING }}>
         <Pressable style={[styles.primaryButton, styles.primaryButtonFullWidth]} onPress={onNext}>
           <Text style={styles.primaryButtonText}>{t('onboarding.preferencesIntro.startAnalysis')}</Text>
         </Pressable>
@@ -4321,12 +4331,12 @@ function MBTIStep({
   return (
     <View style={styles.centeredStepContainer}>
       {/* Title at top */}
-      <View style={{ width: '100%', paddingHorizontal: SPACING.xl, paddingTop: SPACING.xxxl + 40, alignItems: 'center' }}>
+      <View style={{ width: '100%', paddingHorizontal: SPACING.xl, paddingTop: rh(SPACING.xxxl + 40), alignItems: 'center' }}>
         <Text style={styles.stepTitle}>{t('onboarding.mbti.title')}</Text>
       </View>
 
       {/* Centered content - moved up */}
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 150, width: '100%' }}>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-start', paddingTop: rh(150), width: '100%' }}>
         <View style={styles.mbtiGrid}>
           {MBTI_OPTIONS.map((option) => (
             <Pressable
@@ -4343,7 +4353,7 @@ function MBTIStep({
       </View>
 
       {/* Bottom button - consistent position */}
-      <View style={{ width: '100%', paddingBottom: SPACING.lg }}>
+      <View style={{ width: '100%', paddingBottom: rh(SPACING.lg) }}>
         <View style={styles.buttonRow}>
           <Pressable style={styles.secondaryButton} onPress={onBack}>
             <Text style={styles.secondaryButtonText}>{t('onboarding.previous')}</Text>
@@ -4387,7 +4397,7 @@ function ActivityTypeStep({
   return (
     <View style={styles.centeredStepContainer}>
       {/* Title at top */}
-      <View style={{ width: '100%', paddingHorizontal: SPACING.xl, paddingTop: SPACING.xxxl + 40, alignItems: 'center' }}>
+      <View style={{ width: '100%', paddingHorizontal: SPACING.xl, paddingTop: rh(SPACING.xxxl + 40), alignItems: 'center' }}>
         <Text style={styles.stepTitle}>{t('onboarding.preferences.title')}</Text>
         <Text style={styles.stepDescription}>
           {t('onboarding.preferences.subtitle')}
@@ -4398,7 +4408,7 @@ function ActivityTypeStep({
       <View style={styles.topCenteredContent}>
         <ScrollView
           style={{ width: '100%' }}
-          contentContainerStyle={{ alignItems: 'center', paddingBottom: SPACING.md }}
+          contentContainerStyle={{ alignItems: 'center', paddingBottom: rh(SPACING.md) }}
           showsVerticalScrollIndicator={false}
           nestedScrollEnabled={true}
           bounces={false}
@@ -4421,7 +4431,7 @@ function ActivityTypeStep({
       </View>
 
       {/* Bottom button - consistent position */}
-      <View style={{ width: '100%', paddingBottom: SPACING.lg }}>
+      <View style={{ width: '100%', paddingBottom: rh(SPACING.lg) }}>
         <View style={styles.buttonRow}>
           <Pressable style={styles.secondaryButton} onPress={onBack}>
             <Text style={styles.secondaryButtonText}>{t('onboarding.previous')}</Text>
@@ -4467,7 +4477,7 @@ function DateWorriesStep({
   return (
     <View style={styles.centeredStepContainer}>
       {/* Title at top */}
-      <View style={{ width: '100%', paddingHorizontal: SPACING.xl, paddingTop: SPACING.xxxl + 40, alignItems: 'center' }}>
+      <View style={{ width: '100%', paddingHorizontal: SPACING.xl, paddingTop: rh(SPACING.xxxl + 40), alignItems: 'center' }}>
         <Text style={styles.stepTitle}>
           {t('onboarding.concerns.title')}
         </Text>
@@ -4476,7 +4486,7 @@ function DateWorriesStep({
         </Text>
       </View>
 
-      <View style={[styles.topCenteredContent, { paddingTop: SPACING.lg }]}>
+      <View style={[styles.topCenteredContent, { paddingTop: rh(SPACING.lg) }]}>
         <ScrollView
           style={styles.dateWorryList}
           contentContainerStyle={styles.dateWorryContent}
@@ -4556,14 +4566,14 @@ function ConstraintsStep({
   return (
     <View style={styles.centeredStepContainer}>
       {/* Title at top */}
-      <View style={{ width: '100%', paddingHorizontal: SPACING.xl, paddingTop: SPACING.xxxl + 40, alignItems: 'center' }}>
+      <View style={{ width: '100%', paddingHorizontal: SPACING.xl, paddingTop: rh(SPACING.xxxl + 40), alignItems: 'center' }}>
         <Text style={styles.stepTitle}>{t('onboarding.constraints.title')}</Text>
         <Text style={styles.stepDescription}>
           {t('onboarding.constraints.subtitle')}
         </Text>
       </View>
 
-      <View style={[styles.topCenteredContent, { paddingTop: SPACING.lg }]}>
+      <View style={[styles.topCenteredContent, { paddingTop: rh(SPACING.lg) }]}>
         <View style={styles.constraintGrid}>
           {CONSTRAINT_OPTIONS.map((option) => (
             <Pressable
@@ -4623,7 +4633,7 @@ function CompleteStep({
         </Text>
       </View>
 
-      <View style={{ width: '100%', paddingBottom: SPACING.lg + ANDROID_BOTTOM_PADDING }}>
+      <View style={{ width: '100%', paddingBottom: rh(SPACING.lg) + ANDROID_BOTTOM_PADDING }}>
         <Pressable style={[styles.primaryButton, styles.primaryButtonFullWidth]} onPress={onComplete}>
           <Text style={styles.primaryButtonText}>{t('onboarding.start')}</Text>
         </Pressable>
@@ -4676,7 +4686,7 @@ const styles = StyleSheet.create({
   },
   progressContainer: {
     position: 'absolute',
-    top: scale(60),
+    top: rh(60),
     left: scale(SPACING.lg),
     right: scale(SPACING.lg),
     zIndex: 20,
@@ -4699,8 +4709,8 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: scale(SPACING.lg),
-    paddingTop: scale(90),
-    paddingBottom: scale(40),
+    paddingTop: rh(90),
+    paddingBottom: rh(40),
   },
   content: {
     flex: 1,
@@ -4718,16 +4728,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-start',
     paddingHorizontal: scale(SPACING.md),
-    paddingTop: scale(SPACING.xxxl + 40),
-    height: scale(180),
+    paddingTop: rh(SPACING.xxxl + 40),
+    height: rh(180),
   },
   nicknameCenterArea: {
     flex: 1,
     width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: scale(10),
-    paddingBottom: scale(200),
+    paddingTop: rh(10),
+    paddingBottom: rh(200),
     paddingHorizontal: scale(SPACING.md),
   },
   centeredContent: {
@@ -4735,14 +4745,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
-    paddingBottom: scale(100),
+    paddingBottom: rh(100),
   },
   welcomeCenteredContent: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
-    paddingBottom: scale(140),
+    paddingBottom: rh(140),
   },
   welcomeLogo: {
     width: scale(240),
@@ -4752,8 +4762,8 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: scale(60),
-    paddingBottom: scale(100),
+    paddingTop: rh(60),
+    paddingBottom: rh(100),
   },
   welcomeStepContainer: {
     flex: 1,
@@ -4763,7 +4773,7 @@ const styles = StyleSheet.create({
   welcomeTaglineContainer: {
     width: '100%',
     paddingHorizontal: '7.5%', // Match social login button left margin (85% width centered)
-    paddingTop: height * 0.10, // Responsive 10% from top
+    paddingTop: rh(84), // ~10% of base height (844)
     alignItems: 'flex-start',
   },
   welcomeTagline: {
@@ -4794,7 +4804,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'flex-start',
-    paddingTop: scale(SPACING.sm),
+    paddingTop: rh(SPACING.sm),
     width: '100%',
   },
   fixedHeaderArea: {
@@ -4804,7 +4814,7 @@ const styles = StyleSheet.create({
   bottomButtonArea: {
     width: '100%',
     alignItems: 'center',
-    paddingBottom: scale(SPACING.lg),
+    paddingBottom: rh(SPACING.lg),
   },
   welcomeContainer: {
     flex: 1,
@@ -4818,20 +4828,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   iconContainer: {
-    width: scale(96),
-    height: scale(96),
+    width: rh(96),
+    height: rh(96),
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: scale(SPACING.xxl),
+    marginBottom: rh(SPACING.xxl),
   },
   iconContainerSmall: {
-    width: scale(80),
-    height: scale(80),
-    borderRadius: scale(40),
+    width: rh(80),
+    height: rh(80),
+    borderRadius: rh(40),
     backgroundColor: 'rgba(0, 0, 0, 0.05)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: scale(SPACING.lg),
+    marginBottom: rh(SPACING.lg),
     borderWidth: scale(1),
     borderColor: 'rgba(0, 0, 0, 0.1)',
   },
@@ -4851,13 +4861,13 @@ const styles = StyleSheet.create({
     marginBottom: scale(SPACING.xxxl),
   },
   stepTitle: {
-    fontSize: scaleFont(28),
+    fontSize: rh(28),
     color: COLORS.black,
     fontWeight: '700',
     textAlign: 'center',
-    lineHeight: scale(36),
-    marginBottom: scale(SPACING.md),
-    minHeight: scale(72),
+    lineHeight: rh(36),
+    marginBottom: rh(SPACING.md),
+    minHeight: rh(72),
   },
   stepSubtitle: {
     fontSize: scaleFont(18),
@@ -4866,17 +4876,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   fixedTitleContainer: {
-    height: scale(80),
+    height: rh(80),
     justifyContent: 'center',
     alignItems: 'center',
     width: '100%',
   },
   stepDescription: {
-    fontSize: scaleFont(14),
+    fontSize: rh(14),
     color: 'rgba(0, 0, 0, 0.6)',
     textAlign: 'center',
-    lineHeight: scale(20),
-    marginBottom: scale(SPACING.md),
+    lineHeight: rh(20),
+    marginBottom: rh(SPACING.md),
   },
   sectionLabel: {
     fontSize: scaleFont(14),
@@ -4915,7 +4925,7 @@ const styles = StyleSheet.create({
   },
   buttonRow: {
     flexDirection: 'row',
-    gap: scale(12),
+    gap: rh(12),
     width: '100%',
     paddingBottom: ANDROID_BOTTOM_PADDING,
   },
@@ -4927,7 +4937,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: scale(52),
+    height: rh(52),
     backgroundColor: COLORS.black,
     borderRadius: scale(RADIUS.full),
   },
@@ -4939,7 +4949,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.1)',
   },
   primaryButtonText: {
-    fontSize: scaleFont(16),
+    fontSize: rh(16),
     color: COLORS.white,
     fontWeight: '600',
   },
@@ -4953,14 +4963,14 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    height: scale(52),
+    height: rh(52),
     backgroundColor: '#f5f5f5',
     borderRadius: scale(RADIUS.full),
     borderWidth: scale(1),
     borderColor: '#e0e0e0',
   },
   secondaryButtonText: {
-    fontSize: scaleFont(16),
+    fontSize: rh(16),
     color: COLORS.black,
     fontWeight: '600',
   },
@@ -4974,7 +4984,7 @@ const styles = StyleSheet.create({
   // Social Login Styles
   socialLoginContainer: {
     width: '100%',
-    marginBottom: scale(SPACING.lg),
+    marginBottom: rh(SPACING.lg),
   },
   socialButton: {
     flexDirection: 'row',
@@ -4982,9 +4992,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignSelf: 'center',
     width: '85%',
-    height: scale(50),
+    height: rh(50),
     borderRadius: scale(RADIUS.md),
-    marginBottom: scale(SPACING.lg),
+    marginBottom: rh(SPACING.md),
   },
   socialIconContainer: {
     width: IS_TABLET ? 24 : scale(24),
@@ -5124,15 +5134,15 @@ const styles = StyleSheet.create({
   },
   pairingContentArea: {
     width: '100%',
-    minHeight: scale(160),
-    marginBottom: scale(SPACING.lg),
+    minHeight: rh(160),
+    marginBottom: rh(SPACING.lg),
   },
   codeInputArea: {
     width: '100%',
   },
   codeDisplayContainer: {
     width: '100%',
-    padding: scale(SPACING.xl),
+    padding: rh(SPACING.xl),
     backgroundColor: '#f5f5f5',
     borderRadius: scale(RADIUS.md),
     borderWidth: scale(1),
@@ -5180,7 +5190,7 @@ const styles = StyleSheet.create({
   },
   logoutButton: {
     position: 'absolute',
-    top: scale(72),
+    top: rh(72),
     left: scale(SPACING.lg),
     flexDirection: 'row',
     alignItems: 'center',
@@ -5195,7 +5205,7 @@ const styles = StyleSheet.create({
   },
   deleteAccountButton: {
     position: 'absolute',
-    top: scale(72),
+    top: rh(72),
     right: scale(SPACING.lg),
     flexDirection: 'row',
     alignItems: 'center',
@@ -5585,13 +5595,13 @@ const styles = StyleSheet.create({
   mbtiGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: scale(10),
+    gap: rh(10),
     width: '100%',
-    marginBottom: scale(SPACING.xl),
+    marginBottom: rh(SPACING.xl),
   },
   mbtiButton: {
     width: scale((width - SPACING.lg * 2 - 30) / 4),
-    height: scale(44),
+    height: rh(44),
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#f5f5f5',
@@ -5604,7 +5614,7 @@ const styles = StyleSheet.create({
     borderColor: '#4CAF50',
   },
   mbtiButtonText: {
-    fontSize: scaleFont(13),
+    fontSize: rh(13),
     color: '#666',
     fontWeight: '600',
   },
@@ -5672,49 +5682,49 @@ const styles = StyleSheet.create({
   activityGrid3Col: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: scale(8),
+    gap: rh(8),
     width: '100%',
-    paddingTop: scale(SPACING.md),
+    paddingTop: rh(SPACING.md),
   },
   activityButton: {
     width: scale((width - SPACING.lg * 2 - 10) / 2),
-    paddingVertical: scale(16),
+    paddingVertical: rh(16),
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#f5f5f5',
     borderRadius: scale(RADIUS.md),
     borderWidth: scale(1),
     borderColor: '#e0e0e0',
-    gap: scale(6),
+    gap: rh(6),
   },
   activityButtonSmall: {
     width: scale((width - SPACING.lg * 2 - 16) / 3),
-    paddingVertical: scale(12),
+    paddingVertical: rh(12),
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#f5f5f5',
     borderRadius: scale(RADIUS.sm),
     borderWidth: scale(1),
     borderColor: '#e0e0e0',
-    gap: scale(4),
+    gap: rh(4),
   },
   activityButtonActive: {
     backgroundColor: '#e8f5e9',
     borderColor: '#4CAF50',
   },
   activityIcon: {
-    fontSize: scaleFont(24),
+    fontSize: rh(24),
   },
   activityIconSmall: {
-    fontSize: scaleFont(20),
+    fontSize: rh(20),
   },
   activityButtonText: {
-    fontSize: scaleFont(13),
+    fontSize: rh(13),
     color: '#666',
     fontWeight: '500',
   },
   activityButtonTextSmall: {
-    fontSize: scaleFont(11),
+    fontSize: rh(11),
     color: '#666',
     fontWeight: '500',
   },
@@ -5723,18 +5733,18 @@ const styles = StyleSheet.create({
   },
   dateWorryList: {
     width: '100%',
-    maxHeight: scale(420),
+    maxHeight: rh(420),
   },
   dateWorryContent: {
-    gap: scale(10),
-    paddingBottom: scale(SPACING.md),
+    gap: rh(10),
+    paddingBottom: rh(SPACING.md),
   },
   dateWorryButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     width: '100%',
-    paddingVertical: scale(14),
+    paddingVertical: rh(14),
     paddingHorizontal: scale(SPACING.lg),
     backgroundColor: '#f5f5f5',
     borderRadius: scale(RADIUS.md),
@@ -5751,10 +5761,10 @@ const styles = StyleSheet.create({
     gap: scale(SPACING.md),
   },
   dateWorryIcon: {
-    fontSize: scaleFont(20),
+    fontSize: rh(20),
   },
   dateWorryButtonText: {
-    fontSize: scaleFont(14),
+    fontSize: rh(14),
     color: '#666',
     fontWeight: '500',
   },
@@ -5770,30 +5780,30 @@ const styles = StyleSheet.create({
   constraintGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: scale(10),
+    gap: rh(10),
     width: '100%',
-    marginBottom: scale(SPACING.xl),
+    marginBottom: rh(SPACING.xl),
   },
   constraintButton: {
     width: scale((width - SPACING.lg * 2 - 10) / 2),
-    paddingVertical: scale(16),
+    paddingVertical: rh(16),
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#f5f5f5',
     borderRadius: scale(RADIUS.md),
     borderWidth: scale(1),
     borderColor: '#e0e0e0',
-    gap: scale(6),
+    gap: rh(6),
   },
   constraintButtonActive: {
     backgroundColor: '#e8f5e9',
     borderColor: '#4CAF50',
   },
   constraintIcon: {
-    fontSize: scaleFont(24),
+    fontSize: rh(24),
   },
   constraintButtonText: {
-    fontSize: scaleFont(13),
+    fontSize: rh(13),
     color: '#666',
     fontWeight: '500',
   },
@@ -5826,25 +5836,25 @@ const styles = StyleSheet.create({
     color: COLORS.black,
   },
   celebrationIconContainer: {
-    width: scale(96),
-    height: scale(96),
+    width: rh(96),
+    height: rh(96),
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: scale(SPACING.xxl),
+    marginBottom: rh(SPACING.xxl),
   },
   celebrationTitle: {
-    fontSize: scaleFont(36),
+    fontSize: rh(36),
     color: COLORS.black,
     fontWeight: '700',
     textAlign: 'center',
-    marginBottom: scale(SPACING.md),
+    marginBottom: rh(SPACING.md),
   },
   celebrationDescription: {
-    fontSize: scaleFont(16),
+    fontSize: rh(16),
     color: 'rgba(0, 0, 0, 0.7)',
     textAlign: 'center',
-    lineHeight: scale(24),
-    marginBottom: scale(SPACING.xxxl),
+    lineHeight: rh(24),
+    marginBottom: rh(SPACING.xxxl),
   },
   confettiContainer: {
     position: 'absolute',
@@ -5924,11 +5934,11 @@ const styles = StyleSheet.create({
   },
   basicInfoScrollContent: {
     paddingHorizontal: scale(SPACING.md),
-    paddingTop: scale(SPACING.lg),
-    paddingBottom: scale(SPACING.xxxl),
+    paddingTop: rh(SPACING.lg),
+    paddingBottom: rh(SPACING.xxxl),
   },
   basicInfoSection: {
-    marginBottom: scale(SPACING.huge),
+    marginBottom: rh(SPACING.huge),
   },
   basicInfoLabel: {
     fontSize: scaleFont(16),

@@ -59,7 +59,7 @@
         "android.permission.ACTIVITY_RECOGNITION",
         "android.permission.READ_MEDIA_VIDEO"
       ],
-      "versionCode": 12
+      "versionCode": 13
     },
     "web": {
       "bundler": "metro",
