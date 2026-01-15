@@ -37,7 +37,7 @@ const DEFAULT_BACKGROUND_IMAGE = require('@/assets/images/backgroundimage.jpg');
 Asset.fromModule(LOGO_IMAGE).downloadAsync();
 Asset.fromModule(DEFAULT_BACKGROUND_IMAGE).downloadAsync();
 
-import { COLORS, SPACING, RADIUS, TYPOGRAPHY, scale, scaleFont, IS_TABLET, ANDROID_BOTTOM_PADDING } from '@/constants/design';
+import { COLORS, SPACING, RADIUS, scale, scaleFont, IS_TABLET } from '@/constants/design';
 
 // Responsive Polaroid sizing
 // Base: iPhone 16 (393px width) with 280px polaroid = 71.2% ratio
@@ -1950,11 +1950,11 @@ const styles = StyleSheet.create({
   coupleNameText: {
     fontSize: Math.max(scaleFont(18) * HEIGHT_SCALE, 15), // Min 15pt for readability
     color: COLORS.white,
-    fontFamily: TYPOGRAPHY.fontFamily.display,
-    fontWeight: '400',
+    fontFamily: 'Jua', // Use Jua directly for better Android compatibility
     letterSpacing: scale(0.5),
     opacity: 0.95,
     backgroundColor: 'transparent',
+    includeFontPadding: false, // Android: remove extra padding
   },
   coupleNameLeft: {
     flex: 1,
@@ -1985,8 +1985,7 @@ const styles = StyleSheet.create({
   dDayNumber: {
     fontSize: Platform.OS === 'android' ? Math.max(rw(44), 36) : scaleFont(52),
     color: '#FFFFFF',
-    fontFamily: Platform.OS === 'android' ? 'sans-serif' : undefined,
-    fontWeight: '300',
+    fontFamily: 'Jua',
     letterSpacing: 1,
     includeFontPadding: false,
     textAlignVertical: 'center',
@@ -1994,8 +1993,7 @@ const styles = StyleSheet.create({
   dDayUnit: {
     fontSize: Platform.OS === 'android' ? Math.max(rw(20), 16) : scaleFont(24),
     color: '#FFFFFF',
-    fontFamily: Platform.OS === 'android' ? 'sans-serif' : undefined,
-    fontWeight: '300',
+    fontFamily: 'Jua',
     letterSpacing: 0.5,
     marginLeft: 6,
     includeFontPadding: false,
