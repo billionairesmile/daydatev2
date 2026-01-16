@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Dimensions,
   Pressable,
   Modal,
   ScrollView,
@@ -37,55 +36,21 @@ const DEFAULT_BACKGROUND_IMAGE = require('@/assets/images/backgroundimage.jpg');
 Asset.fromModule(LOGO_IMAGE).downloadAsync();
 Asset.fromModule(DEFAULT_BACKGROUND_IMAGE).downloadAsync();
 
-import { COLORS, SPACING, RADIUS, scale, scaleFont, IS_TABLET } from '@/constants/design';
+import { COLORS, SPACING, RADIUS, rs, fp, SCREEN_WIDTH, SCREEN_HEIGHT, rw, rh, isCompactHeight } from '@/constants/design';
 
 // Responsive Polaroid sizing
 // Base: iPhone 16 (393px width) with 280px polaroid = 71.2% ratio
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const POLAROID_BASE_WIDTH = 280;
-
-// Responsive height scaling for Android
-// Base height: 844 (iPhone 14 Pro / standard modern phone)
-const BASE_HEIGHT = 844;
-const HEIGHT_SCALE = Platform.OS === 'android'
-  ? Math.max(Math.min(SCREEN_HEIGHT / BASE_HEIGHT, 1), 0.75)
-  : 1; // iOS uses fixed sizes
-
-// Android width-based scaling for horizontal elements
-const BASE_WIDTH = 393; // iPhone 14 Pro width
-const WIDTH_SCALE = Platform.OS === 'android'
-  ? Math.max(Math.min(SCREEN_WIDTH / BASE_WIDTH, 1.1), 0.75)
-  : 1;
-
-// Helper function for responsive height scaling (Android only)
-const rh = (size: number): number => {
-  if (Platform.OS !== 'android') return size;
-  return Math.round(size * HEIGHT_SCALE);
-};
-
-// Helper function for responsive width scaling (Android only)
-const rw = (size: number): number => {
-  if (Platform.OS !== 'android') return size;
-  return Math.round(size * WIDTH_SCALE);
-};
 
 // Calculate responsive polaroid width and scale factor
 // For compact screens (height < 700), use smaller ratio
-const POLAROID_WIDTH_RATIO = Platform.OS === 'android' && SCREEN_HEIGHT < 700
-  ? 0.55  // Smaller ratio for compact Android screens
-  : 0.712;
-const POLAROID_WIDTH = IS_TABLET
-  ? Math.round(POLAROID_BASE_WIDTH * 0.75)
-  : Platform.OS === 'android'
-    ? Math.round(SCREEN_WIDTH * POLAROID_WIDTH_RATIO * HEIGHT_SCALE)
-    : Math.round(SCREEN_WIDTH * POLAROID_WIDTH_RATIO);
+// Android: slightly larger ratio (0.75) for better visual balance
+const POLAROID_WIDTH_RATIO = isCompactHeight() ? 0.55 : (Platform.OS === 'android' ? 0.75 : 0.712);
+const POLAROID_WIDTH = Math.round(SCREEN_WIDTH * POLAROID_WIDTH_RATIO);
 const POLAROID_SCALE = POLAROID_WIDTH / POLAROID_BASE_WIDTH;
 
 // Helper to scale polaroid-related values proportionally
 const polaroidScale = (size: number): number => {
-  if (IS_TABLET) {
-    return Math.round(size * 0.75);
-  }
   return Math.round(size * POLAROID_SCALE);
 };
 import { useBackground } from '@/contexts';
@@ -153,8 +118,10 @@ const getNextBirthdayDate = (birthDate: Date, isLunar: boolean, today: Date): Da
   }
 };
 
-const { width, height } = Dimensions.get('window');
-const { height: screenHeight } = Dimensions.get('screen');
+// Use responsive screen dimensions from design
+const width = SCREEN_WIDTH;
+const height = SCREEN_HEIGHT;
+const screenHeight = SCREEN_HEIGHT;
 
 // Anniversary type definition (local display type, extends service type)
 interface Anniversary {
@@ -222,7 +189,7 @@ function SwipeableAnniversaryCard({ anniversary, onEdit, onDelete, isCustom, t }
             onEdit();
           }}
         >
-          <Edit2 color="#000000" size={scale(20)} />
+          <Edit2 color="#000000" size={rs(20)} />
           <Text style={swipeStyles.editActionText}>{t('common.edit')}</Text>
         </Pressable>
         <Pressable
@@ -232,7 +199,7 @@ function SwipeableAnniversaryCard({ anniversary, onEdit, onDelete, isCustom, t }
             onDelete();
           }}
         >
-          <Trash2 color="#FFFFFF" size={scale(20)} />
+          <Trash2 color="#FFFFFF" size={rs(20)} />
           <Text style={swipeStyles.actionText}>{t('common.delete')}</Text>
         </Pressable>
       </Animated.View>
@@ -242,10 +209,10 @@ function SwipeableAnniversaryCard({ anniversary, onEdit, onDelete, isCustom, t }
   // Calculate dynamic font size for long labels (EN, ES tend to be longer)
   const getLabelFontSize = (label: string) => {
     const length = label.length;
-    if (length > 25) return scaleFont(12);
-    if (length > 20) return scaleFont(13);
-    if (length > 15) return scaleFont(14);
-    return scaleFont(15);
+    if (length > 25) return fp(12);
+    if (length > 20) return fp(13);
+    if (length > 15) return fp(14);
+    return fp(15);
   };
 
   const labelFontSize = getLabelFontSize(anniversary.label);
@@ -299,54 +266,54 @@ function SwipeableAnniversaryCard({ anniversary, onEdit, onDelete, isCustom, t }
 
 const swipeStyles = StyleSheet.create({
   container: {
-    marginBottom: scale(8),
-    borderRadius: scale(20),
+    marginBottom: rs(8),
+    borderRadius: rs(20),
     overflow: 'hidden',
   },
   swipeableContainer: {
-    borderRadius: scale(20),
+    borderRadius: rs(20),
     overflow: 'hidden',
   },
   actionsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingLeft: scale(12),
-    gap: scale(8),
+    paddingLeft: rs(12),
+    gap: rs(8),
   },
   editButton: {
-    width: scale(50),
-    height: scale(50),
+    width: rs(50),
+    height: rs(50),
     backgroundColor: '#FFFFFF',
-    borderRadius: scale(25),
+    borderRadius: rs(25),
     alignItems: 'center',
     justifyContent: 'center',
   },
   editActionText: {
     color: '#000000',
-    fontSize: scaleFont(10),
+    fontSize: fp(10),
     fontWeight: '600',
-    marginTop: scale(2),
+    marginTop: rs(2),
   },
   deleteButton: {
-    width: scale(50),
-    height: scale(50),
+    width: rs(50),
+    height: rs(50),
     backgroundColor: '#EF4444',
-    borderRadius: scale(25),
+    borderRadius: rs(25),
     alignItems: 'center',
     justifyContent: 'center',
   },
   actionText: {
     color: '#FFFFFF',
-    fontSize: scaleFont(10),
+    fontSize: fp(10),
     fontWeight: '600',
-    marginTop: scale(2),
+    marginTop: rs(2),
   },
   card: {
-    borderRadius: scale(20),
-    paddingVertical: scale(12),
-    paddingHorizontal: scale(16),
+    borderRadius: rs(20),
+    paddingVertical: rs(12),
+    paddingHorizontal: rs(16),
     width: '100%',
-    minHeight: scale(70),
+    minHeight: rs(70),
     justifyContent: 'center',
   },
   cardContent: {
@@ -357,33 +324,33 @@ const swipeStyles = StyleSheet.create({
   cardLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: scale(12),
+    gap: rs(12),
     flex: 1,
-    marginRight: scale(8),
+    marginRight: rs(8),
   },
   labelContainer: {
     flex: 1,
   },
   icon: {
-    fontSize: scaleFont(28),
+    fontSize: fp(28),
   },
   label: {
-    fontSize: scaleFont(15),
+    fontSize: fp(15),
     fontWeight: '600',
     color: '#FFFFFF',
   },
   date: {
-    fontSize: scaleFont(12),
+    fontSize: fp(12),
     color: 'rgba(255, 255, 255, 0.7)',
-    marginTop: scale(2),
+    marginTop: rs(2),
   },
   badge: {
-    paddingHorizontal: scale(14),
-    paddingVertical: scale(8),
-    borderRadius: scale(20),
+    paddingHorizontal: rs(14),
+    paddingVertical: rs(8),
+    borderRadius: rs(20),
   },
   dDay: {
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     fontWeight: '700',
     color: '#FFFFFF',
   },
@@ -662,11 +629,18 @@ export default function HomeScreen() {
     }
   };
 
-  // Anniversary modal animation (scale + opacity like album modal)
-  const anniversaryModalOpacity = useRef(new Animated.Value(0)).current;
-  const anniversaryModalScale = useRef(new Animated.Value(0.9)).current;
+  // Anniversary modal animation (scale + opacity like album modal, iOS only)
+  const anniversaryModalOpacity = useRef(new Animated.Value(Platform.OS === 'android' ? 1 : 0)).current;
+  const anniversaryModalScale = useRef(new Animated.Value(Platform.OS === 'android' ? 1 : 0.9)).current;
 
   const openAnniversaryModal = () => {
+    // Android: Skip animation
+    if (Platform.OS === 'android') {
+      anniversaryModalOpacity.setValue(1);
+      anniversaryModalScale.setValue(1);
+      setShowAnniversaryModal(true);
+      return;
+    }
     anniversaryModalOpacity.setValue(0);
     anniversaryModalScale.setValue(0.9);
     setShowAnniversaryModal(true);
@@ -686,6 +660,11 @@ export default function HomeScreen() {
   };
 
   const closeAnniversaryModal = () => {
+    // Android: Close immediately
+    if (Platform.OS === 'android') {
+      setShowAnniversaryModal(false);
+      return;
+    }
     Animated.parallel([
       Animated.timing(anniversaryModalScale, {
         toValue: 0.9,
@@ -1293,7 +1272,7 @@ export default function HomeScreen() {
       <Modal
         visible={showAnniversaryModal}
         transparent
-        animationType="none"
+        animationType="fade"
         onRequestClose={() => {
           if (anniversaryModalStep === 'list') {
             closeAnniversaryModal();
@@ -1306,7 +1285,7 @@ export default function HomeScreen() {
           }
         }}
       >
-        <Animated.View style={[styles.blurContainer, { opacity: anniversaryModalOpacity }]}>
+        <View style={styles.blurContainer}>
           <BlurView experimentalBlurMethod="dimezisBlurView" intensity={80} tint="dark" style={styles.blurOverlay}>
             <TouchableWithoutFeedback onPress={() => {
               if (anniversaryModalStep === 'list') {
@@ -1318,17 +1297,14 @@ export default function HomeScreen() {
 
             {/* Step: List */}
             {anniversaryModalStep === 'list' && (
-              <Animated.View style={[
-                styles.anniversaryModalContent,
-                { transform: [{ scale: anniversaryModalScale }] }
-              ]}>
+              <View style={styles.anniversaryModalContent}>
                 <View style={styles.anniversaryModalHeader}>
                   <Text style={styles.anniversaryModalTitle}>{t('home.anniversary.title')}</Text>
                   <Pressable
                     onPress={closeAnniversaryModal}
                     style={styles.modalCloseButton}
                   >
-                    <X color="rgba(255,255,255,0.8)" size={scale(20)} />
+                    <X color="rgba(255,255,255,0.8)" size={rs(20)} />
                   </Pressable>
                 </View>
                 <View style={styles.anniversaryHeaderDivider} />
@@ -1358,7 +1334,7 @@ export default function HomeScreen() {
                     <Text style={styles.addAnniversaryText}>{t('home.anniversary.add')}</Text>
                   </Pressable>
                 </View>
-              </Animated.View>
+              </View>
             )}
 
             {/* Step: Add */}
@@ -1374,7 +1350,7 @@ export default function HomeScreen() {
                       onPress={goToListStep}
                       style={styles.modalCloseButton}
                     >
-                      <X color="rgba(255,255,255,0.8)" size={scale(20)} />
+                      <X color="rgba(255,255,255,0.8)" size={rs(20)} />
                     </Pressable>
                   </View>
                   <View style={styles.anniversaryHeaderDivider} />
@@ -1403,7 +1379,7 @@ export default function HomeScreen() {
                             onPress={() => setShowEmojiPicker(false)}
                           >
                             <Text style={[
-                              { color: newAnniversaryName ? COLORS.white : 'rgba(255,255,255,0.4)', fontSize: scaleFont(15) }
+                              { color: newAnniversaryName ? COLORS.white : 'rgba(255,255,255,0.4)', fontSize: fp(15) }
                             ]}>
                               {newAnniversaryName || t('home.anniversary.namePlaceholder')}
                             </Text>
@@ -1487,7 +1463,7 @@ export default function HomeScreen() {
                     onPress={() => goToAddFromDatePicker()}
                     style={styles.modalCloseButton}
                   >
-                    <X color="rgba(255,255,255,0.8)" size={scale(20)} />
+                    <X color="rgba(255,255,255,0.8)" size={rs(20)} />
                   </Pressable>
                 </View>
                 <View style={styles.anniversaryHeaderDivider} />
@@ -1498,7 +1474,7 @@ export default function HomeScreen() {
                       onPress={() => setPickerMonth(new Date(pickerMonth.getFullYear(), pickerMonth.getMonth() - 1, 1))}
                       style={styles.pickerNavButton}
                     >
-                      <ChevronLeft color={COLORS.white} size={scale(18)} />
+                      <ChevronLeft color={COLORS.white} size={rs(18)} />
                     </Pressable>
                     <Text style={styles.pickerMonthText}>
                       {i18n.language === 'ko'
@@ -1509,7 +1485,7 @@ export default function HomeScreen() {
                       onPress={() => setPickerMonth(new Date(pickerMonth.getFullYear(), pickerMonth.getMonth() + 1, 1))}
                       style={styles.pickerNavButton}
                     >
-                      <ChevronRight color={COLORS.white} size={scale(18)} />
+                      <ChevronRight color={COLORS.white} size={rs(18)} />
                     </Pressable>
                   </View>
 
@@ -1581,7 +1557,7 @@ export default function HomeScreen() {
                       }}
                       style={styles.modalCloseButton}
                     >
-                      <X color="rgba(255,255,255,0.8)" size={scale(20)} />
+                      <X color="rgba(255,255,255,0.8)" size={rs(20)} />
                     </Pressable>
                   </View>
                   <View style={styles.anniversaryHeaderDivider} />
@@ -1610,7 +1586,7 @@ export default function HomeScreen() {
                             onPress={() => setShowEditEmojiPicker(false)}
                           >
                             <Text style={[
-                              { color: editAnniversaryName ? COLORS.white : 'rgba(255,255,255,0.4)', fontSize: scaleFont(15) }
+                              { color: editAnniversaryName ? COLORS.white : 'rgba(255,255,255,0.4)', fontSize: fp(15) }
                             ]}>
                               {editAnniversaryName || t('home.anniversary.namePlaceholder')}
                             </Text>
@@ -1694,7 +1670,7 @@ export default function HomeScreen() {
                     onPress={() => goToEditFromDatePicker()}
                     style={styles.modalCloseButton}
                   >
-                    <X color="rgba(255,255,255,0.8)" size={scale(20)} />
+                    <X color="rgba(255,255,255,0.8)" size={rs(20)} />
                   </Pressable>
                 </View>
                 <View style={styles.anniversaryHeaderDivider} />
@@ -1705,7 +1681,7 @@ export default function HomeScreen() {
                       onPress={() => setEditPickerMonth(new Date(editPickerMonth.getFullYear(), editPickerMonth.getMonth() - 1, 1))}
                       style={styles.pickerNavButton}
                     >
-                      <ChevronLeft color={COLORS.white} size={scale(18)} />
+                      <ChevronLeft color={COLORS.white} size={rs(18)} />
                     </Pressable>
                     <Text style={styles.pickerMonthText}>
                       {i18n.language === 'ko'
@@ -1716,7 +1692,7 @@ export default function HomeScreen() {
                       onPress={() => setEditPickerMonth(new Date(editPickerMonth.getFullYear(), editPickerMonth.getMonth() + 1, 1))}
                       style={styles.pickerNavButton}
                     >
-                      <ChevronRight color={COLORS.white} size={scale(18)} />
+                      <ChevronRight color={COLORS.white} size={rs(18)} />
                     </Pressable>
                   </View>
 
@@ -1772,14 +1748,14 @@ export default function HomeScreen() {
               </View>
             )}
           </BlurView>
-        </Animated.View>
+        </View>
       </Modal>
 
       {/* Image Picker Modal with Blur */}
       <Modal
         visible={showImagePickerModal}
         transparent
-        animationType="fade"
+        animationType={Platform.OS === 'android' ? 'none' : 'fade'}
         onRequestClose={() => setShowImagePickerModal(false)}
       >
         <Pressable
@@ -1795,7 +1771,7 @@ export default function HomeScreen() {
                     onPress={() => setShowImagePickerModal(false)}
                     style={styles.modalCloseButton}
                   >
-                    <X color={COLORS.white} size={scale(18)} />
+                    <X color={COLORS.white} size={rs(18)} />
                   </Pressable>
                 </View>
 
@@ -1929,13 +1905,13 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: scale(SPACING.lg),
+    paddingHorizontal: rs(SPACING.lg),
   },
   anniversarySection: {
     paddingTop: Platform.OS === 'android' && SCREEN_HEIGHT < 700
-      ? Math.max(scale(60) * HEIGHT_SCALE, 50)  // Smaller padding for compact screens
-      : Math.max(scale(90) * HEIGHT_SCALE, 70),
-    paddingBottom: Math.max(scale(SPACING.md) * HEIGHT_SCALE, 8),
+      ? Math.max(rh(60), 50)  // Smaller padding for compact screens
+      : Math.max(rh(90), 70),
+    paddingBottom: Math.max(rh(SPACING.md), 8),
     alignItems: 'center',
     backgroundColor: 'transparent',
   },
@@ -1944,14 +1920,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: Platform.OS === 'android' && SCREEN_HEIGHT < 700
-      ? Math.max(scale(SPACING.md) * HEIGHT_SCALE, 8)
-      : Math.max(scale(SPACING.xl) * HEIGHT_SCALE, 16),
+      ? Math.max(rh(SPACING.md), 8)
+      : Math.max(rh(SPACING.xl), 16),
   },
   coupleNameText: {
-    fontSize: Math.max(scaleFont(18) * HEIGHT_SCALE, 15), // Min 15pt for readability
+    fontSize: Platform.OS === 'android' ? Math.max(fp(20), 17) : Math.max(fp(18), 15), // Android: larger for readability
     color: COLORS.white,
     fontFamily: 'Jua', // Use Jua directly for better Android compatibility
-    letterSpacing: scale(0.5),
+    letterSpacing: rs(0.5),
     opacity: 0.95,
     backgroundColor: 'transparent',
     includeFontPadding: false, // Android: remove extra padding
@@ -1959,16 +1935,16 @@ const styles = StyleSheet.create({
   coupleNameLeft: {
     flex: 1,
     textAlign: 'right',
-    marginRight: scale(SPACING.sm),
+    marginRight: rs(SPACING.sm),
   },
   coupleNameRight: {
     flex: 1,
     textAlign: 'left',
-    marginLeft: scale(SPACING.sm),
+    marginLeft: rs(SPACING.sm),
   },
   heartEmoji: {
     fontFamily: 'System',
-    fontSize: scaleFont(18) * HEIGHT_SCALE,
+    fontSize: fp(18),
   },
   anniversaryButton: {
     flexDirection: 'row',
@@ -1983,7 +1959,7 @@ const styles = StyleSheet.create({
     minHeight: 50,
   },
   dDayNumber: {
-    fontSize: Platform.OS === 'android' ? Math.max(rw(44), 36) : scaleFont(52),
+    fontSize: Platform.OS === 'android' ? Math.max(rw(52), 44) : fp(52), // Android: 52→44 min
     color: '#FFFFFF',
     fontFamily: 'Jua',
     letterSpacing: 1,
@@ -1991,7 +1967,7 @@ const styles = StyleSheet.create({
     textAlignVertical: 'center',
   },
   dDayUnit: {
-    fontSize: Platform.OS === 'android' ? Math.max(rw(20), 16) : scaleFont(24),
+    fontSize: Platform.OS === 'android' ? Math.max(rw(24), 20) : fp(24), // Android: 24→20 min
     color: '#FFFFFF',
     fontFamily: 'Jua',
     letterSpacing: 0.5,
@@ -2004,8 +1980,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingBottom: Platform.OS === 'android' && SCREEN_HEIGHT < 700
-      ? scale(180) * HEIGHT_SCALE  // Less padding for compact screens
-      : scale(240) * HEIGHT_SCALE,
+      ? rh(180)  // Less padding for compact screens
+      : rh(240),
   },
   polaroid: {
     width: POLAROID_WIDTH,
@@ -2135,15 +2111,15 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    borderRadius: scale(2),
+    borderRadius: rs(2),
     // Top-left light edge (light source simulation)
-    borderTopWidth: scale(1),
-    borderLeftWidth: scale(1),
+    borderTopWidth: rs(1),
+    borderLeftWidth: rs(1),
     borderTopColor: 'rgba(255, 255, 255, 0.6)',
     borderLeftColor: 'rgba(255, 255, 255, 0.4)',
     // Bottom-right shadow edge
-    borderBottomWidth: scale(1),
-    borderRightWidth: scale(1),
+    borderBottomWidth: rs(1),
+    borderRightWidth: rs(1),
     borderBottomColor: 'rgba(0, 0, 0, 0.05)',
     borderRightColor: 'rgba(0, 0, 0, 0.03)',
   },
@@ -2153,9 +2129,9 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    borderRadius: scale(2),
+    borderRadius: rs(2),
     // Simulate inner shadow with gradient-like border
-    borderWidth: scale(3),
+    borderWidth: rs(3),
     borderColor: 'transparent',
     borderTopColor: 'rgba(0, 0, 0, 0.02)',
     borderLeftColor: 'rgba(0, 0, 0, 0.015)',
@@ -2174,7 +2150,7 @@ const styles = StyleSheet.create({
     width: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: scale(SPACING.lg),
+    paddingHorizontal: rs(SPACING.lg),
   },
   modalBackdrop: {
     position: 'absolute',
@@ -2184,10 +2160,10 @@ const styles = StyleSheet.create({
     bottom: 0,
   },
   anniversaryModalContent: {
-    width: width - scale(48),
+    width: width - rs(48),
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    borderRadius: scale(32),
-    borderWidth: scale(1),
+    borderRadius: rs(32),
+    borderWidth: rs(1),
     borderColor: 'rgba(255, 255, 255, 0.2)',
     overflow: 'hidden',
   },
@@ -2195,109 +2171,109 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: scale(24),
-    paddingVertical: scale(20),
+    paddingHorizontal: rs(24),
+    paddingVertical: rs(20),
   },
   anniversaryHeaderDivider: {
-    height: scale(1),
+    height: rs(1),
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    marginHorizontal: scale(24),
+    marginHorizontal: rs(24),
   },
   anniversaryModalTitle: {
-    fontSize: scaleFont(20),
+    fontSize: fp(20),
     color: COLORS.white,
     fontWeight: '600',
-    lineHeight: scale(28),
+    lineHeight: rs(28),
   },
   modalCloseButton: {
-    width: scale(36),
-    height: scale(36),
-    borderRadius: scale(18),
+    width: rs(36),
+    height: rs(36),
+    borderRadius: rs(18),
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   anniversaryListContainer: {
-    maxHeight: scale(300),
+    maxHeight: rs(300),
     overflow: 'hidden',
   },
   anniversaryListContent: {
-    paddingHorizontal: scale(24),
-    paddingTop: scale(20),
-    paddingBottom: scale(16),
+    paddingHorizontal: rs(24),
+    paddingTop: rs(20),
+    paddingBottom: rs(16),
   },
   anniversaryFooterDivider: {
-    height: scale(1),
+    height: rs(1),
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    marginHorizontal: scale(24),
+    marginHorizontal: rs(24),
   },
   anniversaryFooter: {
-    paddingHorizontal: scale(24),
-    paddingTop: scale(16),
-    paddingBottom: scale(24),
+    paddingHorizontal: rs(24),
+    paddingTop: rs(16),
+    paddingBottom: rs(24),
   },
   addAnniversaryButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: scale(SPACING.sm),
+    gap: rs(SPACING.sm),
     backgroundColor: COLORS.white,
-    paddingVertical: scale(14),
-    borderRadius: scale(100),
+    paddingVertical: rs(14),
+    borderRadius: rs(100),
   },
   addAnniversaryText: {
-    fontSize: scaleFont(15),
+    fontSize: fp(15),
     color: COLORS.black,
     fontWeight: '500',
   },
   imagePickerModal: {
-    width: width - scale(48),
+    width: width - rs(48),
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    borderRadius: scale(32),
-    padding: scale(SPACING.xl),
-    borderWidth: scale(1),
+    borderRadius: rs(32),
+    padding: rs(SPACING.xl),
+    borderWidth: rs(1),
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   imagePickerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: scale(SPACING.md),
+    marginBottom: rs(SPACING.md),
   },
   imagePickerTitle: {
-    fontSize: scaleFont(18),
+    fontSize: fp(18),
     color: COLORS.white,
     fontWeight: '600',
   },
   imagePickerDescription: {
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     color: 'rgba(255, 255, 255, 0.7)',
-    marginBottom: scale(SPACING.lg),
+    marginBottom: rs(SPACING.lg),
   },
   imagePickerButtons: {
-    gap: scale(SPACING.sm),
+    gap: rs(SPACING.sm),
   },
   imagePickerButtonPrimary: {
     width: '100%',
-    paddingVertical: scale(14),
-    borderRadius: scale(24),
+    paddingVertical: rs(14),
+    borderRadius: rs(24),
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     alignItems: 'center',
   },
   imagePickerButtonPrimaryText: {
-    fontSize: scaleFont(15),
+    fontSize: fp(15),
     color: '#000',
     fontWeight: '500',
   },
   imagePickerButtonSecondary: {
     width: '100%',
-    paddingVertical: scale(14),
-    borderRadius: scale(24),
+    paddingVertical: rs(14),
+    borderRadius: rs(24),
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
   },
   imagePickerButtonSecondaryText: {
-    fontSize: scaleFont(15),
+    fontSize: fp(15),
     color: COLORS.white,
     fontWeight: '500',
   },
@@ -2307,10 +2283,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   addAnniversaryModalContent: {
-    width: width - scale(48),
+    width: width - rs(48),
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    borderRadius: scale(32),
-    borderWidth: scale(1),
+    borderRadius: rs(32),
+    borderWidth: rs(1),
     borderColor: 'rgba(255, 255, 255, 0.2)',
     overflow: 'hidden',
     maxHeight: height * 0.7,
@@ -2319,130 +2295,130 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: scale(24),
-    paddingVertical: scale(20),
+    paddingHorizontal: rs(24),
+    paddingVertical: rs(20),
   },
   addAnniversaryTitle: {
-    fontSize: scaleFont(20),
+    fontSize: fp(20),
     color: COLORS.white,
     fontWeight: '600',
-    lineHeight: scale(28),
+    lineHeight: rs(28),
   },
   addAnniversaryForm: {
-    maxHeight: scale(320),
+    maxHeight: rs(320),
   },
   addAnniversaryFormContent: {
-    paddingHorizontal: scale(24),
-    paddingTop: scale(20),
-    paddingBottom: scale(16),
+    paddingHorizontal: rs(24),
+    paddingTop: rs(20),
+    paddingBottom: rs(16),
   },
   formSection: {
-    marginBottom: scale(24),
+    marginBottom: rs(24),
   },
   formLabel: {
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     color: 'rgba(255, 255, 255, 0.7)',
-    marginBottom: scale(12),
+    marginBottom: rs(12),
     fontWeight: '500',
   },
   iconSelector: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: scale(12),
+    gap: rs(12),
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: scale(16),
-    paddingVertical: scale(12),
-    paddingHorizontal: scale(16),
-    borderWidth: scale(1),
+    borderRadius: rs(16),
+    paddingVertical: rs(12),
+    paddingHorizontal: rs(16),
+    borderWidth: rs(1),
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   selectedIcon: {
-    fontSize: scaleFont(32),
+    fontSize: fp(32),
   },
   iconSelectorHint: {
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     color: 'rgba(255, 255, 255, 0.5)',
   },
   emojiPickerContainer: {
-    marginTop: scale(12),
+    marginTop: rs(12),
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: scale(16),
-    padding: scale(12),
-    borderWidth: scale(1),
+    borderRadius: rs(16),
+    padding: rs(12),
+    borderWidth: rs(1),
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   emojiGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: scale(8),
+    gap: rs(8),
     justifyContent: 'center',
   },
   emojiOption: {
-    width: scale(44),
-    height: scale(44),
+    width: rs(44),
+    height: rs(44),
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: scale(12),
+    borderRadius: rs(12),
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   emojiOptionSelected: {
     backgroundColor: 'rgba(168, 85, 247, 0.4)',
-    borderWidth: scale(2),
+    borderWidth: rs(2),
     borderColor: '#A855F7',
   },
   emojiOptionText: {
-    fontSize: scaleFont(24),
+    fontSize: fp(24),
   },
   iconNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: scale(12),
+    gap: rs(12),
   },
   iconButton: {
-    width: scale(52),
-    height: scale(52),
-    borderRadius: scale(16),
+    width: rs(52),
+    height: rs(52),
+    borderRadius: rs(16),
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: scale(1),
+    borderWidth: rs(1),
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   selectedIconSmall: {
-    fontSize: scaleFont(28),
+    fontSize: fp(28),
   },
   nameInput: {
     flex: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: scale(16),
-    paddingVertical: scale(14),
-    paddingHorizontal: scale(16),
-    fontSize: scaleFont(16),
+    borderRadius: rs(16),
+    paddingVertical: rs(14),
+    paddingHorizontal: rs(16),
+    fontSize: fp(16),
     color: COLORS.white,
-    borderWidth: scale(1),
+    borderWidth: rs(1),
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   datePickerButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: scale(16),
-    paddingVertical: scale(14),
-    paddingHorizontal: scale(16),
+    borderRadius: rs(16),
+    paddingVertical: rs(14),
+    paddingHorizontal: rs(16),
     alignItems: 'center',
-    borderWidth: scale(1),
+    borderWidth: rs(1),
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   datePickerButtonText: {
-    fontSize: scaleFont(16),
+    fontSize: fp(16),
     color: COLORS.white,
     fontWeight: '500',
   },
   addAnniversaryFooter: {
-    paddingHorizontal: scale(24),
-    paddingTop: scale(16),
-    paddingBottom: scale(24),
+    paddingHorizontal: rs(24),
+    paddingTop: rs(16),
+    paddingBottom: rs(24),
   },
   submitButton: {
-    borderRadius: scale(100),
+    borderRadius: rs(100),
     overflow: 'hidden',
   },
   submitButtonDisabled: {
@@ -2450,12 +2426,12 @@ const styles = StyleSheet.create({
   },
   submitButtonInner: {
     backgroundColor: COLORS.white,
-    paddingVertical: scale(14),
+    paddingVertical: rs(14),
     alignItems: 'center',
     justifyContent: 'center',
   },
   submitButtonText: {
-    fontSize: scaleFont(16),
+    fontSize: fp(16),
     color: COLORS.black,
     fontWeight: '600',
   },
@@ -2474,12 +2450,12 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     backgroundColor: 'transparent',
     // Glowing border to highlight the button
-    borderWidth: IS_TABLET ? 3 * 0.75 : scale(3),
+    borderWidth: rs(3),
     borderColor: 'rgba(255, 255, 255, 0.9)',
     shadowColor: '#FFFFFF',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
-    shadowRadius: IS_TABLET ? 20 * 0.75 : scale(20),
+    shadowRadius: rs(20),
     elevation: 10,
   },
   tutorialMessageContainer: {
@@ -2487,47 +2463,47 @@ const styles = StyleSheet.create({
   },
   tutorialMessageBox: {
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: IS_TABLET ? 16 * 0.75 : scale(16),
-    paddingVertical: IS_TABLET ? 16 * 0.75 : scale(16),
-    paddingHorizontal: IS_TABLET ? 20 * 0.75 : scale(20),
-    borderWidth: IS_TABLET ? 1 : scale(1),
+    borderRadius: rs(16),
+    paddingVertical: rs(16),
+    paddingHorizontal: rs(20),
+    borderWidth: rs(1),
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   tutorialMessageTitle: {
-    fontSize: IS_TABLET ? 16 * 0.75 : scaleFont(16),
+    fontSize: fp(16),
     fontWeight: '600',
     color: COLORS.white,
-    marginBottom: IS_TABLET ? 6 * 0.75 : scale(6),
+    marginBottom: rs(6),
     textAlign: 'right',
   },
   tutorialMessageText: {
-    fontSize: IS_TABLET ? 13 * 0.75 : scaleFont(13),
+    fontSize: fp(13),
     color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'right',
-    lineHeight: IS_TABLET ? 18 * 0.75 : scale(18),
+    lineHeight: rs(18),
   },
   // DatePicker Confirm Button
   datePickerConfirmWrapper: {
     alignItems: 'center',
-    marginBottom: scale(8),
+    marginBottom: rs(8),
   },
   datePickerConfirmButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingVertical: scale(10),
-    paddingHorizontal: scale(32),
-    borderRadius: scale(20),
+    paddingVertical: rs(10),
+    paddingHorizontal: rs(32),
+    borderRadius: rs(20),
   },
   datePickerConfirmText: {
-    fontSize: scaleFont(15),
+    fontSize: fp(15),
     color: COLORS.white,
     fontWeight: '600',
   },
   // Date Picker Modal Styles
   datePickerModalContent: {
-    width: width - scale(48),
+    width: width - rs(48),
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    borderRadius: scale(32),
-    borderWidth: scale(1),
+    borderRadius: rs(32),
+    borderWidth: rs(1),
     borderColor: 'rgba(255, 255, 255, 0.2)',
     overflow: 'hidden',
   },
@@ -2535,48 +2511,48 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: scale(24),
-    paddingVertical: scale(20),
+    paddingHorizontal: rs(24),
+    paddingVertical: rs(20),
   },
   datePickerModalTitle: {
-    fontSize: scaleFont(20),
+    fontSize: fp(20),
     color: COLORS.white,
     fontWeight: '600',
-    lineHeight: scale(28),
+    lineHeight: rs(28),
   },
   datePickerModalBody: {
-    paddingHorizontal: scale(24),
-    paddingTop: scale(20),
-    paddingBottom: scale(24),
+    paddingHorizontal: rs(24),
+    paddingTop: rs(20),
+    paddingBottom: rs(24),
   },
   pickerMonthNav: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: scale(20),
+    marginBottom: rs(20),
   },
   pickerNavButton: {
-    width: scale(36),
-    height: scale(36),
-    borderRadius: scale(18),
+    width: rs(36),
+    height: rs(36),
+    borderRadius: rs(18),
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   pickerMonthText: {
-    fontSize: scaleFont(16),
+    fontSize: fp(16),
     color: COLORS.white,
     fontWeight: '600',
   },
   pickerDayNames: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginBottom: scale(12),
+    marginBottom: rs(12),
   },
   pickerDayName: {
-    width: scale(36),
+    width: rs(36),
     textAlign: 'center',
-    fontSize: scaleFont(12),
+    fontSize: fp(12),
     color: 'rgba(255, 255, 255, 0.6)',
     fontWeight: '500',
   },
@@ -2590,32 +2566,32 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: scale(2),
+    padding: rs(2),
   },
   pickerDayCellInner: {
-    width: scale(36),
-    height: scale(36),
-    borderRadius: scale(18),
+    width: rs(36),
+    height: rs(36),
+    borderRadius: rs(18),
     alignItems: 'center',
     justifyContent: 'center',
   },
   pickerDayCellInnerSelected: {
-    width: scale(36),
-    height: scale(36),
-    borderRadius: scale(18),
+    width: rs(36),
+    height: rs(36),
+    borderRadius: rs(18),
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderWidth: scale(1),
+    borderWidth: rs(1),
     borderColor: 'rgba(255, 255, 255, 0.5)',
   },
   pickerDayText: {
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     color: COLORS.white,
     fontWeight: '500',
   },
   pickerDayTextSelected: {
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     color: COLORS.white,
     fontWeight: '700',
   },

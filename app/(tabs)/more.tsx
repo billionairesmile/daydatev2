@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Dimensions,
   Pressable,
   Platform,
   ScrollView,
@@ -23,14 +22,12 @@ import {
 import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
 
-import { COLORS, SPACING, scale, scaleFont } from '@/constants/design';
+import { COLORS, SPACING, rs, fp } from '@/constants/design';
 import { useBackground } from '@/contexts';
 import { useSubscriptionStore } from '@/stores';
 import { PremiumSubscriptionModal } from '@/components/premium';
 import { BannerAdView } from '@/components/ads';
 import { useBannerAdBottom } from '@/hooks/useConsistentBottomInset';
-
-const { width, height } = Dimensions.get('window');
 
 
 type MenuItemType = {
@@ -109,10 +106,10 @@ export default function MoreScreen() {
         android_ripple={{ color: 'rgba(255, 255, 255, 0.15)', borderless: false }}
       >
         <View style={styles.menuItemLeft}>
-          <IconComponent color="rgba(255, 255, 255, 0.8)" size={scale(22)} />
+          <IconComponent color="rgba(255, 255, 255, 0.8)" size={rs(22)} />
           <Text style={styles.menuItemLabel}>{item.label}</Text>
         </View>
-        <ChevronRight color="rgba(255, 255, 255, 0.4)" size={scale(20)} />
+        <ChevronRight color="rgba(255, 255, 255, 0.4)" size={rs(20)} />
       </Pressable>
     );
   };
@@ -166,7 +163,7 @@ export default function MoreScreen() {
                 >
                   <View style={styles.premiumCardLeft}>
                     <View style={[styles.premiumIconWrapper, hasPremiumAccess && styles.premiumIconWrapperActive]}>
-                      <Crown color={hasPremiumAccess ? '#D97706' : COLORS.black} size={scale(22)} />
+                      <Crown color={hasPremiumAccess ? '#D97706' : COLORS.black} size={rs(22)} />
                     </View>
                     <View style={styles.premiumInfo}>
                       <Text style={[styles.premiumTitle, hasPremiumAccess && styles.premiumTitleActive]}>
@@ -183,7 +180,7 @@ export default function MoreScreen() {
                       </Text>
                     </View>
                   </View>
-                  <ChevronRight color={hasPremiumAccess ? '#D97706' : '#999'} size={scale(20)} />
+                  <ChevronRight color={hasPremiumAccess ? '#D97706' : '#999'} size={rs(20)} />
                 </Pressable>
               </View>
             )}
@@ -236,38 +233,38 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: scale(SPACING.lg),
-    paddingBottom: scale(120),
+    paddingHorizontal: rs(SPACING.lg),
+    paddingBottom: rs(120),
   },
   header: {
-    paddingTop: scale(64),
-    paddingHorizontal: scale(SPACING.lg),
-    paddingBottom: scale(SPACING.lg),
+    paddingTop: rs(64),
+    paddingHorizontal: rs(SPACING.lg),
+    paddingBottom: rs(SPACING.lg),
     zIndex: 20,
   },
   headerTitle: {
-    fontSize: scaleFont(32),
+    fontSize: fp(32),
     color: COLORS.white,
     fontWeight: '700',
-    lineHeight: scaleFont(38),
+    lineHeight: fp(38),
     textShadowColor: 'transparent',
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 0,
   },
   section: {
-    marginBottom: scale(SPACING.lg),
+    marginBottom: rs(SPACING.lg),
   },
   sectionTitle: {
-    fontSize: scaleFont(13),
+    fontSize: fp(13),
     color: 'rgba(255, 255, 255, 0.6)',
     fontWeight: '500',
-    marginBottom: scale(SPACING.sm),
-    marginLeft: scale(SPACING.xs),
+    marginBottom: rs(SPACING.sm),
+    marginLeft: rs(SPACING.xs),
     textTransform: 'uppercase',
-    letterSpacing: scale(0.5),
+    letterSpacing: rs(0.5),
   },
   menuCard: {
-    borderRadius: scale(20),
+    borderRadius: rs(20),
     overflow: 'hidden',
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderWidth: 1,
@@ -277,7 +274,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: scale(SPACING.lg),
+    padding: rs(SPACING.lg),
   },
   menuItemBorder: {
     borderBottomWidth: 1,
@@ -288,17 +285,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   menuItemLabel: {
-    fontSize: scaleFont(16),
+    fontSize: fp(16),
     color: COLORS.white,
-    marginLeft: scale(SPACING.md),
+    marginLeft: rs(SPACING.md),
     fontWeight: '400',
   },
   // Premium Card Styles
   premiumCard: {
-    borderRadius: scale(20),
+    borderRadius: rs(20),
     overflow: 'hidden',
     backgroundColor: COLORS.white,
-    padding: scale(SPACING.lg),
+    padding: rs(SPACING.lg),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -312,13 +309,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   premiumIconWrapper: {
-    width: scale(44),
-    height: scale(44),
-    borderRadius: scale(22),
+    width: rs(44),
+    height: rs(44),
+    borderRadius: rs(22),
     backgroundColor: '#f5f5f5',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: scale(SPACING.md),
+    marginRight: rs(SPACING.md),
   },
   premiumIconWrapperActive: {
     backgroundColor: '#FEF3C7',
@@ -327,16 +324,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   premiumTitle: {
-    fontSize: scaleFont(16),
+    fontSize: fp(16),
     fontWeight: '600',
     color: COLORS.black,
-    marginBottom: scale(2),
+    marginBottom: rs(2),
   },
   premiumTitleActive: {
     color: '#D97706',
   },
   premiumDescription: {
-    fontSize: scaleFont(13),
+    fontSize: fp(13),
     color: '#666',
   },
   bannerAd: {

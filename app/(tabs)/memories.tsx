@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Dimensions,
   Pressable,
   ScrollView,
   Modal,
@@ -42,7 +41,7 @@ import ReanimatedModule, {
 import PagerView from 'react-native-pager-view';
 import { useTranslation } from 'react-i18next';
 
-import { COLORS, SPACING, IS_TABLET, IS_FOLDABLE, scale, scaleFont, ANDROID_BOTTOM_PADDING } from '@/constants/design';
+import { COLORS, SPACING, rs, fp, ANDROID_BOTTOM_PADDING, SCREEN_WIDTH, SCREEN_HEIGHT, isLargeDevice } from '@/constants/design';
 import { useMemoryStore, SAMPLE_MEMORIES } from '@/stores/memoryStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useOnboardingStore } from '@/stores/onboardingStore';
@@ -94,7 +93,12 @@ interface Album {
   textColor?: 'white' | 'black'; // Text color for basic font style
 }
 
-const { width, height } = Dimensions.get('window');
+// Use responsive screen dimensions
+const width = SCREEN_WIDTH;
+const height = SCREEN_HEIGHT;
+
+// Large device detection for layout adjustments (replaces IS_LARGE_DEVICE)
+const IS_LARGE_DEVICE = isLargeDevice();
 
 // Calculate scale ratio between modal preview and album card
 // Modal: maxWidth 360 - 48 padding = 312px modal content width (or device width - 48 if smaller)
@@ -107,6 +111,12 @@ const ALBUM_SCALE_RATIO = ALBUM_CARD_WIDTH / MODAL_PREVIEW_WIDTH;
 const ALBUM_DETAIL_SCALE_RATIO = ALBUM_DETAIL_WIDTH / MODAL_PREVIEW_WIDTH;
 const ALBUM_CARD_HEIGHT = ALBUM_CARD_WIDTH * 4 / 3;
 const ALBUM_DETAIL_HEIGHT = ALBUM_DETAIL_WIDTH * 4 / 3;
+
+// Dynamic scale ratios for font sizing (accounts for rs() container scaling)
+// These functions return ratios that match the actual rendered container sizes
+const getDynamicAlbumScaleRatio = () => rs(ALBUM_CARD_WIDTH) / MODAL_PREVIEW_WIDTH;
+const getDynamicAlbumDetailScaleRatio = () => rs(ALBUM_DETAIL_WIDTH) / MODAL_PREVIEW_WIDTH;
+
 // Default text position - horizontally centered (35% from left)
 const DEFAULT_TEXT_X = Math.floor(MODAL_PREVIEW_WIDTH * 0.35);
 const DEFAULT_TEXT_Y = 16;
@@ -117,25 +127,28 @@ const isNormalizedPosition = (pos: { x: number; y: number }): boolean => {
 };
 
 // Calculate album card position (handles both normalized and legacy positions)
+// Uses rs() to match the actual container size which also uses rs()
 const getAlbumCardPosition = (pos: { x: number; y: number } | undefined) => {
   const defaultPos = { x: 0.096, y: 0.038 }; // 30/312, 16/416 normalized
-  if (!pos) return { left: defaultPos.x * ALBUM_CARD_WIDTH, top: defaultPos.y * ALBUM_CARD_HEIGHT };
+  if (!pos) return { left: defaultPos.x * rs(ALBUM_CARD_WIDTH), top: defaultPos.y * rs(ALBUM_CARD_HEIGHT) };
 
   if (isNormalizedPosition(pos)) {
-    // Normalized value: apply directly
-    return { left: pos.x * ALBUM_CARD_WIDTH, top: pos.y * ALBUM_CARD_HEIGHT };
+    // Normalized value: scale to match container dimensions
+    return { left: pos.x * rs(ALBUM_CARD_WIDTH), top: pos.y * rs(ALBUM_CARD_HEIGHT) };
   }
   // Legacy absolute value: use old scale ratio
   return { left: pos.x * ALBUM_SCALE_RATIO, top: pos.y * ALBUM_SCALE_RATIO };
 };
 
 // Calculate album detail position (handles both normalized and legacy positions)
+// Uses rs() to match the actual container size which also uses rs()
 const getAlbumDetailPosition = (pos: { x: number; y: number } | undefined) => {
   const defaultPos = { x: 0.096, y: 0.038 };
-  if (!pos) return { left: defaultPos.x * ALBUM_DETAIL_WIDTH, top: defaultPos.y * ALBUM_DETAIL_HEIGHT };
+  if (!pos) return { left: defaultPos.x * rs(ALBUM_DETAIL_WIDTH), top: defaultPos.y * rs(ALBUM_DETAIL_HEIGHT) };
 
   if (isNormalizedPosition(pos)) {
-    return { left: pos.x * ALBUM_DETAIL_WIDTH, top: pos.y * ALBUM_DETAIL_HEIGHT };
+    // Normalized value: scale to match container dimensions
+    return { left: pos.x * rs(ALBUM_DETAIL_WIDTH), top: pos.y * rs(ALBUM_DETAIL_HEIGHT) };
   }
   return { left: pos.x * ALBUM_DETAIL_SCALE_RATIO, top: pos.y * ALBUM_DETAIL_SCALE_RATIO };
 };
@@ -356,8 +369,9 @@ export default function MemoriesScreen() {
   const coverPickerSlideAnim = useRef(new Animated.Value(height)).current;
 
   // Animated values for album creation modal
-  const albumModalScaleAnim = useRef(new Animated.Value(0.9)).current;
-  const albumModalOpacityAnim = useRef(new Animated.Value(0)).current;
+  // Android: Initialize with final values (1) to prevent animation flash
+  const albumModalScaleAnim = useRef(new Animated.Value(Platform.OS === 'android' ? 1 : 0.9)).current;
+  const albumModalOpacityAnim = useRef(new Animated.Value(Platform.OS === 'android' ? 1 : 0)).current;
 
   // Animated values for step transitions (fade effect)
   const stepOpacityAnim = useRef(new Animated.Value(1)).current;
@@ -563,12 +577,17 @@ export default function MemoriesScreen() {
     closeCoverPhotoPicker();
   };
 
-  // Animation for album detail modal (fade only)
-  const albumDetailOpacityAnim = useRef(new Animated.Value(0)).current;
+  // Animation for album detail modal (fade only, iOS only)
+  const albumDetailOpacityAnim = useRef(new Animated.Value(Platform.OS === 'android' ? 1 : 0)).current;
 
   useEffect(() => {
     if (showAlbumDetailModal) {
-      // Fade in animation
+      // Android: Skip animation
+      if (Platform.OS === 'android') {
+        albumDetailOpacityAnim.setValue(1);
+        return;
+      }
+      // iOS: Fade in animation
       Animated.timing(albumDetailOpacityAnim, {
         toValue: 1,
         duration: 300,
@@ -576,7 +595,7 @@ export default function MemoriesScreen() {
       }).start();
     } else {
       // Reset animation
-      albumDetailOpacityAnim.setValue(0);
+      albumDetailOpacityAnim.setValue(Platform.OS === 'android' ? 1 : 0);
     }
   }, [showAlbumDetailModal]);
 
@@ -891,9 +910,15 @@ export default function MemoriesScreen() {
     }
   };
 
-  // Smooth step transition with fade animation
+  // Smooth step transition with fade animation (iOS only)
   const transitionToNextStep = (nextStep: 'fontStyle' | 'name' | 'cover') => {
-    // Fade out current content
+    // Android: Skip animation for smoother performance
+    if (Platform.OS === 'android') {
+      setAlbumStep(nextStep);
+      return;
+    }
+
+    // iOS: Fade out current content
     Animated.timing(stepOpacityAnim, {
       toValue: 0,
       duration: 150,
@@ -923,8 +948,14 @@ export default function MemoriesScreen() {
     }
 
     // Reset animation values
-    albumModalScaleAnim.setValue(0.9);
-    albumModalOpacityAnim.setValue(0);
+    // Android: Set final values directly (no animation)
+    if (Platform.OS === 'android') {
+      albumModalScaleAnim.setValue(1);
+      albumModalOpacityAnim.setValue(1);
+    } else {
+      albumModalScaleAnim.setValue(0.9);
+      albumModalOpacityAnim.setValue(0);
+    }
     stepOpacityAnim.setValue(1);
 
     setShowAlbumModal(true);
@@ -938,7 +969,12 @@ export default function MemoriesScreen() {
     setFontStyle(null); // Reset font style - no selection
     setRansomSeed(Math.floor(Math.random() * 1000000)); // Generate fresh seed
 
-    // Animate in
+    // Android: Skip animation
+    if (Platform.OS === 'android') {
+      return;
+    }
+
+    // iOS: Animate in
     Animated.parallel([
       Animated.spring(albumModalScaleAnim, {
         toValue: 1,
@@ -954,8 +990,23 @@ export default function MemoriesScreen() {
     ]).start();
   };
 
-  // Close album creation modal with animation
+  // Close album creation modal with animation (iOS only)
   const closeAlbumModal = () => {
+    // Android: Close immediately without animation
+    if (Platform.OS === 'android') {
+      setShowAlbumModal(false);
+      setAlbumName('');
+      setPreviewText('');
+      setAlbumCoverPhoto(null);
+      setAlbumStep('fontStyle');
+      setNamePosition({ x: DEFAULT_TEXT_X, y: DEFAULT_TEXT_Y });
+      panPosition.setValue({ x: DEFAULT_TEXT_X, y: DEFAULT_TEXT_Y });
+      setTextScale(1.0);
+      setFontStyle(null);
+      return;
+    }
+
+    // iOS: Animate out
     Animated.parallel([
       Animated.timing(albumModalScaleAnim, {
         toValue: 0.9,
@@ -981,8 +1032,21 @@ export default function MemoriesScreen() {
     });
   };
 
-  // Close album detail modal with fade-out animation
+  // Close album detail modal with fade-out animation (iOS only)
   const closeAlbumDetailModal = () => {
+    // Android: Close immediately without animation
+    if (Platform.OS === 'android') {
+      setShowAlbumDetailModal(false);
+      setShowAlbumMenu(false);
+      setSelectedAlbum(null);
+      setIsSelectingAlbumPhotos(false);
+      setSelectedAlbumPhotoIndices(new Set());
+      setSelectedAlbumPhoto(null);
+      setShowMissionPhotosPicker(false);
+      return;
+    }
+
+    // iOS: Fade out animation
     Animated.timing(albumDetailOpacityAnim, {
       toValue: 0,
       duration: 300,
@@ -1260,7 +1324,7 @@ export default function MemoriesScreen() {
             <View style={styles.collageSectionHeader}>
               <Text style={styles.collageSectionTitle}>{t('memories.album.title')}</Text>
               <Pressable style={styles.albumIconButton} onPress={openAlbumModal}>
-                <BookHeart color={COLORS.white} size={scale(20)} strokeWidth={1.5} />
+                <BookHeart color={COLORS.white} size={rs(20)} strokeWidth={1.5} />
               </Pressable>
             </View>
             <Text style={styles.collageSectionSubtitle}>{t('memories.album.subtitle')}</Text>
@@ -1291,7 +1355,7 @@ export default function MemoriesScreen() {
                             <ExpoImage source={{ uri: album.coverPhoto }} style={styles.bookFullPhoto} contentFit="cover" cachePolicy="memory-disk" transition={0} priority="high" />
                           ) : (
                             <View style={styles.bookPlaceholder}>
-                              <ImageIcon color="rgba(255,255,255,0.3)" size={scale(24)} />
+                              <ImageIcon color="rgba(255,255,255,0.3)" size={rs(24)} />
                             </View>
                           )}
 
@@ -1319,14 +1383,14 @@ export default function MemoriesScreen() {
                             ]}>
                               {album.fontStyle === 'basic' ? (
                                 // Basic Jua Font Style
-                                <Text style={[styles.basicFontTiny, { fontSize: 16 * (album.textScale || 1) * ALBUM_SCALE_RATIO, lineHeight: 16 * (album.textScale || 1) * ALBUM_SCALE_RATIO * 1.3, color: album.textColor === 'black' ? '#000000' : '#FFFFFF' }]}>{album.name}</Text>
+                                <Text style={[styles.basicFontTiny, { fontSize: 16 * (album.textScale || 1) * getDynamicAlbumScaleRatio(), lineHeight: 16 * (album.textScale || 1) * getDynamicAlbumScaleRatio() * 1.3, color: album.textColor === 'black' ? '#000000' : '#FFFFFF' }]}>{album.name}</Text>
                               ) : (
                                 // Ransom Style - Image-based
                                 <RansomText
                                   text={album.name}
                                   seed={album.ransomSeed || 12345}
-                                  characterSize={18 * (album.textScale || 1) * ALBUM_SCALE_RATIO}
-                                  spacing={-4 * ALBUM_SCALE_RATIO}
+                                  characterSize={18 * (album.textScale || 1) * getDynamicAlbumScaleRatio()}
+                                  spacing={-4 * getDynamicAlbumScaleRatio()}
                                   enableRotation={true}
                                   enableYOffset={true}
                                 />
@@ -1336,7 +1400,7 @@ export default function MemoriesScreen() {
                             {/* Read-only indicator */}
                             {isAlbumReadOnly(albums.indexOf(album), albums.length) && (
                               <View style={styles.readOnlyBadge}>
-                                <Lock size={scale(10)} color="rgba(255,255,255,0.8)" />
+                                <Lock size={rs(10)} color="rgba(255,255,255,0.8)" />
                               </View>
                             )}
                           </View>
@@ -1474,7 +1538,7 @@ export default function MemoriesScreen() {
             <View style={styles.collageSectionHeader}>
               <Text style={styles.collageSectionTitle}>{t('memories.album.title')}</Text>
               <Pressable style={styles.albumIconButton} onPress={openAlbumModal}>
-                <BookHeart color={COLORS.white} size={scale(20)} strokeWidth={1.5} />
+                <BookHeart color={COLORS.white} size={rs(20)} strokeWidth={1.5} />
               </Pressable>
             </View>
             <Text style={styles.collageSectionSubtitle}>{t('memories.album.subtitle')}</Text>
@@ -1505,7 +1569,7 @@ export default function MemoriesScreen() {
                             <ExpoImage source={{ uri: album.coverPhoto }} style={styles.bookFullPhoto} contentFit="cover" cachePolicy="memory-disk" transition={0} priority="high" />
                           ) : (
                             <View style={styles.bookPlaceholder}>
-                              <ImageIcon color="rgba(255,255,255,0.3)" size={scale(24)} />
+                              <ImageIcon color="rgba(255,255,255,0.3)" size={rs(24)} />
                             </View>
                           )}
 
@@ -1533,14 +1597,14 @@ export default function MemoriesScreen() {
                             ]}>
                               {album.fontStyle === 'basic' ? (
                                 // Basic Jua Font Style
-                                <Text style={[styles.basicFontTiny, { fontSize: 16 * (album.textScale || 1) * ALBUM_SCALE_RATIO, lineHeight: 16 * (album.textScale || 1) * ALBUM_SCALE_RATIO * 1.3, color: album.textColor === 'black' ? '#000000' : '#FFFFFF' }]}>{album.name}</Text>
+                                <Text style={[styles.basicFontTiny, { fontSize: 16 * (album.textScale || 1) * getDynamicAlbumScaleRatio(), lineHeight: 16 * (album.textScale || 1) * getDynamicAlbumScaleRatio() * 1.3, color: album.textColor === 'black' ? '#000000' : '#FFFFFF' }]}>{album.name}</Text>
                               ) : (
                                 // Ransom Style - Image-based
                                 <RansomText
                                   text={album.name}
                                   seed={album.ransomSeed || 12345}
-                                  characterSize={18 * (album.textScale || 1) * ALBUM_SCALE_RATIO}
-                                  spacing={-4 * ALBUM_SCALE_RATIO}
+                                  characterSize={18 * (album.textScale || 1) * getDynamicAlbumScaleRatio()}
+                                  spacing={-4 * getDynamicAlbumScaleRatio()}
                                   enableRotation={true}
                                   enableYOffset={true}
                                 />
@@ -1566,7 +1630,7 @@ export default function MemoriesScreen() {
       <Modal
         visible={!!selectedMonth}
         transparent
-        animationType="none"
+        animationType="fade"
         onRequestClose={() => {
           if (selectedPhoto) {
             setSelectedPhoto(null);
@@ -1697,17 +1761,17 @@ export default function MemoriesScreen() {
       <Modal
         visible={showAlbumModal}
         transparent
-        animationType="none"
+        animationType="fade"
         onRequestClose={closeAlbumModal}
       >
-        <Animated.View style={[styles.albumModalFadeWrapper, { opacity: albumModalOpacityAnim }]}>
+        <View style={styles.albumModalFadeWrapper}>
           <BlurView
             experimentalBlurMethod="dimezisBlurView"
             intensity={80}
             tint="dark"
             style={[
               styles.albumModalContainer,
-              { paddingBottom: Math.max(insets.bottom, scale(24)) }
+              { paddingBottom: Math.max(insets.bottom, rs(24)) }
             ]}
           >
             {/* Preload all character images when modal opens */}
@@ -1720,13 +1784,10 @@ export default function MemoriesScreen() {
               style={styles.keyboardAvoidingView}
               keyboardVerticalOffset={Platform.OS === 'android' ? -100 : 0}
             >
-              <Animated.View
+              <View
                 style={[
                   styles.albumModalContent,
                   albumStep === 'fontStyle' && styles.albumModalContentFontStyle,
-                  {
-                    transform: [{ scale: albumModalScaleAnim }],
-                  },
                 ]}
               >
                 {/* Header */}
@@ -2075,7 +2136,7 @@ export default function MemoriesScreen() {
                     </>
                   )}
                 </Animated.View>
-              </Animated.View>
+              </View>
             </KeyboardAvoidingView>
 
             {/* Cover Photo Picker Overlay */}
@@ -2125,22 +2186,17 @@ export default function MemoriesScreen() {
               </View>
             )}
           </BlurView>
-        </Animated.View>
+        </View>
       </Modal>
 
       {/* Album Detail Page (Full Screen) */}
       <Modal
         visible={showAlbumDetailModal}
         transparent
-        animationType="none"
+        animationType="fade"
         onRequestClose={closeAlbumDetailModal}
       >
-        <Animated.View
-          style={[
-            styles.albumDetailFullScreen,
-            { opacity: albumDetailOpacityAnim },
-          ]}
-        >
+        <View style={styles.albumDetailFullScreen}>
           <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000000' }]} />
           {/* Album Content (hidden when photo is selected) */}
           {!selectedAlbumPhoto && (
@@ -2329,15 +2385,15 @@ export default function MemoriesScreen() {
                         getAlbumDetailPosition(selectedAlbum.namePosition)
                       ]}>
                         {selectedAlbum.fontStyle === 'basic' ? (
-                          <Text style={[styles.basicFontOverlay, { fontSize: 16 * selectedAlbum.textScale * ALBUM_DETAIL_SCALE_RATIO, lineHeight: 16 * selectedAlbum.textScale * ALBUM_DETAIL_SCALE_RATIO * 1.3, color: selectedAlbum.textColor === 'black' ? '#000000' : '#FFFFFF' }]}>
+                          <Text style={[styles.basicFontOverlay, { fontSize: 16 * selectedAlbum.textScale * getDynamicAlbumDetailScaleRatio(), lineHeight: 16 * selectedAlbum.textScale * getDynamicAlbumDetailScaleRatio() * 1.3, color: selectedAlbum.textColor === 'black' ? '#000000' : '#FFFFFF' }]}>
                             {selectedAlbum.name}
                           </Text>
                         ) : (
                           <RansomText
                             text={selectedAlbum.name}
                             seed={selectedAlbum.ransomSeed || 12345}
-                            characterSize={18 * (selectedAlbum.textScale || 1) * ALBUM_DETAIL_SCALE_RATIO}
-                            spacing={-4 * ALBUM_DETAIL_SCALE_RATIO}
+                            characterSize={18 * (selectedAlbum.textScale || 1) * getDynamicAlbumDetailScaleRatio()}
+                            spacing={-4 * getDynamicAlbumDetailScaleRatio()}
                             enableRotation={true}
                             enableYOffset={true}
                           />
@@ -3104,7 +3160,7 @@ export default function MemoriesScreen() {
               </BlurView>
             </Modal>
           )}
-        </Animated.View>
+        </View>
       </Modal>
 
     </View>
@@ -3894,10 +3950,10 @@ const styles = StyleSheet.create({
   },
   inlineBannerContainer: {
     alignItems: 'center',
-    paddingVertical: scale(8),
+    paddingVertical: rs(8),
   },
   premiumSpacer: {
-    height: scale(16),
+    height: rs(16),
   },
   backgroundImage: {
     position: 'absolute',
@@ -3924,51 +3980,51 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: scale(50),
+    height: rs(50),
     zIndex: 10,
   },
   header: {
-    paddingTop: scale(64),
-    paddingHorizontal: scale(SPACING.lg),
-    paddingBottom: scale(SPACING.lg),
+    paddingTop: rs(64),
+    paddingHorizontal: rs(SPACING.lg),
+    paddingBottom: rs(SPACING.lg),
     zIndex: 20,
   },
   headerTitle: {
-    fontSize: scaleFont(32),
+    fontSize: fp(32),
     color: COLORS.white,
     fontWeight: '700',
-    lineHeight: scaleFont(38),
+    lineHeight: fp(38),
     textShadowColor: 'transparent',
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 0,
   },
   headerSubtitle: {
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     color: 'rgba(255, 255, 255, 0.6)',
     fontWeight: '400',
-    marginTop: scale(4),
+    marginTop: rs(4),
   },
   emptyState: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: scale(SPACING.lg),
+    paddingHorizontal: rs(SPACING.lg),
   },
   emptyText: {
-    fontSize: scaleFont(15),
+    fontSize: fp(15),
     color: 'rgba(255, 255, 255, 0.6)',
     textAlign: 'center',
-    lineHeight: scaleFont(24),
+    lineHeight: fp(24),
   },
   emptyMissionCardContainer: {
-    paddingHorizontal: scale(SPACING.lg),
-    height: scale(ALBUM_CARD_WIDTH), // Match month card height (140px)
+    paddingHorizontal: rs(SPACING.lg),
+    height: rs(ALBUM_CARD_WIDTH), // Match month card height (140px)
     justifyContent: 'center',
-    marginTop: scale(SPACING.sm), // Match album section spacing
+    marginTop: rs(SPACING.sm), // Match album section spacing
   },
   emptyMissionCard: {
-    padding: scale(24),
-    borderRadius: scale(20),
+    padding: rs(24),
+    borderRadius: rs(20),
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
@@ -3978,46 +4034,46 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   emptyMissionText: {
-    fontSize: scaleFont(16),
+    fontSize: fp(16),
     fontWeight: '600',
     color: COLORS.white,
-    marginBottom: scale(8),
+    marginBottom: rs(8),
   },
   emptyMissionHint: {
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     color: 'rgba(255, 255, 255, 0.6)',
     textAlign: 'center',
-    lineHeight: scaleFont(20),
+    lineHeight: fp(20),
   },
   mainContent: {
     flex: 1,
   },
   mainContentContainer: {
-    paddingBottom: scale(170),
+    paddingBottom: rs(170),
   },
   yearSection: {
-    marginTop: scale(SPACING.md),
-    marginBottom: scale(SPACING.xl),
+    marginTop: rs(SPACING.md),
+    marginBottom: rs(SPACING.xl),
   },
   yearHeader: {
     position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: scale(SPACING.lg),
-    marginBottom: scale(SPACING.md),
+    paddingHorizontal: rs(SPACING.lg),
+    marginBottom: rs(SPACING.md),
     zIndex: 10,
   },
   yearTitle: {
-    fontSize: scaleFont(20),
+    fontSize: fp(20),
     color: COLORS.white,
     fontWeight: '700',
   },
   yearPickerButton: {
-    width: scale(32),
-    height: scale(32),
+    width: rs(32),
+    height: rs(32),
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: scale(SPACING.xs),
+    marginLeft: rs(SPACING.xs),
   },
   yearTitleButton: {
     flexDirection: 'row',
@@ -4025,55 +4081,55 @@ const styles = StyleSheet.create({
   },
   yearPickerDropdown: {
     position: 'absolute',
-    top: scale(36),
-    left: scale(SPACING.lg),
+    top: rs(36),
+    left: rs(SPACING.lg),
     backgroundColor: '#FFFFFF',
-    borderRadius: scale(16),
-    paddingVertical: scale(8),
-    paddingHorizontal: scale(6),
-    minWidth: scale(160),
+    borderRadius: rs(16),
+    paddingVertical: rs(8),
+    paddingHorizontal: rs(6),
+    minWidth: rs(160),
     zIndex: 100,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: scale(4) },
+    shadowOffset: { width: 0, height: rs(4) },
     shadowOpacity: 0.15,
-    shadowRadius: scale(12),
+    shadowRadius: rs(12),
     elevation: 8,
   },
   yearPickerItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: scale(14),
-    paddingHorizontal: scale(16),
-    borderRadius: scale(16),
+    paddingVertical: rs(14),
+    paddingHorizontal: rs(16),
+    borderRadius: rs(16),
   },
   yearPickerItemActive: {
     backgroundColor: 'rgba(0, 0, 0, 0.06)',
   },
   yearPickerItemText: {
-    fontSize: scaleFont(17),
+    fontSize: fp(17),
     color: '#1A1A1A',
   },
   yearPickerItemTextActive: {
     fontWeight: '700',
   },
   yearPickerCheckCircle: {
-    width: scale(22),
-    height: scale(22),
-    borderRadius: scale(11),
+    width: rs(22),
+    height: rs(22),
+    borderRadius: rs(11),
     backgroundColor: '#000',
     alignItems: 'center',
     justifyContent: 'center',
   },
   monthCardsContainer: {
-    paddingHorizontal: scale(SPACING.lg),
-    gap: scale(12),
+    paddingHorizontal: rs(SPACING.lg),
+    gap: rs(12),
   },
   monthCard: {
-    width: scale(ALBUM_CARD_WIDTH), // Match album card width (140px)
+    width: rs(ALBUM_CARD_WIDTH), // Match album card width (140px)
   },
   monthCardInner: {
-    borderRadius: scale(16),
+    borderRadius: rs(16),
     overflow: 'hidden',
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
@@ -4083,35 +4139,35 @@ const styles = StyleSheet.create({
   },
   monthBadge: {
     position: 'absolute',
-    bottom: scale(12),
-    left: scale(12),
-    paddingHorizontal: scale(12),
-    paddingVertical: scale(6),
-    borderRadius: scale(12),
+    bottom: rs(12),
+    left: rs(12),
+    paddingHorizontal: rs(12),
+    paddingVertical: rs(6),
+    borderRadius: rs(12),
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
   monthBadgeText: {
-    fontSize: scaleFont(13),
+    fontSize: fp(13),
     color: COLORS.white,
     fontWeight: '600',
   },
   multipleIcon: {
     position: 'absolute',
-    top: scale(12),
-    right: scale(12),
+    top: rs(12),
+    right: rs(12),
   },
   stackIcon: {
-    width: scale(14),
-    height: scale(14),
+    width: rs(14),
+    height: rs(14),
     position: 'relative',
   },
   stackBack: {
     position: 'absolute',
-    top: scale(3),
-    left: scale(3),
-    width: scale(10),
-    height: scale(10),
-    borderRadius: scale(2),
+    top: rs(3),
+    left: rs(3),
+    width: rs(10),
+    height: rs(10),
+    borderRadius: rs(2),
     backgroundColor: COLORS.white,
     borderWidth: 1,
     borderColor: 'rgba(0, 0, 0, 0.15)',
@@ -4120,55 +4176,55 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     left: 0,
-    width: scale(10),
-    height: scale(10),
-    borderRadius: scale(2),
+    width: rs(10),
+    height: rs(10),
+    borderRadius: rs(2),
     backgroundColor: COLORS.white,
     borderWidth: 1,
     borderColor: 'rgba(0, 0, 0, 0.15)',
   },
   collageSection: {
-    paddingHorizontal: scale(SPACING.lg),
-    marginTop: scale(SPACING.lg),
-    marginBottom: scale(SPACING.lg),
+    paddingHorizontal: rs(SPACING.lg),
+    marginTop: rs(SPACING.lg),
+    marginBottom: rs(SPACING.lg),
   },
   collageSectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: scale(SPACING.xs),
+    marginBottom: rs(SPACING.xs),
   },
   collageSectionTitle: {
-    fontSize: scaleFont(20),
+    fontSize: fp(20),
     fontWeight: '700',
     color: COLORS.white,
   },
   albumIconButton: {
-    width: scale(36),
-    height: scale(36),
-    borderRadius: scale(18),
+    width: rs(36),
+    height: rs(36),
+    borderRadius: rs(18),
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   createAlbumButton: {
-    paddingHorizontal: scale(16),
-    paddingVertical: scale(8),
-    borderRadius: scale(20),
+    paddingHorizontal: rs(16),
+    paddingVertical: rs(8),
+    borderRadius: rs(20),
     backgroundColor: COLORS.secondary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   createAlbumButtonText: {
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     fontWeight: '600',
     color: COLORS.white,
   },
   collageSectionSubtitle: {
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     fontWeight: '400',
     color: 'rgba(255, 255, 255, 0.6)',
-    marginBottom: scale(SPACING.md),
+    marginBottom: rs(SPACING.md),
   },
   monthModalContainer: {
     flex: 1,
@@ -4188,9 +4244,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'center',
-    paddingHorizontal: scale(20),
-    paddingTop: scale(16),
-    paddingBottom: scale(8),
+    paddingHorizontal: rs(20),
+    paddingTop: rs(16),
+    paddingBottom: rs(8),
   },
   monthModalContent: {
     position: 'absolute',
@@ -4199,17 +4255,17 @@ const styles = StyleSheet.create({
     bottom: 0,
     height: '90%',
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    borderTopLeftRadius: scale(32),
-    borderTopRightRadius: scale(32),
+    borderTopLeftRadius: rs(32),
+    borderTopRightRadius: rs(32),
     borderTopWidth: 1,
     borderLeftWidth: 1,
     borderRightWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   monthModalCloseButton: {
-    width: scale(36),
-    height: scale(36),
-    borderRadius: scale(18),
+    width: rs(36),
+    height: rs(36),
+    borderRadius: rs(18),
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -4218,29 +4274,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    paddingHorizontal: scale(SPACING.lg),
-    paddingTop: scale(32),
-    paddingBottom: scale(SPACING.lg),
+    paddingHorizontal: rs(SPACING.lg),
+    paddingTop: rs(32),
+    paddingBottom: rs(SPACING.lg),
   },
   monthModalTitle: {
-    fontSize: scaleFont(28),
+    fontSize: fp(28),
     color: COLORS.white,
     fontWeight: '700',
   },
   monthModalCount: {
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     color: 'rgba(255, 255, 255, 0.7)',
     fontWeight: '500',
-    marginTop: scale(8),
+    marginTop: rs(8),
   },
   monthModalGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: scale(SPACING.lg) - 1,
-    gap: scale(2),
+    paddingHorizontal: rs(SPACING.lg) - 1,
+    gap: rs(2),
   },
   monthModalItem: {
-    width: IS_FOLDABLE ? (width - scale(SPACING.lg) * 2 - scale(8)) / 5 : (width - scale(SPACING.lg) * 2 - scale(4)) / 3,
+    width: IS_LARGE_DEVICE ? (width - rs(SPACING.lg) * 2 - rs(8)) / 5 : (width - rs(SPACING.lg) * 2 - rs(4)) / 3,
     aspectRatio: 1,
   },
   monthModalItemInner: {
@@ -4256,7 +4312,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: scale(SPACING.lg),
+    padding: rs(SPACING.lg),
     backgroundColor: 'rgba(0, 0, 0, 0.95)',
   },
   // Carousel styles
@@ -4280,7 +4336,7 @@ const styles = StyleSheet.create({
       width: 0,
       height: 0,
     },
-    shadowRadius: scale(20),
+    shadowRadius: rs(20),
     shadowOpacity: 0.5,
     elevation: 10,
   },
@@ -4302,7 +4358,7 @@ const styles = StyleSheet.create({
       width: 0,
       height: 0,
     },
-    shadowRadius: scale(20),
+    shadowRadius: rs(20),
     shadowOpacity: 0.5,
     elevation: 10,
   },
@@ -4312,17 +4368,17 @@ const styles = StyleSheet.create({
   },
   photoDetailTopButtons: {
     position: 'absolute',
-    top: scale(48),
-    right: scale(24),
+    top: rs(48),
+    right: rs(24),
     flexDirection: 'row',
-    gap: scale(12),
+    gap: rs(12),
     zIndex: 10,
   },
   photoDetailTopButtonsContainer: {
     position: 'absolute',
-    top: scale(60),
-    left: scale(20),
-    right: scale(20),
+    top: rs(60),
+    left: rs(20),
+    right: rs(20),
     flexDirection: 'row',
     justifyContent: 'space-between',
     zIndex: 10,
@@ -4337,11 +4393,11 @@ const styles = StyleSheet.create({
   },
   photoDetailMenuDropdown: {
     position: 'absolute',
-    top: scale(100),
-    right: scale(20),
-    borderRadius: scale(10),
-    paddingVertical: scale(5),
-    minWidth: scale(95),
+    top: rs(100),
+    right: rs(20),
+    borderRadius: rs(10),
+    paddingVertical: rs(5),
+    minWidth: rs(95),
     zIndex: 100,
     overflow: 'hidden',
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
@@ -4351,23 +4407,23 @@ const styles = StyleSheet.create({
   photoDetailMenuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: scale(10),
-    paddingHorizontal: scale(13),
-    gap: scale(8),
+    paddingVertical: rs(10),
+    paddingHorizontal: rs(13),
+    gap: rs(8),
   },
   photoDetailMenuItemDanger: {
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.1)',
   },
   photoDetailMenuItemText: {
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     color: COLORS.white,
     fontWeight: '500',
   },
   photoDetailButton: {
-    width: scale(40),
-    height: scale(40),
-    borderRadius: scale(20),
+    width: rs(40),
+    height: rs(40),
+    borderRadius: rs(20),
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
@@ -4376,25 +4432,25 @@ const styles = StyleSheet.create({
   },
   photoDetailCloseButton: {
     position: 'absolute',
-    top: scale(60),
-    right: scale(20),
-    width: scale(40),
-    height: scale(40),
-    borderRadius: scale(20),
+    top: rs(60),
+    right: rs(20),
+    width: rs(40),
+    height: rs(40),
+    borderRadius: rs(20),
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
   },
   photoDetailCard: {
-    width: IS_FOLDABLE ? '60%' : '90%',
+    width: IS_LARGE_DEVICE ? '60%' : '90%',
     aspectRatio: 3 / 4,
-    borderRadius: scale(16),
+    borderRadius: rs(16),
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: scale(8) },
+    shadowOffset: { width: 0, height: rs(8) },
     shadowOpacity: 0.3,
-    shadowRadius: scale(16),
+    shadowRadius: rs(16),
     elevation: 8,
   },
   photoDetailImage: {
@@ -4402,68 +4458,68 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   photoInfoCard: {
-    width: IS_FOLDABLE ? '60%' : '90%',
-    marginTop: scale(SPACING.lg),
-    padding: scale(SPACING.lg),
-    borderRadius: scale(16),
+    width: IS_LARGE_DEVICE ? '60%' : '90%',
+    marginTop: rs(SPACING.lg),
+    padding: rs(SPACING.lg),
+    borderRadius: rs(16),
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   photoInfoTitle: {
-    fontSize: scaleFont(20),
+    fontSize: fp(20),
     color: COLORS.white,
     fontWeight: '700',
-    marginBottom: scale(SPACING.md),
+    marginBottom: rs(SPACING.md),
   },
   photoInfoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: scale(8),
-    marginBottom: scale(SPACING.xs),
+    gap: rs(8),
+    marginBottom: rs(SPACING.xs),
   },
   photoInfoText: {
-    fontSize: scaleFont(13),
+    fontSize: fp(13),
     color: 'rgba(255, 255, 255, 0.9)',
   },
   photoMessages: {
-    marginTop: scale(SPACING.md),
-    paddingTop: scale(SPACING.md),
+    marginTop: rs(SPACING.md),
+    paddingTop: rs(SPACING.md),
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.2)',
-    gap: scale(SPACING.md),
+    gap: rs(SPACING.md),
   },
   photoMessageItem: {},
   photoMessageLabel: {
-    fontSize: scaleFont(12),
+    fontSize: fp(12),
     color: 'rgba(255, 255, 255, 0.7)',
     fontWeight: '600',
-    marginBottom: scale(4),
+    marginBottom: rs(4),
   },
   photoMessageText: {
-    fontSize: scaleFont(15),
+    fontSize: fp(15),
     color: COLORS.white,
-    lineHeight: scaleFont(22),
+    lineHeight: fp(22),
   },
   // Flip Card Styles
   flipInstructionContainer: {
     position: 'absolute',
-    top: scale(140),
+    top: rs(140),
     left: 0,
     right: 0,
     alignItems: 'center',
     zIndex: 10,
   },
   flipInstructionBadge: {
-    paddingHorizontal: scale(16),
-    paddingVertical: scale(8),
-    borderRadius: scale(20),
+    paddingHorizontal: rs(16),
+    paddingVertical: rs(8),
+    borderRadius: rs(20),
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   flipInstructionText: {
-    fontSize: scaleFont(12),
+    fontSize: fp(12),
     color: 'rgba(255, 255, 255, 0.8)',
     fontWeight: '400',
   },
@@ -4483,7 +4539,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: width * 0.05,
   },
   flipCardContainer: {
-    width: IS_FOLDABLE ? '60%' : '90%',
+    width: IS_LARGE_DEVICE ? '60%' : '90%',
     aspectRatio: 3 / 4,
   },
   flipCardPressable: {
@@ -4495,13 +4551,13 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     backfaceVisibility: 'hidden',
-    borderRadius: scale(16),
+    borderRadius: rs(16),
     overflow: 'hidden',
     backgroundColor: '#000',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: scale(8) },
+    shadowOffset: { width: 0, height: rs(8) },
     shadowOpacity: 0.4,
-    shadowRadius: scale(16),
+    shadowRadius: rs(16),
     ...(Platform.OS === 'ios' ? { elevation: 10 } : {}),
   },
   flipCardBack: {
@@ -4515,36 +4571,36 @@ const styles = StyleSheet.create({
   },
   flipCardBackGradient: {
     flex: 1,
-    borderRadius: scale(16),
+    borderRadius: rs(16),
   },
   flipCardBackContent: {
     flex: 1,
-    padding: scale(24),
+    padding: rs(24),
     backgroundColor: '#1a1a1a',
-    borderRadius: scale(16),
+    borderRadius: rs(16),
   },
   flipCardBackTop: {
-    marginBottom: scale(16),
+    marginBottom: rs(16),
   },
   flipCardTitle: {
-    fontSize: scaleFont(22),
+    fontSize: fp(22),
     color: COLORS.white,
     fontWeight: '700',
-    marginBottom: scale(16),
-    lineHeight: scaleFont(28),
+    marginBottom: rs(16),
+    lineHeight: fp(28),
     flexShrink: 1,
   },
   flipCardInfoSection: {
-    gap: scale(8),
-    marginBottom: scale(16),
+    gap: rs(8),
+    marginBottom: rs(16),
   },
   flipCardInfoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: scale(8),
+    gap: rs(8),
   },
   flipCardInfoText: {
-    fontSize: scaleFont(13),
+    fontSize: fp(13),
     color: 'rgba(255, 255, 255, 0.9)',
     fontWeight: '400',
   },
@@ -4555,66 +4611,66 @@ const styles = StyleSheet.create({
   flipCardMessages: {
     flex: 1,
     justifyContent: 'center',
-    gap: scale(20),
+    gap: rs(20),
   },
   flipCardMessageItem: {
-    gap: scale(4),
+    gap: rs(4),
   },
   flipCardMessageLabel: {
-    fontSize: scaleFont(12),
+    fontSize: fp(12),
     color: 'rgba(255, 255, 255, 0.7)',
     fontWeight: '600',
   },
   flipCardMessageText: {
-    fontSize: scaleFont(15),
+    fontSize: fp(15),
     color: COLORS.white,
     fontWeight: '400',
-    lineHeight: scaleFont(22),
+    lineHeight: fp(22),
   },
   photoCounterContainer: {
     position: 'absolute',
-    bottom: Platform.OS === 'android' ? scale(130) : scale(90),
+    bottom: Platform.OS === 'android' ? rs(130) : rs(90),
     left: 0,
     right: 0,
     alignItems: 'center',
   },
   photoCounterBadge: {
-    paddingHorizontal: scale(12),
-    paddingVertical: scale(6),
-    borderRadius: scale(16),
+    paddingHorizontal: rs(12),
+    paddingVertical: rs(6),
+    borderRadius: rs(16),
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   photoCounterText: {
-    fontSize: scaleFont(13),
+    fontSize: fp(13),
     color: COLORS.white,
     fontWeight: '600',
   },
   // Album List Styles
   albumsContainer: {
-    marginTop: scale(SPACING.sm),
-    marginHorizontal: -scale(SPACING.lg),
-    gap: scale(12),
+    marginTop: rs(SPACING.sm),
+    marginHorizontal: -rs(SPACING.lg),
+    gap: rs(12),
   },
   albumRow: {
-    paddingHorizontal: scale(SPACING.lg),
-    gap: scale(12),
+    paddingHorizontal: rs(SPACING.lg),
+    gap: rs(12),
   },
   albumItem: {
-    width: scale(140),
+    width: rs(140),
   },
   hardcoverBook: {
     width: '100%',
     aspectRatio: 3 / 4,
-    borderRadius: scale(4),
+    borderRadius: rs(4),
     overflow: 'hidden',
     position: 'relative',
     // Book shadow
     shadowColor: '#000',
-    shadowOffset: { width: scale(2), height: scale(4) },
+    shadowOffset: { width: rs(2), height: rs(4) },
     shadowOpacity: 0.3,
-    shadowRadius: scale(8),
+    shadowRadius: rs(8),
     elevation: 8,
   },
   bookFullPhoto: {
@@ -4641,7 +4697,7 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
-    width: scale(24 * ALBUM_SCALE_RATIO), // Match modal spine ratio (24px in modal)
+    width: rs(24 * ALBUM_SCALE_RATIO), // Match modal spine ratio (24px in modal)
     zIndex: 10,
   },
   albumCoverWrapper: {
@@ -4650,7 +4706,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    borderRadius: scale(4),
+    borderRadius: rs(4),
     overflow: 'hidden',
   },
   coverTextureOverlay: {
@@ -4667,8 +4723,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    borderTopRightRadius: scale(4),
-    borderBottomRightRadius: scale(4),
+    borderTopRightRadius: rs(4),
+    borderBottomRightRadius: rs(4),
     // Inner highlight
     borderTopWidth: 1,
     borderRightWidth: 1,
@@ -4692,7 +4748,7 @@ const styles = StyleSheet.create({
   },
   albumNameOverlay: {
     position: 'absolute',
-    maxWidth: scale(ALBUM_CARD_WIDTH) * 0.80, // 80% of album card width (140 * 0.80 = 112px), matches modal's draggableTextOverlay ratio
+    maxWidth: rs(ALBUM_CARD_WIDTH) * 0.80, // 80% of album card width (140 * 0.80 = 112px), matches modal's draggableTextOverlay ratio
   },
   albumNameContainer: {
     flexDirection: 'row',
@@ -4704,7 +4760,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     alignItems: 'flex-start',
     justifyContent: 'center',
-    gap: scale(1),
+    gap: rs(1),
     maxWidth: '100%',
   },
   wordContainerTiny: {
@@ -4716,33 +4772,33 @@ const styles = StyleSheet.create({
   },
   // Space styles for ransom note
   ransomSpace: {
-    width: scale(8),
-    height: scale(20),
+    width: rs(8),
+    height: rs(20),
   },
   ransomSpaceLarge: {
-    width: scale(12),
-    height: scale(36),
+    width: rs(12),
+    height: rs(36),
   },
   ransomSpaceSmall: {
-    width: scale(6),
-    height: scale(18),
+    width: rs(6),
+    height: rs(18),
   },
   ransomSpaceTiny: {
-    width: scale(3),
-    height: scale(10),
+    width: rs(3),
+    height: rs(10),
   },
   // Torn paper base style
   ransomCharBox: {
-    paddingHorizontal: scale(6),
-    paddingVertical: scale(4),
+    paddingHorizontal: rs(6),
+    paddingVertical: rs(4),
     shadowColor: '#000',
-    shadowOffset: { width: scale(2), height: scale(3) },
+    shadowOffset: { width: rs(2), height: rs(3) },
     shadowOpacity: 0.25,
-    shadowRadius: scale(3),
+    shadowRadius: rs(3),
     elevation: 4,
   },
   ransomChar: {
-    fontSize: scaleFont(13),
+    fontSize: fp(13),
     color: '#1a1a1a',
     fontWeight: '500',
   },
@@ -4875,19 +4931,19 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: scale(24),
+    paddingHorizontal: rs(24),
   },
   albumModalContent: {
     width: '100%',
-    maxWidth: scale(360),
+    maxWidth: rs(360),
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    borderRadius: scale(32),
-    padding: scale(24),
+    borderRadius: rs(32),
+    padding: rs(24),
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   albumModalContentFontStyle: {
-    paddingBottom: scale(28),
+    paddingBottom: rs(28),
   },
   albumModalHeader: {
     flexDirection: 'row',
@@ -4898,48 +4954,48 @@ const styles = StyleSheet.create({
   albumModalHeaderDivider: {
     height: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    marginTop: scale(16),
-    marginBottom: scale(20),
+    marginTop: rs(16),
+    marginBottom: rs(20),
     width: '100%',
   },
   albumModalCloseButton: {
-    width: scale(32),
-    height: scale(32),
-    borderRadius: scale(16),
+    width: rs(32),
+    height: rs(32),
+    borderRadius: rs(16),
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   albumModalTitle: {
-    fontSize: scaleFont(18),
+    fontSize: fp(18),
     fontWeight: '600',
     color: COLORS.white,
   },
   albumModalSubtitle: {
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     color: 'rgba(255, 255, 255, 0.6)',
-    marginBottom: scale(20),
+    marginBottom: rs(20),
   },
   ransomPreviewContainer: {
     width: '100%',
-    minHeight: scale(80),
+    minHeight: rs(80),
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: scale(16),
-    padding: scale(16),
+    borderRadius: rs(16),
+    padding: rs(16),
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: scale(20),
+    marginBottom: rs(20),
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
     position: 'relative',
   },
   refreshButton: {
     position: 'absolute',
-    bottom: scale(8),
-    right: scale(8),
-    width: scale(32),
-    height: scale(32),
-    borderRadius: scale(16),
+    bottom: rs(8),
+    right: rs(8),
+    width: rs(32),
+    height: rs(32),
+    borderRadius: rs(16),
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -4949,7 +5005,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'center',
     alignItems: 'flex-start',
-    gap: scale(4),
+    gap: rs(4),
     width: '100%',
   },
   wordContainerLarge: {
@@ -4957,27 +5013,27 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     alignItems: 'flex-start',
     justifyContent: 'center',
-    gap: scale(2),
+    gap: rs(2),
     maxWidth: '100%',
   },
   // Large preview torn paper style
   ransomPreviewCharBox: {
-    paddingHorizontal: scale(12),
-    paddingVertical: scale(10),
+    paddingHorizontal: rs(12),
+    paddingVertical: rs(10),
     shadowColor: '#000',
-    shadowOffset: { width: scale(3), height: scale(4) },
+    shadowOffset: { width: rs(3), height: rs(4) },
     shadowOpacity: 0.3,
-    shadowRadius: scale(4),
+    shadowRadius: rs(4),
     elevation: 5,
   },
   ransomPreviewChar: {
-    fontSize: scaleFont(26),
+    fontSize: fp(26),
     color: '#1a1a1a',
     fontWeight: '500',
   },
   basicFontPreview: {
     fontFamily: 'Jua',
-    fontSize: scaleFont(28),
+    fontSize: fp(28),
     color: COLORS.white,
     textAlign: 'center',
   },
@@ -4985,36 +5041,36 @@ const styles = StyleSheet.create({
     fontFamily: 'Jua',
     color: COLORS.white,
     textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: { width: scale(1), height: scale(1) },
-    textShadowRadius: scale(3),
+    textShadowOffset: { width: rs(1), height: rs(1) },
+    textShadowRadius: rs(3),
   },
   basicFontTiny: {
     fontFamily: 'Jua',
     color: COLORS.white,
     textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: { width: scale(0.5), height: scale(0.5) },
-    textShadowRadius: scale(2),
+    textShadowOffset: { width: rs(0.5), height: rs(0.5) },
+    textShadowRadius: rs(2),
   },
   ransomPlaceholder: {
-    fontSize: scaleFont(18),
+    fontSize: fp(18),
     color: 'rgba(255, 255, 255, 0.3)',
   },
   albumNameInput: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: scale(12),
-    paddingHorizontal: scale(16),
-    paddingVertical: scale(14),
-    fontSize: scaleFont(16),
+    borderRadius: rs(12),
+    paddingHorizontal: rs(16),
+    paddingVertical: rs(14),
+    fontSize: fp(16),
     color: COLORS.white,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
-    marginBottom: scale(20),
+    marginBottom: rs(20),
   },
   albumModalButton: {
     flex: 1,
     backgroundColor: COLORS.white,
-    borderRadius: scale(999),
-    height: scale(48),
+    borderRadius: rs(999),
+    height: rs(48),
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -5022,7 +5078,7 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
   albumModalButtonText: {
-    fontSize: scaleFont(16),
+    fontSize: fp(16),
     fontWeight: '700',
     color: '#1a1a1a',
     includeFontPadding: false,
@@ -5035,20 +5091,20 @@ const styles = StyleSheet.create({
   albumModalButtonFullWidth: {
     width: '100%',
     backgroundColor: COLORS.white,
-    borderRadius: scale(999),
-    height: scale(48),
+    borderRadius: rs(999),
+    height: rs(48),
     alignItems: 'center',
     justifyContent: 'center',
   },
   coverPhotoContainer: {
     width: '100%',
     position: 'relative',
-    marginBottom: scale(12),
+    marginBottom: rs(12),
   },
   coverPhotoPickerContainer: {
     width: '100%',
     aspectRatio: 3 / 4, // 3:4 aspect ratio
-    borderRadius: scale(16),
+    borderRadius: rs(16),
     overflow: 'hidden',
     position: 'relative',
   },
@@ -5057,7 +5113,7 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
-    width: scale(24),
+    width: rs(24),
     zIndex: 10,
   },
   coverPhotoInner: {
@@ -5076,13 +5132,13 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderStyle: 'dashed',
     borderColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: scale(16),
+    borderRadius: rs(16),
     alignItems: 'center',
     justifyContent: 'center',
-    gap: scale(8),
+    gap: rs(8),
   },
   coverPhotoPlaceholderText: {
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     color: 'rgba(255, 255, 255, 0.5)',
   },
   draggableTextOverlay: {
@@ -5096,19 +5152,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'nowrap',
     alignItems: 'flex-start',
-    gap: scale(2),
+    gap: rs(2),
   },
   wordContainerSmall: {
     flexDirection: 'row',
     flexWrap: 'nowrap',
     alignItems: 'flex-start',
-    gap: scale(1),
+    gap: rs(1),
   },
   dragHintText: {
-    fontSize: scaleFont(12),
+    fontSize: fp(12),
     color: 'rgba(255, 255, 255, 0.5)',
     textAlign: 'center',
-    marginBottom: scale(16),
+    marginBottom: rs(16),
   },
   // Size Selection Buttons
   textStyleSelectionContainer: {
@@ -5116,8 +5172,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: scale(16),
-    paddingHorizontal: scale(8),
+    marginBottom: rs(16),
+    paddingHorizontal: rs(8),
   },
   colorSelectionSection: {
     alignItems: 'center',
@@ -5126,18 +5182,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   selectionLabel: {
-    fontSize: scaleFont(13),
+    fontSize: fp(13),
     color: 'rgba(255, 255, 255, 0.7)',
-    marginBottom: scale(10),
+    marginBottom: rs(10),
   },
   colorButtonRow: {
     flexDirection: 'row',
-    gap: scale(10),
+    gap: rs(10),
   },
   colorButton: {
-    width: scale(36),
-    height: scale(36),
-    borderRadius: scale(18),
+    width: rs(36),
+    height: rs(36),
+    borderRadius: rs(18),
     borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.3)',
   },
@@ -5147,28 +5203,28 @@ const styles = StyleSheet.create({
     shadowColor: '#fff',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
-    shadowRadius: scale(4),
+    shadowRadius: rs(4),
   },
   sizeSelectionContainer: {
     width: '100%',
-    marginBottom: scale(16),
+    marginBottom: rs(16),
   },
   sizeSelectionLabel: {
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     color: 'rgba(255, 255, 255, 0.7)',
-    marginBottom: scale(12),
+    marginBottom: rs(12),
     textAlign: 'center',
   },
   sizeButtonRow: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: scale(12),
+    gap: rs(12),
   },
   sizeButton: {
-    width: scale(44),
-    height: scale(44),
-    borderRadius: scale(22),
+    width: rs(44),
+    height: rs(44),
+    borderRadius: rs(22),
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.2)',
@@ -5190,36 +5246,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: scale(3),
-    marginBottom: scale(24),
+    gap: rs(3),
+    marginBottom: rs(24),
   },
   // Small torn paper - for modal draggable text (larger modal view)
   ransomCharBoxSmall: {
-    paddingHorizontal: scale(6),
-    paddingVertical: scale(4),
+    paddingHorizontal: rs(6),
+    paddingVertical: rs(4),
     shadowColor: '#000',
-    shadowOffset: { width: scale(2), height: scale(3) },
+    shadowOffset: { width: rs(2), height: rs(3) },
     shadowOpacity: 0.25,
-    shadowRadius: scale(3),
+    shadowRadius: rs(3),
     elevation: 4,
   },
   ransomCharSmall: {
-    fontSize: scaleFont(13),
+    fontSize: fp(13),
     color: '#1a1a1a',
     fontWeight: '500',
   },
   // Tiny torn paper - for album list thumbnails (proportionally smaller ~0.56 ratio)
   ransomCharBoxTiny: {
-    paddingHorizontal: scale(3),
-    paddingVertical: scale(2),
+    paddingHorizontal: rs(3),
+    paddingVertical: rs(2),
     shadowColor: '#000',
-    shadowOffset: { width: scale(1.1), height: scale(1.7) },
+    shadowOffset: { width: rs(1.1), height: rs(1.7) },
     shadowOpacity: 0.22,
-    shadowRadius: scale(1.7),
+    shadowRadius: rs(1.7),
     elevation: 2,
   },
   ransomCharTiny: {
-    fontSize: scaleFont(7),
+    fontSize: fp(7),
     color: '#1a1a1a',
     fontWeight: '500',
   },
@@ -5428,20 +5484,20 @@ const styles = StyleSheet.create({
   albumModalButtonRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: scale(12),
+    gap: rs(12),
   },
   albumModalButtonSecondary: {
     flex: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: scale(999),
-    height: scale(48),
+    borderRadius: rs(999),
+    height: rs(48),
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   albumModalButtonSecondaryText: {
-    fontSize: scaleFont(15),
+    fontSize: fp(15),
     fontWeight: '600',
     color: COLORS.white,
     includeFontPadding: false,
@@ -5450,128 +5506,128 @@ const styles = StyleSheet.create({
   },
   // Slider styles
   sliderContainer: {
-    marginBottom: scale(20),
-    paddingHorizontal: scale(4),
+    marginBottom: rs(20),
+    paddingHorizontal: rs(4),
   },
   sliderLabel: {
-    fontSize: scaleFont(13),
+    fontSize: fp(13),
     color: 'rgba(255, 255, 255, 0.7)',
-    marginBottom: scale(12),
+    marginBottom: rs(12),
   },
   sliderTrackTouchable: {
-    height: scale(44),
+    height: rs(44),
     justifyContent: 'center',
     position: 'relative',
-    width: scale(280),
+    width: rs(280),
     alignSelf: 'center',
   },
   sliderTrack: {
-    height: scale(8),
+    height: rs(8),
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: scale(4),
+    borderRadius: rs(4),
     overflow: 'hidden',
   },
   sliderFill: {
     height: '100%',
     backgroundColor: COLORS.white,
-    borderRadius: scale(4),
+    borderRadius: rs(4),
   },
   sliderThumb: {
     position: 'absolute',
-    top: scale(10),
-    width: scale(24),
-    height: scale(24),
-    borderRadius: scale(12),
+    top: rs(10),
+    width: rs(24),
+    height: rs(24),
+    borderRadius: rs(12),
     backgroundColor: COLORS.white,
-    marginLeft: scale(-12),
+    marginLeft: rs(-12),
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: scale(2) },
+    shadowOffset: { width: 0, height: rs(2) },
     shadowOpacity: 0.3,
-    shadowRadius: scale(3),
+    shadowRadius: rs(3),
     elevation: 3,
   },
   sliderValue: {
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     color: COLORS.white,
     fontWeight: '600',
-    minWidth: scale(50),
+    minWidth: rs(50),
     textAlign: 'center',
   },
   // Padding variants for varied paper sizes (Large - for step 1 preview)
   paddingVariantLarge0: {
-    paddingHorizontal: scale(8),
-    paddingVertical: scale(6),
+    paddingHorizontal: rs(8),
+    paddingVertical: rs(6),
   },
   paddingVariantLarge1: {
-    paddingHorizontal: scale(14),
-    paddingVertical: scale(8),
+    paddingHorizontal: rs(14),
+    paddingVertical: rs(8),
   },
   paddingVariantLarge2: {
-    paddingHorizontal: scale(10),
-    paddingVertical: scale(10),
+    paddingHorizontal: rs(10),
+    paddingVertical: rs(10),
   },
   paddingVariantLarge3: {
-    paddingHorizontal: scale(16),
-    paddingVertical: scale(6),
+    paddingHorizontal: rs(16),
+    paddingVertical: rs(6),
   },
   paddingVariantLarge4: {
-    paddingHorizontal: scale(12),
-    paddingVertical: scale(12),
+    paddingHorizontal: rs(12),
+    paddingVertical: rs(12),
   },
   // Padding variants for varied paper sizes (Small - for modal)
   paddingVariantSmall0: {
-    paddingHorizontal: scale(4),
-    paddingVertical: scale(3),
+    paddingHorizontal: rs(4),
+    paddingVertical: rs(3),
   },
   paddingVariantSmall1: {
-    paddingHorizontal: scale(7),
-    paddingVertical: scale(4),
+    paddingHorizontal: rs(7),
+    paddingVertical: rs(4),
   },
   paddingVariantSmall2: {
-    paddingHorizontal: scale(5),
-    paddingVertical: scale(5),
+    paddingHorizontal: rs(5),
+    paddingVertical: rs(5),
   },
   paddingVariantSmall3: {
-    paddingHorizontal: scale(8),
-    paddingVertical: scale(3),
+    paddingHorizontal: rs(8),
+    paddingVertical: rs(3),
   },
   paddingVariantSmall4: {
-    paddingHorizontal: scale(6),
-    paddingVertical: scale(6),
+    paddingHorizontal: rs(6),
+    paddingVertical: rs(6),
   },
   // Padding variants for varied paper sizes (Tiny - for album list)
   paddingVariantTiny0: {
-    paddingHorizontal: scale(2),
-    paddingVertical: scale(1),
+    paddingHorizontal: rs(2),
+    paddingVertical: rs(1),
   },
   paddingVariantTiny1: {
-    paddingHorizontal: scale(4),
-    paddingVertical: scale(2),
+    paddingHorizontal: rs(4),
+    paddingVertical: rs(2),
   },
   paddingVariantTiny2: {
-    paddingHorizontal: scale(2.5),
-    paddingVertical: scale(2.5),
+    paddingHorizontal: rs(2.5),
+    paddingVertical: rs(2.5),
   },
   paddingVariantTiny3: {
-    paddingHorizontal: scale(4),
-    paddingVertical: scale(1.5),
+    paddingHorizontal: rs(4),
+    paddingVertical: rs(1.5),
   },
   paddingVariantTiny4: {
-    paddingHorizontal: scale(3),
-    paddingVertical: scale(3),
+    paddingHorizontal: rs(3),
+    paddingVertical: rs(3),
   },
   // Font style selection styles
   fontStyleOptions: {
     flexDirection: 'row',
-    gap: scale(12),
-    marginBottom: scale(24),
+    gap: rs(12),
+    marginBottom: rs(24),
   },
   fontStyleOption: {
     flex: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: scale(16),
-    paddingVertical: scale(20),
-    paddingHorizontal: Platform.OS === 'android' ? scale(8) : scale(20),
+    borderRadius: rs(16),
+    paddingVertical: rs(20),
+    paddingHorizontal: Platform.OS === 'android' ? rs(8) : rs(20),
     alignItems: 'center',
     borderWidth: 2,
     borderColor: 'transparent',
@@ -5581,13 +5637,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
   },
   fontStylePreviewContainer: {
-    height: scale(50),
+    height: rs(50),
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: scale(8),
+    marginBottom: rs(8),
   },
   fontStylePreviewBasic: {
-    fontSize: scaleFont(24),
+    fontSize: fp(24),
     fontFamily: 'Jua',
     color: COLORS.white,
     textAlign: 'center',
@@ -5596,25 +5652,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: scale(2),
+    gap: rs(2),
     overflow: 'visible',
   },
   fontStyleLabel: {
-    fontSize: scaleFont(13),
+    fontSize: fp(13),
     color: 'rgba(255, 255, 255, 0.7)',
     textAlign: 'center',
   },
   ransomMiniBox: {
-    paddingHorizontal: scale(3),
-    paddingVertical: scale(1),
-    borderRadius: scale(2),
-    height: scale(22),
+    paddingHorizontal: rs(3),
+    paddingVertical: rs(1),
+    borderRadius: rs(2),
+    height: rs(22),
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'visible',
   },
   ransomMiniText: {
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     fontWeight: '600',
     color: '#1a1a1a',
   },
@@ -5720,9 +5776,9 @@ const styles = StyleSheet.create({
   albumDetailContent: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    borderTopLeftRadius: scale(32),
-    borderTopRightRadius: scale(32),
-    marginTop: scale(60),
+    borderTopLeftRadius: rs(32),
+    borderTopRightRadius: rs(32),
+    marginTop: rs(60),
     borderTopWidth: 1,
     borderLeftWidth: 1,
     borderRightWidth: 1,
@@ -5733,21 +5789,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: scale(20),
-    paddingTop: scale(60),
-    paddingBottom: scale(16),
+    paddingHorizontal: rs(20),
+    paddingTop: rs(60),
+    paddingBottom: rs(16),
     position: 'relative',
   },
   albumDetailCloseButton: {
-    width: scale(40),
-    height: scale(40),
-    borderRadius: scale(20),
+    width: rs(40),
+    height: rs(40),
+    borderRadius: rs(20),
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   albumDetailTitle: {
-    fontSize: scaleFont(18),
+    fontSize: fp(18),
     fontWeight: '600',
     color: '#FFFFFF',
     textAlign: 'center',
@@ -5761,22 +5817,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 107, 107, 0.2)',
-    paddingHorizontal: scale(8),
-    paddingVertical: scale(4),
-    borderRadius: scale(12),
-    marginTop: scale(4),
-    gap: scale(4),
+    paddingHorizontal: rs(8),
+    paddingVertical: rs(4),
+    borderRadius: rs(12),
+    marginTop: rs(4),
+    gap: rs(4),
   },
   readOnlyBadgeText: {
-    fontSize: scaleFont(11),
+    fontSize: fp(11),
     fontWeight: '600',
     color: '#FF6B6B',
     letterSpacing: 0.3,
   },
   albumDetailMenuButton: {
-    width: scale(40),
-    height: scale(40),
-    borderRadius: scale(20),
+    width: rs(40),
+    height: rs(40),
+    borderRadius: rs(20),
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
@@ -5793,11 +5849,11 @@ const styles = StyleSheet.create({
   },
   albumMenuDropdown: {
     position: 'absolute',
-    top: scale(100),
-    right: scale(20),
-    borderRadius: scale(12),
-    paddingVertical: scale(6),
-    minWidth: scale(120),
+    top: rs(100),
+    right: rs(20),
+    borderRadius: rs(12),
+    paddingVertical: rs(6),
+    minWidth: rs(120),
     zIndex: 100,
     overflow: 'hidden',
     backgroundColor: 'rgba(30, 30, 30, 0.95)',
@@ -5807,30 +5863,30 @@ const styles = StyleSheet.create({
   albumMenuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: scale(11),
-    paddingHorizontal: scale(14),
-    gap: scale(11),
+    paddingVertical: rs(11),
+    paddingHorizontal: rs(14),
+    gap: rs(11),
   },
   albumMenuItemDanger: {
-    marginTop: scale(3),
+    marginTop: rs(3),
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.1)',
   },
   albumMenuItemText: {
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     color: '#FFFFFF',
     fontWeight: '500',
   },
   albumDetailCoverContainer: {
     alignItems: 'center',
-    paddingTop: scale(12),
-    paddingBottom: scale(24),
-    paddingHorizontal: scale(20),
+    paddingTop: rs(12),
+    paddingBottom: rs(24),
+    paddingHorizontal: rs(20),
   },
   albumDetailCoverWrapper: {
-    width: scale(180),
-    height: scale(240),
-    borderRadius: scale(4), // Match memories preview (hardcoverBook) border radius
+    width: rs(180),
+    height: rs(240),
+    borderRadius: rs(4), // Match memories preview (hardcoverBook) border radius
     overflow: 'hidden',
     position: 'relative',
     backgroundColor: 'rgba(60, 60, 60, 0.5)',
@@ -5840,7 +5896,7 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
-    width: scale(24 * ALBUM_DETAIL_SCALE_RATIO), // Match modal spine ratio (24px in modal)
+    width: rs(24 * ALBUM_DETAIL_SCALE_RATIO), // Match modal spine ratio (24px in modal)
     zIndex: 10,
   },
   albumDetailCoverImage: {
@@ -5861,22 +5917,22 @@ const styles = StyleSheet.create({
   albumNameContainerTiny: {
     flexDirection: 'row',
     flexWrap: 'nowrap',
-    gap: scale(1),
+    gap: rs(1),
   },
   albumPhotosSection: {
     flex: 1,
-    minHeight: scale(200),
+    minHeight: rs(200),
   },
   albumDetailScrollView: {
     flex: 1,
   },
   albumDetailScrollContent: {
     flexGrow: 1,
-    paddingBottom: scale(100),
+    paddingBottom: rs(100),
   },
   albumPhotosSectionHeaderSticky: {
-    paddingVertical: scale(14),
-    paddingHorizontal: scale(SPACING.lg),
+    paddingVertical: rs(14),
+    paddingHorizontal: rs(SPACING.lg),
     backgroundColor: '#000000',
   },
   albumPhotosSectionHeaderInner: {
@@ -5885,47 +5941,47 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   albumPhotosGridContainer: {
-    paddingHorizontal: scale(SPACING.lg) - 1,
-    paddingTop: scale(SPACING.md),
+    paddingHorizontal: rs(SPACING.lg) - 1,
+    paddingTop: rs(SPACING.md),
   },
   albumPhotosSectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: scale(SPACING.lg),
+    paddingHorizontal: rs(SPACING.lg),
   },
   albumPhotosSectionTitle: {
-    fontSize: scaleFont(16),
+    fontSize: fp(16),
     fontWeight: '600',
     color: '#FFFFFF',
   },
   selectionButtonsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: scale(8),
+    gap: rs(8),
   },
   cancelButton: {
-    paddingHorizontal: scale(16),
-    paddingVertical: scale(8),
-    borderRadius: scale(16),
+    paddingHorizontal: rs(16),
+    paddingVertical: rs(8),
+    borderRadius: rs(16),
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   cancelButtonText: {
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     fontWeight: '600',
     color: 'rgba(255, 255, 255, 0.7)',
   },
   selectAddButton: {
-    paddingHorizontal: scale(16),
-    paddingVertical: scale(8),
-    borderRadius: scale(16),
+    paddingHorizontal: rs(16),
+    paddingVertical: rs(8),
+    borderRadius: rs(16),
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   selectAddButtonDisabled: {
     opacity: 0.4,
   },
   selectAddButtonText: {
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     fontWeight: '600',
     color: COLORS.white,
   },
@@ -5938,32 +5994,32 @@ const styles = StyleSheet.create({
   albumPhotosGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: scale(SPACING.lg) - 1,
-    paddingTop: scale(SPACING.md),
-    gap: scale(2),
-    paddingBottom: scale(100),
+    paddingHorizontal: rs(SPACING.lg) - 1,
+    paddingTop: rs(SPACING.md),
+    gap: rs(2),
+    paddingBottom: rs(100),
     flexGrow: 1,
   },
   albumMonthSection: {
     width: '100%',
-    marginBottom: scale(SPACING.lg),
+    marginBottom: rs(SPACING.lg),
   },
   albumMonthHeader: {
-    fontSize: scaleFont(15),
+    fontSize: fp(15),
     fontWeight: '600',
     color: 'rgba(255, 255, 255, 0.8)',
-    paddingHorizontal: scale(SPACING.sm),
-    marginBottom: scale(SPACING.sm),
+    paddingHorizontal: rs(SPACING.sm),
+    marginBottom: rs(SPACING.sm),
   },
   albumMonthPhotosGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: scale(2),
+    gap: rs(2),
   },
   addPhotoButton: {
-    width: IS_FOLDABLE ? (width - scale(SPACING.lg) * 2 - scale(8)) / 5 : (width - scale(SPACING.lg) * 2 - scale(4)) / 3,
+    width: IS_LARGE_DEVICE ? (width - rs(SPACING.lg) * 2 - rs(8)) / 5 : (width - rs(SPACING.lg) * 2 - rs(4)) / 3,
     aspectRatio: 1,
-    borderRadius: scale(12),
+    borderRadius: rs(12),
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.15)',
@@ -5971,28 +6027,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   emptyAddPhotoButton: {
-    width: IS_FOLDABLE ? (width - scale(SPACING.lg) * 2 - scale(8)) / 5 : (width - scale(SPACING.lg) * 2 - scale(4)) / 3,
-    height: IS_FOLDABLE ? (width - scale(SPACING.lg) * 2 - scale(8)) / 5 + scale(24) : (width - scale(SPACING.lg) * 2 - scale(4)) / 3 + scale(24),
-    borderRadius: scale(12),
+    width: IS_LARGE_DEVICE ? (width - rs(SPACING.lg) * 2 - rs(8)) / 5 : (width - rs(SPACING.lg) * 2 - rs(4)) / 3,
+    height: IS_LARGE_DEVICE ? (width - rs(SPACING.lg) * 2 - rs(8)) / 5 + rs(24) : (width - rs(SPACING.lg) * 2 - rs(4)) / 3 + rs(24),
+    borderRadius: rs(12),
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: scale(12),
+    paddingVertical: rs(12),
   },
   emptyAddPhotoButtonText: {
-    fontSize: scaleFont(12),
+    fontSize: fp(12),
     color: 'rgba(255, 255, 255, 0.5)',
-    marginTop: scale(8),
+    marginTop: rs(8),
   },
   addPhotoButtonText: {
-    fontSize: scaleFont(12),
+    fontSize: fp(12),
     color: 'rgba(255, 255, 255, 0.5)',
-    marginTop: scale(8),
+    marginTop: rs(8),
   },
   missionPhotoItem: {
-    width: IS_FOLDABLE ? (width - scale(SPACING.lg) * 2 - scale(8)) / 5 : (width - scale(SPACING.lg) * 2 - scale(4)) / 3,
-    height: IS_FOLDABLE ? (width - scale(SPACING.lg) * 2 - scale(8)) / 5 + scale(24) : (width - scale(SPACING.lg) * 2 - scale(4)) / 3 + scale(24),
-    borderRadius: scale(12),
+    width: IS_LARGE_DEVICE ? (width - rs(SPACING.lg) * 2 - rs(8)) / 5 : (width - rs(SPACING.lg) * 2 - rs(4)) / 3,
+    height: IS_LARGE_DEVICE ? (width - rs(SPACING.lg) * 2 - rs(8)) / 5 + rs(24) : (width - rs(SPACING.lg) * 2 - rs(4)) / 3 + rs(24),
+    borderRadius: rs(12),
     overflow: 'hidden',
     position: 'relative',
   },
@@ -6015,11 +6071,11 @@ const styles = StyleSheet.create({
   },
   photoInAlbumOverlay: {
     position: 'absolute',
-    top: scale(4),
-    right: scale(4),
-    width: scale(24),
-    height: scale(24),
-    borderRadius: scale(12),
+    top: rs(4),
+    right: rs(4),
+    width: rs(24),
+    height: rs(24),
+    borderRadius: rs(12),
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -6028,41 +6084,41 @@ const styles = StyleSheet.create({
   albumPhotoActionButtons: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: scale(12),
+    gap: rs(12),
   },
   albumPhotoSelectButton: {
-    paddingHorizontal: scale(16),
-    paddingVertical: scale(8),
+    paddingHorizontal: rs(16),
+    paddingVertical: rs(8),
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: scale(100),
+    borderRadius: rs(100),
   },
   albumPhotoSelectButtonText: {
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     color: '#FFFFFF',
     fontWeight: '500',
   },
   albumPhotoCancelButton: {
-    paddingHorizontal: scale(16),
-    paddingVertical: scale(8),
+    paddingHorizontal: rs(16),
+    paddingVertical: rs(8),
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: scale(100),
+    borderRadius: rs(100),
   },
   albumPhotoCancelButtonText: {
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     color: '#FFFFFF',
     fontWeight: '500',
   },
   albumPhotoDeleteButton: {
-    paddingHorizontal: scale(16),
-    paddingVertical: scale(8),
+    paddingHorizontal: rs(16),
+    paddingVertical: rs(8),
     backgroundColor: 'rgba(255, 107, 107, 0.2)',
-    borderRadius: scale(100),
+    borderRadius: rs(100),
   },
   albumPhotoDeleteButtonDisabled: {
     opacity: 0.4,
   },
   albumPhotoDeleteButtonText: {
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     color: '#FF6B6B',
     fontWeight: '600',
   },
@@ -6076,18 +6132,18 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    borderRadius: scale(12),
+    borderRadius: rs(12),
   },
   photoSelectionOverlaySelected: {
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
   photoSelectionCheck: {
     position: 'absolute',
-    bottom: scale(8),
-    right: scale(8),
-    width: scale(24),
-    height: scale(24),
-    borderRadius: scale(12),
+    bottom: rs(8),
+    right: rs(8),
+    width: rs(24),
+    height: rs(24),
+    borderRadius: rs(12),
     backgroundColor: '#007AFF',
     alignItems: 'center',
     justifyContent: 'center',
@@ -6097,12 +6153,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: scale(SPACING.lg),
-    paddingTop: scale(32),
-    paddingBottom: scale(SPACING.lg),
+    paddingHorizontal: rs(SPACING.lg),
+    paddingTop: rs(32),
+    paddingBottom: rs(SPACING.lg),
   },
   missionPickerTitle: {
-    fontSize: scaleFont(20),
+    fontSize: fp(20),
     fontWeight: '700',
     color: COLORS.white,
     flex: 1,
@@ -6131,11 +6187,11 @@ const styles = StyleSheet.create({
   },
   missionPickerCheckBadge: {
     position: 'absolute',
-    bottom: scale(8),
-    right: scale(8),
-    width: scale(24),
-    height: scale(24),
-    borderRadius: scale(12),
+    bottom: rs(8),
+    right: rs(8),
+    width: rs(24),
+    height: rs(24),
+    borderRadius: rs(12),
     backgroundColor: '#007AFF',
     alignItems: 'center',
     justifyContent: 'center',
@@ -6145,21 +6201,21 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: scale(60),
+    paddingVertical: rs(60),
   },
   missionPickerEmptyText: {
-    fontSize: scaleFont(15),
+    fontSize: fp(15),
     color: 'rgba(255, 255, 255, 0.5)',
   },
   missionPickerHeaderButton: {
-    paddingHorizontal: scale(16),
-    paddingVertical: scale(8),
-    minWidth: scale(50),
+    paddingHorizontal: rs(16),
+    paddingVertical: rs(8),
+    minWidth: rs(50),
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: scale(100),
+    borderRadius: rs(100),
   },
   missionPickerHeaderButtonText: {
-    fontSize: scaleFont(15),
+    fontSize: fp(15),
     fontWeight: '500',
     color: 'rgba(255, 255, 255, 0.9)',
   },
@@ -6172,7 +6228,7 @@ const styles = StyleSheet.create({
   },
   missionPickerItemSelected: {
     backgroundColor: 'rgba(236, 72, 153, 0.7)',
-    borderWidth: scale(3),
+    borderWidth: rs(3),
     borderColor: '#EC4899',
   },
 

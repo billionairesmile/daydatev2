@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import { Jua_400Regular } from '@expo-google-fonts/jua';
@@ -206,7 +206,6 @@ function RootLayoutNav() {
   const { syncFromCouple } = useTimezoneStore();
   const { initializeRevenueCat, loadFromDatabase, checkCouplePremium, setPartnerIsPremium, _hasHydrated: subscriptionHydrated } = useSubscriptionStore();
   const { syncLanguageToDatabase } = useLanguageStore();
-  const [isNavigationReady, setIsNavigationReady] = useState(false);
   const appState = useRef(AppState.currentState);
   const lastFetchTime = useRef<number>(0);
   const subscriptionInitialized = useRef(false);
@@ -1154,16 +1153,9 @@ function RootLayoutNav() {
     };
   }, [isOnboardingComplete, couple?.id, setCouple, setPartner, setIsOnboardingComplete, cleanupSync, setOnboardingStep, updateOnboardingData]);
 
-  // Wait for auth hydration and onboarding state to be determined before navigation
-  useEffect(() => {
-    // Only set navigation ready after auth store is hydrated AND onboarding state is determined (boolean, not undefined)
-    if (authHydrated && typeof isOnboardingComplete === 'boolean') {
-      const timer = setTimeout(() => {
-        setIsNavigationReady(true);
-      }, 50);
-      return () => clearTimeout(timer);
-    }
-  }, [authHydrated, isOnboardingComplete]);
+  // Track if navigation has been performed to prevent re-navigation
+  // Use ref instead of state to persist across hot reloads
+  const hasNavigated = useRef(false);
 
   // Calculate navigation state
   const inAuthGroup = segments?.[0] === '(auth)';
@@ -1176,28 +1168,22 @@ function RootLayoutNav() {
   // This covers tabs, more, mission, and any other top-level routes
   const needsNavigationToAuth = shouldBeInAuth && !inAuthGroup;
 
-  // Track if navigation has been performed to prevent re-navigation
-  // Use ref instead of state to persist across hot reloads
-  const hasNavigated = useRef(false);
+  // Determine if we need to navigate (prevents flash of wrong screen)
+  const needsNavigation = needsNavigationToAuth || needsNavigationToTabs;
 
+  // Trigger navigation immediately when auth is ready and we're in wrong location
   useEffect(() => {
-    if (!isNavigationReady || !authHydrated) return;
-    // Wait for segments to be populated (prevents flash during error recovery)
-    if (!segments?.[0]) return;
-    // Prevent re-navigation
+    if (!authHydrated || typeof isOnboardingComplete !== 'boolean') return;
     if (hasNavigated.current) return;
 
-    // If onboarding not complete and not in auth group, redirect to onboarding
     if (needsNavigationToAuth) {
       hasNavigated.current = true;
       router.replace('/(auth)/onboarding');
-    }
-    // If onboarding is complete and in auth group, redirect to tabs
-    else if (needsNavigationToTabs) {
+    } else if (needsNavigationToTabs) {
       hasNavigated.current = true;
-      router.replace('/(tabs)');
+      router.replace('/');
     }
-  }, [isNavigationReady, isOnboardingComplete, authHydrated, segments, needsNavigationToTabs, needsNavigationToAuth]);
+  }, [authHydrated, isOnboardingComplete, needsNavigationToAuth, needsNavigationToTabs]);
 
   // Reset navigation flag when onboarding state changes
   useEffect(() => {
@@ -1207,9 +1193,9 @@ function RootLayoutNav() {
   // Don't render Stack until:
   // 1. Auth state is hydrated
   // 2. Onboarding state is determined (boolean, not undefined)
-  // 3. Navigation is ready
-  // Always render StatusBar to maintain light style even during loading
-  if (!authHydrated || typeof isOnboardingComplete !== 'boolean' || !isNavigationReady) {
+  // 3. We're in the correct location (no pending navigation)
+  // This prevents flash of home screen before redirecting to login
+  if (!authHydrated || typeof isOnboardingComplete !== 'boolean' || needsNavigation) {
     return <StatusBar style="light" />;
   }
 

@@ -1231,6 +1231,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
         mission_data: mission,
         bookmarked_by: userId || 'demo',
         created_at: new Date().toISOString(),
+        completed_at: null,
       };
       set({ sharedBookmarks: [newBookmark, ...sharedBookmarks] });
       return true;
@@ -1283,6 +1284,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
         mission_data: mission,
         bookmarked_by: authUserId,
         created_at: new Date().toISOString(),
+        completed_at: null,
       };
       set({ sharedBookmarks: [newBookmark, ...sharedBookmarks] });
       return true;

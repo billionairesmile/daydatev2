@@ -1,144 +1,118 @@
 // Daydate Design Tokens - Glassmorphism UI System
 // Based on Figma designs - aligned with figma-designs/src/styles/globals.css
+// Responsive design based on iPhone 16 (393 x 852)
 
-import { Dimensions, Platform } from 'react-native';
-import * as Device from 'expo-device';
+import { Platform } from 'react-native';
+import {
+  SCREEN_WIDTH,
+  SCREEN_HEIGHT,
+  rs,
+  fp,
+  rh,
+  rw,
+  wp,
+  hp,
+  isSmallDevice,
+  isLargeDevice,
+  isCompactHeight,
+  ANDROID_NAV_BAR_HEIGHT as NAV_BAR_HEIGHT,
+  ANDROID_BOTTOM_PADDING as BOTTOM_PADDING,
+} from '@/utils/responsive';
 
-// Get screen dimensions
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const aspectRatio = SCREEN_HEIGHT / SCREEN_WIDTH;
-
-// Android Navigation Bar Height (3-button navigation)
-// Most Android devices have ~48dp navigation bar, we add extra padding for safety
-export const ANDROID_NAV_BAR_HEIGHT = Platform.OS === 'android' ? 48 : 0;
-export const ANDROID_BOTTOM_PADDING = Platform.OS === 'android' ? 32 : 0;
-
-// Device detection
-const deviceModel = Device.modelName || '';
-const isRealIPad = deviceModel.toLowerCase().includes('ipad');
-
-// Foldable detection: aspect ratio close to 1:1 (between 0.8 and 1.4) on Android
-// Z Fold unfolded: ~1.2 aspect ratio (2176/1812)
-// Normal phones: ~2.0+ aspect ratio
-// iPads: ~1.3-1.4 aspect ratio but larger screen
-const isFoldableDevice = Platform.OS === 'android' &&
-  aspectRatio >= 0.8 &&
-  aspectRatio <= 1.5 &&
-  SCREEN_WIDTH > 600; // Foldables have wide screens when unfolded
-
-// TODO: Change to false for iPhone testing, true for iPad testing
-const FORCE_TABLET_MODE = false; // Set to true for iPad simulator testing
-
-// Only real iPads should be treated as tablets (with 50% scaling)
-// Foldables should use phone UI without aggressive scaling
-export const IS_TABLET = FORCE_TABLET_MODE || isRealIPad;
-export const IS_FOLDABLE = isFoldableDevice;
-
-// DEBUG: Log device detection
-console.log('[DESIGN] Device.modelName:', Device.modelName);
-console.log('[DESIGN] IS_TABLET:', IS_TABLET);
-console.log('[DESIGN] IS_FOLDABLE:', IS_FOLDABLE);
-console.log('[DESIGN] Aspect Ratio:', aspectRatio.toFixed(2));
-console.log('[DESIGN] Screen:', Dimensions.get('window'));
-
-// iPad scale factor - 50% size reduction on iPad (scale = 0.5 means 50% of original)
-export const TABLET_SCALE = 0.5;
-
-// Scale function - returns scaled value for iPad, original for iPhone
-export const scale = (size: number): number => {
-  if (IS_TABLET) {
-    return Math.round(size * TABLET_SCALE);
-  }
-  return size;
+// Re-export responsive utilities for convenience
+export {
+  SCREEN_WIDTH,
+  SCREEN_HEIGHT,
+  rs,
+  fp,
+  rh,
+  rw,
+  wp,
+  hp,
+  isSmallDevice,
+  isLargeDevice,
+  isCompactHeight,
 };
 
-// Scale function for font sizes - slightly less aggressive scaling for readability
-export const scaleFont = (size: number): number => {
-  if (IS_TABLET) {
-    // Use 0.6 scale for fonts to maintain readability
-    return Math.round(size * 0.6);
-  }
-  return size;
-};
+// Android Navigation Bar Height (re-exported from responsive)
+export const ANDROID_NAV_BAR_HEIGHT = NAV_BAR_HEIGHT;
+export const ANDROID_BOTTOM_PADDING = BOTTOM_PADDING;
 
-// Scale function that returns both values for conditional styling
-export const scaleValue = <T extends number>(ipadValue: T, iphoneValue: T): T => {
-  return IS_TABLET ? ipadValue : iphoneValue;
-};
+// Legacy compatibility - scale() and scaleFont() now use responsive utilities
+// These are kept for backward compatibility during migration
+export const scale = rs;
+export const scaleFont = fp;
 
-// Moderately scale - for elements that shouldn't be reduced as much (60%)
-export const scaleModerate = (size: number): number => {
-  if (IS_TABLET) {
-    return Math.round(size * 0.6);
-  }
-  return size;
-};
+// Legacy exports for backward compatibility (will be removed after full migration)
+export const IS_TABLET = false;
+export const IS_FOLDABLE = false;
 
 // ============================================
-// AUTO-SCALED DESIGN TOKENS FOR IPAD
-// These automatically return scaled values on iPad
+// AUTO-SCALED DESIGN TOKENS
+// These automatically return responsive scaled values
+// Based on iPhone 16 (393 x 852) baseline
 // ============================================
 
-// Auto-scaled SPACING for iPad (50% reduction)
+// Auto-scaled SPACING (responsive)
 export const SP = {
-  xs: scale(4),
-  sm: scale(8),
-  md: scale(12),
-  lg: scale(16),
-  xl: scale(20),
-  xxl: scale(24),
-  xxxl: scale(32),
-  huge: scale(40),
-  massive: scale(48),
+  xs: rs(4),
+  sm: rs(8),
+  md: rs(12),
+  lg: rs(16),
+  xl: rs(20),
+  xxl: rs(24),
+  xxxl: rs(32),
+  huge: rs(40),
+  massive: rs(48),
 };
 
-// Auto-scaled font sizes for iPad (60% for readability)
+// Auto-scaled font sizes (with min/max bounds for readability)
 export const FS = {
-  xs: scaleFont(10),
-  sm: scaleFont(12),
-  md: scaleFont(14),
-  base: scaleFont(15),
-  lg: scaleFont(16),
-  xl: scaleFont(18),
-  xxl: scaleFont(20),
-  xxxl: scaleFont(24),
-  display: scaleFont(28),
-  hero: scaleFont(32),
-  giant: scaleFont(36),
-  massive: scaleFont(48),
+  xs: fp(10),
+  sm: fp(12),
+  md: fp(14),
+  base: fp(15),
+  lg: fp(16),
+  xl: fp(18),
+  xxl: fp(20),
+  xxxl: fp(24),
+  display: fp(28),
+  hero: fp(32),
+  giant: fp(36),
+  massive: fp(48),
 };
 
-// Auto-scaled RADIUS for iPad
+// Auto-scaled RADIUS (responsive)
 export const RD = {
-  xs: scale(4),
-  sm: scale(12),
-  md: scale(24),
-  lg: scale(44),
-  xl: scale(60),
-  xxl: scale(80),
-  xxxl: scale(100),
-  full: scale(100),
+  xs: rs(4),
+  sm: rs(12),
+  md: rs(24),
+  lg: rs(44),
+  xl: rs(60),
+  xxl: rs(80),
+  xxxl: rs(100),
+  full: rs(100),
 };
 
-// Auto-scaled common sizes
+// Auto-scaled common sizes (responsive)
 export const SZ = {
-  iconXs: scale(16),
-  iconSm: scale(20),
-  iconMd: scale(24),
-  iconLg: scale(28),
-  iconXl: scale(32),
-  iconXxl: scale(36),
-  buttonHeight: scale(44),
-  buttonHeightLg: scale(52),
-  inputHeight: scale(48),
-  avatarSm: scale(32),
-  avatarMd: scale(48),
-  avatarLg: scale(64),
-  avatarXl: scale(80),
-  headerPaddingTop: scale(64),
-  tabBarBottom: scale(24),
-  cardRadius: scale(45),
-  modalRadius: scale(24),
+  iconXs: rs(16),
+  iconSm: rs(20),
+  iconMd: rs(24),
+  iconLg: rs(28),
+  iconXl: rs(32),
+  iconXxl: rs(36),
+  buttonHeight: rs(44),
+  buttonHeightLg: rs(52),
+  inputHeight: rs(48),
+  avatarSm: rs(32),
+  avatarMd: rs(48),
+  avatarLg: rs(64),
+  avatarXl: rs(80),
+  headerPaddingTop: rs(64),
+  tabBarBottom: rs(24),
+  cardRadius: rs(45),
+  modalRadius: rs(24),
 };
 
 export const COLORS = {
@@ -425,11 +399,11 @@ export const TAB_BAR = {
 // Calculated from _layout.tsx tab bar styles
 export const TAB_BAR_LAYOUT = {
   // Bottom position of tab bar from screen edge
-  bottom: scale(24),
+  bottom: rs(24),
   // Calculated height: TAB_INNER_PADDING*2 + TAB_PADDING_VERTICAL*2 + ICON + MARGIN + LABEL + BORDER
   // iOS: 6*2 + 6*2 + 28 + 2 + 13 + 1 = 68
   // We use 70 for safety margin
-  height: scale(70),
+  height: rs(70),
   // Top position of tab bar (bottom + height)
   get top() { return this.bottom + this.height; },
 };
@@ -437,7 +411,7 @@ export const TAB_BAR_LAYOUT = {
 // Banner Ad placement - always positioned just above the tab bar
 // Works with any banner height (adaptive banners range from 50-90px)
 // iOS: no gap, Android: 24px gap
-export const BANNER_AD_BOTTOM = TAB_BAR_LAYOUT.top + (Platform.OS === 'ios' ? 0 : scale(24));
+export const BANNER_AD_BOTTOM = TAB_BAR_LAYOUT.top + (Platform.OS === 'ios' ? 0 : rs(24));
 
 export default {
   COLORS,

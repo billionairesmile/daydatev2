@@ -562,10 +562,18 @@ function buildContext(
   const timeMap: Record<string, string> = {
     '30min': '30min', '1hour': '1hour', '2hour': '2hours+', 'allday': 'All day',
   };
+  // Distance limit based on available time
+  const distanceMap: Record<string, string> = {
+    '30min': '1km radius (home date OK)',
+    '1hour': '5km radius',
+    '2hour': '10km radius',
+    'allday': 'No distance limit',
+  };
   const moodStr = todayMoods.map(m => moodMap[m] || m).join(', ');
   parts.push(`\n[TODAY]`);
   parts.push(`- Meeting: ${canMeetToday ? 'Yes' : 'No (one person does mission alone)'}`);
   parts.push(`- Time: ${timeMap[availableTime]}`);
+  parts.push(`- Distance: ${distanceMap[availableTime]} -> Suggest places within this range from user's location`);
   parts.push(`- Mood: ${moodStr}`);
 
   // === Priority 5: Weather/Season ===
@@ -1099,6 +1107,7 @@ REQUIRED:
 - All ${missionCount} missions: DIFFERENT activity types
 - At least 1 FREE mission (difficulty:1)
 - Unique, creative ideas (not generic "walk/cafe/restaurant")
+- DISTANCE LIMIT: STRICTLY follow the Distance constraint in [TODAY] section. Do NOT suggest places beyond the specified radius (e.g., don't suggest Han River for someone in Ansan with 5km limit)
 ${canMeetToday ? '- Examples: puzzle challenge, workout+brunch, flea market, cooking together' : '- Examples: video call game night, same recipe cooking apart, online movie watch party'}
 
 ${fewShotExamples}

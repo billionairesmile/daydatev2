@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Dimensions,
   Pressable,
   Animated,
   PanResponder,
@@ -15,6 +14,7 @@ import {
   Alert,
   InteractionManager,
   ScrollView,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -37,7 +37,7 @@ import {
 
 import { useTranslation } from 'react-i18next';
 import { useFocusEffect } from 'expo-router';
-import { COLORS, SPACING, RADIUS, IS_TABLET, scale, scaleFont, ANDROID_BOTTOM_PADDING } from '@/constants/design';
+import { COLORS, SPACING, RADIUS, rs, fp, ANDROID_BOTTOM_PADDING, SCREEN_WIDTH, SCREEN_HEIGHT } from '@/constants/design';
 import { useBackground } from '@/contexts';
 import { useMemoryStore, SAMPLE_MEMORIES } from '@/stores/memoryStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -47,7 +47,9 @@ import { isDemoMode } from '@/lib/supabase';
 import { BannerAdView } from '@/components/ads';
 import { useBannerAdBottom } from '@/hooks/useConsistentBottomInset';
 
-const { width, height } = Dimensions.get('window');
+// Use responsive screen dimensions
+const width = SCREEN_WIDTH;
+const height = SCREEN_HEIGHT;
 
 // Parse date string as local date (not UTC) to avoid timezone issues
 // Handles both simple date strings and ISO timestamps
@@ -306,11 +308,11 @@ function SwipeableTodoItem({
         ]}
       >
         <Pressable style={styles.todoEditButton} onPress={handleEdit}>
-          <Edit2 color={COLORS.black} size={scale(18)} strokeWidth={2} />
+          <Edit2 color={COLORS.black} size={rs(18)} strokeWidth={2} />
           <Text style={styles.todoEditButtonText}>{editLabel}</Text>
         </Pressable>
         <Pressable style={styles.todoDeleteButton} onPress={handleDelete}>
-          <Trash2 color={COLORS.white} size={scale(18)} strokeWidth={2} />
+          <Trash2 color={COLORS.white} size={rs(18)} strokeWidth={2} />
           <Text style={styles.todoDeleteButtonText}>{deleteLabel}</Text>
         </Pressable>
       </Animated.View>
@@ -326,12 +328,12 @@ function SwipeableTodoItem({
         <Pressable onPress={onToggle} style={styles.todoCheckbox}>
           {todo.completed ? (
             <View style={styles.todoCheckboxCompleted}>
-              <Check color={COLORS.black} size={scale(14)} strokeWidth={3} />
+              <Check color={COLORS.black} size={rs(14)} strokeWidth={3} />
             </View>
           ) : (
             <Circle
               color="rgba(255,255,255,0.4)"
-              size={scale(20)}
+              size={rs(20)}
             />
           )}
         </Pressable>
@@ -409,13 +411,20 @@ export default function CalendarScreen() {
   const keyboardOffset = useRef(new Animated.Value(0)).current;
 
   // Modal animations
-  const settingsOpacity = useRef(new Animated.Value(0)).current;
-  const todoOpacity = useRef(new Animated.Value(0)).current;
-  const editTodoOpacity = useRef(new Animated.Value(0)).current;
-  const periodOpacity = useRef(new Animated.Value(0)).current;
+  // Android: Initialize with final values (1) to prevent animation flash
+  const settingsOpacity = useRef(new Animated.Value(Platform.OS === 'android' ? 1 : 0)).current;
+  const todoOpacity = useRef(new Animated.Value(Platform.OS === 'android' ? 1 : 0)).current;
+  const editTodoOpacity = useRef(new Animated.Value(Platform.OS === 'android' ? 1 : 0)).current;
+  const periodOpacity = useRef(new Animated.Value(Platform.OS === 'android' ? 1 : 0)).current;
 
   const openSettingsModal = () => {
     setTempMenstrualEnabled(menstrualTrackingEnabled);
+    // Android: Skip animation
+    if (Platform.OS === 'android') {
+      settingsOpacity.setValue(1);
+      setIsSettingsOpen(true);
+      return;
+    }
     settingsOpacity.setValue(0);
     setIsSettingsOpen(true);
     Animated.timing(settingsOpacity, {
@@ -426,6 +435,14 @@ export default function CalendarScreen() {
   };
 
   const closeSettingsModal = async (saveChanges = false) => {
+    // Android: Close immediately
+    if (Platform.OS === 'android') {
+      if (saveChanges) {
+        await updateMenstrualSettings({ enabled: tempMenstrualEnabled });
+      }
+      setIsSettingsOpen(false);
+      return;
+    }
     Animated.timing(settingsOpacity, {
       toValue: 0,
       duration: 150,
@@ -440,6 +457,12 @@ export default function CalendarScreen() {
   };
 
   const openTodoModal = () => {
+    // Android: Skip animation
+    if (Platform.OS === 'android') {
+      todoOpacity.setValue(1);
+      setIsAddTodoOpen(true);
+      return;
+    }
     todoOpacity.setValue(0);
     setIsAddTodoOpen(true);
     Animated.timing(todoOpacity, {
@@ -451,6 +474,12 @@ export default function CalendarScreen() {
 
   const closeTodoModal = () => {
     Keyboard.dismiss();
+    // Android: Close immediately
+    if (Platform.OS === 'android') {
+      setIsAddTodoOpen(false);
+      setTodoText('');
+      return;
+    }
     Animated.timing(todoOpacity, {
       toValue: 0,
       duration: 150,
@@ -464,6 +493,12 @@ export default function CalendarScreen() {
   const openEditTodoModal = (todo: Todo) => {
     setEditingTodo(todo);
     setEditTodoText(todo.text);
+    // Android: Skip animation
+    if (Platform.OS === 'android') {
+      editTodoOpacity.setValue(1);
+      setIsEditTodoOpen(true);
+      return;
+    }
     editTodoOpacity.setValue(0);
     setIsEditTodoOpen(true);
     Animated.timing(editTodoOpacity, {
@@ -475,6 +510,13 @@ export default function CalendarScreen() {
 
   const closeEditTodoModal = () => {
     Keyboard.dismiss();
+    // Android: Close immediately
+    if (Platform.OS === 'android') {
+      setIsEditTodoOpen(false);
+      setEditingTodo(null);
+      setEditTodoText('');
+      return;
+    }
     Animated.timing(editTodoOpacity, {
       toValue: 0,
       duration: 150,
@@ -500,6 +542,12 @@ export default function CalendarScreen() {
       setPeriodModalStep('settings'); // Reset to settings step
     }
 
+    // Android: Skip animation
+    if (Platform.OS === 'android') {
+      periodOpacity.setValue(1);
+      setIsPeriodSettingsOpen(true);
+      return;
+    }
     periodOpacity.setValue(0);
     setIsPeriodSettingsOpen(true);
     Animated.timing(periodOpacity, {
@@ -511,6 +559,20 @@ export default function CalendarScreen() {
 
   const closePeriodModal = async (save = false) => {
     Keyboard.dismiss();
+    // Android: Close immediately
+    if (Platform.OS === 'android') {
+      if (save) {
+        const parsedCycle = parseInt(tempCycleLength, 10);
+        const validCycle = !isNaN(parsedCycle) && parsedCycle >= 20 && parsedCycle <= 50 ? parsedCycle : 28;
+        const formattedDate = `${tempLastPeriodDate.getFullYear()}-${String(tempLastPeriodDate.getMonth() + 1).padStart(2, '0')}-${String(tempLastPeriodDate.getDate()).padStart(2, '0')}`;
+        await updateMenstrualSettings({
+          last_period_date: formattedDate,
+          cycle_length: validCycle,
+        });
+      }
+      setIsPeriodSettingsOpen(false);
+      return;
+    }
     Animated.timing(periodOpacity, {
       toValue: 0,
       duration: 150,
@@ -1039,7 +1101,7 @@ export default function CalendarScreen() {
           style={styles.settingsButton}
           onPress={openSettingsModal}
         >
-          <Settings color={COLORS.white} size={scale(20)} strokeWidth={2} />
+          <Settings color={COLORS.white} size={rs(20)} strokeWidth={2} />
         </Pressable>
       </View>
 
@@ -1057,7 +1119,7 @@ export default function CalendarScreen() {
               setCurrentDate(new Date(year, month - 1, 1));
             }}
           >
-            <ChevronLeft color={COLORS.white} size={scale(20)} strokeWidth={2} />
+            <ChevronLeft color={COLORS.white} size={rs(20)} strokeWidth={2} />
           </Pressable>
           <Text style={styles.monthYearText}>
             {MONTH_NAMES_EN[month]} {year}
@@ -1068,7 +1130,7 @@ export default function CalendarScreen() {
               setCurrentDate(new Date(year, month + 1, 1));
             }}
           >
-            <ChevronRight color={COLORS.white} size={scale(20)} strokeWidth={2} />
+            <ChevronRight color={COLORS.white} size={rs(20)} strokeWidth={2} />
           </Pressable>
         </View>
 
@@ -1212,7 +1274,7 @@ export default function CalendarScreen() {
               style={styles.iconButtonRound}
               onPress={openTodoModal}
             >
-              <Pen color={COLORS.white} size={scale(18)} strokeWidth={2} />
+              <Pen color={COLORS.white} size={rs(18)} strokeWidth={2} />
             </Pressable>
           </View>
           <View style={styles.divider} />
@@ -1223,7 +1285,7 @@ export default function CalendarScreen() {
               <Pressable style={styles.emptyTodoCard} onPress={openTodoModal}>
                 <Text style={styles.emptyTodoText}>{t('calendar.todo.empty')}</Text>
                 <View style={styles.emptyTodoHint}>
-                  <Pen color="rgba(255,255,255,0.5)" size={scale(16)} strokeWidth={2} />
+                  <Pen color="rgba(255,255,255,0.5)" size={rs(16)} strokeWidth={2} />
                   <Text style={styles.emptyTodoHintText}>{t('calendar.todo.emptyHint')}</Text>
                 </View>
               </Pressable>
@@ -1255,7 +1317,7 @@ export default function CalendarScreen() {
                 style={styles.iconButtonRound}
                 onPress={() => openPeriodModal()}
               >
-                <Pen color={COLORS.white} size={scale(18)} strokeWidth={2} />
+                <Pen color={COLORS.white} size={rs(18)} strokeWidth={2} />
               </Pressable>
             </View>
             <View style={styles.divider} />
@@ -1268,7 +1330,7 @@ export default function CalendarScreen() {
                   end={{ x: 1, y: 1 }}
                   style={styles.periodIconLarge}
                 >
-                  <Droplet color={COLORS.white} size={scale(32)} strokeWidth={2} />
+                  <Droplet color={COLORS.white} size={rs(32)} strokeWidth={2} />
                 </LinearGradient>
                 <Text style={styles.emptyPeriodTitle}>{t('calendar.period.inputTitle')}</Text>
               </Pressable>
@@ -1289,7 +1351,7 @@ export default function CalendarScreen() {
                         end={{ x: 1, y: 1 }}
                         style={styles.periodIconSmall}
                       >
-                        <Droplet color={COLORS.white} size={scale(20)} strokeWidth={2} />
+                        <Droplet color={COLORS.white} size={rs(20)} strokeWidth={2} />
                       </LinearGradient>
                       <View>
                         <Text style={styles.nextPeriodLabel}>
@@ -1357,11 +1419,14 @@ export default function CalendarScreen() {
       <Modal
         visible={isSettingsOpen}
         transparent
-        animationType="none"
+        animationType="fade"
         onRequestClose={() => closeSettingsModal(false)}
       >
-        <Animated.View style={[styles.modalOverlay, { opacity: settingsOpacity }]}>
+        <View style={styles.blurContainer}>
           <BlurView experimentalBlurMethod="dimezisBlurView" intensity={60} tint="dark" style={styles.blurOverlay}>
+            <TouchableWithoutFeedback onPress={() => closeSettingsModal(false)}>
+              <View style={styles.modalBackdrop} />
+            </TouchableWithoutFeedback>
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>{t('calendar.settings.title')}</Text>
@@ -1369,7 +1434,7 @@ export default function CalendarScreen() {
                   onPress={() => closeSettingsModal(false)}
                   style={styles.modalCloseButton}
                 >
-                  <X color="rgba(255,255,255,0.8)" size={scale(20)} strokeWidth={2} />
+                  <X color="rgba(255,255,255,0.8)" size={rs(20)} strokeWidth={2} />
                 </Pressable>
               </View>
               <View style={styles.modalHeaderDivider} />
@@ -1390,7 +1455,7 @@ export default function CalendarScreen() {
                     end={{ x: 1, y: 1 }}
                     style={styles.featureIconRound}
                   >
-                    <Droplet color={COLORS.white} size={scale(24)} strokeWidth={2} />
+                    <Droplet color={COLORS.white} size={rs(24)} strokeWidth={2} />
                   </LinearGradient>
                   <View style={styles.featureInfo}>
                     <Text style={styles.featureTitle}>{t('calendar.period.calendar')}</Text>
@@ -1400,10 +1465,10 @@ export default function CalendarScreen() {
                   </View>
                   {tempMenstrualEnabled ? (
                     <View style={styles.checkCircleActive}>
-                      <Check color={COLORS.black} size={scale(16)} strokeWidth={3} />
+                      <Check color={COLORS.black} size={rs(16)} strokeWidth={3} />
                     </View>
                   ) : (
-                    <Circle color="rgba(255,255,255,0.4)" size={scale(24)} strokeWidth={2} />
+                    <Circle color="rgba(255,255,255,0.4)" size={rs(24)} strokeWidth={2} />
                   )}
                 </Pressable>
               </View>
@@ -1418,27 +1483,33 @@ export default function CalendarScreen() {
               </View>
             </View>
           </BlurView>
-        </Animated.View>
+        </View>
       </Modal>
 
       {/* Add Todo Modal */}
       <Modal
         visible={isAddTodoOpen}
         transparent
-        animationType="none"
+        animationType="fade"
         onRequestClose={closeTodoModal}
       >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <Animated.View style={[styles.modalOverlay, { opacity: todoOpacity }]}>
-            <BlurView experimentalBlurMethod="dimezisBlurView" intensity={60} tint="dark" style={styles.blurOverlay}>
-              <Animated.View style={[styles.modalContent, { transform: [{ translateY: keyboardOffset }] }]}>
+        <View style={styles.blurContainer}>
+          <BlurView experimentalBlurMethod="dimezisBlurView" intensity={60} tint="dark" style={styles.blurOverlay}>
+            <TouchableWithoutFeedback onPress={closeTodoModal}>
+              <View style={styles.modalBackdrop} />
+            </TouchableWithoutFeedback>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              style={styles.keyboardAvoidingView}
+            >
+              <View style={styles.modalContent}>
                 <View style={styles.modalHeader}>
                   <Text style={styles.modalTitle}>{t('calendar.todo.addTitle')}</Text>
                   <Pressable
                     onPress={closeTodoModal}
                     style={styles.modalCloseButton}
                   >
-                    <X color="rgba(255,255,255,0.8)" size={scale(20)} strokeWidth={2} />
+                    <X color="rgba(255,255,255,0.8)" size={rs(20)} strokeWidth={2} />
                   </Pressable>
                 </View>
                 <View style={styles.modalHeaderDivider} />
@@ -1470,30 +1541,36 @@ export default function CalendarScreen() {
                     </Text>
                   </Pressable>
                 </View>
-              </Animated.View>
-            </BlurView>
-          </Animated.View>
-        </TouchableWithoutFeedback>
+              </View>
+            </KeyboardAvoidingView>
+          </BlurView>
+        </View>
       </Modal>
 
       {/* Edit Todo Modal */}
       <Modal
         visible={isEditTodoOpen}
         transparent
-        animationType="none"
+        animationType="fade"
         onRequestClose={closeEditTodoModal}
       >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <Animated.View style={[styles.modalOverlay, { opacity: editTodoOpacity }]}>
-            <BlurView experimentalBlurMethod="dimezisBlurView" intensity={60} tint="dark" style={styles.blurOverlay}>
-              <Animated.View style={[styles.modalContent, { transform: [{ translateY: keyboardOffset }] }]}>
+        <View style={styles.blurContainer}>
+          <BlurView experimentalBlurMethod="dimezisBlurView" intensity={60} tint="dark" style={styles.blurOverlay}>
+            <TouchableWithoutFeedback onPress={closeEditTodoModal}>
+              <View style={styles.modalBackdrop} />
+            </TouchableWithoutFeedback>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              style={styles.keyboardAvoidingView}
+            >
+              <View style={styles.modalContent}>
                 <View style={styles.modalHeader}>
                   <Text style={styles.modalTitle}>{t('calendar.todo.editTitle')}</Text>
                   <Pressable
                     onPress={closeEditTodoModal}
                     style={styles.modalCloseButton}
                   >
-                    <X color="rgba(255,255,255,0.8)" size={scale(20)} strokeWidth={2} />
+                    <X color="rgba(255,255,255,0.8)" size={rs(20)} strokeWidth={2} />
                   </Pressable>
                 </View>
                 <View style={styles.modalHeaderDivider} />
@@ -1522,23 +1599,29 @@ export default function CalendarScreen() {
                     <Text style={styles.modalAddButtonText}>{t('common.save')}</Text>
                   </Pressable>
                 </View>
-              </Animated.View>
-            </BlurView>
-          </Animated.View>
-        </TouchableWithoutFeedback>
+              </View>
+            </KeyboardAvoidingView>
+          </BlurView>
+        </View>
       </Modal>
 
       {/* Period Settings Modal (with Date Picker step) */}
       <Modal
         visible={isPeriodSettingsOpen}
         transparent
-        animationType="none"
+        animationType="fade"
         onRequestClose={() => periodModalStep === 'datePicker' ? closeDatePicker() : closePeriodModal(false)}
       >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <Animated.View style={[styles.modalOverlay, { opacity: periodOpacity }]}>
-            <BlurView experimentalBlurMethod="dimezisBlurView" intensity={60} tint="dark" style={styles.blurOverlay}>
-              <Animated.View style={[styles.modalContent, { transform: [{ translateY: keyboardOffset }] }]}>
+        <View style={styles.blurContainer}>
+          <BlurView experimentalBlurMethod="dimezisBlurView" intensity={60} tint="dark" style={styles.blurOverlay}>
+            <TouchableWithoutFeedback onPress={() => periodModalStep === 'datePicker' ? closeDatePicker() : closePeriodModal(false)}>
+              <View style={styles.modalBackdrop} />
+            </TouchableWithoutFeedback>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              style={styles.keyboardAvoidingView}
+            >
+              <View style={styles.modalContent}>
                 {periodModalStep === 'settings' ? (
                   <>
                     <View style={styles.modalHeader}>
@@ -1547,7 +1630,7 @@ export default function CalendarScreen() {
                         onPress={() => closePeriodModal(false)}
                         style={styles.modalCloseButton}
                       >
-                        <X color="rgba(255,255,255,0.8)" size={scale(20)} strokeWidth={2} />
+                        <X color="rgba(255,255,255,0.8)" size={rs(20)} strokeWidth={2} />
                       </Pressable>
                     </View>
                     <View style={styles.modalHeaderDivider} />
@@ -1566,7 +1649,7 @@ export default function CalendarScreen() {
                             end={{ x: 1, y: 1 }}
                             style={styles.settingIconRound}
                           >
-                            <CalendarIcon color={COLORS.white} size={scale(18)} strokeWidth={2} />
+                            <CalendarIcon color={COLORS.white} size={rs(18)} strokeWidth={2} />
                           </LinearGradient>
                           <View style={styles.periodSettingInfo}>
                             <Text style={styles.periodSettingHint}>{t('calendar.period.lastStartDate')}</Text>
@@ -1576,7 +1659,7 @@ export default function CalendarScreen() {
                                 : tempLastPeriodDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
                             </Text>
                           </View>
-                          <ChevronRight color="rgba(255,255,255,0.4)" size={scale(20)} strokeWidth={2} />
+                          <ChevronRight color="rgba(255,255,255,0.4)" size={rs(20)} strokeWidth={2} />
                         </Pressable>
                       </View>
 
@@ -1593,7 +1676,7 @@ export default function CalendarScreen() {
                             end={{ x: 1, y: 1 }}
                             style={styles.settingIconRound}
                           >
-                            <Clock color={COLORS.white} size={scale(18)} strokeWidth={2} />
+                            <Clock color={COLORS.white} size={rs(18)} strokeWidth={2} />
                           </LinearGradient>
                           <TextInput
                             style={styles.cycleInput}
@@ -1605,7 +1688,7 @@ export default function CalendarScreen() {
                           <Text style={styles.cycleUnit}>{t('calendar.period.daysUnit')}</Text>
                         </Pressable>
                         <View style={styles.infoTextContainer}>
-                          <Info color="rgba(255, 255, 255, 0.5)" size={scale(14)} strokeWidth={2} />
+                          <Info color="rgba(255, 255, 255, 0.5)" size={rs(14)} strokeWidth={2} />
                           <Text style={styles.infoText}>{t('calendar.period.cycleHint')}</Text>
                         </View>
                       </View>
@@ -1628,7 +1711,7 @@ export default function CalendarScreen() {
                         onPress={() => closeDatePicker()}
                         style={styles.modalCloseButton}
                       >
-                        <X color="rgba(255,255,255,0.8)" size={scale(20)} strokeWidth={2} />
+                        <X color="rgba(255,255,255,0.8)" size={rs(20)} strokeWidth={2} />
                       </Pressable>
                     </View>
                     <View style={styles.modalHeaderDivider} />
@@ -1640,7 +1723,7 @@ export default function CalendarScreen() {
                           onPress={() => setPickerMonth(new Date(pickerMonth.getFullYear(), pickerMonth.getMonth() - 1, 1))}
                           style={styles.pickerNavButton}
                         >
-                          <ChevronLeft color={COLORS.foreground} size={scale(18)} />
+                          <ChevronLeft color={COLORS.foreground} size={rs(18)} />
                         </Pressable>
                         <Text style={styles.pickerMonthText}>
                           {i18n.language === 'ko'
@@ -1651,7 +1734,7 @@ export default function CalendarScreen() {
                           onPress={() => setPickerMonth(new Date(pickerMonth.getFullYear(), pickerMonth.getMonth() + 1, 1))}
                           style={styles.pickerNavButton}
                         >
-                          <ChevronRight color={COLORS.foreground} size={scale(18)} />
+                          <ChevronRight color={COLORS.foreground} size={rs(18)} />
                         </Pressable>
                       </View>
 
@@ -1720,10 +1803,10 @@ export default function CalendarScreen() {
                     </View>
                   </>
                 )}
-              </Animated.View>
-            </BlurView>
-          </Animated.View>
-        </TouchableWithoutFeedback>
+              </View>
+            </KeyboardAvoidingView>
+          </BlurView>
+        </View>
       </Modal>
 
     </View>
@@ -1743,10 +1826,10 @@ const styles = StyleSheet.create({
   },
   inlineBannerContainer: {
     alignItems: 'center',
-    paddingVertical: scale(8),
+    paddingVertical: rs(8),
   },
   premiumSpacer: {
-    height: scale(16),
+    height: rs(16),
   },
   backgroundImage: {
     position: 'absolute',
@@ -1773,46 +1856,46 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: scale(SPACING.lg),
-    paddingBottom: scale(170),
+    paddingHorizontal: rs(SPACING.lg),
+    paddingBottom: rs(170),
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    paddingTop: scale(64),
-    paddingHorizontal: scale(SPACING.lg),
-    paddingBottom: scale(SPACING.lg),
+    paddingTop: rs(64),
+    paddingHorizontal: rs(SPACING.lg),
+    paddingBottom: rs(SPACING.lg),
     zIndex: 20,
   },
   headerTitle: {
-    fontSize: scaleFont(32),
+    fontSize: fp(32),
     color: COLORS.white,
     fontWeight: '700',
-    lineHeight: scaleFont(38),
+    lineHeight: fp(38),
     textShadowColor: 'transparent',
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 0,
   },
   headerSubtitle: {
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     color: COLORS.mutedForeground,
     fontWeight: '400',
-    marginTop: scale(4),
+    marginTop: rs(4),
   },
   // Icon button - circular style
   settingsButton: {
-    width: scale(36),
-    height: scale(36),
-    borderRadius: scale(18),
+    width: rs(36),
+    height: rs(36),
+    borderRadius: rs(18),
     backgroundColor: COLORS.secondary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconButtonRound: {
-    width: scale(36),
-    height: scale(36),
-    borderRadius: scale(18),
+    width: rs(36),
+    height: rs(36),
+    borderRadius: rs(18),
     backgroundColor: COLORS.secondary,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1821,34 +1904,34 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: scale(16),
-    marginBottom: scale(SPACING.md),
+    gap: rs(16),
+    marginBottom: rs(SPACING.md),
   },
   monthNavButton: {
-    width: scale(32),
-    height: scale(32),
-    borderRadius: scale(16),
+    width: rs(32),
+    height: rs(32),
+    borderRadius: rs(16),
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   monthYearText: {
-    fontSize: scaleFont(16),
+    fontSize: fp(16),
     color: COLORS.white,
     fontWeight: '600',
     textAlign: 'center',
-    minWidth: scale(120),
+    minWidth: rs(120),
   },
   dayNamesRow: {
     flexDirection: 'row',
-    marginBottom: scale(SPACING.md),
+    marginBottom: rs(SPACING.md),
   },
   dayNameCell: {
     flex: 1,
     alignItems: 'center',
   },
   dayNameText: {
-    fontSize: scaleFont(12),
+    fontSize: fp(12),
     color: COLORS.mutedForeground,
     fontWeight: '500',
   },
@@ -1858,12 +1941,12 @@ const styles = StyleSheet.create({
   calendarGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: scale(SPACING.lg),
+    marginBottom: rs(SPACING.lg),
   },
   dayCell: {
     width: `${100 / 7}%`,
     aspectRatio: 1,
-    padding: scale(3),
+    padding: rs(3),
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1872,7 +1955,7 @@ const styles = StyleSheet.create({
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: scale(RADIUS.full),
+    borderRadius: rs(RADIUS.full),
     position: 'relative',
   },
   missionCell: {
@@ -1892,77 +1975,77 @@ const styles = StyleSheet.create({
   // Selection overlay for mission cells - positioned on top without affecting image size
   missionSelectionOverlay: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: scale(RADIUS.full),
-    borderWidth: scale(2),
+    borderRadius: rs(RADIUS.full),
+    borderWidth: rs(2),
   },
   missionTodayIndicator: {
     borderColor: COLORS.primary,
     shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.4,
-    shadowRadius: scale(8),
+    shadowRadius: rs(8),
   },
   missionSelectedIndicator: {
     borderColor: '#E8DCC4',
     shadowColor: '#E8DCC4',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.4,
-    shadowRadius: scale(8),
+    shadowRadius: rs(8),
   },
   missionDayText: {
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     fontWeight: '600',
     color: COLORS.white,
     textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 0, height: scale(2) },
-    textShadowRadius: scale(8),
+    textShadowOffset: { width: 0, height: rs(2) },
+    textShadowRadius: rs(8),
   },
   todayBorder: {
-    borderWidth: scale(2),
+    borderWidth: rs(2),
     borderColor: COLORS.primary,
     shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.4,
-    shadowRadius: scale(8),
+    shadowRadius: rs(8),
   },
   selectedBorder: {
-    borderWidth: scale(2),
+    borderWidth: rs(2),
     borderColor: '#E8DCC4',
     shadowColor: '#E8DCC4',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.4,
-    shadowRadius: scale(8),
+    shadowRadius: rs(8),
   },
   todayCell: {
     backgroundColor: COLORS.glass.white10,
-    borderWidth: scale(2),
+    borderWidth: rs(2),
     borderColor: COLORS.primary,
     shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.4,
-    shadowRadius: scale(8),
+    shadowRadius: rs(8),
   },
   todayDayText: {
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     fontWeight: '700',
     color: COLORS.foreground,
   },
   selectedCell: {
     backgroundColor: COLORS.glass.white08,
-    borderWidth: scale(2),
+    borderWidth: rs(2),
     borderColor: '#E8DCC4',
     shadowColor: '#E8DCC4',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.4,
-    shadowRadius: scale(8),
+    shadowRadius: rs(8),
   },
   selectedDayText: {
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     fontWeight: '700',
     color: COLORS.foreground,
   },
   normalDayText: {
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     fontWeight: '500',
     color: COLORS.text.secondary,
   },
@@ -1971,170 +2054,170 @@ const styles = StyleSheet.create({
   },
   periodDot: {
     position: 'absolute',
-    top: scale(4),
-    right: scale(4),
-    width: scale(6),
-    height: scale(6),
-    borderRadius: scale(3),
+    top: rs(4),
+    right: rs(4),
+    width: rs(6),
+    height: rs(6),
+    borderRadius: rs(3),
     backgroundColor: '#ec4899',
   },
   ovulationDot: {
     position: 'absolute',
-    top: scale(4),
-    right: scale(4),
-    width: scale(6),
-    height: scale(6),
-    borderRadius: scale(3),
+    top: rs(4),
+    right: rs(4),
+    width: rs(6),
+    height: rs(6),
+    borderRadius: rs(3),
     backgroundColor: '#eab308',
   },
   fertileDot: {
     position: 'absolute',
-    top: scale(4),
-    right: scale(4),
-    width: scale(6),
-    height: scale(6),
-    borderRadius: scale(3),
+    top: rs(4),
+    right: rs(4),
+    width: rs(6),
+    height: rs(6),
+    borderRadius: rs(3),
     backgroundColor: '#93c5fd',
   },
   todoDot: {
     position: 'absolute',
     top: '78%',
-    width: scale(18),
-    height: scale(3),
-    borderRadius: scale(2),
+    width: rs(18),
+    height: rs(3),
+    borderRadius: rs(2),
     backgroundColor: '#E8DCC4',
   },
   todaySection: {
-    marginTop: scale(SPACING.lg),
-    paddingBottom: scale(SPACING.lg),
+    marginTop: rs(SPACING.lg),
+    paddingBottom: rs(SPACING.lg),
   },
   todaySectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: scale(SPACING.sm),
+    marginBottom: rs(SPACING.sm),
   },
   todaySectionTitle: {
-    fontSize: scaleFont(24),
+    fontSize: fp(24),
     color: COLORS.white,
     fontWeight: '600',
   },
   // Separator - aligned with figma-designs separator.tsx
   divider: {
-    height: scale(1),
+    height: rs(1),
     backgroundColor: COLORS.border,
-    marginBottom: scale(SPACING.md),
+    marginBottom: rs(SPACING.md),
   },
   todoList: {
-    gap: scale(4),
+    gap: rs(4),
   },
   // Empty state card - aligned with figma-designs card.tsx
   emptyTodoCard: {
-    padding: scale(24),
-    borderRadius: scale(20),
+    padding: rs(24),
+    borderRadius: rs(20),
     backgroundColor: COLORS.card,
-    borderWidth: scale(1),
+    borderWidth: rs(1),
     borderColor: COLORS.border,
     alignItems: 'center',
   },
   emptyTodoText: {
-    fontSize: scaleFont(18),
+    fontSize: fp(18),
     color: COLORS.text.secondary,
     fontWeight: '500',
-    marginBottom: scale(12),
+    marginBottom: rs(12),
   },
   emptyTodoHint: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: scale(8),
+    gap: rs(8),
   },
   emptyTodoHintText: {
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     color: COLORS.text.muted,
     fontWeight: '400',
   },
   // Swipeable Todo Item styles
   todoItemWrapper: {
     position: 'relative',
-    marginBottom: scale(4),
+    marginBottom: rs(4),
   },
   todoActionsContainer: {
     position: 'absolute',
-    right: scale(4),
+    right: rs(4),
     top: 0,
     bottom: 0,
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'center',
-    gap: scale(8),
-    paddingRight: scale(4),
+    gap: rs(8),
+    paddingRight: rs(4),
     zIndex: 0,
   },
   // Edit button - matches anniversary card style
   todoEditButton: {
-    width: scale(50),
-    height: scale(50),
-    borderRadius: scale(25),
+    width: rs(50),
+    height: rs(50),
+    borderRadius: rs(25),
     backgroundColor: COLORS.white,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: scale(2) },
+    shadowOffset: { width: 0, height: rs(2) },
     shadowOpacity: 0.1,
-    shadowRadius: scale(4),
+    shadowRadius: rs(4),
   },
   // Delete button - matches anniversary card style
   todoDeleteButton: {
-    width: scale(50),
-    height: scale(50),
-    borderRadius: scale(25),
+    width: rs(50),
+    height: rs(50),
+    borderRadius: rs(25),
     backgroundColor: '#EF4444',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#EF4444',
-    shadowOffset: { width: 0, height: scale(2) },
+    shadowOffset: { width: 0, height: rs(2) },
     shadowOpacity: 0.3,
-    shadowRadius: scale(4),
+    shadowRadius: rs(4),
   },
   // Button text labels
   todoEditButtonText: {
-    fontSize: scaleFont(10),
+    fontSize: fp(10),
     color: COLORS.black,
     fontWeight: '600',
-    marginTop: scale(2),
+    marginTop: rs(2),
   },
   todoDeleteButtonText: {
-    fontSize: scaleFont(10),
+    fontSize: fp(10),
     color: COLORS.white,
     fontWeight: '600',
-    marginTop: scale(2),
+    marginTop: rs(2),
   },
   // Todo item card - maximum rounded
   todoItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: scale(16),
-    borderRadius: scale(999),
+    padding: rs(16),
+    borderRadius: rs(999),
     backgroundColor: COLORS.card,
-    borderWidth: scale(1),
+    borderWidth: rs(1),
     borderColor: COLORS.border,
-    gap: scale(12),
+    gap: rs(12),
     zIndex: 1,
   },
   todoCheckbox: {
     flexShrink: 0,
   },
   todoCheckboxCompleted: {
-    width: scale(20),
-    height: scale(20),
-    borderRadius: scale(10),
+    width: rs(20),
+    height: rs(20),
+    borderRadius: rs(10),
     backgroundColor: COLORS.white,
     alignItems: 'center',
     justifyContent: 'center',
   },
   todoText: {
     flex: 1,
-    fontSize: scaleFont(16),
+    fontSize: fp(16),
     color: COLORS.white,
     fontWeight: '400',
   },
@@ -2143,150 +2226,161 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   periodSection: {
-    marginTop: scale(SPACING.xl),
-    paddingBottom: scale(SPACING.lg),
+    marginTop: rs(SPACING.xl),
+    paddingBottom: rs(SPACING.lg),
   },
   periodSectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: scale(SPACING.sm),
+    marginBottom: rs(SPACING.sm),
   },
   periodSectionTitle: {
-    fontSize: scaleFont(24),
+    fontSize: fp(24),
     color: COLORS.white,
     fontWeight: '600',
   },
   // Period empty card - aligned with figma-designs card.tsx
   emptyPeriodCard: {
-    padding: scale(24),
-    borderRadius: scale(20),
+    padding: rs(24),
+    borderRadius: rs(20),
     backgroundColor: COLORS.card,
-    borderWidth: scale(1),
+    borderWidth: rs(1),
     borderColor: COLORS.border,
     alignItems: 'center',
-    gap: scale(12),
+    gap: rs(12),
   },
   periodIconLarge: {
-    width: scale(64),
-    height: scale(64),
-    borderRadius: scale(RADIUS.full),
+    width: rs(64),
+    height: rs(64),
+    borderRadius: rs(RADIUS.full),
     alignItems: 'center',
     justifyContent: 'center',
   },
   emptyPeriodTitle: {
-    fontSize: scaleFont(18),
+    fontSize: fp(18),
     color: COLORS.foreground,
     fontWeight: '600',
   },
   periodDataContainer: {
-    gap: scale(12),
+    gap: rs(12),
   },
   // Next period card - aligned with figma-designs card.tsx
   nextPeriodCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: scale(16),
-    borderRadius: scale(20),
-    borderWidth: scale(1),
+    padding: rs(16),
+    borderRadius: rs(20),
+    borderWidth: rs(1),
     borderColor: COLORS.border,
   },
   nextPeriodLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: scale(12),
+    gap: rs(12),
   },
   periodIconSmall: {
-    width: scale(40),
-    height: scale(40),
-    borderRadius: scale(RADIUS.full),
+    width: rs(40),
+    height: rs(40),
+    borderRadius: rs(RADIUS.full),
     alignItems: 'center',
     justifyContent: 'center',
   },
   nextPeriodLabel: {
-    fontSize: scaleFont(12),
+    fontSize: fp(12),
     color: COLORS.text.tertiary,
     fontWeight: '500',
   },
   nextPeriodDate: {
-    fontSize: scaleFont(16),
+    fontSize: fp(16),
     color: COLORS.white,
     fontWeight: '600',
   },
   dDayBadge: {
     backgroundColor: COLORS.glass.white20,
-    paddingHorizontal: scale(12),
-    paddingVertical: scale(6),
-    borderRadius: scale(RADIUS.sm),
+    paddingHorizontal: rs(12),
+    paddingVertical: rs(6),
+    borderRadius: rs(RADIUS.sm),
   },
   dDayText: {
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     color: COLORS.white,
     fontWeight: '700',
   },
   cycleInfoRow: {
     flexDirection: 'row',
-    gap: scale(12),
+    gap: rs(12),
   },
   cycleInfoCard: {
     flex: 1,
-    padding: scale(16),
-    borderRadius: scale(20),
-    borderWidth: scale(1),
+    padding: rs(16),
+    borderRadius: rs(20),
+    borderWidth: rs(1),
     borderColor: COLORS.border,
   },
   cycleInfoLabel: {
-    fontSize: scaleFont(12),
+    fontSize: fp(12),
     color: COLORS.text.tertiary,
     fontWeight: '500',
-    marginBottom: scale(4),
+    marginBottom: rs(4),
   },
   cycleInfoValue: {
-    fontSize: scaleFont(16),
+    fontSize: fp(16),
     color: COLORS.white,
     fontWeight: '600',
   },
   legendRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: scale(16),
-    marginTop: scale(8),
+    gap: rs(16),
+    marginTop: rs(8),
   },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: scale(6),
+    gap: rs(6),
   },
   legendDot: {
-    width: scale(8),
-    height: scale(8),
-    borderRadius: scale(4),
+    width: rs(8),
+    height: rs(8),
+    borderRadius: rs(4),
   },
   legendText: {
-    fontSize: scaleFont(12),
+    fontSize: fp(12),
     color: COLORS.text.tertiary,
     fontWeight: '400',
   },
   // Modal styles - aligned with figma-designs dialog.tsx (glassmorphism)
-  modalOverlay: {
+  // Fixed structure to prevent Android modal movement animation
+  blurContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: '100%',
   },
   blurOverlay: {
     flex: 1,
     width: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: scale(SPACING.lg),
+    paddingHorizontal: rs(SPACING.lg),
+  },
+  modalBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  keyboardAvoidingView: {
+    width: '100%',
+    alignItems: 'center',
   },
   // Figma: bg-white/30 backdrop-blur-xl border-white/40 rounded-[32px]
   modalContent: {
-    width: width - scale(48),
+    width: width - rs(48),
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    borderRadius: scale(32),
-    borderWidth: scale(1),
+    borderRadius: rs(32),
+    borderWidth: rs(1),
     borderColor: 'rgba(255, 255, 255, 0.2)',
     overflow: 'hidden',
   },
@@ -2295,66 +2389,66 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: scale(24),
-    paddingVertical: scale(20),
+    paddingHorizontal: rs(24),
+    paddingVertical: rs(20),
   },
   modalHeaderDivider: {
-    height: scale(1),
+    height: rs(1),
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    marginHorizontal: scale(24),
+    marginHorizontal: rs(24),
   },
   // Figma: fontSize 20px, fontWeight 600
   modalTitle: {
-    fontSize: scaleFont(20),
+    fontSize: fp(20),
     color: COLORS.foreground,
     fontWeight: '600',
-    lineHeight: scaleFont(28),
+    lineHeight: fp(28),
   },
   // Figma: p-2 rounded-full hover:bg-white/20
   modalCloseButton: {
-    width: scale(36),
-    height: scale(36),
-    borderRadius: scale(18),
+    width: rs(36),
+    height: rs(36),
+    borderRadius: rs(18),
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   modalBody: {
-    paddingHorizontal: scale(24),
-    paddingTop: scale(20),
-    paddingBottom: scale(24),
-    gap: scale(16),
+    paddingHorizontal: rs(24),
+    paddingTop: rs(20),
+    paddingBottom: rs(24),
+    gap: rs(16),
   },
   modalDescription: {
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     color: COLORS.mutedForeground,
     fontWeight: '400',
-    lineHeight: scaleFont(20),
+    lineHeight: fp(20),
   },
   modalFooter: {
-    paddingHorizontal: scale(24),
-    paddingBottom: scale(24),
+    paddingHorizontal: rs(24),
+    paddingBottom: rs(24),
   },
   // Button styles - rounded like navigation bar
   // Figma: primary button - bg-white text-black, very rounded
   modalDoneButton: {
-    height: scale(44),
+    height: rs(44),
     backgroundColor: COLORS.white,
-    paddingHorizontal: scale(24),
-    borderRadius: scale(22),
+    paddingHorizontal: rs(24),
+    borderRadius: rs(22),
     alignItems: 'center',
     justifyContent: 'center',
   },
   modalDoneButtonText: {
-    fontSize: scaleFont(15),
+    fontSize: fp(15),
     color: COLORS.black,
     fontWeight: '600',
   },
   modalAddButtonFull: {
     width: '100%',
-    height: scale(44),
+    height: rs(44),
     backgroundColor: COLORS.white,
-    borderRadius: scale(22),
+    borderRadius: rs(22),
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2362,21 +2456,21 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   modalAddButtonText: {
-    fontSize: scaleFont(15),
+    fontSize: fp(15),
     color: COLORS.black,
     fontWeight: '600',
   },
   // Figma: primary button - bg-white text-black, very rounded
   modalSaveButton: {
-    height: scale(44),
+    height: rs(44),
     backgroundColor: COLORS.white,
-    paddingHorizontal: scale(24),
-    borderRadius: scale(22),
+    paddingHorizontal: rs(24),
+    borderRadius: rs(22),
     alignItems: 'center',
     justifyContent: 'center',
   },
   modalSaveButtonText: {
-    fontSize: scaleFont(15),
+    fontSize: fp(15),
     color: COLORS.black,
     fontWeight: '600',
   },
@@ -2385,12 +2479,12 @@ const styles = StyleSheet.create({
   featureCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: scale(16),
-    borderRadius: scale(16),
+    padding: rs(16),
+    borderRadius: rs(16),
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderWidth: scale(2),
+    borderWidth: rs(2),
     borderColor: 'rgba(255, 255, 255, 0.2)',
-    gap: scale(16),
+    gap: rs(16),
   },
   // Figma: active - bg-white/30 border-white
   featureCardActive: {
@@ -2398,17 +2492,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   checkCircleActive: {
-    width: scale(24),
-    height: scale(24),
-    borderRadius: scale(12),
+    width: rs(24),
+    height: rs(24),
+    borderRadius: rs(12),
     backgroundColor: COLORS.white,
     alignItems: 'center',
     justifyContent: 'center',
   },
   featureIconRound: {
-    width: scale(48),
-    height: scale(48),
-    borderRadius: scale(RADIUS.full),
+    width: rs(48),
+    height: rs(48),
+    borderRadius: rs(RADIUS.full),
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2416,13 +2510,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   featureTitle: {
-    fontSize: scaleFont(16),
+    fontSize: fp(16),
     color: COLORS.white,
     fontWeight: '600',
-    marginBottom: scale(4),
+    marginBottom: rs(4),
   },
   featureDescription: {
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     color: COLORS.text.tertiary,
     fontWeight: '400',
   },
@@ -2430,53 +2524,53 @@ const styles = StyleSheet.create({
   // Figma: bg-white/10 border-white/20 rounded-2xl
   todoInputContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: scale(16),
-    borderWidth: scale(1),
+    borderRadius: rs(16),
+    borderWidth: rs(1),
     borderColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: scale(16),
-    paddingVertical: scale(12),
+    paddingHorizontal: rs(16),
+    paddingVertical: rs(12),
   },
   todoInput: {
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     color: COLORS.foreground,
     fontWeight: '400',
-    minHeight: scale(72),
+    minHeight: rs(72),
     textAlignVertical: 'top',
-    lineHeight: scaleFont(20),
+    lineHeight: fp(20),
   },
   todoInputCount: {
-    fontSize: scaleFont(12),
+    fontSize: fp(12),
     color: 'rgba(255, 255, 255, 0.4)',
     textAlign: 'right',
-    marginTop: scale(8),
+    marginTop: rs(8),
   },
   // Period settings - aligned with figma-designs input.tsx
   periodSettingSection: {
-    marginBottom: scale(20),
+    marginBottom: rs(20),
   },
   periodSettingLabel: {
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     color: 'rgba(255, 255, 255, 0.7)',
     fontWeight: '500',
-    marginBottom: scale(10),
+    marginBottom: rs(10),
   },
   // Figma: bg-white/10 border-white/20 rounded-2xl
   periodSettingButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: scale(16),
-    paddingVertical: scale(12),
-    borderRadius: scale(16),
+    paddingHorizontal: rs(16),
+    paddingVertical: rs(12),
+    borderRadius: rs(16),
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderWidth: scale(1),
+    borderWidth: rs(1),
     borderColor: 'rgba(255, 255, 255, 0.2)',
-    gap: scale(12),
+    gap: rs(12),
   },
   // Gradient background for period settings icons
   settingIconRound: {
-    width: scale(36),
-    height: scale(36),
-    borderRadius: scale(18),
+    width: rs(36),
+    height: rs(36),
+    borderRadius: rs(18),
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2484,12 +2578,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   periodSettingHint: {
-    fontSize: scaleFont(12),
+    fontSize: fp(12),
     color: COLORS.mutedForeground,
     fontWeight: '400',
   },
   periodSettingValue: {
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     color: COLORS.foreground,
     fontWeight: '500',
   },
@@ -2497,33 +2591,33 @@ const styles = StyleSheet.create({
   cycleInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: scale(16),
-    paddingVertical: scale(12),
-    borderRadius: scale(16),
+    paddingHorizontal: rs(16),
+    paddingVertical: rs(12),
+    borderRadius: rs(16),
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderWidth: scale(1),
+    borderWidth: rs(1),
     borderColor: 'rgba(255, 255, 255, 0.2)',
-    gap: scale(12),
+    gap: rs(12),
   },
   cycleInput: {
     flex: 1,
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     color: COLORS.foreground,
     fontWeight: '500',
   },
   cycleUnit: {
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     color: 'rgba(255, 255, 255, 0.6)',
     fontWeight: '400',
   },
   infoTextContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: scale(4),
-    marginTop: scale(8),
+    gap: rs(4),
+    marginTop: rs(8),
   },
   infoText: {
-    fontSize: scaleFont(12),
+    fontSize: fp(12),
     color: 'rgba(255, 255, 255, 0.5)',
     fontWeight: '400',
   },
@@ -2532,57 +2626,57 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: scale(8),
-    paddingVertical: scale(8),
-    marginBottom: scale(12),
+    paddingHorizontal: rs(8),
+    paddingVertical: rs(8),
+    marginBottom: rs(12),
   },
   pickerNavButton: {
-    width: scale(32),
-    height: scale(32),
-    borderRadius: scale(16),
+    width: rs(32),
+    height: rs(32),
+    borderRadius: rs(16),
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   pickerMonthText: {
-    fontSize: scaleFont(16),
+    fontSize: fp(16),
     color: COLORS.foreground,
     fontWeight: '600',
   },
   pickerDayNames: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginBottom: scale(8),
-    paddingHorizontal: scale(4),
+    marginBottom: rs(8),
+    paddingHorizontal: rs(4),
   },
   pickerDayName: {
     flex: 1,
     textAlign: 'center',
-    fontSize: scaleFont(12),
+    fontSize: fp(12),
     color: COLORS.mutedForeground,
     fontWeight: '500',
   },
   pickerGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: scale(4),
+    paddingHorizontal: rs(4),
   },
   pickerDayCell: {
     width: '14.28%',
     aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: scale(2),
+    padding: rs(2),
   },
   pickerDayCellInner: {
     width: '100%',
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: scale(100),
+    borderRadius: rs(100),
   },
   pickerDayText: {
-    fontSize: scaleFont(14),
+    fontSize: fp(14),
     color: COLORS.foreground,
     fontWeight: '400',
   },
