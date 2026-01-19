@@ -148,8 +148,11 @@
       "adLoadingFailed": "Ad Loading Failed",
       "adLoadingFailedMessage": "Failed to load the ad.\nPlease try again later.",
       "generating": "Generating new missions...",
-      "loadingAd": "Loading ad..."
-    }
+      "loadingAd": "Loading ad...",
+      "adNotCompleted": "Ad Not Completed",
+      "adNotCompletedMessage": "Please watch the complete ad to refresh missions."
+    },
+    "partnerWatchingAd": "Partner is watching an ad..."
   },
   "missionDetail": {
     "headerTitle": "Mission Details",
@@ -887,7 +890,7 @@
     "benefits": {
       "missionComplete": "Mission Complete",
       "missionCompleteFree": "1/day",
-      "missionCompletePremium": "Unlimited\nMissions",
+      "missionCompletePremium": "Mission Complete\nUnlimited",
       "missionCompletePremiumDesc": "Complete as many missions as you want\nand create more memories together",
       "noAdsFree": "With Ads",
       "noAdsPremium": "Ad-Free\nExperience",
@@ -905,8 +908,8 @@
       "albumCreateFree": "Max 5",
       "albumCreatePremium": "Unlimited Albums",
       "albumCreatePremiumDesc": "Organize your special moments by theme\nand create your own memory albums",
-      "missionGeneratePremiumShort": "10 Daily\nMissions",
-      "newFeaturesPremium": "Free\nNew Features"
+      "missionGeneratePremiumShort": "Daily Missions\nUp to 30",
+      "newFeaturesPremium": "New Features\nUnlimited"
     },
     "button": {
       "subscribe": "Subscribe to Premium",

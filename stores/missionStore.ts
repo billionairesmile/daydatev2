@@ -93,7 +93,7 @@ interface MissionActions {
   getTodayCompletedMissionId: () => string | null;
   isTodayCompletedMission: (missionId: string) => boolean;
   // Mission generation actions
-  generateTodayMissions: (answers: MissionGenerationAnswers, excludedMissions?: ExcludedMission[]) => Promise<{ status: 'success' | 'locked' | 'exists' | 'location_required' | 'preferences_required' | 'limit_reached'; message?: string }>;
+  generateTodayMissions: (answers: MissionGenerationAnswers, excludedMissions?: ExcludedMission[], options?: { deferSave?: boolean }) => Promise<{ status: 'success' | 'pending_success' | 'locked' | 'exists' | 'location_required' | 'preferences_required' | 'limit_reached'; message?: string }>;
   hasTodayMissions: () => boolean;
   getTodayMissions: () => Mission[];
   checkAndResetMissions: () => void;
@@ -375,9 +375,10 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
       // Generate today's missions based on user answers (with AI)
       // Returns: { status: 'success' | 'locked' | 'error' | 'location_required' | 'preferences_required', message?: string }
       // excludedMissions: Optional list of missions to exclude (used for refresh to avoid duplicates)
-      generateTodayMissions: async (answers, excludedMissions) => {
+      generateTodayMissions: async (answers, excludedMissions, options) => {
         const today = getTodayDateString();
         const syncStore = useCoupleSyncStore.getState();
+        const deferSave = options?.deferSave ?? false;
         const { user, partner } = useAuthStore.getState();
 
         try {
@@ -585,6 +586,13 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
 
           // Save to couple sync (will broadcast to partner)
           if (syncStore.isInitialized && syncStore.coupleId) {
+            if (deferSave) {
+              // Defer save: store as pending missions (for ad-gated refresh)
+              await syncStore.savePendingMissions(aiMissions, answers);
+              // Don't increment generation count yet - wait for commit
+              return { status: 'pending_success' as const };
+            }
+
             await syncStore.saveSharedMissions(
               aiMissions,
               answers,
@@ -618,6 +626,13 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
 
           // Save fallback missions to couple sync
           if (syncStore.isInitialized && syncStore.coupleId) {
+            if (deferSave) {
+              // Defer save: store as pending missions (for ad-gated refresh)
+              await syncStore.savePendingMissions(fallbackMissions, answers);
+              // Don't increment generation count yet - wait for commit
+              return { status: 'pending_success' as const };
+            }
+
             await syncStore.saveSharedMissions(
               fallbackMissions,
               answers,

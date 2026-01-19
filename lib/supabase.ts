@@ -1646,8 +1646,11 @@ export const db = {
         .maybeSingle();
 
       if (existing) {
-        // If already generating by someone else, fail
-        if (existing.status === 'generating' && existing.locked_by !== userId) {
+        // If already generating or watching ad by someone else, fail
+        if (
+          (existing.status === 'generating' || existing.status === 'ad_pending') &&
+          existing.locked_by !== userId
+        ) {
           // Check if lock is stale (older than 2 minutes)
           const lockTime = new Date(existing.locked_at).getTime();
           const now = Date.now();
@@ -1692,6 +1695,42 @@ export const db = {
           status,
           locked_by: null,
           locked_at: null,
+          pending_missions: null,
+          pending_answers: null,
+        })
+        .eq('couple_id', coupleId);
+      return { error };
+    },
+
+    // Update lock with pending missions during ad viewing
+    async updatePending(
+      coupleId: string,
+      missions: unknown[],
+      answers: unknown,
+      userId: string
+    ) {
+      const client = getSupabase();
+      const { error } = await client
+        .from('mission_generation_lock')
+        .update({
+          status: 'ad_pending',
+          pending_missions: missions,
+          pending_answers: answers,
+          locked_by: userId,
+          locked_at: new Date().toISOString(),
+        })
+        .eq('couple_id', coupleId);
+      return { error };
+    },
+
+    // Clear pending data (on commit or rollback)
+    async clearPending(coupleId: string) {
+      const client = getSupabase();
+      const { error } = await client
+        .from('mission_generation_lock')
+        .update({
+          pending_missions: null,
+          pending_answers: null,
         })
         .eq('couple_id', coupleId);
       return { error };

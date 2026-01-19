@@ -124,7 +124,7 @@ export interface SharedMissionData {
   status: string;
 }
 
-type MissionGenerationStatus = 'idle' | 'generating' | 'completed';
+type MissionGenerationStatus = 'idle' | 'generating' | 'ad_pending' | 'completed';
 
 interface CoupleSyncState {
   // Connection
@@ -139,6 +139,10 @@ interface CoupleSyncState {
   missionGenerationStatus: MissionGenerationStatus;
   generatingUserId: string | null;
   lastMissionUpdate: Date | null;
+
+  // Pending missions (waiting for ad completion)
+  pendingMissions: Mission[] | null;
+  pendingMissionsAnswers: unknown | null;
 
   // Bookmark sync
   sharedBookmarks: SyncedBookmark[];
@@ -188,6 +192,12 @@ interface CoupleSyncActions {
   loadSharedMissions: () => Promise<Mission[] | null>;
   resetAllMissions: () => Promise<void>;
   checkAndResetSharedMissions: () => void;
+
+  // Pending mission management (for ad-gated refresh)
+  savePendingMissions: (missions: Mission[], answers: unknown) => Promise<void>;
+  commitPendingMissions: (partnerId?: string, userNickname?: string) => Promise<void>;
+  rollbackPendingMissions: () => Promise<void>;
+  hasPendingMissions: () => boolean;
 
   // Mission reminder notification
   sendMissionReminderNotifications: (userNickname: string, partnerNickname: string) => Promise<void>;
@@ -287,6 +297,8 @@ const initialState: CoupleSyncState = {
   missionGenerationStatus: 'idle',
   generatingUserId: null,
   lastMissionUpdate: null,
+  pendingMissions: null,
+  pendingMissionsAnswers: null,
   sharedBookmarks: [],
   sharedTodos: [],
   menstrualSettings: null,
@@ -900,6 +912,95 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
 
     await db.missionLock.release(coupleId, status);
     set({ missionGenerationStatus: status, generatingUserId: null });
+  },
+
+  // ============================================
+  // PENDING MISSION MANAGEMENT (for ad-gated refresh)
+  // ============================================
+
+  savePendingMissions: async (missions: Mission[], answers: unknown) => {
+    const { coupleId, userId } = get();
+
+    if (!coupleId || !userId || isInTestMode()) {
+      // Test mode: save locally only
+      set({
+        pendingMissions: missions,
+        pendingMissionsAnswers: answers,
+        missionGenerationStatus: 'ad_pending',
+        generatingUserId: userId,
+      });
+      return;
+    }
+
+    // Update lock table with pending status and missions
+    const { error } = await db.missionLock.updatePending(coupleId, missions, answers, userId);
+
+    if (error) {
+      console.error('[CoupleSyncStore] Failed to save pending missions:', error);
+    }
+
+    set({
+      pendingMissions: missions,
+      pendingMissionsAnswers: answers,
+      missionGenerationStatus: 'ad_pending',
+      generatingUserId: userId,
+    });
+
+    console.log('[CoupleSyncStore] Saved pending missions, waiting for ad completion');
+  },
+
+  commitPendingMissions: async (partnerId?: string, userNickname?: string) => {
+    const { pendingMissions, pendingMissionsAnswers } = get();
+
+    if (!pendingMissions || pendingMissions.length === 0) {
+      console.warn('[CoupleSyncStore] No pending missions to commit');
+      return;
+    }
+
+    console.log('[CoupleSyncStore] Committing pending missions to active');
+
+    // Use existing saveSharedMissions with pending data
+    await get().saveSharedMissions(
+      pendingMissions,
+      pendingMissionsAnswers,
+      partnerId,
+      userNickname
+    );
+
+    // Clear pending state
+    set({
+      pendingMissions: null,
+      pendingMissionsAnswers: null,
+    });
+
+    console.log('[CoupleSyncStore] Pending missions committed successfully');
+  },
+
+  rollbackPendingMissions: async () => {
+    const { coupleId } = get();
+
+    console.log('[CoupleSyncStore] Rolling back pending missions');
+
+    // Clear local pending state
+    set({
+      pendingMissions: null,
+      pendingMissionsAnswers: null,
+      missionGenerationStatus: 'idle',
+      generatingUserId: null,
+    });
+
+    // Clear pending data and release lock in DB
+    if (coupleId && !isInTestMode()) {
+      await db.missionLock.clearPending(coupleId);
+      await db.missionLock.release(coupleId, 'idle');
+    }
+
+    console.log('[CoupleSyncStore] Pending missions rolled back');
+  },
+
+  hasPendingMissions: () => {
+    const { pendingMissions } = get();
+    return pendingMissions !== null && pendingMissions.length > 0;
   },
 
   saveSharedMissions: async (missions: Mission[], answers: unknown, partnerId?: string, userNickname?: string) => {

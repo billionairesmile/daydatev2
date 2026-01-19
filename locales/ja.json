@@ -148,8 +148,11 @@
       "adLoadingFailed": "広告の読み込み失敗",
       "adLoadingFailedMessage": "広告の読み込みに失敗しました。\n後でもう一度お試しください。",
       "generating": "新しいミッションを生成中...",
-      "loadingAd": "広告を準備中..."
-    }
+      "loadingAd": "広告を準備中...",
+      "adNotCompleted": "広告視聴未完了",
+      "adNotCompletedMessage": "ミッションを更新するには広告を最後まで視聴してください。"
+    },
+    "partnerWatchingAd": "パートナーが広告を視聴中です..."
   },
   "missionDetail": {
     "headerTitle": "ミッション詳細",
@@ -885,7 +888,7 @@
     "benefits": {
       "missionComplete": "ミッション完了",
       "missionCompleteFree": "1個/日",
-      "missionCompletePremium": "無制限\nミッション完了",
+      "missionCompletePremium": "ミッション完了\n無制限",
       "missionCompletePremiumDesc": "1日に好きなだけミッションを完了して\nもっと多くの思い出を作ろう",
       "noAdsFree": "広告あり",
       "noAdsPremium": "広告なしで\n快適に",
@@ -903,8 +906,8 @@
       "albumCreateFree": "最大5個",
       "albumCreatePremium": "無制限アルバム作成",
       "albumCreatePremiumDesc": "特別な瞬間をテーマ別に整理して\n自分だけの思い出アルバムを作ろう",
-      "missionGeneratePremiumShort": "1日10個\nミッション生成",
-      "newFeaturesPremium": "新機能を\n無料で利用"
+      "missionGeneratePremiumShort": "1日ミッション生成\n最大30個",
+      "newFeaturesPremium": "新機能\n無制限利用"
     },
     "button": {
       "subscribe": "プレミアムプランを購読",

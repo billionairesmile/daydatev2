@@ -146,8 +146,11 @@
       "adLoadingFailed": "Error al Cargar Anuncio",
       "adLoadingFailedMessage": "Error al cargar el anuncio.\nPor favor, inténtalo más tarde.",
       "generating": "Generando nuevas misiones...",
-      "loadingAd": "Cargando anuncio..."
-    }
+      "loadingAd": "Cargando anuncio...",
+      "adNotCompleted": "Anuncio No Completado",
+      "adNotCompletedMessage": "Por favor, mira el anuncio completo para actualizar las misiones."
+    },
+    "partnerWatchingAd": "Tu pareja está viendo un anuncio..."
   },
   "missionDetail": {
     "headerTitle": "Detalles de Misión",
@@ -882,7 +885,7 @@
     "benefits": {
       "missionComplete": "Completar Misión",
       "missionCompleteFree": "1/día",
-      "missionCompletePremium": "Misiones\nIlimitadas",
+      "missionCompletePremium": "Misiones Completas\nIlimitadas",
       "missionCompletePremiumDesc": "Completa todas las misiones que quieras\ny crea más recuerdos juntos",
       "noAdsFree": "Con Anuncios",
       "noAdsPremium": "Sin\nAnuncios",
@@ -900,8 +903,8 @@
       "albumCreateFree": "Máx 5",
       "albumCreatePremium": "Álbumes Ilimitados",
       "albumCreatePremiumDesc": "Organiza tus momentos especiales por tema\ny crea tus propios álbumes de recuerdos",
-      "missionGeneratePremiumShort": "10 Misiones\nDiarias",
-      "newFeaturesPremium": "Nuevas Funciones\nGratis"
+      "missionGeneratePremiumShort": "Misiones Diarias\nHasta 30",
+      "newFeaturesPremium": "Nuevas Funciones\nIlimitadas"
     },
     "button": {
       "subscribe": "Suscribirse a Premium",

@@ -237,10 +237,13 @@ export default function MissionScreen() {
     coupleId,
     resetAllMissions,
     loadSharedMissions,
+    generatingUserId,
+    commitPendingMissions,
+    rollbackPendingMissions,
   } = useCoupleSyncStore();
 
-  // Get partner info from auth store
-  const { partner } = useAuthStore();
+  // Get user and partner info from auth store
+  const { user, partner } = useAuthStore();
 
   // Subscription store for ads
   const { shouldShowAds } = useSubscriptionStore();
@@ -613,16 +616,31 @@ export default function MissionScreen() {
 
   // Watch for partner generating missions (via real-time sync)
   useEffect(() => {
-    if (isSyncInitialized && missionGenerationStatus === 'generating') {
-      // Partner is generating - show loading state
-      setIsGenerating(true);
-      setPartnerGeneratingMessage(t('mission.generatingMessage'));
-    } else if (missionGenerationStatus === 'completed' && sharedMissions.length > 0) {
-      // Missions were generated (by partner or self) - hide loading
-      setIsGenerating(false);
-      setPartnerGeneratingMessage(null);
+    const currentUserId = user?.id;
+
+    if (isSyncInitialized) {
+      // Check if partner is generating (not self)
+      const isPartnerAction = generatingUserId && generatingUserId !== currentUserId;
+
+      if (missionGenerationStatus === 'generating' && isPartnerAction) {
+        // Partner is generating - show loading state
+        setIsGenerating(true);
+        setPartnerGeneratingMessage(t('mission.generatingMessage'));
+      } else if (missionGenerationStatus === 'ad_pending' && isPartnerAction) {
+        // Partner is watching ad - show loading state with ad message
+        setIsGenerating(true);
+        setPartnerGeneratingMessage(t('mission.partnerWatchingAd') || '파트너가 광고를 시청 중입니다...');
+      } else if (missionGenerationStatus === 'completed' && sharedMissions.length > 0) {
+        // Missions were generated (by partner or self) - hide loading
+        setIsGenerating(false);
+        setPartnerGeneratingMessage(null);
+      } else if (missionGenerationStatus === 'idle' && isPartnerAction) {
+        // Partner cancelled/rolled back - hide loading
+        setIsGenerating(false);
+        setPartnerGeneratingMessage(null);
+      }
     }
-  }, [isSyncInitialized, missionGenerationStatus, sharedMissions.length]);
+  }, [isSyncInitialized, missionGenerationStatus, sharedMissions.length, generatingUserId, user?.id]);
 
   // Check location permission
   const checkLocationPermission = async (): Promise<boolean> => {
@@ -805,14 +823,15 @@ export default function MissionScreen() {
         return;
       }
 
-      // Free user - close modal, show rewarded ad, generate missions in PARALLEL
+      // Free user - close modal, show rewarded ad, generate missions with PENDING state
+      // Only commit to DB after ad is fully watched
       // Save original missions before reset (for deduplication)
       const originalMissionsForAd = getTodayMissions();
       const excludedMissionsForAd: ExcludedMission[] = originalMissionsForAd.map(m => ({
         title: m.title,
         category: m.category,
       }));
-      console.log('[Mission Refresh] Free user - parallel ad + generation, excluding:', excludedMissionsForAd.map(m => m.title).join(', '));
+      console.log('[Mission Refresh] Free user - ad-gated generation, excluding:', excludedMissionsForAd.map(m => m.title).join(', '));
 
       // 1. Set loading state FIRST (before closing modal) to prevent "오늘의 미션" button from showing
       setIsGenerating(true);
@@ -827,20 +846,23 @@ export default function MissionScreen() {
       let missionGenerationError: Error | null = null;
       let generationResult: Awaited<ReturnType<typeof generateTodayMissions>> | null = null;
 
-      // 2. Start mission generation IMMEDIATELY (runs in parallel with ad)
+      // Track if ad was fully watched (onEarnedReward was called)
+      let adCompletedSuccessfully = false;
+
+      // 2. Start mission generation with PENDING state (doesn't save to active DB yet)
       const missionGenerationPromise = (async () => {
         try {
           // Reset existing missions first (both local and shared)
           resetGeneratedMissions();
           await resetAllMissions();
 
-          // Generate new missions with excluded missions to avoid duplicates
-          const result = await generateTodayMissions(answers, excludedMissionsForAd);
-          console.log('[Mission Refresh] Parallel generation completed:', result?.status);
+          // Generate new missions with deferSave option - saves as PENDING, not active
+          const result = await generateTodayMissions(answers, excludedMissionsForAd, { deferSave: true });
+          console.log('[Mission Refresh] Generation completed with pending status:', result?.status);
           generationResult = result;
           return result;
         } catch (error) {
-          console.error('[Mission Refresh] Parallel generation error:', error);
+          console.error('[Mission Refresh] Generation error:', error);
           missionGenerationError = error as Error;
           return null;
         }
@@ -848,16 +870,21 @@ export default function MissionScreen() {
 
       // 3. Load and show rewarded ad (runs in parallel with mission generation)
       const adShown = await rewardedAdManager.loadAndShow({
+        onEarnedReward: (reward) => {
+          // User watched complete ad - set flag for commit
+          console.log('[Mission Refresh] Ad reward earned:', reward);
+          adCompletedSuccessfully = true;
+        },
         onAdClosed: async () => {
           setIsLoadingAd(false);
-          // isGenerating is already true from before modal close, keep it showing
 
-          // Wait for mission generation to complete (should already be done or almost done)
+          // Wait for mission generation to complete
           const result = await missionGenerationPromise;
 
           // Handle generation error
           if (missionGenerationError || !result) {
             setIsGenerating(false);
+            await rollbackPendingMissions();
             Alert.alert(
               t('mission.refresh.adLoadingFailed'),
               t('mission.refresh.adLoadingFailedMessage'),
@@ -872,51 +899,71 @@ export default function MissionScreen() {
             return;
           }
 
-          if (result.status === 'exists' || result.status === 'success') {
-            // Success - missions are ready
-          } else if (result.status === 'location_required' || result.status === 'preferences_required') {
+          if (result.status === 'location_required' || result.status === 'preferences_required') {
             setIsGenerating(false);
             setPartnerGeneratingMessage(null);
+            await rollbackPendingMissions();
             return;
           }
 
-          // Get the newly generated missions
-          const newMissions = getTodayMissions();
+          // Check if ad was completed successfully
+          if (adCompletedSuccessfully) {
+            // SUCCESS: Commit pending missions to active DB
+            console.log('[Mission Refresh] Ad completed - committing pending missions');
+            await commitPendingMissions(partner?.id, user?.nickname);
 
-          // Mark refresh as used for today (only once per day)
-          if (newMissions.length > 0) {
-            await setRefreshUsedToday();
-          }
+            // Get the newly generated missions
+            const newMissions = getTodayMissions();
 
-          // Prefetch all mission images before showing cards
-          if (newMissions.length > 0) {
-            const imagesToLoad = newMissions.filter(mission => mission.imageUrl);
-
-            try {
-              const imagePromises = imagesToLoad.map(mission =>
-                ExpoImage.prefetch(`${mission.imageUrl}?w=800&h=1000&fit=crop`)
-              );
-
-              // Wait for all images to prefetch (with timeout fallback)
-              await Promise.race([
-                Promise.all(imagePromises),
-                new Promise(resolve => setTimeout(resolve, 10000)), // 10초 타임아웃
-              ]);
-
-              console.log('[Mission Refresh] Free user ad - Image prefetch completed, images are cached');
-            } catch (error) {
-              console.log('Image prefetch error:', error);
+            // Mark refresh as used for today (only once per day)
+            if (newMissions.length > 0) {
+              await setRefreshUsedToday();
             }
 
-            // Small delay for smooth transition after prefetch
-            await new Promise(resolve => setTimeout(resolve, 300));
+            // Prefetch all mission images before showing cards
+            if (newMissions.length > 0) {
+              const imagesToLoad = newMissions.filter(mission => mission.imageUrl);
 
-            // Hide loading - images are now cached and will render instantly
-            setIsGenerating(false);
-            setIsWaitingForImages(false);
-            isWaitingForImagesRef.current = false;
+              try {
+                const imagePromises = imagesToLoad.map(mission =>
+                  ExpoImage.prefetch(`${mission.imageUrl}?w=800&h=1000&fit=crop`)
+                );
+
+                // Wait for all images to prefetch (with timeout fallback)
+                await Promise.race([
+                  Promise.all(imagePromises),
+                  new Promise(resolve => setTimeout(resolve, 10000)), // 10초 타임아웃
+                ]);
+
+                console.log('[Mission Refresh] Ad completed - Image prefetch completed');
+              } catch (error) {
+                console.log('Image prefetch error:', error);
+              }
+
+              // Small delay for smooth transition after prefetch
+              await new Promise(resolve => setTimeout(resolve, 300));
+
+              // Hide loading - images are now cached and will render instantly
+              setIsGenerating(false);
+              setIsWaitingForImages(false);
+              isWaitingForImagesRef.current = false;
+            } else {
+              setIsGenerating(false);
+            }
           } else {
+            // ROLLBACK: Ad was not completed (user closed early)
+            console.log('[Mission Refresh] Ad not completed - rolling back pending missions');
+            await rollbackPendingMissions();
+
             setIsGenerating(false);
+            setPartnerGeneratingMessage(null);
+
+            // Inform user that ad must be completed
+            Alert.alert(
+              t('mission.refresh.adNotCompleted') || '광고 시청 미완료',
+              t('mission.refresh.adNotCompletedMessage') || '미션을 새로고침하려면 광고를 끝까지 시청해주세요.',
+              [{ text: t('common.confirm') || '확인' }]
+            );
           }
 
           // Reset form
@@ -924,8 +971,13 @@ export default function MissionScreen() {
           setAvailableTime(null);
           setSelectedMoods([]);
         },
-        onAdFailedToLoad: () => {
+        onAdFailedToLoad: async () => {
           setIsLoadingAd(false);
+          setIsGenerating(false);
+
+          // Rollback any pending state
+          await rollbackPendingMissions();
+
           // Show error alert
           Alert.alert(
             t('mission.refresh.adLoadingFailed'),
@@ -939,65 +991,29 @@ export default function MissionScreen() {
       if (!adShown) {
         setIsLoadingAd(false);
 
-        // Wait for mission generation to complete and get result
-        // This applies to both __DEV__ and production when ad fails
-        const fallbackResult = await missionGenerationPromise;
+        // Wait for mission generation to complete
+        await missionGenerationPromise;
 
-        if (missionGenerationError || !fallbackResult) {
-          setIsGenerating(false);
-          return;
-        }
+        // Rollback pending missions since ad was not shown
+        await rollbackPendingMissions();
 
-        if (fallbackResult.status === 'locked') {
-          setPartnerGeneratingMessage(t('mission.refresh.partnerGenerating'));
-          return;
-        }
+        setIsGenerating(false);
+        setPartnerGeneratingMessage(null);
 
-        if (fallbackResult.status === 'exists' || fallbackResult.status === 'success') {
-          // Success - continue to show missions
-        } else if (fallbackResult.status === 'location_required' || fallbackResult.status === 'preferences_required') {
-          setIsGenerating(false);
-          setPartnerGeneratingMessage(null);
-          return;
-        }
-
-        const newMissions = getTodayMissions();
-
-        // Mark refresh as used for today (only once per day)
-        // This is critical - even if ad failed, missions were generated so refresh should be marked as used
-        if (newMissions.length > 0) {
-          await setRefreshUsedToday();
-        }
-
-        // Prefetch all mission images before showing cards
-        if (newMissions.length > 0) {
-          const imagesToLoad = newMissions.filter(mission => mission.imageUrl);
-
-          try {
-            const imagePromises = imagesToLoad.map(mission =>
-              ExpoImage.prefetch(`${mission.imageUrl}?w=800&h=1000&fit=crop`)
-            );
-
-            // Wait for all images to prefetch (with timeout fallback)
-            await Promise.race([
-              Promise.all(imagePromises),
-              new Promise(resolve => setTimeout(resolve, 10000)), // 10초 타임아웃
-            ]);
-
-            console.log('[Mission Refresh] Fallback - Image prefetch completed, images are cached');
-          } catch (error) {
-            console.log('Image prefetch error:', error);
-          }
-
-          // Small delay for smooth transition after prefetch
-          await new Promise(resolve => setTimeout(resolve, 300));
-
-          // Hide loading - images are now cached and will render instantly
-          setIsGenerating(false);
-          setIsWaitingForImages(false);
-          isWaitingForImagesRef.current = false;
+        // In development (Expo Go), show info message
+        if (__DEV__) {
+          Alert.alert(
+            '개발 모드',
+            '광고는 프로덕션 빌드에서만 표시됩니다. 미션 새로고침은 광고 시청 후 사용 가능합니다.',
+            [{ text: t('common.confirm') || '확인' }]
+          );
         } else {
-          setIsGenerating(false);
+          // Production - ad failed to load
+          Alert.alert(
+            t('mission.refresh.adLoadingFailed'),
+            t('mission.refresh.adLoadingFailedMessage'),
+            [{ text: t('common.confirm') }]
+          );
         }
 
         setCanMeetToday(null);

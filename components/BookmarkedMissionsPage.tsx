@@ -321,12 +321,12 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     backgroundColor: Platform.OS === 'android' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.05)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
     overflow: 'hidden',
   },
   cardDarkOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: Platform.OS === 'android' ? 'rgba(0, 0, 0, 0.1)' : 'rgba(0, 0, 0, 0)',
   },
   cardInner: {
     flexDirection: 'row',

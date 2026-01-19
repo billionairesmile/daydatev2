@@ -146,8 +146,11 @@
       "adLoadingFailed": "廣告載入失敗",
       "adLoadingFailedMessage": "廣告載入失敗。\n請稍後再試。",
       "generating": "正在生成新任務...",
-      "loadingAd": "正在準備廣告..."
-    }
+      "loadingAd": "正在準備廣告...",
+      "adNotCompleted": "廣告觀看未完成",
+      "adNotCompletedMessage": "請觀看完整廣告以刷新任務。"
+    },
+    "partnerWatchingAd": "對方正在觀看廣告..."
   },
   "missionDetail": {
     "headerTitle": "任務詳情",
@@ -884,7 +887,7 @@
     "benefits": {
       "missionComplete": "任務完成",
       "missionCompleteFree": "1個/天",
-      "missionCompletePremium": "無限任務完成",
+      "missionCompletePremium": "任務完成\n無限",
       "missionCompletePremiumDesc": "想完成多少任務就完成多少\n一起創造更多美好回憶",
       "noAdsFree": "有廣告",
       "noAdsPremium": "無廣告舒適體驗",
@@ -902,8 +905,8 @@
       "albumCreateFree": "最多5個",
       "albumCreatePremium": "無限相簿創建",
       "albumCreatePremiumDesc": "按主題整理特別時刻\n打造專屬回憶相簿",
-      "missionGeneratePremiumShort": "每日生成10個任務",
-      "newFeaturesPremium": "免費使用新功能"
+      "missionGeneratePremiumShort": "每日任務生成\n最多30個",
+      "newFeaturesPremium": "新功能\n無限使用"
     },
     "button": {
       "subscribe": "訂閱Premium方案",

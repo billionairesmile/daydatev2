@@ -148,8 +148,11 @@
       "adLoadingFailed": "광고 로딩 실패",
       "adLoadingFailedMessage": "광고를 불러오는데 실패했어요.\n잠시 후 다시 시도해주세요.",
       "generating": "새로운 미션 생성 중...",
-      "loadingAd": "광고 준비 중..."
-    }
+      "loadingAd": "광고 준비 중...",
+      "adNotCompleted": "광고 시청 미완료",
+      "adNotCompletedMessage": "미션을 새로고침하려면 광고를 끝까지 시청해주세요."
+    },
+    "partnerWatchingAd": "파트너가 광고를 시청 중입니다..."
   },
   "missionDetail": {
     "headerTitle": "미션 상세",
@@ -887,7 +890,7 @@
     "benefits": {
       "missionComplete": "미션 완료",
       "missionCompleteFree": "1개/일",
-      "missionCompletePremium": "무제한 미션 완료",
+      "missionCompletePremium": "미션 완료\n무제한",
       "missionCompletePremiumDesc": "하루에 원하는 만큼 미션을 완료하고\n더 많은 추억을 쌓아보세요",
       "missionGenerate": "미션 생성",
       "missionGenerateFree": "1회/일 (3개)",
@@ -910,8 +913,8 @@
       "albumCreateFree": "최대 5개",
       "albumCreatePremium": "앨범 생성 무제한",
       "albumCreatePremiumDesc": "특별한 순간들을 테마별로 정리해서\n나만의 추억 앨범을 만들어보세요",
-      "missionGeneratePremiumShort": "하루 미션 생성 10개",
-      "newFeaturesPremium": "새로운 기능 무료 이용"
+      "missionGeneratePremiumShort": "하루 미션 생성\n최대 30개",
+      "newFeaturesPremium": "새로운 기능\n무제한 이용"
     },
     "button": {
       "subscribe": "프리미엄 플랜 구독하기",
