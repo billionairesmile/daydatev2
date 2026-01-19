@@ -1156,6 +1156,8 @@ function RootLayoutNav() {
   // Track if navigation has been performed to prevent re-navigation
   // Use ref instead of state to persist across hot reloads
   const hasNavigated = useRef(false);
+  // Track if Stack navigator is mounted
+  const isNavigatorMounted = useRef(false);
 
   // Calculate navigation state
   const inAuthGroup = segments?.[0] === '(auth)';
@@ -1168,13 +1170,12 @@ function RootLayoutNav() {
   // This covers tabs, more, mission, and any other top-level routes
   const needsNavigationToAuth = shouldBeInAuth && !inAuthGroup;
 
-  // Determine if we need to navigate (prevents flash of wrong screen)
-  const needsNavigation = needsNavigationToAuth || needsNavigationToTabs;
-
-  // Trigger navigation immediately when auth is ready and we're in wrong location
+  // Trigger navigation only AFTER navigator is mounted
+  // This prevents "route not found" errors when navigator isn't ready
   useEffect(() => {
     if (!authHydrated || typeof isOnboardingComplete !== 'boolean') return;
     if (hasNavigated.current) return;
+    if (!isNavigatorMounted.current) return; // Wait for navigator to mount
 
     if (needsNavigationToAuth) {
       hasNavigated.current = true;
@@ -1190,12 +1191,19 @@ function RootLayoutNav() {
     hasNavigated.current = false;
   }, [isOnboardingComplete]);
 
+  // Mark navigator as mounted when Stack renders
+  useEffect(() => {
+    isNavigatorMounted.current = true;
+    return () => {
+      isNavigatorMounted.current = false;
+    };
+  }, []);
+
   // Don't render Stack until:
   // 1. Auth state is hydrated
   // 2. Onboarding state is determined (boolean, not undefined)
-  // 3. We're in the correct location (no pending navigation)
   // This prevents flash of home screen before redirecting to login
-  if (!authHydrated || typeof isOnboardingComplete !== 'boolean' || needsNavigation) {
+  if (!authHydrated || typeof isOnboardingComplete !== 'boolean') {
     return <StatusBar style="light" />;
   }
 
