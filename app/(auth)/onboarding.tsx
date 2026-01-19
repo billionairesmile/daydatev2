@@ -4336,7 +4336,7 @@ function MBTIStep({
       </View>
 
       {/* Centered content - moved up */}
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-start', paddingTop: rh(150), width: '100%' }}>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-start', paddingTop: rh(110), width: '100%' }}>
         <View style={styles.mbtiGrid}>
           {MBTI_OPTIONS.map((option) => (
             <Pressable
@@ -5595,12 +5595,14 @@ const styles = StyleSheet.create({
   mbtiGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: rh(10),
+    justifyContent: 'space-evenly',
+    rowGap: rh(10),
     width: '100%',
+    paddingHorizontal: scale(SPACING.sm),
     marginBottom: rh(SPACING.xl),
   },
   mbtiButton: {
-    width: scale((width - SPACING.lg * 2 - 30) / 4),
+    width: '22%',
     height: rh(44),
     alignItems: 'center',
     justifyContent: 'center',
@@ -5682,9 +5684,11 @@ const styles = StyleSheet.create({
   activityGrid3Col: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: rh(8),
+    justifyContent: 'space-evenly',
     width: '100%',
+    paddingHorizontal: scale(SPACING.sm),
     paddingTop: rh(SPACING.md),
+    rowGap: rh(8),
   },
   activityButton: {
     width: scale((width - SPACING.lg * 2 - 10) / 2),
@@ -5698,7 +5702,7 @@ const styles = StyleSheet.create({
     gap: rh(6),
   },
   activityButtonSmall: {
-    width: scale((width - SPACING.lg * 2 - 16) / 3),
+    width: '29%',
     paddingVertical: rh(12),
     alignItems: 'center',
     justifyContent: 'center',
@@ -5737,6 +5741,7 @@ const styles = StyleSheet.create({
   },
   dateWorryContent: {
     gap: rh(10),
+    paddingHorizontal: scale(SPACING.lg),
     paddingBottom: rh(SPACING.md),
   },
   dateWorryButton: {
@@ -5780,12 +5785,14 @@ const styles = StyleSheet.create({
   constraintGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: rh(10),
+    justifyContent: 'space-evenly',
+    rowGap: rh(10),
     width: '100%',
+    paddingHorizontal: scale(SPACING.sm),
     marginBottom: rh(SPACING.xl),
   },
   constraintButton: {
-    width: scale((width - SPACING.lg * 2 - 10) / 2),
+    width: '46%',
     paddingVertical: rh(16),
     alignItems: 'center',
     justifyContent: 'center',
