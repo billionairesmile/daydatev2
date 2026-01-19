@@ -223,7 +223,7 @@ export default function NativeAdMissionCard({
             {/* CTA Button */}
             {nativeAd.callToAction && (
               <NativeAsset assetType={NativeAssetType.CALL_TO_ACTION}>
-                <Text style={[styles.ctaButton, { width: contentWidth }]} numberOfLines={1}>
+                <Text style={styles.ctaButton} numberOfLines={1}>
                   {nativeAd.callToAction}
                 </Text>
               </NativeAsset>
@@ -301,6 +301,7 @@ const styles = StyleSheet.create({
     marginTop: Platform.OS === 'android' ? 4 : 6,
   },
   ctaButton: {
+    alignSelf: 'stretch',
     backgroundColor: '#4285F4',
     paddingVertical: Platform.OS === 'android' ? 10 : 12,
     paddingHorizontal: Platform.OS === 'android' ? 14 : 16,

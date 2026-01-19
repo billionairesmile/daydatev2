@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scale } from '@/constants/design';
 import { useSubscriptionStore } from '@/stores/subscriptionStore';
+import { useUIStore } from '@/stores/uiStore';
 
 /**
  * Android 네비게이션 바가 있을 때와 없을 때 하단 간격을 제공하는 훅
@@ -64,9 +65,6 @@ export function useConsistentBottomPadding(): number {
  * 3. 탭바 (배너 광고 바로 위)
  */
 
-// 배너 광고 최대 높이 (adaptive banner: 50-60px 범위)
-// 탭바 위치 계산에 최대값 사용하여 어떤 크기의 배너든 겹치지 않도록 함
-const BANNER_AD_MAX_HEIGHT = 55;
 // 배너와 탭바 사이 간격
 const BANNER_TAB_GAP = 0;
 
@@ -89,12 +87,14 @@ export function useTabBarBottom(): number {
   const isPremium = useSubscriptionStore((state) => state.isPremium);
   const partnerIsPremium = useSubscriptionStore((state) => state.partnerIsPremium);
   const showAds = !isPremium && !partnerIsPremium;
+  // 실제 로드된 배너 광고 높이를 사용하여 반응형 포지셔닝
+  const bannerAdHeight = useUIStore((state) => state.bannerAdHeight);
 
   if (Platform.OS === 'android') {
     if (showAds) {
       // 무료 사용자: 탭바는 배너 광고 위에 위치
-      // 탭바 bottom = 네비바 높이 + 배너 높이 + 간격
-      return insets.bottom + BANNER_AD_MAX_HEIGHT + BANNER_TAB_GAP;
+      // 탭바 bottom = 네비바 높이 + 실제 배너 높이 + 간격
+      return insets.bottom + bannerAdHeight + BANNER_TAB_GAP;
     } else {
       // 프리미엄 사용자: 광고 없음, iOS와 동일한 위치
       // 네비바가 있으면 네비바 위에, 없으면 화면 하단에 scale(24) 간격

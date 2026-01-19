@@ -1,8 +1,9 @@
-import React, { useState, useRef } from 'react';
-import { View, StyleSheet, StyleProp, ViewStyle, Platform } from 'react-native';
+import React, { useState, useRef, useCallback } from 'react';
+import { View, StyleSheet, StyleProp, ViewStyle, Platform, LayoutChangeEvent } from 'react-native';
 import Constants from 'expo-constants';
 
 import { useSubscriptionStore } from '@/stores/subscriptionStore';
+import { useUIStore } from '@/stores/uiStore';
 
 // Check if we're running in Expo Go (not a development build)
 const isExpoGo = Constants.appOwnership === 'expo';
@@ -55,9 +56,18 @@ export default function BannerAdView({
   size,
 }: BannerAdViewProps) {
   const { shouldShowAds } = useSubscriptionStore();
+  const setBannerAdHeight = useUIStore((state) => state.setBannerAdHeight);
   const [adLoaded, setAdLoaded] = useState(false);
   const [adError, setAdError] = useState(false);
   const bannerRef = useRef<any>(null);
+
+  // Track actual banner height for responsive tab bar positioning
+  const handleLayout = useCallback((event: LayoutChangeEvent) => {
+    const { height } = event.nativeEvent.layout;
+    if (height > 0 && adLoaded) {
+      setBannerAdHeight(height);
+    }
+  }, [adLoaded, setBannerAdHeight]);
 
   // Required for iOS to handle app state changes - reload ad when app returns to foreground
   // Only use if useForeground is available (not in Expo Go)
@@ -102,7 +112,7 @@ export default function BannerAdView({
   const bannerSize = size || (BannerAdSize?.ANCHORED_ADAPTIVE_BANNER);
 
   return (
-    <View style={[styles.container, !adLoaded && styles.hidden, style]}>
+    <View style={[styles.container, !adLoaded && styles.hidden, style]} onLayout={handleLayout}>
       <BannerAd
         ref={bannerRef}
         unitId={getAdUnitId()}
