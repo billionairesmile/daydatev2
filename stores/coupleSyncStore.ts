@@ -243,6 +243,7 @@ interface CoupleSyncActions {
   getLockedMissionProgress: () => MissionProgress | null;
   isMissionLocked: (missionId: string) => boolean;
   canStartNewMission: () => boolean;
+  clearMissionProgressByMissionId: (missionId: string) => Promise<void>;
 
   // Extended sync - Albums
   createAlbum: (
@@ -1146,6 +1147,26 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
         }
       }
 
+      // Also cleanup stale 'ad_pending' status (when user closed app during ad)
+      // This prevents abuse where user can repeatedly generate missions without watching ads
+      if (lockData && lockData.status === 'ad_pending') {
+        const lockTime = lockData.locked_at ? new Date(lockData.locked_at) : null;
+        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+
+        // If ad_pending status is older than 5 minutes, it's stale (ad should complete in seconds)
+        if (!lockTime || lockTime < fiveMinutesAgo) {
+          console.log('[CoupleSyncStore] Stale ad_pending lock detected, cleaning up');
+          await db.missionLock.clearPending(coupleId);
+          await db.missionLock.release(coupleId, 'idle');
+          set({
+            missionGenerationStatus: 'idle',
+            generatingUserId: null,
+            pendingMissions: null,
+            pendingMissionsAnswers: null,
+          });
+        }
+      }
+
       return null;
     } finally {
       set({ isLoadingMissions: false });
@@ -1230,19 +1251,30 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     }
   },
 
-  // Reset all missions (for manual reset from settings)
+  // Reset all missions (for manual reset from settings or mission refresh)
+  // IMPORTANT: Preserves locked mission progress to prevent starting new missions while one is in progress
   resetAllMissions: async () => {
-    const { coupleId } = get();
+    const { coupleId, lockedMissionId, allMissionProgress, activeMissionProgress } = get();
 
-    // Clear local state first
+    // Check if there's a mission in progress that should be preserved
+    const lockedProgress = lockedMissionId
+      ? allMissionProgress.find((p) => p.mission_id === lockedMissionId)
+      : null;
+    const shouldPreserveLock =
+      lockedMissionId && lockedProgress && lockedProgress.status !== 'completed';
+
+    console.log('[CoupleSyncStore] resetAllMissions - shouldPreserveLock:', shouldPreserveLock, 'lockedMissionId:', lockedMissionId);
+
+    // Clear local state (but preserve locked mission progress if in progress)
     set({
       sharedMissions: [],
       sharedMissionsDate: null,
       missionGenerationStatus: 'idle',
-      activeMissionProgress: null,
-      allMissionProgress: [],
-      lockedMissionId: null,
       generatingUserId: null,
+      // Preserve locked mission data if mission is still in progress
+      activeMissionProgress: shouldPreserveLock ? activeMissionProgress : null,
+      allMissionProgress: shouldPreserveLock && lockedProgress ? [lockedProgress] : [],
+      lockedMissionId: shouldPreserveLock ? lockedMissionId : null,
     });
 
     // If synced, also delete from database
@@ -1251,8 +1283,10 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
         // Delete active missions from couple_missions table
         await db.coupleMissions.deleteActive(coupleId);
 
-        // Delete today's mission progress
-        await db.missionProgress.deleteToday(coupleId);
+        // Only delete mission progress if no locked mission to preserve
+        if (!shouldPreserveLock) {
+          await db.missionProgress.deleteToday(coupleId);
+        }
 
         // Release any mission lock
         await db.missionLock.release(coupleId);
@@ -1398,6 +1432,10 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
 
   removeBookmark: async (missionId: string) => {
     const { coupleId, sharedBookmarks } = get();
+
+    // First, clear any in-progress mission data for this mission
+    // This ensures the locked state is reset when deleting a bookmarked mission
+    await get().clearMissionProgressByMissionId(missionId);
 
     if (!coupleId || isInTestMode()) {
       // Demo mode: remove locally
@@ -2246,6 +2284,55 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       return lockedProgress?.status === 'completed';
     }
     return true;
+  },
+
+  // Clear mission progress when a bookmarked mission is deleted
+  // This resets the locked state and allows starting new missions
+  clearMissionProgressByMissionId: async (missionId: string) => {
+    const { coupleId, allMissionProgress, lockedMissionId } = get();
+
+    // Find the progress for this mission
+    const progressToDelete = allMissionProgress.find(p => p.mission_id === missionId);
+
+    if (!progressToDelete) {
+      console.log('[CoupleSyncStore] No progress found for mission:', missionId);
+      return; // No progress data, nothing to clear
+    }
+
+    console.log('[CoupleSyncStore] Clearing mission progress for:', missionId, 'progressId:', progressToDelete.id);
+
+    // Delete from DB if not in test mode
+    if (coupleId && !isInTestMode()) {
+      const { error } = await db.missionProgress.delete(progressToDelete.id);
+      if (error) {
+        console.error('[CoupleSyncStore] Failed to delete mission progress from DB:', error);
+        // Continue with local cleanup even if DB fails
+      }
+    }
+
+    // Update local state
+    set((state) => {
+      const updatedAll = state.allMissionProgress.filter(p => p.mission_id !== missionId);
+      const lockedProgress = updatedAll.find(p => p.is_message_locked);
+      const active = lockedProgress || updatedAll[0] || null;
+
+      return {
+        allMissionProgress: updatedAll,
+        activeMissionProgress: active,
+        lockedMissionId: lockedProgress?.mission_id || null,
+      };
+    });
+
+    // If the deleted mission was the locked mission, cancel scheduled notifications
+    if (lockedMissionId === missionId) {
+      console.log('[CoupleSyncStore] Deleted mission was locked, canceling notifications');
+      Promise.all([
+        cancelMissionReminderNotification(),
+        cancelHourlyReminders(),
+      ]).catch(err => {
+        console.warn('[CoupleSyncStore] Failed to cancel notifications:', err);
+      });
+    }
   },
 
   // ============================================

@@ -215,7 +215,9 @@
     "empty": "No saved missions",
     "emptyHint": "Keep missions you like",
     "deleteMission": "Delete Mission",
-    "deleteConfirm": "Delete '{{title}}'?"
+    "deleteConfirm": "Delete '{{title}}'?",
+    "cannotDelete": "Cannot Delete",
+    "missionInProgressMessage": "You cannot delete a mission in progress. Please complete or cancel the mission first."
   },
   "calendar": {
     "title": "Calendar",

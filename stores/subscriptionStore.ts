@@ -933,11 +933,11 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
             customerId: state.customerInfo?.originalAppUserId,
           });
 
-          // Get current profile to check subscription_started_at
+          // Get current profile to check subscription_started_at and existing admin-granted premium
           // Use maybeSingle() to handle case when profile doesn't exist yet (returns null instead of error)
           const { data: profile, error: profileFetchError } = await supabase
             .from('profiles')
-            .select('subscription_started_at, couple_id')
+            .select('subscription_started_at, couple_id, subscription_plan, subscription_expires_at')
             .eq('id', user.id)
             .maybeSingle();
 
@@ -962,7 +962,21 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
             authStore_couple_id: authCouple?.id,
             effective_couple_id: coupleId,
             subscription_started_at: profile?.subscription_started_at,
+            db_subscription_plan: profile?.subscription_plan,
+            db_subscription_expires_at: profile?.subscription_expires_at,
           });
+
+          // Check if DB has admin-granted premium that should be preserved
+          const dbHasValidPremium = profile?.subscription_plan !== 'free'
+            && profile?.subscription_expires_at
+            && new Date(profile.subscription_expires_at) > new Date();
+
+          // If RevenueCat says free but DB has valid premium, don't overwrite DB
+          // This preserves admin-granted premium for testing
+          if (!state.isPremium && dbHasValidPremium) {
+            console.log('[Subscription] Preserving admin-granted premium in DB, skipping sync');
+            return;
+          }
 
           // Prepare profile update data
           const profileUpdate: Record<string, unknown> = {

@@ -212,7 +212,9 @@
     "empty": "No hay misiones guardadas",
     "emptyHint": "Guarda las misiones que te gusten",
     "deleteMission": "Eliminar Misión",
-    "deleteConfirm": "¿Eliminar '{{title}}'?"
+    "deleteConfirm": "¿Eliminar '{{title}}'?",
+    "cannotDelete": "No se puede eliminar",
+    "missionInProgressMessage": "No puedes eliminar una misión en progreso. Por favor, completa o cancela la misión primero."
   },
   "calendar": {
     "title": "Calendario",

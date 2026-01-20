@@ -214,6 +214,21 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
 
       // Remove kept mission by kept ID (unique instance)
       removeKeptMissionByKeptId: (keptId) => {
+        const { keptMissions } = get();
+
+        // Find the mission to remove
+        const missionToRemove = keptMissions.find((m) => m.keptId === keptId);
+
+        if (missionToRemove) {
+          // Clear any in-progress mission data for this mission
+          // This ensures the locked state is reset when deleting a kept mission
+          const syncStore = useCoupleSyncStore.getState();
+          syncStore.clearMissionProgressByMissionId(missionToRemove.id).catch((err) => {
+            console.warn('[MissionStore] Failed to clear mission progress:', err);
+          });
+        }
+
+        // Remove from kept missions
         set((state) => ({
           keptMissions: state.keptMissions.filter((m) => m.keptId !== keptId),
         }));

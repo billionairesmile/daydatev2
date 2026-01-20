@@ -598,12 +598,12 @@ export default function HomeScreen() {
     );
   };
 
-  // Check for first-time tutorial
+  // Check for tutorial flag (only shows when user completes onboarding)
   useEffect(() => {
-    const checkFirstTimeVisit = async () => {
+    const checkTutorialFlag = async () => {
       try {
-        const hasSeenTutorial = await AsyncStorage.getItem('hasSeenHomeTutorial');
-        if (!hasSeenTutorial) {
+        const shouldShow = await AsyncStorage.getItem('shouldShowHomeTutorial');
+        if (shouldShow === 'true') {
           // Measure button position first, then show tutorial
           setTimeout(() => {
             measureButton();
@@ -616,14 +616,14 @@ export default function HomeScreen() {
         // If error, don't show tutorial
       }
     };
-    checkFirstTimeVisit();
+    checkTutorialFlag();
   }, [measureButton]);
 
-  // Close tutorial and save to AsyncStorage
+  // Close tutorial and remove flag from AsyncStorage
   const closeTutorial = async () => {
     setShowTutorial(false);
     try {
-      await AsyncStorage.setItem('hasSeenHomeTutorial', 'true');
+      await AsyncStorage.removeItem('shouldShowHomeTutorial');
     } catch {
       // Ignore storage errors
     }

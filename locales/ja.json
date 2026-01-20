@@ -215,7 +215,9 @@
     "empty": "保存したミッションがありません",
     "emptyHint": "気に入ったミッションをKeepしてみよう",
     "deleteMission": "ミッションを削除",
-    "deleteConfirm": "「{{title}}」を削除しますか？"
+    "deleteConfirm": "「{{title}}」を削除しますか？",
+    "cannotDelete": "削除できません",
+    "missionInProgressMessage": "進行中のミッションは削除できません。ミッションを完了またはキャンセルしてから削除してください。"
   },
   "calendar": {
     "title": "カレンダー",

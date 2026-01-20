@@ -47,6 +47,7 @@ import { useTranslation } from 'react-i18next';
 
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY, ANDROID_BOTTOM_PADDING } from '@/constants/design';
 import { useMissionStore } from '@/stores/missionStore';
+import { setReturningFromBookmark } from '@/app/(tabs)/mission';
 import { useMemoryStore } from '@/stores/memoryStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
@@ -64,11 +65,11 @@ export default function MissionDetailScreen() {
   // Custom back navigation - returns to bookmark page if came from there
   const handleBack = useCallback(() => {
     if (source === 'bookmark') {
-      // Navigate to mission tab with bookmark page open
-      router.replace('/(tabs)/mission?showBookmark=true');
-    } else {
-      router.back();
+      // Set flag to preserve bookmark view on mission tab
+      setReturningFromBookmark(true);
     }
+    // Use router.back() for consistent native animation
+    router.back();
   }, [router, source]);
 
   const [photoTaken, setPhotoTaken] = useState(false);

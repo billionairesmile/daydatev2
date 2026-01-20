@@ -54,6 +54,14 @@ import { db, isDemoMode } from '@/lib/supabase';
 import { rewardedAdManager } from '@/lib/rewardedAd';
 import { cancelHourlyReminders, cancelMissionReminderNotification } from '@/lib/pushNotifications';
 
+// Module-level flag to track returning from mission detail to bookmark view
+// This allows router.back() to work while preserving bookmark state
+let returningFromMissionDetailToBookmark = false;
+
+export const setReturningFromBookmark = (value: boolean) => {
+  returningFromMissionDetailToBookmark = value;
+};
+
 // Type for carousel items (Mission, Ad placeholder, or Refresh card)
 type CarouselItem = Mission | { type: 'ad'; id: string } | { type: 'refresh'; id: string };
 
@@ -494,8 +502,12 @@ export default function MissionScreen() {
   useFocusEffect(
     useCallback(() => {
       checkAndResetMissions();
-      // Don't reset bookmark view if returning from mission detail with showBookmark param
-      if (showBookmark !== 'true') {
+      // Don't reset bookmark view if returning from mission detail via back navigation
+      // or if showBookmark param is set (legacy support)
+      if (returningFromMissionDetailToBookmark) {
+        // Keep bookmark view open and clear the flag
+        returningFromMissionDetailToBookmark = false;
+      } else if (showBookmark !== 'true') {
         setShowBookmarkedMissions(false);
       }
       loadFeaturedMissions(); // Load featured missions on focus
@@ -850,11 +862,13 @@ export default function MissionScreen() {
       let adCompletedSuccessfully = false;
 
       // 2. Start mission generation with PENDING state (doesn't save to active DB yet)
+      // IMPORTANT: Do NOT reset existing missions here! Reset only after ad completes.
+      // This prevents losing missions if user closes app during ad.
       const missionGenerationPromise = (async () => {
         try {
-          // Reset existing missions first (both local and shared)
+          // Reset local generated mission state (not shared missions)
           resetGeneratedMissions();
-          await resetAllMissions();
+          // Note: resetAllMissions() is now called AFTER ad completes successfully
 
           // Generate new missions with deferSave option - saves as PENDING, not active
           const result = await generateTodayMissions(answers, excludedMissionsForAd, { deferSave: true });
@@ -908,8 +922,13 @@ export default function MissionScreen() {
 
           // Check if ad was completed successfully
           if (adCompletedSuccessfully) {
-            // SUCCESS: Commit pending missions to active DB
-            console.log('[Mission Refresh] Ad completed - committing pending missions');
+            // SUCCESS: First reset existing missions, then commit pending missions
+            console.log('[Mission Refresh] Ad completed - resetting old missions and committing pending');
+
+            // Now it's safe to reset existing missions since ad was completed
+            await resetAllMissions();
+
+            // Commit pending missions to active DB
             await commitPendingMissions(partner?.id, user?.nickname);
 
             // Get the newly generated missions

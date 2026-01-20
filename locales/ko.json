@@ -215,7 +215,9 @@
     "empty": "보관한 미션이 없어요",
     "emptyHint": "마음에 드는 미션을 Keep 해보세요",
     "deleteMission": "미션 삭제",
-    "deleteConfirm": "'{{title}}' 미션을 삭제하시겠어요?"
+    "deleteConfirm": "'{{title}}' 미션을 삭제하시겠어요?",
+    "cannotDelete": "삭제할 수 없어요",
+    "missionInProgressMessage": "진행 중인 미션은 삭제할 수 없어요. 미션을 완료하거나 취소한 후 삭제해주세요."
   },
   "calendar": {
     "title": "캘린더",

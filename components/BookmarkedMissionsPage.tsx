@@ -166,6 +166,9 @@ export function BookmarkedMissionsPage({ onBack }: BookmarkedMissionsPageProps) 
             const mission = getMissionFromBookmark(bookmark);
             const bookmarkId = getBookmarkId(bookmark);
             const isCompleted = isBookmarkCompleted(bookmark) || isTodayCompletedMission(mission.id);
+            // Check if this specific mission is currently in progress (locked)
+            const isMissionInProgress = lockedMissionId === mission.id;
+            const canDelete = !isMissionInProgress;
 
             return (
               <View key={bookmarkId} style={styles.missionCard}>
@@ -229,12 +232,28 @@ export function BookmarkedMissionsPage({ onBack }: BookmarkedMissionsPageProps) 
                         </Text>
                       </Pressable>
 
-                      {/* Delete Button */}
+                      {/* Delete Button - disabled when mission is in progress */}
                       <Pressable
-                        style={styles.deleteButton}
-                        onPress={() => handleRemove(bookmark, mission.title)}
+                        style={[
+                          styles.deleteButton,
+                          !canDelete && styles.deleteButtonDisabled,
+                        ]}
+                        onPress={() => {
+                          if (!canDelete) {
+                            Alert.alert(
+                              t('bookmark.cannotDelete'),
+                              t('bookmark.missionInProgressMessage'),
+                              [{ text: t('common.confirm') }]
+                            );
+                            return;
+                          }
+                          handleRemove(bookmark, mission.title);
+                        }}
                       >
-                        <Trash2 color={COLORS.white} size={18} />
+                        <Trash2
+                          color={!canDelete ? 'rgba(255, 255, 255, 0.4)' : COLORS.white}
+                          size={18}
+                        />
                       </Pressable>
                     </View>
                   </View>
@@ -389,6 +408,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#FF4444',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  deleteButtonDisabled: {
+    backgroundColor: 'rgba(255, 68, 68, 0.4)',
+    opacity: 0.6,
   },
   startButtonText: {
     fontSize: 14,

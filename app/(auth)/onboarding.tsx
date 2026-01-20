@@ -38,6 +38,7 @@ import * as Linking from 'expo-linking';
 import * as Location from 'expo-location';
 import * as Localization from 'expo-localization';
 import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WebView } from 'react-native-webview';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -944,6 +945,13 @@ export default function OnboardingScreen() {
           weddingDate: data.relationshipType === 'married' ? data.anniversaryDate : undefined,
         });
       }
+    }
+
+    // Set flag to show home tutorial for first-time users completing onboarding
+    try {
+      await AsyncStorage.setItem('shouldShowHomeTutorial', 'true');
+    } catch {
+      // Ignore storage errors
     }
 
     setIsOnboardingComplete(true);
