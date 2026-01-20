@@ -218,9 +218,9 @@ export default function UnpairScreen() {
                 relationshipType: 'dating',
               });
 
-              // Set onboarding incomplete - this triggers navigation via _layout.tsx effect
-              // DO NOT call router.replace here as it would cause duplicate navigation
+              // Set onboarding incomplete and navigate to onboarding screen
               setIsOnboardingComplete(false);
+              router.replace('/(auth)/onboarding');
             },
           },
         ]

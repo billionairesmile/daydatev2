@@ -317,7 +317,7 @@ export default function SettingsScreen() {
             // Reset onboarding steps to welcome
             resetOnboarding();
             // Note: Don't clear hasSeenHomeTutorial - it should persist so returning users don't see the tutorial again
-            router.replace('/(auth)/onboarding');
+            // Navigation is handled by _layout.tsx effect when isOnboardingComplete becomes false
           },
         },
       ]

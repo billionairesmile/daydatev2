@@ -6,6 +6,7 @@ export default function AuthLayout() {
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: '#FFFFFF' },
+        gestureEnabled: false,
       }}
     >
       <Stack.Screen name="onboarding" />
