@@ -871,7 +871,8 @@ export default function MissionScreen() {
           // Note: resetAllMissions() is now called AFTER ad completes successfully
 
           // Generate new missions with deferSave option - saves as PENDING, not active
-          const result = await generateTodayMissions(answers, excludedMissionsForAd, { deferSave: true });
+          // forceRegenerate: true to skip 'exists' check since we're refreshing
+          const result = await generateTodayMissions(answers, excludedMissionsForAd, { deferSave: true, forceRegenerate: true });
           console.log('[Mission Refresh] Generation completed with pending status:', result?.status);
           generationResult = result;
           return result;
@@ -966,8 +967,41 @@ export default function MissionScreen() {
               setIsGenerating(false);
               setIsWaitingForImages(false);
               isWaitingForImagesRef.current = false;
+
+              // Reset carousel state for proper first card scale
+              // This prevents the intermittent bug where first card appears smaller
+              setIsScrollInitialized(false);
+              hasInitializedCarousel.current = false;
+              setCurrentIndex(0);
+              scrollX.setValue(0);
+
+              setTimeout(() => {
+                if (scrollViewRef.current) {
+                  scrollViewRef.current.scrollToOffset({ offset: 1, animated: false });
+                  setTimeout(() => {
+                    scrollViewRef.current?.scrollToOffset({ offset: 0, animated: false });
+                    setIsScrollInitialized(true);
+                  }, 50);
+                }
+              }, 150);
             } else {
               setIsGenerating(false);
+
+              // Also reset carousel state for proper first card scale (no images case)
+              setIsScrollInitialized(false);
+              hasInitializedCarousel.current = false;
+              setCurrentIndex(0);
+              scrollX.setValue(0);
+
+              setTimeout(() => {
+                if (scrollViewRef.current) {
+                  scrollViewRef.current.scrollToOffset({ offset: 1, animated: false });
+                  setTimeout(() => {
+                    scrollViewRef.current?.scrollToOffset({ offset: 0, animated: false });
+                    setIsScrollInitialized(true);
+                  }, 50);
+                }
+              }, 150);
             }
           } else {
             // ROLLBACK: Ad was not completed (user closed early)
@@ -1201,10 +1235,25 @@ export default function MissionScreen() {
   };
 
   // Handle refresh button press - open modal in refresh mode
+  // Check if partner is already generating before opening modal
   const handleRefreshPress = useCallback(() => {
+    // Check if partner is generating (not self)
+    const currentUserId = user?.id;
+    const isPartnerGenerating = generatingUserId && generatingUserId !== currentUserId;
+
+    if ((missionGenerationStatus === 'generating' || missionGenerationStatus === 'ad_pending') && isPartnerGenerating) {
+      // Partner is generating - show alert and prevent opening modal
+      Alert.alert(
+        t('mission.refresh.partnerGenerating'),
+        t('mission.refresh.partnerGeneratingMessage'),
+        [{ text: t('common.confirm') }]
+      );
+      return;
+    }
+
     setIsRefreshMode(true);
     setShowGenerationModal(true);
-  }, []);
+  }, [user?.id, generatingUserId, missionGenerationStatus, t]);
 
   const renderCard = useCallback(
     ({ item, index }: { item: CarouselItem; index: number }) => {

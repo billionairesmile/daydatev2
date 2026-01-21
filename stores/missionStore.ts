@@ -93,7 +93,7 @@ interface MissionActions {
   getTodayCompletedMissionId: () => string | null;
   isTodayCompletedMission: (missionId: string) => boolean;
   // Mission generation actions
-  generateTodayMissions: (answers: MissionGenerationAnswers, excludedMissions?: ExcludedMission[], options?: { deferSave?: boolean }) => Promise<{ status: 'success' | 'pending_success' | 'locked' | 'exists' | 'location_required' | 'preferences_required' | 'limit_reached'; message?: string }>;
+  generateTodayMissions: (answers: MissionGenerationAnswers, excludedMissions?: ExcludedMission[], options?: { deferSave?: boolean; forceRegenerate?: boolean }) => Promise<{ status: 'success' | 'pending_success' | 'locked' | 'exists' | 'location_required' | 'preferences_required' | 'limit_reached'; message?: string }>;
   hasTodayMissions: () => boolean;
   getTodayMissions: () => Mission[];
   checkAndResetMissions: () => void;
@@ -394,6 +394,7 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
         const today = getTodayDateString();
         const syncStore = useCoupleSyncStore.getState();
         const deferSave = options?.deferSave ?? false;
+        const forceRegenerate = options?.forceRegenerate ?? false;
         const { user, partner } = useAuthStore.getState();
 
         try {
@@ -456,8 +457,9 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
             const todayTimezone = getTodayInTimezone(); // Use timezone-aware date for comparison
             console.log('[MissionStore] Existing missions count:', existingMissions.length, 'Date:', existingMissionsDate, 'Today:', todayTimezone);
 
-            // Only consider existing missions if they are from TODAY
-            if (existingMissions.length > 0 && existingMissionsDate === todayTimezone) {
+            // Only consider existing missions if they are from TODAY and we're not forcing regeneration
+            // forceRegenerate is used for refresh mode (ad-gated) where user wants new missions
+            if (existingMissions.length > 0 && existingMissionsDate === todayTimezone && !forceRegenerate) {
               console.log('[MissionStore] Using existing missions from today - returning exists status');
               // Use existing shared missions
               set({
