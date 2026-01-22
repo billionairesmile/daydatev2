@@ -654,6 +654,67 @@ export default function MissionScreen() {
     }
   }, [isSyncInitialized, missionGenerationStatus, sharedMissions.length, generatingUserId, user?.id]);
 
+  // Automatic polling for stale lock recovery when partner is generating
+  // This helps User B recover automatically when User A force-closes app during ad
+  useEffect(() => {
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    // Only poll when partner (not self) is generating or watching ad
+    if (missionGenerationStatus === 'generating' || missionGenerationStatus === 'ad_pending') {
+      const currentUserId = user?.id;
+      const isPartnerGenerating = generatingUserId && generatingUserId !== currentUserId;
+
+      if (isPartnerGenerating) {
+        // Poll every 30 seconds to check for stale locks
+        intervalId = setInterval(async () => {
+          console.log('[Mission] Polling for stale lock recovery...');
+
+          // Get status before polling
+          const statusBeforePoll = useCoupleSyncStore.getState().missionGenerationStatus;
+
+          await loadSharedMissions(); // This function auto-releases stale locks
+
+          // Get status after polling
+          const statusAfterPoll = useCoupleSyncStore.getState().missionGenerationStatus;
+
+          // If status changed from generating/ad_pending to idle, reset UI and carousel
+          if (
+            (statusBeforePoll === 'generating' || statusBeforePoll === 'ad_pending') &&
+            statusAfterPoll === 'idle'
+          ) {
+            console.log('[Mission] Polling detected stale lock recovery, resetting UI and carousel');
+
+            // Reset UI loading states
+            setIsGenerating(false);
+            setPartnerGeneratingMessage(null);
+
+            // Reset carousel state for proper first card scale
+            setIsScrollInitialized(false);
+            hasInitializedCarousel.current = false;
+            setCurrentIndex(0);
+            scrollX.setValue(0);
+
+            setTimeout(() => {
+              if (scrollViewRef.current) {
+                scrollViewRef.current.scrollToOffset({ offset: 1, animated: false });
+                setTimeout(() => {
+                  scrollViewRef.current?.scrollToOffset({ offset: 0, animated: false });
+                  setIsScrollInitialized(true);
+                }, 50);
+              }
+            }, 150);
+          }
+        }, 30000); // 30 seconds
+      }
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [missionGenerationStatus, generatingUserId, user?.id, loadSharedMissions, scrollX]);
+
   // Check location permission
   const checkLocationPermission = async (): Promise<boolean> => {
     try {

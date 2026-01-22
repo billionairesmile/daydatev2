@@ -1147,15 +1147,22 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
         }
       }
 
-      // Also cleanup stale 'ad_pending' status (when user closed app during ad)
-      // This prevents abuse where user can repeatedly generate missions without watching ads
+      // Handle 'ad_pending' status (when partner is watching ad or user closed app during ad)
+      // Uses 3-minute timeout since ads typically complete within 30 seconds to 2 minutes
       if (lockData && lockData.status === 'ad_pending') {
         const lockTime = lockData.locked_at ? new Date(lockData.locked_at) : null;
-        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+        const threeMinutesAgo = new Date(Date.now() - 3 * 60 * 1000);
 
-        // If ad_pending status is older than 5 minutes, it's stale (ad should complete in seconds)
-        if (!lockTime || lockTime < fiveMinutesAgo) {
-          console.log('[CoupleSyncStore] Stale ad_pending lock detected, cleaning up');
+        if (lockTime && lockTime > threeMinutesAgo) {
+          // Lock is fresh (< 3 min) - partner might still be watching ad
+          // Set state so UI shows loading/waiting state
+          set({
+            missionGenerationStatus: 'ad_pending',
+            generatingUserId: lockData.locked_by,
+          });
+        } else {
+          // Lock is stale (> 3 min) - ad viewing was likely abandoned
+          console.log('[CoupleSyncStore] Stale ad_pending lock detected (>3min), cleaning up');
           await db.missionLock.clearPending(coupleId);
           await db.missionLock.release(coupleId, 'idle');
           set({
