@@ -665,9 +665,11 @@ export default function MissionScreen() {
       const isPartnerGenerating = generatingUserId && generatingUserId !== currentUserId;
 
       if (isPartnerGenerating) {
-        // Poll every 30 seconds to check for stale locks
+        // Dynamic poll interval: ad_pending = 60s (ads take longer), generating = 30s
+        const pollInterval = missionGenerationStatus === 'ad_pending' ? 60000 : 30000;
+        // Poll to check for stale locks
         intervalId = setInterval(async () => {
-          console.log('[Mission] Polling for stale lock recovery...');
+          console.log('[Mission] Polling for stale lock recovery (interval:', pollInterval / 1000, 's)...');
 
           // Get status before polling
           const statusBeforePoll = useCoupleSyncStore.getState().missionGenerationStatus;
@@ -704,7 +706,7 @@ export default function MissionScreen() {
               }
             }, 150);
           }
-        }, 30000); // 30 seconds
+        }, pollInterval);
       }
     }
 

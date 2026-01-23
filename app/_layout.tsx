@@ -762,11 +762,12 @@ function RootLayoutNav() {
         // Then refresh all synced data
         fetchCoupleAndPartnerData();
         updateUserLocation();
-        // Check and reset missions if date changed (CRITICAL: Must be called before loading missions)
+        // First load fresh mission data from DB to ensure proper date comparison
+        await loadSharedMissions();
+        // Then check and reset missions based on fresh data
         checkAndResetMissions();
-        // Refresh mission data to sync any changes from partner
+        // Refresh mission progress
         loadMissionProgress();
-        loadSharedMissions();
         // Refresh albums to sync any changes from partner
         loadAlbums();
         // Refresh calendar data (todos and menstrual settings) to sync any changes from partner
