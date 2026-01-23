@@ -1996,9 +1996,6 @@ const styles = StyleSheet.create({
     fontSize: fp(14),
     fontWeight: '600',
     color: COLORS.white,
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 0, height: rs(2) },
-    textShadowRadius: rs(8),
   },
   todayBorder: {
     borderWidth: rs(2),

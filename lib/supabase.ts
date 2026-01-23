@@ -2826,9 +2826,18 @@ export const db = {
 
   // Storage
   storage: {
-    async uploadPhoto(coupleId: string, uri: string): Promise<string | null> {
+    async uploadPhoto(coupleId: string, uri: string, previousPhotoUrl?: string): Promise<string | null> {
       try {
         const client = getSupabase();
+
+        // Delete previous photo if exists (prevents orphan files when retaking photos)
+        if (previousPhotoUrl && previousPhotoUrl.startsWith('http')) {
+          const previousPath = extractStoragePathFromUrl(previousPhotoUrl);
+          if (previousPath) {
+            console.log('[Storage] Deleting previous photo before upload:', previousPath);
+            await deleteFromStorage(previousPath);
+          }
+        }
 
         // Photo is already processed locally in mission/[id].tsx (1500px, 0.85 quality)
         // No additional compression needed - upload as-is to preserve quality

@@ -2,7 +2,7 @@
 // 카테고리별 이미지 URL (앱 용량에 영향 없음 - URL 문자열만 저장)
 
 const UNSPLASH_BASE = 'https://images.unsplash.com';
-const IMAGE_PARAMS = '?w=600&q=80&auto=format';
+const IMAGE_PARAMS = '?w=1400&q=85&auto=format';
 
 export type MissionCategory =
   // 🍴 Food & Drink

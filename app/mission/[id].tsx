@@ -20,6 +20,9 @@ import {
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
+import MaskedView from '@react-native-masked-view/masked-view';
+import { easeGradient } from 'react-native-easing-gradient';
 import { Camera as VisionCamera, useCameraDevice, useCameraFormat, useCameraPermission, CameraRuntimeError } from 'react-native-vision-camera';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as Location from 'expo-location';
@@ -33,6 +36,7 @@ try {
 }
 import {
   ChevronLeft,
+  ChevronDown,
   Camera,
   Edit3,
   Check,
@@ -42,10 +46,10 @@ import {
   Zap,
   ZapOff,
 } from 'lucide-react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
-import { COLORS, SPACING, RADIUS, TYPOGRAPHY, ANDROID_BOTTOM_PADDING } from '@/constants/design';
+import { COLORS, SPACING, RADIUS, TYPOGRAPHY, ANDROID_BOTTOM_PADDING, hp, rs, fp, SCREEN_HEIGHT } from '@/constants/design';
 import { useMissionStore } from '@/stores/missionStore';
 import { setReturningFromBookmark } from '@/app/(tabs)/mission';
 import { useMemoryStore } from '@/stores/memoryStore';
@@ -54,6 +58,21 @@ import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
 import { useSubscriptionStore } from '@/stores/subscriptionStore';
 import { db, isDemoMode } from '@/lib/supabase';
 import type { CompletedMission, Mission } from '@/types';
+
+// Hero section height (70% of screen)
+const HERO_HEIGHT = hp(60);
+
+// Easing gradient for smooth blur-to-black transition in hero section
+const heroGradientResult = easeGradient({
+  colorStops: {
+    0: { color: 'rgba(0,0,0,0)' },
+    0.5: { color: 'rgba(0,0,0,0)' },
+    0.7: { color: 'rgba(0,0,0,0.5)' },
+    1: { color: 'rgba(0,0,0,1)' },
+  },
+});
+const heroBlurColors = heroGradientResult.colors as unknown as readonly [string, string, ...string[]];
+const heroBlurLocations = heroGradientResult.locations as unknown as readonly [number, number, ...number[]];
 
 export default function MissionDetailScreen() {
   // Get screen dimensions dynamically
@@ -134,10 +153,62 @@ export default function MissionDetailScreen() {
   const [currentLocation, setCurrentLocation] = useState<string | null>(null);
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
 
+  // Scroll state for bottom overlay transition
+  // When not scrolled: show down arrow, hide second content
+  // When scrolled: hide down arrow, show second content
+  // When scrolled to bottom: show photo/message buttons
+  const [hasScrolled, setHasScrolled] = useState(false);
+  const [isAtBottom, setIsAtBottom] = useState(false);
+  const scrollThreshold = 1; // Immediately hide down arrow on any scroll
+  const overlayOpacity = useRef(new Animated.Value(1)).current; // Down arrow
+  const secondContentOpacity = useRef(new Animated.Value(0)).current; // Second content (steps card)
+  const buttonsOpacity = useRef(new Animated.Value(0)).current; // Action buttons
+
+  // Handle scroll position change
+  const handleScroll = useCallback((event: any) => {
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    const offsetY = contentOffset.y;
+
+    // Check if scrolled at all (for down arrow and second content)
+    const scrolledAny = offsetY > scrollThreshold;
+
+    // Check if scrolled to bottom (for action buttons)
+    const bottomThreshold = 50; // pixels from bottom to trigger
+    const scrolledToBottom = offsetY + layoutMeasurement.height >= contentSize.height - bottomThreshold;
+
+    // Update down arrow and second content visibility
+    if (scrolledAny !== hasScrolled) {
+      setHasScrolled(scrolledAny);
+      Animated.parallel([
+        Animated.timing(overlayOpacity, {
+          toValue: scrolledAny ? 0 : 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(secondContentOpacity, {
+          toValue: scrolledAny ? 1 : 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+
+    // Update action buttons visibility (only at bottom)
+    if (scrolledToBottom !== isAtBottom) {
+      setIsAtBottom(scrolledToBottom);
+      Animated.timing(buttonsOpacity, {
+        toValue: scrolledToBottom ? 1 : 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [hasScrolled, isAtBottom, overlayOpacity, secondContentOpacity, buttonsOpacity]);
+
   // Vision Camera permission and device
   const { hasPermission, requestPermission } = useCameraPermission();
   const device = useCameraDevice(facing === 'front' ? 'front' : 'back');
   const cameraRef = useRef<VisionCamera>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
 
   // Select best camera format for both photo quality AND preview quality
   // videoResolution improves the live preview stream quality
@@ -386,10 +457,19 @@ export default function MissionDetailScreen() {
     const isUser1 = user?.id === thisMissionProgress.user1_id;
     setIsPhotoTaker(isUser1);
 
-    // Sync photo - this shows the photo to both users
-    if (thisMissionProgress.photo_url && !capturedPhoto) {
-      setCapturedPhoto(thisMissionProgress.photo_url);
-      setPhotoTaken(true);
+    // Sync photo - this shows the photo to both users (including retake)
+    if (thisMissionProgress.photo_url) {
+      const remoteUrl = thisMissionProgress.photo_url;
+      const isLocalPhoto = capturedPhoto && !capturedPhoto.startsWith('http');
+
+      // Don't overwrite if user is currently taking/reviewing a local photo
+      // Only update if:
+      // 1. No local photo, OR
+      // 2. Current photo is a remote URL AND different from new URL (partner retook)
+      if (!capturedPhoto || (!isLocalPhoto && capturedPhoto !== remoteUrl)) {
+        setCapturedPhoto(remoteUrl);
+        setPhotoTaken(true);
+      }
     }
 
     // Sync messages based on user role
@@ -955,6 +1035,11 @@ export default function MissionDetailScreen() {
         showPreviewRef.current = false;
         setPreviewPhoto(null);
 
+        // Scroll to bottom after photo is taken
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+
         // Get current location when photo is confirmed
         const locationName = await getCurrentLocationName();
         setCurrentLocation(locationName);
@@ -968,8 +1053,8 @@ export default function MissionDetailScreen() {
         // Start synced mission progress if sync is initialized
         if (isSyncInitialized && couple?.id) {
           try {
-            // Upload photo to storage first
-            const uploadedPhotoUrl = await db.storage.uploadPhoto(couple.id, previewPhoto);
+            // Upload photo to storage first (pass previous photo URL for cleanup on retake)
+            const uploadedPhotoUrl = await db.storage.uploadPhoto(couple.id, previewPhoto, capturedPhoto ?? undefined);
 
             if (uploadedPhotoUrl) {
               // Update capturedPhoto state to the remote URL to prevent duplicate uploads
@@ -1015,6 +1100,11 @@ export default function MissionDetailScreen() {
         setShowPreview(false);
         showPreviewRef.current = false;
         setPreviewPhoto(null);
+
+        // Scroll to bottom after photo is taken (fallback case)
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }, 100);
       }
     }
   };
@@ -1537,263 +1627,322 @@ export default function MissionDetailScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Background - Optimized with expo-image */}
-      <View style={styles.backgroundImage}>
+      {/* Disable swipe back gesture on iOS */}
+      <Stack.Screen options={{ gestureEnabled: false }} />
+
+      {/* Background Image - Fixed behind ScrollView */}
+      <View style={styles.heroBackground}>
         <ExpoImage
           source={{ uri: mission.imageUrl }}
           style={StyleSheet.absoluteFill}
           contentFit="cover"
           cachePolicy="memory-disk"
           transition={100}
+          priority="high"
+          allowDownscaling={false}
         />
-        <BlurView experimentalBlurMethod="dimezisBlurView" intensity={Platform.OS === 'ios' ? 40 : 40} tint={Platform.OS === 'ios' ? 'light' : 'default'} style={StyleSheet.absoluteFill} />
-        <View style={styles.overlay} />
+        {/* Gradient overlay - starts lower for more image visibility */}
+        <View style={styles.heroGradientContainer}>
+          {Platform.OS === 'ios' ? (
+            <>
+              <MaskedView
+                maskElement={
+                  <LinearGradient
+                    locations={heroBlurLocations}
+                    colors={heroBlurColors}
+                    style={StyleSheet.absoluteFill}
+                  />
+                }
+                style={StyleSheet.absoluteFill}
+              >
+                <BlurView
+                  experimentalBlurMethod="dimezisBlurView"
+                  intensity={30}
+                  tint="dark"
+                  style={StyleSheet.absoluteFill}
+                />
+              </MaskedView>
+              <LinearGradient
+                colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0)', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.85)', 'rgba(0,0,0,1)']}
+                locations={[0, 0.5, 0.7, 0.9, 1]}
+                style={StyleSheet.absoluteFill}
+              />
+            </>
+          ) : (
+            <LinearGradient
+              colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0)', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,1)']}
+              locations={[0, 0.5, 0.7, 0.9, 1]}
+              style={StyleSheet.absoluteFill}
+            />
+          )}
+        </View>
       </View>
 
-
-      {/* Header */}
+      {/* Header - Absolute positioned (back button only) */}
       <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <Pressable onPress={handleBack} style={styles.backButton}>
-            <ChevronLeft color={COLORS.white} size={20} />
-          </Pressable>
-          <Text style={styles.headerTitle}>{t('missionDetail.headerTitle')}</Text>
-          <View style={styles.headerSpacer} />
-        </View>
-        <View style={styles.headerLine} />
+        <Pressable onPress={handleBack} style={styles.backButton}>
+          <ChevronLeft color={COLORS.white} size={24} />
+        </Pressable>
       </View>
 
+      {/* Scrollable Content - Scrolls over the background image */}
       <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        ref={scrollViewRef}
+        style={styles.contentScrollView}
+        contentContainerStyle={styles.contentScrollContentScrolled}
         showsVerticalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
       >
-        {/* Mission Info Card */}
-        <View style={styles.missionCard}>
-          <BlurView experimentalBlurMethod="dimezisBlurView" intensity={Platform.OS === 'ios' ? 10 : 30} tint={Platform.OS === 'ios' ? 'default' : 'dark'} style={styles.cardBlur}>
-            <View style={styles.missionContent}>
-              {/* Title */}
-              <Text style={styles.missionTitle} textBreakStrategy="simple" lineBreakStrategyIOS="hangul-word">{mission.title}</Text>
-
-              {/* Description */}
-              <Text style={styles.missionDescription}>{mission.description}</Text>
-
-              {/* Tags */}
-              {mission.tags.length > 0 && (
-                <View style={styles.tagsContainer}>
-                  {mission.tags.map((tag, index) => (
-                    <View key={index} style={styles.tag}>
-                      <Text style={styles.tagText}>#{tag}</Text>
-                    </View>
-                  ))}
+        {/* Mission Info Section - Scrolls with content */}
+        <View style={styles.scrollableMissionInfo}>
+          {/* Title - Word-by-word wrapping to prevent breaking in middle of words */}
+          <View style={[styles.wordWrapContainer, { marginBottom: rs(10) }]}>
+            {mission.title.split(' ').map((word, index, arr) => (
+              <Text
+                key={index}
+                style={styles.overlayTitleWord}
+                textBreakStrategy="highQuality"
+                android_hyphenationFrequency="none"
+              >
+                {word}{index < arr.length - 1 ? ' ' : ''}
+              </Text>
+            ))}
+          </View>
+          {/* Description - Word-by-word wrapping to prevent breaking in middle of words */}
+          <View style={[styles.wordWrapContainer, { marginBottom: rs(14) }]}>
+            {mission.description.split(' ').map((word, index, arr) => (
+              <Text
+                key={index}
+                style={styles.overlayDescriptionWord}
+                textBreakStrategy="highQuality"
+                android_hyphenationFrequency="none"
+              >
+                {word}{index < arr.length - 1 ? ' ' : ''}
+              </Text>
+            ))}
+          </View>
+          {mission.tags.length > 0 && (
+            <View style={styles.overlayTagsContainer}>
+              {mission.tags.map((tag, index) => (
+                <View key={index} style={styles.overlayTag}>
+                  <Text style={styles.overlayTagText}>#{tag}</Text>
                 </View>
-              )}
+              ))}
             </View>
-          </BlurView>
+          )}
         </View>
 
-        {/* Additional Content Card (Affiliate links, promotional content) */}
-        {additionalContent && (
-          <View style={styles.additionalContentCard}>
+        {/* Second Content - Hidden until scroll (appears when down arrow disappears) */}
+        <Animated.View style={{ opacity: secondContentOpacity }}>
+          {/* Additional Content Card (Affiliate links, promotional content) */}
+          {additionalContent && (
+            <View style={styles.additionalContentCard}>
+              <BlurView experimentalBlurMethod="dimezisBlurView" intensity={Platform.OS === 'ios' ? 10 : 30} tint={Platform.OS === 'ios' ? 'default' : 'dark'} style={styles.cardBlur}>
+                <View style={styles.additionalContentInner}>
+                  {renderRichContent(additionalContent)}
+                </View>
+              </BlurView>
+            </View>
+          )}
+
+          {/* Mission Steps Card */}
+          <View style={styles.stepsCard}>
             <BlurView experimentalBlurMethod="dimezisBlurView" intensity={Platform.OS === 'ios' ? 10 : 30} tint={Platform.OS === 'ios' ? 'default' : 'dark'} style={styles.cardBlur}>
-              <View style={styles.additionalContentInner}>
-                {renderRichContent(additionalContent)}
+              <View style={styles.stepsContent}>
+                {/* Step 1: Photo */}
+                <View style={styles.stepItem}>
+                  <View style={styles.stepIndicator}>
+                    <View
+                      style={[
+                        styles.stepCircle,
+                        photoTaken && styles.stepCircleComplete,
+                      ]}
+                    >
+                      {photoTaken ? (
+                        <Check color="#86efac" size={20} />
+                      ) : (
+                        <Text style={styles.stepNumber}>1</Text>
+                      )}
+                    </View>
+                    <View style={styles.stepLine} />
+                  </View>
+                  <View style={styles.stepContent}>
+                    <View style={styles.stepTitleRow}>
+                      <Camera color={COLORS.white} size={20} />
+                      <Text style={styles.stepTitle}>{t('missionDetail.steps.photo.title')}</Text>
+                    </View>
+                    <Text style={styles.stepDescription}>
+                      {t('missionDetail.steps.photo.description')}
+                    </Text>
+                    <Text style={styles.stepDescription}>
+                      {t('missionDetail.steps.photo.hint')}
+                    </Text>
+                    {capturedPhoto && (
+                      <View style={styles.photoPreviewContainer}>
+                        {/* Tap photo to enlarge */}
+                        <Pressable onPress={() => setShowEnlargedPhoto(true)}>
+                          <ExpoImage
+                            source={{ uri: capturedPhoto }}
+                            style={styles.photoPreview}
+                            contentFit="cover"
+                            cachePolicy="memory-disk"
+                            transition={100}
+                          />
+                        </Pressable>
+                        {/* Show retake button for both users until mission is complete */}
+                        {!isComplete && (
+                          <Pressable
+                            onPress={handleRetakeFromDetail}
+                            style={styles.detailRetakeButton}
+                          >
+                            <Camera color={COLORS.white} size={16} />
+                            <Text style={styles.detailRetakeButtonText}>{t('missionDetail.camera.retake')}</Text>
+                          </Pressable>
+                        )}
+                      </View>
+                    )}
+                  </View>
+                </View>
+
+                {/* Step 2: Messages */}
+                <View style={styles.stepItem}>
+                  <View style={styles.stepIndicator}>
+                    <View
+                      style={[
+                        styles.stepCircle,
+                        user1Message && user2Message && styles.stepCircleComplete,
+                      ]}
+                    >
+                      {user1Message && user2Message ? (
+                        <Check color="#86efac" size={20} />
+                      ) : (
+                        <Text style={styles.stepNumber}>2</Text>
+                      )}
+                    </View>
+                  </View>
+                  <View style={styles.stepContent}>
+                    <View style={styles.stepTitleRow}>
+                      <Edit3 color={COLORS.white} size={20} />
+                      <Text style={styles.stepTitle}>{t('missionDetail.steps.message.title')}</Text>
+                    </View>
+                    <Text style={styles.stepDescription}>
+                      {t('missionDetail.steps.message.description')}
+                    </Text>
+
+                    {/* User Status Cards */}
+                    <View style={styles.userStatusContainer}>
+                      <View style={styles.userStatus}>
+                        <View
+                          style={[
+                            styles.userIcon,
+                            user1Message && styles.userIconComplete,
+                          ]}
+                        >
+                          <User
+                            color={user1Message ? '#86efac' : 'rgba(255,255,255,0.5)'}
+                            size={14}
+                          />
+                        </View>
+                        <View style={styles.userInfo}>
+                          <Text style={styles.userLabel}>{t('common.me')}</Text>
+                          <Text
+                            style={[
+                              styles.userStatusText,
+                              user1Message && styles.userStatusComplete,
+                            ]}
+                          >
+                            {user1Message ? t('missionDetail.steps.message.written') : t('missionDetail.steps.message.notWritten')}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.userStatus}>
+                        <View
+                          style={[
+                            styles.userIcon,
+                            user2Message && styles.userIconComplete,
+                          ]}
+                        >
+                          <User
+                            color={user2Message ? '#86efac' : 'rgba(255,255,255,0.5)'}
+                            size={14}
+                          />
+                        </View>
+                        <View style={styles.userInfo}>
+                          <Text style={styles.userLabel}>{t('common.partner')}</Text>
+                          <Text
+                            style={[
+                              styles.userStatusText,
+                              user2Message && styles.userStatusComplete,
+                            ]}
+                          >
+                            {user2Message ? t('missionDetail.steps.message.written') : t('missionDetail.steps.message.notWritten')}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+
               </View>
             </BlurView>
           </View>
-        )}
-
-        {/* Mission Steps Card */}
-        <View style={styles.stepsCard}>
-          <BlurView experimentalBlurMethod="dimezisBlurView" intensity={Platform.OS === 'ios' ? 10 : 30} tint={Platform.OS === 'ios' ? 'default' : 'dark'} style={styles.cardBlur}>
-            <View style={styles.stepsContent}>
-              {/* Step 1: Photo */}
-              <View style={styles.stepItem}>
-                <View style={styles.stepIndicator}>
-                  <View
-                    style={[
-                      styles.stepCircle,
-                      photoTaken && styles.stepCircleComplete,
-                    ]}
-                  >
-                    {photoTaken ? (
-                      <Check color="#86efac" size={20} />
-                    ) : (
-                      <Text style={styles.stepNumber}>1</Text>
-                    )}
-                  </View>
-                  <View style={styles.stepLine} />
-                </View>
-                <View style={styles.stepContent}>
-                  <View style={styles.stepTitleRow}>
-                    <Camera color={COLORS.white} size={20} />
-                    <Text style={styles.stepTitle}>{t('missionDetail.steps.photo.title')}</Text>
-                    {photoTaken && <Text style={styles.stepComplete}>{t('missionDetail.steps.complete')}</Text>}
-                  </View>
-                  <Text style={styles.stepDescription}>
-                    {t('missionDetail.steps.photo.description')}
-                  </Text>
-                  <Text style={styles.stepDescription}>
-                    {t('missionDetail.steps.photo.hint')}
-                  </Text>
-                  {capturedPhoto && (
-                    <View style={styles.photoPreviewContainer}>
-                      {/* Tap photo to enlarge */}
-                      <Pressable onPress={() => setShowEnlargedPhoto(true)}>
-                        <ExpoImage
-                          source={{ uri: capturedPhoto }}
-                          style={styles.photoPreview}
-                          contentFit="cover"
-                          cachePolicy="memory-disk"
-                          transition={100}
-                        />
-                      </Pressable>
-                      {/* Show retake button for both users until mission is complete */}
-                      {!isComplete && (
-                        <Pressable
-                          onPress={handleRetakeFromDetail}
-                          style={styles.detailRetakeButton}
-                        >
-                          <Camera color={COLORS.white} size={16} />
-                          <Text style={styles.detailRetakeButtonText}>{t('missionDetail.camera.retake')}</Text>
-                        </Pressable>
-                      )}
-                    </View>
-                  )}
-                </View>
-              </View>
-
-              {/* Step 2: Messages */}
-              <View style={styles.stepItem}>
-                <View style={styles.stepIndicator}>
-                  <View
-                    style={[
-                      styles.stepCircle,
-                      user1Message && user2Message && styles.stepCircleComplete,
-                    ]}
-                  >
-                    {user1Message && user2Message ? (
-                      <Check color="#86efac" size={20} />
-                    ) : (
-                      <Text style={styles.stepNumber}>2</Text>
-                    )}
-                  </View>
-                </View>
-                <View style={styles.stepContent}>
-                  <View style={styles.stepTitleRow}>
-                    <Edit3 color={COLORS.white} size={20} />
-                    <Text style={styles.stepTitle}>{t('missionDetail.steps.message.title')}</Text>
-                    {user1Message && user2Message && (
-                      <Text style={styles.stepComplete}>{t('missionDetail.steps.complete')}</Text>
-                    )}
-                  </View>
-                  <Text style={styles.stepDescription}>
-                    {t('missionDetail.steps.message.description')}
-                  </Text>
-
-                  {/* User Status Cards */}
-                  <View style={styles.userStatusContainer}>
-                    <View style={styles.userStatus}>
-                      <View
-                        style={[
-                          styles.userIcon,
-                          user1Message && styles.userIconComplete,
-                        ]}
-                      >
-                        <User
-                          color={user1Message ? '#86efac' : 'rgba(255,255,255,0.5)'}
-                          size={14}
-                        />
-                      </View>
-                      <View style={styles.userInfo}>
-                        <Text style={styles.userLabel}>{t('common.me')}</Text>
-                        <Text
-                          style={[
-                            styles.userStatusText,
-                            user1Message && styles.userStatusComplete,
-                          ]}
-                        >
-                          {user1Message ? t('missionDetail.steps.message.written') : t('missionDetail.steps.message.notWritten')}
-                        </Text>
-                      </View>
-                    </View>
-                    <View style={styles.userStatus}>
-                      <View
-                        style={[
-                          styles.userIcon,
-                          user2Message && styles.userIconComplete,
-                        ]}
-                      >
-                        <User
-                          color={user2Message ? '#86efac' : 'rgba(255,255,255,0.5)'}
-                          size={14}
-                        />
-                      </View>
-                      <View style={styles.userInfo}>
-                        <Text style={styles.userLabel}>{t('common.partner')}</Text>
-                        <Text
-                          style={[
-                            styles.userStatusText,
-                            user2Message && styles.userStatusComplete,
-                          ]}
-                        >
-                          {user2Message ? t('missionDetail.steps.message.written') : t('missionDetail.steps.message.notWritten')}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                </View>
-              </View>
-
-            </View>
-          </BlurView>
-        </View>
+        </Animated.View>
       </ScrollView>
 
-      {/* Bottom CTA */}
-      <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={styles.bottomBar}>
-        <View style={styles.bottomContent}>
-          <Pressable
-            style={[
-              styles.ctaButton,
-              (isWaitingForPartner || isWaitingForPhoto || isMissionLockedByAnother) && styles.ctaButtonDisabled,
-              isComplete && styles.ctaButtonComplete,
-            ]}
-            onPress={
-              isComplete
-                ? handleCompleteAndClose
-                : isWaitingForPartner || isWaitingForPhoto || isMissionLockedByAnother
-                  ? undefined
-                  : photoTaken
-                    ? handleOpenMessageModal
-                    : handleTakePhoto
-            }
-            disabled={!!(isWaitingForPartner || isWaitingForPhoto || isMissionLockedByAnother)}
-          >
-            {isComplete ? (
-              <View style={styles.ctaButtonCompleteContent}>
-                <Check color="#86efac" size={18} />
-                <Text style={styles.ctaButtonCompleteText}>{t('missionDetail.completeButton')}</Text>
-              </View>
-            ) : (
-              <Text style={[
-                styles.ctaButtonText,
-                (isWaitingForPartner || isWaitingForPhoto || isMissionLockedByAnother) && styles.ctaButtonTextDisabled,
-              ]}>
-                {isMissionLockedByAnother
-                  ? t('missionDetail.status.anotherInProgress')
-                  : isWaitingForPartner
-                    ? t('missionDetail.status.waitingPartner')
-                    : isWaitingForPhoto
-                      ? t('missionDetail.status.waitingPhoto')
-                      : photoTaken
-                        ? t('missionDetail.status.writeMessage')
-                        : t('missionDetail.status.takePhoto')}
-              </Text>
-            )}
-          </Pressable>
+      {/* Fixed Down Arrow - Hidden after scroll */}
+      <Animated.View style={[styles.fixedDownArrow, { opacity: overlayOpacity, pointerEvents: hasScrolled ? 'none' : 'auto' }]}>
+        <ChevronDown color="rgba(255,255,255,0.6)" size={20} style={{ marginBottom: -12 }} />
+        <ChevronDown color="rgba(255,255,255,0.4)" size={20} style={{ marginBottom: -12 }} />
+        <ChevronDown color="rgba(255,255,255,0.2)" size={20} />
+      </Animated.View>
+
+      {/* Bottom Action Buttons - Shown when scrolled to bottom */}
+      <Animated.View style={[styles.actionButtonsContainer, { opacity: buttonsOpacity, pointerEvents: isAtBottom ? 'auto' : 'none' }]}>
+        <View style={styles.bottomBar}>
+          <View style={styles.bottomContent}>
+            <Pressable
+              style={[
+                styles.ctaButton,
+                (isWaitingForPartner || isWaitingForPhoto || isMissionLockedByAnother) && styles.ctaButtonDisabled,
+                isComplete && styles.ctaButtonComplete,
+              ]}
+              onPress={
+                isComplete
+                  ? handleCompleteAndClose
+                  : isWaitingForPartner || isWaitingForPhoto || isMissionLockedByAnother
+                    ? undefined
+                    : photoTaken
+                      ? handleOpenMessageModal
+                      : handleTakePhoto
+              }
+              disabled={!!(isWaitingForPartner || isWaitingForPhoto || isMissionLockedByAnother)}
+            >
+              {isComplete ? (
+                <View style={styles.ctaButtonCompleteContent}>
+                  <Check color="#22c55e" size={18} />
+                  <Text style={styles.ctaButtonCompleteText}>{t('missionDetail.completeButton')}</Text>
+                </View>
+              ) : (
+                <Text style={[
+                  styles.ctaButtonText,
+                  (isWaitingForPartner || isWaitingForPhoto || isMissionLockedByAnother) && styles.ctaButtonTextDisabled,
+                ]}>
+                  {isMissionLockedByAnother
+                    ? t('missionDetail.status.anotherInProgress')
+                    : isWaitingForPartner
+                      ? t('missionDetail.status.waitingPartner')
+                      : isWaitingForPhoto
+                        ? t('missionDetail.status.waitingPhoto')
+                        : photoTaken
+                          ? t('missionDetail.status.writeMessage')
+                          : t('missionDetail.status.takePhoto')}
+                </Text>
+              )}
+            </Pressable>
+          </View>
         </View>
-      </BlurView>
+      </Animated.View>
 
       {/* Message Modal - Small Todo-list Style */}
       <Modal
@@ -1932,37 +2081,80 @@ const styles = StyleSheet.create({
     marginTop: 12,
     opacity: 0.7,
   },
-  backgroundImage: {
+  // Hero Background Styles (fixed behind scroll)
+  heroBackground: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    bottom: 0,
-    width: '100%',
-    height: '100%',
+    height: HERO_HEIGHT,
   },
-  overlay: {
+  heroGradientContainer: {
+    position: 'absolute',
+    top: HERO_HEIGHT * 0.65, // Start gradient earlier for smoother transition
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  heroTitle: {
+    fontSize: fp(24),
+    color: COLORS.white,
+    fontWeight: '700',
+    textAlign: 'center',
+    lineHeight: fp(32),
+    marginBottom: rs(12),
+  },
+  heroDescription: {
+    fontSize: fp(14),
+    color: 'rgba(255,255,255,0.85)',
+    textAlign: 'center',
+    lineHeight: fp(21),
+    marginBottom: rs(14),
+  },
+  heroTagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: rs(8),
+  },
+  heroTag: {
+    paddingHorizontal: rs(12),
+    paddingVertical: rs(5),
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: rs(100),
+  },
+  heroTagText: {
+    fontSize: fp(12),
+    color: COLORS.white,
+  },
+  // Mission Info Section (over the image)
+  missionInfoSection: {
+    alignItems: 'center',
+    marginBottom: rs(20),
+  },
+  // Content Section Styles (scrolls over background)
+  contentScrollView: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  contentScrollContent: {
+    paddingHorizontal: SPACING.lg,
+    paddingTop: HERO_HEIGHT - rs(60), // Start content near bottom of hero, allowing scroll over image
+    paddingBottom: 140,
   },
   header: {
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
     paddingHorizontal: SPACING.lg,
-    paddingTop: 56,
-    paddingBottom: SPACING.md,
-  },
-  headerLine: {
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    marginHorizontal: SPACING.lg,
+    paddingTop: 64,
   },
   backButton: {
     width: 40,
     height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.3)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2213,19 +2405,124 @@ const styles = StyleSheet.create({
   userStatusComplete: {
     color: '#86efac',
   },
-  bottomBar: {
+  // Scrollable Mission Info (inside ScrollView)
+  scrollableMissionInfo: {
+    alignItems: 'center',
+    marginBottom: rs(24), // Small gap - second content hidden behind down arrow until scroll
+  },
+  // Word wrap container for preventing word-break in middle of words
+  wordWrapContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Fixed Down Arrow at bottom (fades out on scroll)
+  fixedDownArrow: {
+    position: 'absolute',
+    bottom: hp(2) + ANDROID_BOTTOM_PADDING,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  // Bottom Section - Contains both overlay and buttons
+  bottomSection: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.2)',
+  },
+  // Mission Info Overlay (shown initially before scroll)
+  missionInfoOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: SPACING.lg,
+    paddingTop: rs(20),
+    paddingBottom: 40 + ANDROID_BOTTOM_PADDING,
+    alignItems: 'center',
+  },
+  overlayTitle: {
+    fontSize: fp(30),
+    color: COLORS.white,
+    fontWeight: '700',
+    textAlign: 'center',
+    lineHeight: fp(40),
+    marginBottom: rs(20),
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  overlayTitleWord: {
+    fontSize: fp(30),
+    color: COLORS.white,
+    fontWeight: '700',
+    lineHeight: fp(40),
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  overlayDescription: {
+    fontSize: fp(18),
+    color: 'rgba(255,255,255,0.85)',
+    textAlign: 'center',
+    lineHeight: fp(24),
+    marginBottom: rs(20),
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  overlayDescriptionWord: {
+    fontSize: fp(18),
+    color: 'rgba(255,255,255,0.85)',
+    lineHeight: fp(24),
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  overlayTagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: rs(8),
+    marginBottom: rs(16),
+  },
+  overlayTag: {
+    paddingHorizontal: rs(12),
+    paddingVertical: rs(5),
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: rs(100),
+  },
+  overlayTagText: {
+    fontSize: fp(12),
+    color: COLORS.white,
+  },
+  downArrowContainer: {
+    alignItems: 'center',
+    marginTop: rs(8),
+  },
+  // Action Buttons Container (shown after scroll)
+  actionButtonsContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+  },
+  // Scrolled content style - mission info visible at bottom of initial screen
+  contentScrollContentScrolled: {
+    paddingHorizontal: SPACING.lg,
+    paddingTop: hp(65), // Position mission info closer to down arrow (responsive)
+    paddingBottom: Platform.OS === 'ios' ? 120 : 160, // Android needs more space above bottom bar
+  },
+  bottomBar: {
+    // Transparent background - no background
   },
   bottomContent: {
     paddingHorizontal: SPACING.lg,
     paddingTop: SPACING.md,
     paddingBottom: 28 + ANDROID_BOTTOM_PADDING,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    // Transparent background - no background
   },
   ctaButton: {
     backgroundColor: 'rgba(255,255,255,0.9)',
@@ -2247,8 +2544,8 @@ const styles = StyleSheet.create({
     color: 'rgba(0,0,0,0.4)',
   },
   ctaButtonComplete: {
-    backgroundColor: 'rgba(74, 222, 128, 0.2)',
-    borderColor: 'rgba(74, 222, 128, 0.5)',
+    backgroundColor: 'rgba(240, 253, 244, 0.95)',
+    borderColor: 'rgba(74, 222, 128, 0.6)',
   },
   ctaButtonCompleteContent: {
     flexDirection: 'row',
@@ -2257,7 +2554,7 @@ const styles = StyleSheet.create({
   },
   ctaButtonCompleteText: {
     fontSize: 16,
-    color: '#86efac',
+    color: '#22c55e',
     fontWeight: '600',
   },
   // Camera Styles
