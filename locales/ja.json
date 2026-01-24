@@ -135,7 +135,9 @@
       "keepLimitMessage": "ミッションは最大5つまで保存できます。\n保存済みのミッションを削除してから再度お試しください。",
       "cannotStart": "ミッションを開始できません",
       "anotherInProgressMessage": "すでに別のミッションが進行中です。\n進行中のミッションを完了してください！",
-      "dailyLimitMessage": "今日のミッションはすべて完了しました。\nまた明日チャレンジしましょう！"
+      "dailyLimitMessage": "今日のミッションはすべて完了しました。\nまた明日チャレンジしましょう！",
+      "offlineTitle": "インターネット接続が必要です",
+      "offlineMessage": "ミッションを生成するにはインターネット接続が必要です。\nネットワーク接続を確認してから再度お試しください。"
     },
     "refresh": {
       "questionLine1": "お気に入りの",

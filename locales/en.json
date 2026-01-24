@@ -135,7 +135,9 @@
       "keepLimitMessage": "You can save up to 5 missions.\nPlease remove some before adding more.",
       "cannotStart": "Cannot Start Mission",
       "anotherInProgressMessage": "Another mission is already in progress.",
-      "dailyLimitMessage": "You've completed today's mission.\nCome back tomorrow!"
+      "dailyLimitMessage": "You've completed today's mission.\nCome back tomorrow!",
+      "offlineTitle": "Internet Connection Required",
+      "offlineMessage": "An internet connection is required to generate missions.\nPlease check your network connection and try again."
     },
     "refresh": {
       "questionLine1": "Can't find the",

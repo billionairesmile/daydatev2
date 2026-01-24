@@ -63,12 +63,15 @@ import type { CompletedMission, Mission } from '@/types';
 const HERO_HEIGHT = hp(60);
 
 // Easing gradient for smooth blur-to-black transition in hero section
+// Gradient now covers full hero height but only applies blur/dark from 65% down
+// This eliminates the white line artifact at the MaskedView boundary
 const heroGradientResult = easeGradient({
   colorStops: {
     0: { color: 'rgba(0,0,0,0)' },
-    0.5: { color: 'rgba(0,0,0,0)' },
-    0.7: { color: 'rgba(0,0,0,0.5)' },
-    1: { color: 'rgba(0,0,0,1)' },
+    0.65: { color: 'rgba(0,0,0,0)' },    // Stay transparent until 65% (shows image)
+    0.75: { color: 'rgba(0,0,0,0.3)' },  // Start transitioning
+    0.85: { color: 'rgba(0,0,0,0.7)' },  // Getting darker
+    1: { color: 'rgba(0,0,0,1)' },       // Full black at bottom
   },
 });
 const heroBlurColors = heroGradientResult.colors as unknown as readonly [string, string, ...string[]];
@@ -1664,14 +1667,14 @@ export default function MissionDetailScreen() {
               </MaskedView>
               <LinearGradient
                 colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0)', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.85)', 'rgba(0,0,0,1)']}
-                locations={[0, 0.5, 0.7, 0.9, 1]}
+                locations={[0, 0.65, 0.75, 0.9, 1]}
                 style={StyleSheet.absoluteFill}
               />
             </>
           ) : (
             <LinearGradient
               colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0)', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,1)']}
-              locations={[0, 0.5, 0.7, 0.9, 1]}
+              locations={[0, 0.65, 0.75, 0.9, 1]}
               style={StyleSheet.absoluteFill}
             />
           )}
@@ -1694,43 +1697,46 @@ export default function MissionDetailScreen() {
         onScroll={handleScroll}
         scrollEventThrottle={16}
       >
-        {/* Mission Info Section - Scrolls with content */}
-        <View style={styles.scrollableMissionInfo}>
-          {/* Title - Word-by-word wrapping to prevent breaking in middle of words */}
-          <View style={[styles.wordWrapContainer, { marginBottom: rs(10) }]}>
-            {mission.title.split(' ').map((word, index, arr) => (
-              <Text
-                key={index}
-                style={styles.overlayTitleWord}
-                textBreakStrategy="highQuality"
-                android_hyphenationFrequency="none"
-              >
-                {word}{index < arr.length - 1 ? ' ' : ''}
-              </Text>
-            ))}
-          </View>
-          {/* Description - Word-by-word wrapping to prevent breaking in middle of words */}
-          <View style={[styles.wordWrapContainer, { marginBottom: rs(14) }]}>
-            {mission.description.split(' ').map((word, index, arr) => (
-              <Text
-                key={index}
-                style={styles.overlayDescriptionWord}
-                textBreakStrategy="highQuality"
-                android_hyphenationFrequency="none"
-              >
-                {word}{index < arr.length - 1 ? ' ' : ''}
-              </Text>
-            ))}
-          </View>
-          {mission.tags.length > 0 && (
-            <View style={styles.overlayTagsContainer}>
-              {mission.tags.map((tag, index) => (
-                <View key={index} style={styles.overlayTag}>
-                  <Text style={styles.overlayTagText}>#{tag}</Text>
-                </View>
+        {/* Black Area Container - Centers mission info vertically in the area below hero */}
+        <View style={styles.blackAreaContainer}>
+          {/* Mission Info Section - Scrolls with content */}
+          <View style={styles.scrollableMissionInfo}>
+            {/* Title - Word-by-word wrapping to prevent breaking in middle of words */}
+            <View style={[styles.wordWrapContainer, { marginBottom: rs(10) }]}>
+              {mission.title.split(' ').map((word, index, arr) => (
+                <Text
+                  key={index}
+                  style={styles.overlayTitleWord}
+                  textBreakStrategy="highQuality"
+                  android_hyphenationFrequency="none"
+                >
+                  {word}{index < arr.length - 1 ? ' ' : ''}
+                </Text>
               ))}
             </View>
-          )}
+            {/* Description - Word-by-word wrapping to prevent breaking in middle of words */}
+            <View style={[styles.wordWrapContainer, { marginBottom: rs(14) }]}>
+              {mission.description.split(' ').map((word, index, arr) => (
+                <Text
+                  key={index}
+                  style={styles.overlayDescriptionWord}
+                  textBreakStrategy="highQuality"
+                  android_hyphenationFrequency="none"
+                >
+                  {word}{index < arr.length - 1 ? ' ' : ''}
+                </Text>
+              ))}
+            </View>
+            {mission.tags.length > 0 && (
+              <View style={styles.overlayTagsContainer}>
+                {mission.tags.map((tag, index) => (
+                  <View key={index} style={styles.overlayTag}>
+                    <Text style={styles.overlayTagText}>#{tag}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
         </View>
 
         {/* Second Content - Hidden until scroll (appears when down arrow disappears) */}
@@ -2091,7 +2097,7 @@ const styles = StyleSheet.create({
   },
   heroGradientContainer: {
     position: 'absolute',
-    top: HERO_HEIGHT * 0.65, // Start gradient earlier for smoother transition
+    top: 0, // Cover full hero area - gradient colorStops control where blur/dark starts
     left: 0,
     right: 0,
     bottom: 0,
@@ -2405,6 +2411,13 @@ const styles = StyleSheet.create({
   userStatusComplete: {
     color: '#86efac',
   },
+  // Black area container - centers content vertically in the area below hero
+  blackAreaContainer: {
+    minHeight: SCREEN_HEIGHT - HERO_HEIGHT - hp(3), // Black area height (screen - hero - bottom padding)
+    justifyContent: 'center',
+    alignItems: 'center',
+    // No backgroundColor - content floats over the fixed hero background
+  },
   // Scrollable Mission Info (inside ScrollView)
   scrollableMissionInfo: {
     alignItems: 'center',
@@ -2420,7 +2433,7 @@ const styles = StyleSheet.create({
   // Fixed Down Arrow at bottom (fades out on scroll)
   fixedDownArrow: {
     position: 'absolute',
-    bottom: hp(2) + ANDROID_BOTTOM_PADDING,
+    bottom: hp(5) + ANDROID_BOTTOM_PADDING,
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -2512,7 +2525,7 @@ const styles = StyleSheet.create({
   // Scrolled content style - mission info visible at bottom of initial screen
   contentScrollContentScrolled: {
     paddingHorizontal: SPACING.lg,
-    paddingTop: hp(65), // Position mission info closer to down arrow (responsive)
+    paddingTop: HERO_HEIGHT, // Start content at end of hero image (60%)
     paddingBottom: Platform.OS === 'ios' ? 120 : 160, // Android needs more space above bottom bar
   },
   bottomBar: {

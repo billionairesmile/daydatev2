@@ -760,7 +760,9 @@ function RootLayoutNav() {
         await verifySessionAndRefresh();
 
         // Then refresh all synced data
-        fetchCoupleAndPartnerData();
+        // CRITICAL: Must await fetchCoupleAndPartnerData to ensure timezone is synced
+        // before checking mission dates
+        await fetchCoupleAndPartnerData();
         updateUserLocation();
         // First load fresh mission data from DB to ensure proper date comparison
         await loadSharedMissions();
@@ -821,13 +823,14 @@ function RootLayoutNav() {
 
       console.log('[Layout] Scheduling midnight reset in', Math.round(msUntilMidnight / 1000 / 60), 'minutes (timezone:', timezone, ')');
 
-      timeoutId = setTimeout(() => {
+      timeoutId = setTimeout(async () => {
         console.log('[Layout] Midnight reached - resetting missions');
-        // Reset missions
+        // CRITICAL: First load fresh mission data from DB to get correct date
+        await loadSharedMissions();
+        // Then check and reset missions based on fresh data
         checkAndResetMissions();
-        // Reload mission data
+        // Reload mission progress
         loadMissionProgress();
-        loadSharedMissions();
         // Schedule next midnight reset (add small delay to ensure we're past midnight)
         setTimeout(() => scheduleMidnightReset(), 1000);
       }, msUntilMidnight);

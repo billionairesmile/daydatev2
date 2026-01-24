@@ -53,6 +53,7 @@ import type { Mission, FeaturedMission } from '@/types';
 import { db, isDemoMode } from '@/lib/supabase';
 import { rewardedAdManager } from '@/lib/rewardedAd';
 import { cancelHourlyReminders, cancelMissionReminderNotification } from '@/lib/pushNotifications';
+import { useNetwork } from '@/lib/useNetwork';
 
 // Module-level flag to track returning from mission detail to bookmark view
 // This allows router.back() to work while preserving bookmark state
@@ -141,6 +142,7 @@ function AndroidCardWrapper({ index, scrollPosition, scrollOffset, cardWidth, ch
 export default function MissionScreen() {
   const { t, i18n } = useTranslation();
   const router = useRouter();
+  const { isOnline } = useNetwork();
   const insets = useConsistentBottomInset();
   const bannerAdBottom = useBannerAdBottom();
   const setTabBarHidden = useUIStore((s) => s.setTabBarHidden);
@@ -788,6 +790,17 @@ export default function MissionScreen() {
   const handleGenerateMissions = useCallback(async () => {
     if (canMeetToday === null || availableTime === null || selectedMoods.length === 0) return;
 
+    // Check network connectivity - mission generation requires internet (OpenAI API)
+    if (!isOnline) {
+      setShowGenerationModal(false);
+      Alert.alert(
+        t('mission.alerts.offlineTitle') || '인터넷 연결 필요',
+        t('mission.alerts.offlineMessage') || '미션을 생성하려면 인터넷 연결이 필요합니다. 네트워크 연결을 확인하고 다시 시도해주세요.',
+        [{ text: t('common.confirm') || '확인' }]
+      );
+      return;
+    }
+
     // Prepare answers
     const answers: MissionGenerationAnswers = {
       canMeetToday,
@@ -866,17 +879,22 @@ export default function MissionScreen() {
           const imagesToLoad = newMissions.filter(mission => mission.imageUrl);
 
           try {
-            const imagePromises = imagesToLoad.map(mission =>
+            // Prefetch card images (cropped version)
+            const cardImagePromises = imagesToLoad.map(mission =>
               ExpoImage.prefetch(`${mission.imageUrl}?w=800&h=1000&fit=crop`)
+            );
+            // Prefetch detail page background images (original version)
+            const detailImagePromises = imagesToLoad.map(mission =>
+              ExpoImage.prefetch(mission.imageUrl)
             );
 
             // Wait for all images to prefetch (with timeout fallback)
             await Promise.race([
-              Promise.all(imagePromises),
+              Promise.all([...cardImagePromises, ...detailImagePromises]),
               new Promise(resolve => setTimeout(resolve, 10000)), // 10초 타임아웃
             ]);
 
-            console.log('[Mission Refresh] Premium - Image prefetch completed, images are cached');
+            console.log('[Mission Refresh] Premium - Image prefetch completed (card + detail), images are cached');
           } catch (error) {
             console.log('Image prefetch error:', error);
           }
@@ -1008,17 +1026,22 @@ export default function MissionScreen() {
               const imagesToLoad = newMissions.filter(mission => mission.imageUrl);
 
               try {
-                const imagePromises = imagesToLoad.map(mission =>
+                // Prefetch card images (cropped version)
+                const cardImagePromises = imagesToLoad.map(mission =>
                   ExpoImage.prefetch(`${mission.imageUrl}?w=800&h=1000&fit=crop`)
+                );
+                // Prefetch detail page background images (original version)
+                const detailImagePromises = imagesToLoad.map(mission =>
+                  ExpoImage.prefetch(mission.imageUrl)
                 );
 
                 // Wait for all images to prefetch (with timeout fallback)
                 await Promise.race([
-                  Promise.all(imagePromises),
+                  Promise.all([...cardImagePromises, ...detailImagePromises]),
                   new Promise(resolve => setTimeout(resolve, 10000)), // 10초 타임아웃
                 ]);
 
-                console.log('[Mission Refresh] Ad completed - Image prefetch completed');
+                console.log('[Mission Refresh] Ad completed - Image prefetch completed (card + detail)');
               } catch (error) {
                 console.log('Image prefetch error:', error);
               }
@@ -1201,17 +1224,22 @@ export default function MissionScreen() {
       const imagesToLoad = newMissions.filter(mission => mission.imageUrl);
 
       try {
-        const imagePromises = imagesToLoad.map(mission =>
+        // Prefetch card images (cropped version)
+        const cardImagePromises = imagesToLoad.map(mission =>
           ExpoImage.prefetch(`${mission.imageUrl}?w=800&h=1000&fit=crop`)
+        );
+        // Prefetch detail page background images (original version)
+        const detailImagePromises = imagesToLoad.map(mission =>
+          ExpoImage.prefetch(mission.imageUrl)
         );
 
         // Wait for all images to prefetch (with timeout fallback)
         await Promise.race([
-          Promise.all(imagePromises),
+          Promise.all([...cardImagePromises, ...detailImagePromises]),
           new Promise(resolve => setTimeout(resolve, 10000)), // 10초 타임아웃
         ]);
 
-        console.log('[Mission] Image prefetch completed, images are cached');
+        console.log('[Mission] Image prefetch completed (card + detail), images are cached');
       } catch (error) {
         console.log('Image prefetch error:', error);
         // Continue even if prefetch fails
@@ -1233,7 +1261,7 @@ export default function MissionScreen() {
     setCanMeetToday(null);
     setAvailableTime(null);
     setSelectedMoods([]);
-  }, [canMeetToday, availableTime, selectedMoods, isRefreshMode, generateTodayMissions, getTodayMissions, resetGeneratedMissions, resetAllMissions, setRefreshUsedToday, incrementPremiumRefreshCount, t, scrollX]);
+  }, [canMeetToday, availableTime, selectedMoods, isRefreshMode, isOnline, generateTodayMissions, getTodayMissions, resetGeneratedMissions, resetAllMissions, setRefreshUsedToday, incrementPremiumRefreshCount, t, scrollX]);
 
   const toggleMood = (mood: TodayMood) => {
     if (selectedMoods.includes(mood)) {

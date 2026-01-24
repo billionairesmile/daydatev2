@@ -133,7 +133,9 @@
       "keepLimitMessage": "Puedes guardar hasta 5 misiones.\nElimina alguna antes de añadir más.",
       "cannotStart": "No Se Puede Iniciar",
       "anotherInProgressMessage": "Ya hay otra misión en progreso.",
-      "dailyLimitMessage": "Ya completaste la misión de hoy.\n¡Vuelve mañana!"
+      "dailyLimitMessage": "Ya completaste la misión de hoy.\n¡Vuelve mañana!",
+      "offlineTitle": "Se requiere conexión a Internet",
+      "offlineMessage": "Se necesita conexión a Internet para generar misiones.\nVerifica tu conexión de red e inténtalo de nuevo."
     },
     "refresh": {
       "questionLine1": "¿No encuentras",

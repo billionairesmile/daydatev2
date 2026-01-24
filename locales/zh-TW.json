@@ -133,7 +133,9 @@
       "keepLimitMessage": "最多只能收藏5個任務。\n請刪除已收藏的任務後再試。",
       "cannotStart": "無法開始任務",
       "anotherInProgressMessage": "已有其他任務進行中。\n請先完成進行中的任務！",
-      "dailyLimitMessage": "今天可完成的任務已全部完成。\n明天再來挑戰吧！"
+      "dailyLimitMessage": "今天可完成的任務已全部完成。\n明天再來挑戰吧！",
+      "offlineTitle": "需要網路連線",
+      "offlineMessage": "生成任務需要網路連線。\n請檢查網路連線後再試一次。"
     },
     "refresh": {
       "questionLine1": "沒有找到",
