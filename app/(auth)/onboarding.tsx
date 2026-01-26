@@ -1764,7 +1764,6 @@ function BasicInfoStep({
                 display="spinner"
                 onChange={handleBirthDateChange}
                 maximumDate={new Date()}
-                locale="ko-KR"
                 style={styles.datePicker}
               />
             </View>
@@ -4296,7 +4295,6 @@ function CoupleInfoStep({
                 display="spinner"
                 onChange={handleAnniversaryDateChange}
                 maximumDate={new Date()}
-                locale="ko-KR"
                 style={styles.datePicker}
               />
             </View>

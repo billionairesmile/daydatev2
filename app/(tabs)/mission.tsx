@@ -200,6 +200,7 @@ export default function MissionScreen() {
   const [isRefreshMode, setIsRefreshMode] = useState(false);
   const [isLoadingAd, setIsLoadingAd] = useState(false);
   const isWaitingForImagesRef = useRef(false);
+  const firstImageLoadedRef = useRef(false);
   const scrollX = useRef(new Animated.Value(0)).current;
   const scrollViewRef = useRef<Animated.FlatList<CarouselItem>>(null);
   const pagerRef = useRef<PagerView>(null);
@@ -416,21 +417,23 @@ export default function MissionScreen() {
     }
   }, [allMissions.length, isGenerating, isWaitingForImages, scrollX]);
 
-  // Handle image loading completion - hide loading when all images are loaded
+  // Handle image loading completion - hide loading when first image is rendered
   useEffect(() => {
     if (isWaitingForImages && loadedImagesCount >= totalImagesToLoad && totalImagesToLoad > 0) {
-      // All images loaded, hide loading with a small delay for smooth transition
+      // First image loaded, hide loading with minimal delay (image is already rendered)
       const timer = setTimeout(() => {
         setIsGenerating(false);
         setIsWaitingForImages(false);
         isWaitingForImagesRef.current = false;
         setLoadedImagesCount(0);
         setTotalImagesToLoad(0);
+        firstImageLoadedRef.current = false;  // Reset for next generation
 
         // Initialize scroll after images are loaded
         setCurrentIndex(0);
         scrollX.setValue(0);
         setIsScrollInitialized(false);
+        hasInitializedCarousel.current = false;
 
         setTimeout(() => {
           if (scrollViewRef.current) {
@@ -440,15 +443,63 @@ export default function MissionScreen() {
               setIsScrollInitialized(true);
             }, 50);
           }
-        }, 150);
-      }, 300);
+        }, 100);
+      }, 100);  // Reduced from 300ms since image is already visible
       return () => clearTimeout(timer);
     }
   }, [isWaitingForImages, loadedImagesCount, totalImagesToLoad, scrollX]);
 
+  // Fallback timeout: If first image doesn't load within 5 seconds, show cards anyway
+  useEffect(() => {
+    if (isWaitingForImages && totalImagesToLoad > 0) {
+      const fallbackTimer = setTimeout(() => {
+        if (isWaitingForImagesRef.current) {
+          console.warn('[Mission] Image load timeout - showing cards anyway');
+          setIsGenerating(false);
+          setIsWaitingForImages(false);
+          isWaitingForImagesRef.current = false;
+          setLoadedImagesCount(0);
+          setTotalImagesToLoad(0);
+          firstImageLoadedRef.current = false;
+
+          // Reset carousel state
+          setCurrentIndex(0);
+          scrollX.setValue(0);
+          setIsScrollInitialized(false);
+          hasInitializedCarousel.current = false;
+
+          setTimeout(() => {
+            if (scrollViewRef.current) {
+              scrollViewRef.current.scrollToOffset({ offset: 1, animated: false });
+              setTimeout(() => {
+                scrollViewRef.current?.scrollToOffset({ offset: 0, animated: false });
+                setIsScrollInitialized(true);
+              }, 50);
+            }
+          }, 100);
+        }
+      }, 5000);  // 5 second timeout
+
+      return () => clearTimeout(fallbackTimer);
+    }
+  }, [isWaitingForImages, totalImagesToLoad, scrollX]);
+
+  // Initialize waiting state for first image render
+  const initializeImageWait = useCallback(() => {
+    firstImageLoadedRef.current = false;
+    setLoadedImagesCount(0);
+    setTotalImagesToLoad(1);  // Only wait for first image
+    setIsWaitingForImages(true);
+    isWaitingForImagesRef.current = true;
+  }, []);
+
   // Callback for when a mission card image loads
-  const handleMissionImageLoad = useCallback(() => {
-    setLoadedImagesCount(prev => prev + 1);
+  const handleMissionImageLoad = useCallback((isFirstCard: boolean) => {
+    // Only track the first card's image load during waiting state
+    if (isFirstCard && isWaitingForImagesRef.current && !firstImageLoadedRef.current) {
+      firstImageLoadedRef.current = true;
+      setLoadedImagesCount(1);
+    }
   }, []);
 
   // Load featured missions on mount and focus
@@ -644,8 +695,9 @@ export default function MissionScreen() {
         // Partner is watching ad - show loading state with ad message
         setIsGenerating(true);
         setPartnerGeneratingMessage(t('mission.partnerWatchingAd') || '파트너가 광고를 시청 중입니다...');
-      } else if (missionGenerationStatus === 'completed' && sharedMissions.length > 0) {
-        // Missions were generated (by partner or self) - hide loading
+      } else if (missionGenerationStatus === 'completed' && sharedMissions.length > 0 && isPartnerAction) {
+        // Only hide loading if partner was generating (not self)
+        // Self-generation handles its own loading state via initializeImageWait()
         setIsGenerating(false);
         setPartnerGeneratingMessage(null);
       } else if (missionGenerationStatus === 'idle' && isPartnerAction) {
@@ -654,7 +706,7 @@ export default function MissionScreen() {
         setPartnerGeneratingMessage(null);
       }
     }
-  }, [isSyncInitialized, missionGenerationStatus, sharedMissions.length, generatingUserId, user?.id]);
+  }, [isSyncInitialized, missionGenerationStatus, sharedMissions.length, generatingUserId, user?.id, t]);
 
   // Automatic polling for stale lock recovery when partner is generating
   // This helps User B recover automatically when User A force-closes app during ad
@@ -899,13 +951,14 @@ export default function MissionScreen() {
             console.log('Image prefetch error:', error);
           }
 
-          // Small delay for smooth transition after prefetch
-          await new Promise(resolve => setTimeout(resolve, 300));
-
-          // Hide loading - images are now cached and will render instantly
-          setIsGenerating(false);
-          setIsWaitingForImages(false);
-          isWaitingForImagesRef.current = false;
+          // Wait for first card image to actually render before hiding loading
+          if (newMissions[0]?.imageUrl) {
+            initializeImageWait();
+            // isGenerating stays true, useEffect will hide it when first image onLoad fires
+          } else {
+            // No image URL, hide loading immediately
+            setIsGenerating(false);
+          }
         } else {
           setIsGenerating(false);
         }
@@ -1046,48 +1099,18 @@ export default function MissionScreen() {
                 console.log('Image prefetch error:', error);
               }
 
-              // Small delay for smooth transition after prefetch
-              await new Promise(resolve => setTimeout(resolve, 300));
-
-              // Hide loading - images are now cached and will render instantly
-              setIsGenerating(false);
-              setIsWaitingForImages(false);
-              isWaitingForImagesRef.current = false;
-
-              // Reset carousel state for proper first card scale
-              // This prevents the intermittent bug where first card appears smaller
-              setIsScrollInitialized(false);
-              hasInitializedCarousel.current = false;
-              setCurrentIndex(0);
-              scrollX.setValue(0);
-
-              setTimeout(() => {
-                if (scrollViewRef.current) {
-                  scrollViewRef.current.scrollToOffset({ offset: 1, animated: false });
-                  setTimeout(() => {
-                    scrollViewRef.current?.scrollToOffset({ offset: 0, animated: false });
-                    setIsScrollInitialized(true);
-                  }, 50);
-                }
-              }, 150);
+              // Wait for first card image to actually render before hiding loading
+              if (newMissions[0]?.imageUrl) {
+                initializeImageWait();
+                // isGenerating stays true, useEffect will hide it when first image onLoad fires
+                // Carousel reset will be handled by useEffect
+              } else {
+                // No image URL, hide loading immediately
+                setIsGenerating(false);
+              }
             } else {
+              // No missions with images
               setIsGenerating(false);
-
-              // Also reset carousel state for proper first card scale (no images case)
-              setIsScrollInitialized(false);
-              hasInitializedCarousel.current = false;
-              setCurrentIndex(0);
-              scrollX.setValue(0);
-
-              setTimeout(() => {
-                if (scrollViewRef.current) {
-                  scrollViewRef.current.scrollToOffset({ offset: 1, animated: false });
-                  setTimeout(() => {
-                    scrollViewRef.current?.scrollToOffset({ offset: 0, animated: false });
-                    setIsScrollInitialized(true);
-                  }, 50);
-                }
-              }, 150);
             }
           } else {
             // ROLLBACK: Ad was not completed (user closed early)
@@ -1245,13 +1268,14 @@ export default function MissionScreen() {
         // Continue even if prefetch fails
       }
 
-      // Small delay for smooth transition after prefetch
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      // Hide loading - images are now cached and will render instantly
-      setIsGenerating(false);
-      setIsWaitingForImages(false);
-      isWaitingForImagesRef.current = false;
+      // Wait for first card image to actually render before hiding loading
+      if (newMissions[0]?.imageUrl) {
+        initializeImageWait();
+        // isGenerating stays true, useEffect will hide it when first image onLoad fires
+      } else {
+        // No image URL, hide loading immediately
+        setIsGenerating(false);
+      }
     } else {
       // No missions generated, hide loading immediately
       setIsGenerating(false);
@@ -1261,7 +1285,7 @@ export default function MissionScreen() {
     setCanMeetToday(null);
     setAvailableTime(null);
     setSelectedMoods([]);
-  }, [canMeetToday, availableTime, selectedMoods, isRefreshMode, isOnline, generateTodayMissions, getTodayMissions, resetGeneratedMissions, resetAllMissions, setRefreshUsedToday, incrementPremiumRefreshCount, t, scrollX]);
+  }, [canMeetToday, availableTime, selectedMoods, isRefreshMode, isOnline, generateTodayMissions, getTodayMissions, resetGeneratedMissions, resetAllMissions, setRefreshUsedToday, incrementPremiumRefreshCount, t, scrollX, initializeImageWait]);
 
   const toggleMood = (mood: TodayMood) => {
     if (selectedMoods.includes(mood)) {
@@ -1424,6 +1448,7 @@ export default function MissionScreen() {
               isCompletedToday={isTodayCompletedMission(item.id)}
               isAnotherMissionInProgress={isAnotherMissionInProgress(item.id)}
               onImageLoad={handleMissionImageLoad}
+              isFirstCard={index === 0}
             />
           </View>
         </Animated.View>
@@ -1562,6 +1587,7 @@ export default function MissionScreen() {
                               isCompletedToday={isTodayCompletedMission(item.id)}
                               isAnotherMissionInProgress={isAnotherMissionInProgress(item.id)}
                               onImageLoad={handleMissionImageLoad}
+                              isFirstCard={index === 0}
                             />
                           </View>
                         )}
@@ -1785,10 +1811,11 @@ interface MissionCardContentProps {
   canStart?: boolean;
   isCompletedToday?: boolean;
   isAnotherMissionInProgress?: boolean;
-  onImageLoad?: () => void;
+  onImageLoad?: (isFirstCard: boolean) => void;
+  isFirstCard?: boolean;
 }
 
-function MissionCardContent({ mission, onStartPress, onKeepPress, isKept, canStart = true, isCompletedToday = false, isAnotherMissionInProgress = false, onImageLoad }: MissionCardContentProps) {
+function MissionCardContent({ mission, onStartPress, onKeepPress, isKept, canStart = true, isCompletedToday = false, isAnotherMissionInProgress = false, onImageLoad, isFirstCard = false }: MissionCardContentProps) {
   const { t } = useTranslation();
   const blurHeight = CARD_HEIGHT * 0.8; // Blur covers bottom 55% of card
   const [imageError, setImageError] = useState(false);
@@ -1887,7 +1914,7 @@ function MissionCardContent({ mission, onStartPress, onKeepPress, isKept, canSta
           style={styles.cardImage}
           contentFit="cover"
           cachePolicy="memory-disk"
-          onLoad={onImageLoad}
+          onLoad={() => onImageLoad?.(isFirstCard)}
           onError={handleImageError}
         />
       ) : (

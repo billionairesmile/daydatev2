@@ -59,7 +59,11 @@ const POLAROID_BASE_WIDTH = 280;
 // For compact screens (height < 700), use smaller ratio
 // Android: slightly larger ratio (0.75) for better visual balance
 const POLAROID_WIDTH_RATIO = isCompactHeight() ? 0.55 : (Platform.OS === 'android' ? 0.75 : 0.712);
-const POLAROID_WIDTH = Math.round(SCREEN_WIDTH * POLAROID_WIDTH_RATIO);
+
+// Calculate polaroid width with min/max constraints for extreme screen sizes
+// Min: 200px (very small phones), Max: 320px (large phones/tablets)
+const rawPolaroidWidth = Math.round(SCREEN_WIDTH * POLAROID_WIDTH_RATIO);
+const POLAROID_WIDTH = Math.min(320, Math.max(200, rawPolaroidWidth));
 const POLAROID_SCALE = POLAROID_WIDTH / POLAROID_BASE_WIDTH;
 
 // Helper to scale polaroid-related values proportionally
@@ -382,6 +386,7 @@ export default function HomeScreen() {
   const [anniversaryModalStep, setAnniversaryModalStep] = useState<'list' | 'add' | 'addDatePicker' | 'edit' | 'editDatePicker'>('list');
   const [showImagePickerModal, setShowImagePickerModal] = useState(false);
   const [isUploadingBackground, setIsUploadingBackground] = useState(false);
+  const [isSavingShare, setIsSavingShare] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [newAnniversaryIcon, setNewAnniversaryIcon] = useState('💝');
   const [newAnniversaryName, setNewAnniversaryName] = useState('');
@@ -423,9 +428,16 @@ export default function HomeScreen() {
 
   // Handle share button press - capture from top line to bottom line
   const handleSharePress = useCallback(async () => {
+    // Prevent double execution
+    if (isSavingShare) return;
+    setIsSavingShare(true);
+
     try {
       // Measure top line and bottom line positions
-      if (!topLineRef.current || !bottomLineRef.current) return;
+      if (!topLineRef.current || !bottomLineRef.current) {
+        setIsSavingShare(false);
+        return;
+      }
 
       const topMeasurement = await new Promise<{ x: number; y: number; width: number; height: number }>((resolve) => {
         topLineRef.current?.measureInWindow((x: number, y: number, width: number, height: number) => {
@@ -439,9 +451,22 @@ export default function HomeScreen() {
         });
       });
 
-      // Add padding above and below (responsive based on screen height)
-      const padding = Math.round(SCREEN_HEIGHT * 0.07);
-      const scale = PixelRatio.get();
+      // Calculate responsive padding based on content height, not screen height
+      // This ensures consistent visual appearance across all device sizes
+      const contentHeight = (bottomMeasurement.y + bottomMeasurement.height) - topMeasurement.y;
+
+      // Padding = 10% of content height, with min 30px and max 50px
+      const basePadding = Math.round(contentHeight * 0.10);
+      const topPadding = Math.min(50, Math.max(30, basePadding));
+
+      // Bottom padding should be limited to avoid capturing ad area
+      // Safe zone: at least 120px from bottom of screen (tab bar + ad height)
+      const safeBottomY = SCREEN_HEIGHT - 120;
+      const bottomLineY = bottomMeasurement.y + bottomMeasurement.height;
+      const maxBottomPadding = Math.max(20, safeBottomY - bottomLineY - 10);
+      const bottomPadding = Math.min(topPadding, maxBottomPadding);
+
+      const pixelScale = PixelRatio.get();
 
       // Capture the full screen
       const fullScreenUri = await captureScreen({
@@ -452,9 +477,9 @@ export default function HomeScreen() {
 
       // Calculate crop area from top line to bottom line (full screen width, convert points to pixels)
       const cropX = 0;
-      const cropY = Math.max(0, Math.round((topMeasurement.y - padding) * scale));
-      const cropWidth = Math.round(SCREEN_WIDTH * scale);
-      const cropHeight = Math.round(((bottomMeasurement.y + bottomMeasurement.height) - topMeasurement.y + padding * 2) * scale);
+      const cropY = Math.max(0, Math.round((topMeasurement.y - topPadding) * pixelScale));
+      const cropWidth = Math.round(SCREEN_WIDTH * pixelScale);
+      const cropHeight = Math.round((contentHeight + topPadding + bottomPadding) * pixelScale);
 
       const croppedImage = await ImageManipulator.manipulateAsync(
         fullScreenUri,
@@ -462,50 +487,36 @@ export default function HomeScreen() {
         { format: ImageManipulator.SaveFormat.PNG, compress: 1 }
       );
 
-      // Save to gallery - handle Android 13+ permission changes
-      let permissionGranted = false;
-
-      if (Platform.OS === 'android') {
-        // On Android 13+, check current permission first
-        const { status: existingStatus, accessPrivileges } = await MediaLibrary.getPermissionsAsync();
-
-        if (existingStatus === 'granted' || accessPrivileges === 'limited' || accessPrivileges === 'all') {
-          permissionGranted = true;
-        } else {
-          // Request permission
-          const { status, accessPrivileges: newAccessPrivileges } = await MediaLibrary.requestPermissionsAsync();
-          permissionGranted = status === 'granted' || newAccessPrivileges === 'limited' || newAccessPrivileges === 'all';
-        }
+      if (Platform.OS === 'ios') {
+        // iOS: Share directly using file URI (no need to save to gallery first)
+        await Share.share({
+          url: croppedImage.uri,
+        });
       } else {
-        // iOS
+        // Android: Need to save to gallery first, then user can share from there
+        // Request permission first
         const { status } = await MediaLibrary.requestPermissionsAsync();
-        permissionGranted = status === 'granted';
-      }
+        if (status !== 'granted') {
+          Alert.alert(t('common.error'), t('home.share.permissionDenied'));
+          return;
+        }
 
-      if (permissionGranted) {
+        // Save to gallery
         await MediaLibrary.createAssetAsync(croppedImage.uri);
 
-        // Show share sheet
-        if (Platform.OS === 'ios') {
-          // iOS can share the file URI directly
-          await Share.share({
-            url: croppedImage.uri,
-          });
-        } else {
-          // Android: show message that image is saved, user can share from gallery
-          Alert.alert(
-            t('home.share.savedTitle'),
-            t('home.share.savedAndShareFromGallery')
-          );
-        }
-      } else {
-        Alert.alert(t('common.error'), t('home.share.permissionDenied'));
+        // Notify user that image is saved and they can share from gallery
+        Alert.alert(
+          t('home.share.savedTitle'),
+          t('home.share.savedAndShareFromGallery')
+        );
       }
     } catch (error) {
       console.error('Error sharing:', error);
       Alert.alert(t('common.error'), t('home.shareError'));
+    } finally {
+      setIsSavingShare(false);
     }
-  }, [t]);
+  }, [t, isSavingShare]);
 
   // Track if navigation/interaction is complete for deferred rendering
   const [isInteractionComplete, setIsInteractionComplete] = useState(false);
@@ -1365,24 +1376,24 @@ export default function HomeScreen() {
 
             {/* User icon and couple names */}
             <View style={styles.frameUserIconRow}>
-            <View style={styles.frameUserIcon}>
-              <Users color="#fff" size={polaroidScale(15)} strokeWidth={3} />
+              <View style={styles.frameUserIcon}>
+                <Users color="#fff" size={polaroidScale(15)} strokeWidth={3} />
+              </View>
+              <View style={styles.coupleNamesInline}>
+                <Text style={[styles.coupleNameInline, { fontFamily: getFontByText(user1Nickname) }]} numberOfLines={1}>
+                  {user1Nickname}
+                </Text>
+                <Heart
+                  color="#FF3B30"
+                  fill="#FF3B30"
+                  size={Platform.OS === 'android' ? Math.max(polaroidScale(16), 14) : polaroidScale(16)}
+                  style={styles.coupleIconInline}
+                />
+                <Text style={[styles.coupleNameInline, { fontFamily: getFontByText(user2Nickname) }]} numberOfLines={1}>
+                  {user2Nickname}
+                </Text>
+              </View>
             </View>
-            <View style={styles.coupleNamesInline}>
-              <Text style={[styles.coupleNameInline, { fontFamily: getFontByText(user1Nickname) }]} numberOfLines={1}>
-                {user1Nickname}
-              </Text>
-              <Heart
-                color="#FF3B30"
-                fill="#FF3B30"
-                size={Platform.OS === 'android' ? Math.max(polaroidScale(16), 14) : polaroidScale(16)}
-                style={styles.coupleIconInline}
-              />
-              <Text style={[styles.coupleNameInline, { fontFamily: getFontByText(user2Nickname) }]} numberOfLines={1}>
-                {user2Nickname}
-              </Text>
-            </View>
-          </View>
           </View>
 
           {/* Photo frame with border */}
@@ -2096,10 +2107,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: rs(SPACING.lg),
-    // Account for banner ad at bottom - responsive padding
+    // Account for banner ad + tab bar at bottom - responsive padding
+    // Small screens (< 700px): 100px, Medium (700-800): 110px, Large: 120px
+    // This ensures content doesn't overlap with ad area on any device
     paddingBottom: Platform.OS === 'android'
-      ? SCREEN_HEIGHT < 700 ? rh(80) : rh(100)
-      : rh(90),
+      ? SCREEN_HEIGHT < 700 ? rh(100) : SCREEN_HEIGHT < 800 ? rh(110) : rh(120)
+      : SCREEN_HEIGHT < 700 ? rh(100) : SCREEN_HEIGHT < 800 ? rh(110) : rh(120),
   },
   anniversarySection: {
     paddingTop: Platform.OS === 'android' && SCREEN_HEIGHT < 700
@@ -2182,7 +2195,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     alignSelf: 'flex-start',
     marginLeft: polaroidScale(11),
-    marginBottom: polaroidScale(12),
   },
   frameCalendarRow: {
     width: POLAROID_WIDTH + polaroidScale(22),

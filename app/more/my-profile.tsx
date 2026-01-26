@@ -407,7 +407,6 @@ export default function MyProfileScreen() {
                 display="spinner"
                 onChange={(_, date) => date && setTempBirthday(date)}
                 maximumDate={new Date()}
-                locale="ko-KR"
                 style={styles.datePicker}
                 textColor="#000000"
                 themeVariant="light"

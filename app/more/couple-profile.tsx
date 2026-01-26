@@ -289,7 +289,6 @@ export default function CoupleProfileScreen() {
                 display="spinner"
                 onChange={(_, date) => date && setTempAnniversaryDate(date)}
                 maximumDate={new Date()}
-                locale="ko-KR"
                 textColor={COLORS.black}
                 themeVariant="light"
                 style={styles.datePicker}
