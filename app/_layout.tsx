@@ -11,6 +11,7 @@ import { NanumPenScript_400Regular } from '@expo-google-fonts/nanum-pen-script';
 import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, Inter_800ExtraBold } from '@expo-google-fonts/inter';
 import { Anton_400Regular } from '@expo-google-fonts/anton';
 import { Lora_400Regular, Lora_500Medium, Lora_600SemiBold, Lora_700Bold } from '@expo-google-fonts/lora';
+import { InstrumentSerif_400Regular, InstrumentSerif_400Regular_Italic } from '@expo-google-fonts/instrument-serif';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Location from 'expo-location';
@@ -124,6 +125,8 @@ export default function RootLayout() {
     LoraMedium: Lora_500Medium,
     LoraSemiBold: Lora_600SemiBold,
     LoraBold: Lora_700Bold,
+    InstrumentSerif: InstrumentSerif_400Regular,
+    InstrumentSerifItalic: InstrumentSerif_400Regular_Italic,
   });
 
   // Preload character assets for ransom text

@@ -354,10 +354,12 @@ const styles = StyleSheet.create({
   },
   thumbnailContainer: {
     width: 96,
-    height: 120,
+    minHeight: 100,
+    maxHeight: 140, // 과도하게 길어지지 않도록 제한
     borderRadius: 16,
     overflow: 'hidden',
     flexShrink: 0,
+    alignSelf: 'stretch',
   },
   thumbnail: {
     width: '100%',

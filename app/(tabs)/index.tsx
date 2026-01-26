@@ -28,7 +28,7 @@ import { Swipeable } from 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Asset } from 'expo-asset';
 import { useTranslation } from 'react-i18next';
-import { captureScreen } from 'react-native-view-shot';
+import { captureScreen, captureRef } from 'react-native-view-shot';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as MediaLibrary from 'expo-media-library';
 import NetInfo from '@react-native-community/netinfo';
@@ -426,7 +426,7 @@ export default function HomeScreen() {
     ]).start();
   }, [heartScale, isHeartLiked, updateHeartLiked]);
 
-  // Handle share button press - capture from top line to bottom line
+  // Handle share button press - capture from top line to bottom line with Daydate branding
   const handleSharePress = useCallback(async () => {
     // Prevent double execution
     if (isSavingShare) return;
@@ -476,8 +476,10 @@ export default function HomeScreen() {
       });
 
       // Calculate crop area from top line to bottom line (full screen width, convert points to pixels)
+      // Add offset to move capture area down slightly (matching content position adjustment)
+      const captureOffsetY = rh(15); // Responsive offset to shift capture down
       const cropX = 0;
-      const cropY = Math.max(0, Math.round((topMeasurement.y - topPadding) * pixelScale));
+      const cropY = Math.max(0, Math.round((topMeasurement.y - topPadding + captureOffsetY) * pixelScale));
       const cropWidth = Math.round(SCREEN_WIDTH * pixelScale);
       const cropHeight = Math.round((contentHeight + topPadding + bottomPadding) * pixelScale);
 
@@ -487,10 +489,47 @@ export default function HomeScreen() {
         { format: ImageManipulator.SaveFormat.PNG, compress: 1 }
       );
 
+      // Step 2: Set the captured content to state to render the branded container
+      const contentWidth = cropWidth / pixelScale;
+      const contentHeightPts = cropHeight / pixelScale;
+
+      // Create a promise that resolves when the branded image loads
+      const imageLoadPromise = new Promise<void>((resolve) => {
+        brandedImageLoadedRef.current = resolve;
+      });
+
+      setCapturedContentUri(croppedImage.uri);
+      setCapturedContentSize({ width: contentWidth, height: contentHeightPts });
+
+      // Wait for the branded container image to load (with 3 second timeout)
+      await Promise.race([
+        imageLoadPromise,
+        new Promise<void>(resolve => setTimeout(resolve, 3000)),
+      ]);
+
+      // Additional small delay to ensure render is complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Step 3: Capture the branded container
+      if (!brandedContainerRef.current) {
+        // Fallback to original image if branding container not available
+        throw new Error('Branded container not ready');
+      }
+
+      const brandedImage = await captureRef(brandedContainerRef, {
+        format: 'png',
+        quality: 1,
+        result: 'tmpfile',
+      });
+
+      // Clear the state after capture
+      setCapturedContentUri(null);
+      setCapturedContentSize(null);
+
       if (Platform.OS === 'ios') {
         // iOS: Share directly using file URI (no need to save to gallery first)
         await Share.share({
-          url: croppedImage.uri,
+          url: brandedImage,
         });
       } else {
         // Android: Need to save to gallery first, then user can share from there
@@ -502,7 +541,7 @@ export default function HomeScreen() {
         }
 
         // Save to gallery
-        await MediaLibrary.createAssetAsync(croppedImage.uri);
+        await MediaLibrary.createAssetAsync(brandedImage);
 
         // Notify user that image is saved and they can share from gallery
         Alert.alert(
@@ -512,6 +551,9 @@ export default function HomeScreen() {
       }
     } catch (error) {
       console.error('Error sharing:', error);
+      // Clear state on error
+      setCapturedContentUri(null);
+      setCapturedContentSize(null);
       Alert.alert(t('common.error'), t('home.shareError'));
     } finally {
       setIsSavingShare(false);
@@ -673,6 +715,12 @@ export default function HomeScreen() {
   const imageButtonRef = useRef<View>(null);
   const topLineRef = useRef<View>(null);
   const bottomLineRef = useRef<View>(null);
+
+  // Branding container for share capture (hidden off-screen)
+  const brandedContainerRef = useRef<View>(null);
+  const [capturedContentUri, setCapturedContentUri] = useState<string | null>(null);
+  const [capturedContentSize, setCapturedContentSize] = useState<{ width: number; height: number } | null>(null);
+  const brandedImageLoadedRef = useRef<(() => void) | null>(null);
 
   // TextInput refs for emoji picker behavior
   const nameInputRef = useRef<TextInput>(null);
@@ -2071,6 +2119,45 @@ export default function HomeScreen() {
           )}
         </Pressable>
       </Modal>
+
+      {/* Hidden branded container for share capture - rendered off-screen but within layout */}
+      {capturedContentUri && capturedContentSize && (
+        <View
+          style={styles.brandedContainerWrapper}
+          pointerEvents="none"
+          collapsable={false}
+        >
+          <View
+            ref={brandedContainerRef}
+            style={[
+              styles.brandedContainer,
+              {
+                width: capturedContentSize.width,
+                height: capturedContentSize.height,
+              },
+            ]}
+            collapsable={false}
+          >
+            {/* Captured content as background */}
+            <ExpoImage
+              source={{ uri: capturedContentUri }}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              cachePolicy="memory"
+              onLoad={() => {
+                // Signal that the branded image is loaded and ready for capture
+                if (brandedImageLoadedRef.current) {
+                  brandedImageLoadedRef.current();
+                  brandedImageLoadedRef.current = null;
+                }
+              }}
+            />
+
+            {/* Bottom: handle */}
+            <Text style={styles.brandedTextBottom}>@Daydate</Text>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -2183,7 +2270,7 @@ const styles = StyleSheet.create({
     textAlignVertical: 'center',
   },
   polaroidContainer: {
-    alignItems: 'center',
+    alignItems: 'center', // Shift content slightly upward
   },
   frameTopSection: {
     alignItems: 'center',
@@ -2922,5 +3009,26 @@ const styles = StyleSheet.create({
     fontSize: fp(14),
     color: COLORS.white,
     fontWeight: '700',
+  },
+  // Wrapper to position branded container off-screen but still render it
+  brandedContainerWrapper: {
+    position: 'absolute',
+    top: -9999,
+    left: 0,
+    opacity: 1, // Must be visible for capture
+  },
+  // Branded container for share capture (no background, just overlay text)
+  brandedContainer: {
+    overflow: 'visible',
+  },
+  // Bottom: handle text
+  brandedTextBottom: {
+    position: 'absolute',
+    bottom: 6,
+    right: 6,
+    fontSize: 16,
+    fontFamily: 'InstrumentSerif',
+    color: 'rgba(255, 255, 255, 0.8)',
+    letterSpacing: 0.5,
   },
 });
