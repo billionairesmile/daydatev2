@@ -52,6 +52,9 @@
     "more": "Más"
   },
   "home": {
+    "dDay": {
+      "suffix": " días"
+    },
     "anniversary": {
       "title": "Aniversario",
       "add": "Añadir Aniversario",
@@ -82,7 +85,13 @@
     "tutorial": {
       "title": "Cambia tu foto de fondo",
       "description": "Toca este botón para personalizar\nel fondo con tu foto de pareja"
-    }
+    },
+    "share": {
+      "savedTitle": "Guardado",
+      "savedAndShareFromGallery": "La imagen se ha guardado en la galería. Puedes compartirla desde ahí.",
+      "permissionDenied": "Se requiere permiso de acceso a la galería."
+    },
+    "shareError": "Ocurrió un error al compartir."
   },
   "mission": {
     "title": "Misión",
@@ -606,7 +615,7 @@
     "licenses": "Licencias de Código Abierto"
   },
   "onboarding": {
-    "tagline": "Cada día,\nuna nueva\nmisión de cita.",
+    "tagline": "Cada día,\nnuevas misiones de cita.",
     "welcome": "Bienvenido",
     "welcomeTitle": "Bienvenido a\nDaydate",
     "welcomeSubtitle": "Registra y comparte tus momentos especiales\njuntos como pareja",

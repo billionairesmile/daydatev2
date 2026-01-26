@@ -52,6 +52,9 @@
     "more": "更多"
   },
   "home": {
+    "dDay": {
+      "suffix": "天"
+    },
     "anniversary": {
       "title": "紀念日",
       "add": "新增紀念日",
@@ -82,7 +85,13 @@
     "tutorial": {
       "title": "試著更換背景圖片吧",
       "description": "點擊這個按鈕\n可以用情侶照片裝飾背景"
-    }
+    },
+    "share": {
+      "savedTitle": "已儲存",
+      "savedAndShareFromGallery": "圖片已儲存至相簿。您可以從相簿分享。",
+      "permissionDenied": "需要相簿存取權限。"
+    },
+    "shareError": "分享時發生錯誤。"
   },
   "mission": {
     "title": "今日任務",

@@ -498,10 +498,22 @@ export const db = {
       return { data, error };
     },
 
-    // Subscribe to couple updates (for timezone sync, status changes, etc.)
+    // Update heart liked status (for real-time sync between partners)
+    async updateHeartLiked(coupleId: string, userId: string | null) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('couples')
+        .update({ heart_liked_by: userId })
+        .eq('id', coupleId)
+        .select()
+        .single();
+      return { data, error };
+    },
+
+    // Subscribe to couple updates (for timezone sync, status changes, heart liked, etc.)
     subscribeToCoupleUpdates(
       coupleId: string,
-      callback: (payload: { timezone: string | null; status: string }) => void
+      callback: (payload: { timezone: string | null; status: string; heart_liked_by: string | null }) => void
     ) {
       const client = getSupabase();
       const channel = client
@@ -515,8 +527,8 @@ export const db = {
             filter: `id=eq.${coupleId}`,
           },
           (payload) => {
-            const record = payload.new as { timezone: string | null; status: string };
-            callback({ timezone: record.timezone, status: record.status });
+            const record = payload.new as { timezone: string | null; status: string; heart_liked_by: string | null };
+            callback({ timezone: record.timezone, status: record.status, heart_liked_by: record.heart_liked_by });
           }
         )
         .subscribe();

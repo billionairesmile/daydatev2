@@ -52,6 +52,9 @@
     "more": "More"
   },
   "home": {
+    "dDay": {
+      "suffix": " days"
+    },
     "anniversary": {
       "title": "Anniversary",
       "add": "Add Anniversary",
@@ -82,7 +85,13 @@
     "tutorial": {
       "title": "Change your background photo",
       "description": "Tap this button to customize\nthe background with your couple photo"
-    }
+    },
+    "share": {
+      "savedTitle": "Saved",
+      "savedAndShareFromGallery": "Image saved to gallery. You can share it from your gallery.",
+      "permissionDenied": "Gallery access permission is required."
+    },
+    "shareError": "An error occurred while sharing."
   },
   "mission": {
     "title": "Mission",
@@ -475,7 +484,7 @@
       "partnerAccount": "Partner Account",
       "datingLabel": "Dating Since",
       "marriedLabel": "Wedding Anniversary",
-      "datingType": "Partners",
+      "datingType": "Dating",
       "marriedType": "Married",
       "editAnniversary": {
         "title": "Change Anniversary",
@@ -611,7 +620,7 @@
     "licenses": "Open Source Licenses"
   },
   "onboarding": {
-    "tagline": "Everyday,\na new date\nmission.",
+    "tagline": "Every day,\nnew date missions\nfor couples.",
     "welcome": "Welcome",
     "welcomeTitle": "Welcome to\nDaydate",
     "welcomeSubtitle": "Record and share your special moments\ntogether as a couple",
@@ -707,7 +716,7 @@
     },
     "coupleInfo": {
       "title": "Enter couple\ninformation",
-      "relationship": "Relationship",
+      "relationship": "Relationship Type",
       "datingLabel": "First Date",
       "marriedLabel": "Wedding Anniversary",
       "selectDate": "Select {{label}}"

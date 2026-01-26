@@ -7,6 +7,10 @@ import { BricolageGrotesque_800ExtraBold } from '@expo-google-fonts/bricolage-gr
 import { MochiyPopOne_400Regular } from '@expo-google-fonts/mochiy-pop-one';
 import { ChironGoRoundTC_400Regular } from '@expo-google-fonts/chiron-goround-tc';
 import { PoetsenOne_400Regular } from '@expo-google-fonts/poetsen-one';
+import { NanumPenScript_400Regular } from '@expo-google-fonts/nanum-pen-script';
+import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, Inter_800ExtraBold } from '@expo-google-fonts/inter';
+import { Anton_400Regular } from '@expo-google-fonts/anton';
+import { Lora_400Regular, Lora_500Medium, Lora_600SemiBold, Lora_700Bold } from '@expo-google-fonts/lora';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Location from 'expo-location';
@@ -44,6 +48,7 @@ interface CoupleDbRow {
   disconnected_at?: string;
   disconnected_by?: string;
   disconnect_reason?: 'unpaired' | 'account_deleted';
+  heart_liked_by?: string;
 }
 
 // Parse date string as local date (not UTC) to avoid timezone issues
@@ -108,6 +113,17 @@ export default function RootLayout() {
     MochiyPopOne: MochiyPopOne_400Regular,
     ChironGoRoundTC: ChironGoRoundTC_400Regular,
     PoetsenOne: PoetsenOne_400Regular,
+    NanumPenScript: NanumPenScript_400Regular,
+    Inter: Inter_400Regular,
+    InterMedium: Inter_500Medium,
+    InterSemiBold: Inter_600SemiBold,
+    InterBold: Inter_700Bold,
+    InterExtraBold: Inter_800ExtraBold,
+    Anton: Anton_400Regular,
+    Lora: Lora_400Regular,
+    LoraMedium: Lora_500Medium,
+    LoraSemiBold: Lora_600SemiBold,
+    LoraBold: Lora_700Bold,
   });
 
   // Preload character assets for ransom text
@@ -490,6 +506,11 @@ function RootLayoutNav() {
       if (coupleData?.timezone) {
         console.log('[Layout] Syncing couple timezone to local store:', coupleData.timezone);
         useTimezoneStore.getState().syncFromCouple(coupleData.timezone);
+      }
+
+      // Sync heart liked state to coupleSyncStore
+      if (coupleData) {
+        useCoupleSyncStore.setState({ heartLikedBy: coupleData.heart_liked_by || null });
       }
 
       // Couple record was deleted (partner deleted their account)

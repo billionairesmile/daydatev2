@@ -7,7 +7,6 @@ import {
   Modal,
   ScrollView,
   TouchableWithoutFeedback,
-  TouchableOpacity,
   TextInput,
   KeyboardAvoidingView,
   Platform,
@@ -16,17 +15,33 @@ import {
   StatusBar,
   InteractionManager,
   ActivityIndicator,
+  PixelRatio,
+  Share,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { BlurView } from 'expo-blur';
 import Svg, { Rect, Circle, Defs, Mask } from 'react-native-svg';
-import { Image as ImageIcon, X, Edit2, Trash2, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { X, Edit2, Trash2, ChevronLeft, ChevronRight, Users, Heart, Send, Image as ImageIcon, Calendar } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { Swipeable } from 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Asset } from 'expo-asset';
 import { useTranslation } from 'react-i18next';
+import { captureScreen } from 'react-native-view-shot';
+import * as ImageManipulator from 'expo-image-manipulator';
+import * as MediaLibrary from 'expo-media-library';
+import NetInfo from '@react-native-community/netinfo';
+import KoreanLunarCalendar from 'korean-lunar-calendar';
+
+import { COLORS, SPACING, RADIUS, rs, fp, SCREEN_WIDTH, SCREEN_HEIGHT, rw, rh, isCompactHeight } from '@/constants/design';
+import { useBackground } from '@/contexts';
+import { useOnboardingStore, useAuthStore, useTimezoneStore } from '@/stores';
+import { BannerAdView } from '@/components/ads';
+import { useBannerAdBottom } from '@/hooks/useConsistentBottomInset';
+import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
+import { db } from '@/lib/supabase';
+import { anniversaryService } from '@/services/anniversaryService';
 
 // Pre-load static images (outside component to avoid re-creation)
 const LOGO_IMAGE = require('@/assets/images/daydate-logo.png');
@@ -35,8 +50,6 @@ const DEFAULT_BACKGROUND_IMAGE = require('@/assets/images/backgroundimage.jpg');
 // Preload images at module level
 Asset.fromModule(LOGO_IMAGE).downloadAsync();
 Asset.fromModule(DEFAULT_BACKGROUND_IMAGE).downloadAsync();
-
-import { COLORS, SPACING, RADIUS, rs, fp, SCREEN_WIDTH, SCREEN_HEIGHT, rw, rh, isCompactHeight } from '@/constants/design';
 
 // Responsive Polaroid sizing
 // Base: iPhone 16 (393px width) with 280px polaroid = 71.2% ratio
@@ -53,15 +66,6 @@ const POLAROID_SCALE = POLAROID_WIDTH / POLAROID_BASE_WIDTH;
 const polaroidScale = (size: number): number => {
   return Math.round(size * POLAROID_SCALE);
 };
-import { useBackground } from '@/contexts';
-import { useOnboardingStore, useAuthStore, useTimezoneStore } from '@/stores';
-import { BannerAdView } from '@/components/ads';
-import { useBannerAdBottom } from '@/hooks/useConsistentBottomInset';
-import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
-import { db } from '@/lib/supabase';
-import { anniversaryService } from '@/services/anniversaryService';
-import NetInfo from '@react-native-community/netinfo';
-import KoreanLunarCalendar from 'korean-lunar-calendar';
 
 // Lunar to Solar date conversion utility
 const lunarToSolar = (lunarYear: number, lunarMonth: number, lunarDay: number): Date => {
@@ -362,7 +366,7 @@ export default function HomeScreen() {
   const { data: onboardingData } = useOnboardingStore();
   const { user, partner, couple, setPartner, setCouple } = useAuthStore();
   const { getEffectiveTimezone } = useTimezoneStore();
-  const { coupleId } = useCoupleSyncStore();
+  const { coupleId, heartLikedBy, updateHeartLiked } = useCoupleSyncStore();
   const bannerAdBottom = useBannerAdBottom();
 
   // Determine nicknames - always show "나 ❤️ 파트너" from current user's perspective
@@ -386,6 +390,122 @@ export default function HomeScreen() {
   // Custom anniversaries added by user (yearly repeating) - loaded from DB/local storage
   const [customAnniversaries, setCustomAnniversaries] = useState<Anniversary[]>([]);
   const [isLoadingAnniversaries, setIsLoadingAnniversaries] = useState(true);
+
+  // Heart like state (synced with partner via coupleSyncStore)
+  const isHeartLiked = !!heartLikedBy; // Heart is liked if any user has liked it
+  const heartScale = useRef(new Animated.Value(1)).current;
+
+  const handleHeartPress = useCallback(() => {
+    // Toggle heart liked state and sync with partner
+    updateHeartLiked(!isHeartLiked);
+
+    // Instagram-style bounce animation (spring, fast)
+    Animated.sequence([
+      Animated.timing(heartScale, {
+        toValue: 0.8,
+        duration: 50,
+        useNativeDriver: true,
+      }),
+      Animated.spring(heartScale, {
+        toValue: 1.15,
+        friction: 5,
+        tension: 400,
+        useNativeDriver: true,
+      }),
+      Animated.spring(heartScale, {
+        toValue: 1,
+        friction: 6,
+        tension: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [heartScale, isHeartLiked, updateHeartLiked]);
+
+  // Handle share button press - capture from top line to bottom line
+  const handleSharePress = useCallback(async () => {
+    try {
+      // Measure top line and bottom line positions
+      if (!topLineRef.current || !bottomLineRef.current) return;
+
+      const topMeasurement = await new Promise<{ x: number; y: number; width: number; height: number }>((resolve) => {
+        topLineRef.current?.measureInWindow((x: number, y: number, width: number, height: number) => {
+          resolve({ x, y, width, height });
+        });
+      });
+
+      const bottomMeasurement = await new Promise<{ x: number; y: number; width: number; height: number }>((resolve) => {
+        bottomLineRef.current?.measureInWindow((x: number, y: number, width: number, height: number) => {
+          resolve({ x, y, width, height });
+        });
+      });
+
+      // Add padding above and below (responsive based on screen height)
+      const padding = Math.round(SCREEN_HEIGHT * 0.07);
+      const scale = PixelRatio.get();
+
+      // Capture the full screen
+      const fullScreenUri = await captureScreen({
+        format: 'png',
+        quality: 1,
+        result: 'tmpfile',
+      });
+
+      // Calculate crop area from top line to bottom line (full screen width, convert points to pixels)
+      const cropX = 0;
+      const cropY = Math.max(0, Math.round((topMeasurement.y - padding) * scale));
+      const cropWidth = Math.round(SCREEN_WIDTH * scale);
+      const cropHeight = Math.round(((bottomMeasurement.y + bottomMeasurement.height) - topMeasurement.y + padding * 2) * scale);
+
+      const croppedImage = await ImageManipulator.manipulateAsync(
+        fullScreenUri,
+        [{ crop: { originX: cropX, originY: cropY, width: cropWidth, height: cropHeight } }],
+        { format: ImageManipulator.SaveFormat.PNG, compress: 1 }
+      );
+
+      // Save to gallery - handle Android 13+ permission changes
+      let permissionGranted = false;
+
+      if (Platform.OS === 'android') {
+        // On Android 13+, check current permission first
+        const { status: existingStatus, accessPrivileges } = await MediaLibrary.getPermissionsAsync();
+
+        if (existingStatus === 'granted' || accessPrivileges === 'limited' || accessPrivileges === 'all') {
+          permissionGranted = true;
+        } else {
+          // Request permission
+          const { status, accessPrivileges: newAccessPrivileges } = await MediaLibrary.requestPermissionsAsync();
+          permissionGranted = status === 'granted' || newAccessPrivileges === 'limited' || newAccessPrivileges === 'all';
+        }
+      } else {
+        // iOS
+        const { status } = await MediaLibrary.requestPermissionsAsync();
+        permissionGranted = status === 'granted';
+      }
+
+      if (permissionGranted) {
+        await MediaLibrary.createAssetAsync(croppedImage.uri);
+
+        // Show share sheet
+        if (Platform.OS === 'ios') {
+          // iOS can share the file URI directly
+          await Share.share({
+            url: croppedImage.uri,
+          });
+        } else {
+          // Android: show message that image is saved, user can share from gallery
+          Alert.alert(
+            t('home.share.savedTitle'),
+            t('home.share.savedAndShareFromGallery')
+          );
+        }
+      } else {
+        Alert.alert(t('common.error'), t('home.share.permissionDenied'));
+      }
+    } catch (error) {
+      console.error('Error sharing:', error);
+      Alert.alert(t('common.error'), t('home.shareError'));
+    }
+  }, [t]);
 
   // Track if navigation/interaction is complete for deferred rendering
   const [isInteractionComplete, setIsInteractionComplete] = useState(false);
@@ -540,6 +660,8 @@ export default function HomeScreen() {
   const [showTutorial, setShowTutorial] = useState(false);
   const [buttonPosition, setButtonPosition] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const imageButtonRef = useRef<View>(null);
+  const topLineRef = useRef<View>(null);
+  const bottomLineRef = useRef<View>(null);
 
   // TextInput refs for emoji picker behavior
   const nameInputRef = useRef<TextInput>(null);
@@ -763,6 +885,43 @@ export default function HomeScreen() {
   const diffDays = anniversaryDate
     ? Math.floor((today.getTime() - anniversaryDate.getTime()) / (1000 * 60 * 60 * 24)) + 1 // +1 to count from day 1
     : null;
+
+  // Detect text language and return appropriate font
+  const getFontByText = useCallback((text: string) => {
+    if (!text) return 'LoraSemiBold';
+
+    // Check for Korean characters
+    if (/[\uAC00-\uD7AF\u1100-\u11FF]/.test(text)) {
+      return 'Jua';
+    }
+    // Check for Japanese characters (Hiragana, Katakana)
+    if (/[\u3040-\u309F\u30A0-\u30FF]/.test(text)) {
+      return 'MochiyPopOne';
+    }
+    // Check for Chinese characters (CJK Unified Ideographs, but not already matched as Japanese/Korean)
+    if (/[\u4E00-\u9FFF]/.test(text)) {
+      return 'ChironGoRoundTC';
+    }
+    // Default to Lora for English/Spanish/other Latin scripts
+    return 'LoraSemiBold';
+  }, []);
+
+  // Get font for D-Day text based on app language
+  const getDDayFont = useMemo(() => {
+    const lang = i18n.language;
+    switch (lang) {
+      case 'en':
+      case 'es':
+        return { primary: 'LoraBold', secondary: 'LoraSemiBold' };
+      case 'ja':
+        return { primary: 'MochiyPopOne', secondary: 'MochiyPopOne' };
+      case 'zh-TW':
+        return { primary: 'ChironGoRoundTC', secondary: 'ChironGoRoundTC' };
+      case 'ko':
+      default:
+        return { primary: 'Jua', secondary: 'Jua' };
+    }
+  }, [i18n.language]);
 
   // Helper function to calculate D-day (compare dates without time)
   const calculateDDay = (targetDate: Date) => {
@@ -1188,80 +1347,109 @@ export default function HomeScreen() {
         cachePolicy="memory-disk"
         style={[styles.backgroundImage, styles.backgroundImageStyle]}
       />
+      <BlurView
+        experimentalBlurMethod="dimezisBlurView"
+        intensity={50}
+        tint="dark"
+        style={StyleSheet.absoluteFill}
+      />
 
       {/* Content */}
       <View style={styles.content}>
-        {/* Anniversary Info - Top Section */}
-        <View style={styles.anniversarySection}>
-          <View style={styles.coupleNamesRow}>
-            <Text style={[styles.coupleNameText, styles.coupleNameLeft]} numberOfLines={1}>
-              {user1Nickname}
-            </Text>
-            <Text style={styles.heartEmoji}>❤️</Text>
-            <Text style={[styles.coupleNameText, styles.coupleNameRight]} numberOfLines={1}>
-              {user2Nickname}
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={openAnniversaryModal}
-            style={styles.anniversaryButton}
-            activeOpacity={0.7}
-          >
-            <View style={styles.dDayRow}>
-              <Text style={styles.dDayNumber}>
-                {diffDays !== null ? diffDays : '-'}
-              </Text>
-              <Text style={styles.dDayUnit}>
-                {t('common.daysCount')}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* Polaroid centered */}
+        {/* Photo centered */}
         <View style={styles.polaroidContainer}>
-          <View style={styles.polaroid}>
-            {/* Photo area */}
-            <View style={styles.polaroidImageContainer}>
-              <ExpoImage
-                source={backgroundImage?.uri ? { uri: backgroundImage.uri } : backgroundImage}
-                style={styles.polaroidImage}
-                contentFit="cover"
-                cachePolicy="memory-disk"
-                transition={100}
-              />
-              {/* Subtle vignette overlay */}
-              <View style={styles.vignetteOverlay} />
-            </View>
+          {/* Top section: line + user icon/names (line matches names width) */}
+          <View style={styles.frameTopSection}>
+            {/* Top line - hidden */}
+            <View ref={topLineRef} style={styles.frameTopLine} />
 
-            {/* Bottom area with logo */}
-            <View style={styles.polaroidBottom}>
-              <View style={styles.brandRow}>
+            {/* User icon and couple names */}
+            <View style={styles.frameUserIconRow}>
+            <View style={styles.frameUserIcon}>
+              <Users color="#fff" size={polaroidScale(15)} strokeWidth={3} />
+            </View>
+            <View style={styles.coupleNamesInline}>
+              <Text style={[styles.coupleNameInline, { fontFamily: getFontByText(user1Nickname) }]} numberOfLines={1}>
+                {user1Nickname}
+              </Text>
+              <Heart
+                color="#FF3B30"
+                fill="#FF3B30"
+                size={Platform.OS === 'android' ? Math.max(polaroidScale(16), 14) : polaroidScale(16)}
+                style={styles.coupleIconInline}
+              />
+              <Text style={[styles.coupleNameInline, { fontFamily: getFontByText(user2Nickname) }]} numberOfLines={1}>
+                {user2Nickname}
+              </Text>
+            </View>
+          </View>
+          </View>
+
+          {/* Photo frame with border */}
+          <View style={styles.frameOuter}>
+            <View style={styles.polaroid}>
+              {/* Photo area */}
+              <View style={styles.polaroidImageContainer}>
                 <ExpoImage
-                  source={LOGO_IMAGE}
-                  style={styles.polaroidLogo}
-                  contentFit="contain"
+                  source={backgroundImage?.uri ? { uri: backgroundImage.uri } : backgroundImage}
+                  style={styles.polaroidImage}
+                  contentFit="cover"
                   cachePolicy="memory-disk"
-                  priority="high"
+                  transition={100}
                 />
-                {/* Image Change Button */}
-                <Pressable
-                  ref={imageButtonRef}
-                  onPress={() => setShowImagePickerModal(true)}
-                  onLayout={measureButton}
-                  style={styles.imageChangeButton}
-                >
-                  <ImageIcon color="#333" size={polaroidScale(20)} />
-                </Pressable>
+                {/* Subtle vignette overlay */}
+                <View style={styles.vignetteOverlay} />
               </View>
             </View>
-
-            {/* Edge highlight for 3D effect */}
-            <View style={styles.edgeHighlight} pointerEvents="none" />
-
-            {/* Inner shadow for depth */}
-            <View style={styles.innerShadow} pointerEvents="none" />
           </View>
+
+          {/* Instagram-style action icons row */}
+          <View style={styles.frameIconsRow}>
+            <View style={styles.frameIconsLeft}>
+              <Pressable onPress={handleHeartPress}>
+                <Animated.View style={{ transform: [{ scale: heartScale }] }}>
+                  <Heart
+                    color={isHeartLiked ? '#FF3B30' : '#fff'}
+                    fill={isHeartLiked ? '#FF3B30' : 'none'}
+                    size={polaroidScale(26)}
+                    strokeWidth={isHeartLiked ? 0 : 1.8}
+                  />
+                </Animated.View>
+              </Pressable>
+              <Pressable onPress={openAnniversaryModal} style={styles.frameIconSpacing}>
+                <Calendar color="#fff" size={polaroidScale(22)} strokeWidth={1.8} />
+              </Pressable>
+              <Pressable onPress={handleSharePress} style={styles.frameIconSpacing}>
+                <Send color="#fff" size={polaroidScale(22)} strokeWidth={1.8} />
+              </Pressable>
+            </View>
+            <Pressable
+              ref={imageButtonRef}
+              onPress={() => setShowImagePickerModal(true)}
+              onLayout={measureButton}
+            >
+              <ImageIcon color="#fff" size={polaroidScale(22)} strokeWidth={1.8} />
+            </Pressable>
+          </View>
+
+          {/* Section between frame and bottom line */}
+          <View style={styles.frameDDaySection}>
+            {/* D-Day text - bottom left (no press action) */}
+            <View style={styles.frameDDayTextRow}>
+              <Text style={[styles.frameDDayNumber, { fontFamily: getDDayFont.primary }]}>
+                {diffDays !== null ? diffDays : '-'}
+              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={[styles.frameDDayUnit, { fontFamily: getDDayFont.secondary }]}>
+                  {t('home.dDay.suffix')}
+                </Text>
+                <Heart color="#FFFFFF" fill="#FFFFFF" size={polaroidScale(16)} style={{ marginLeft: polaroidScale(6) }} />
+              </View>
+            </View>
+          </View>
+
+          {/* Bottom line */}
+          <View ref={bottomLineRef} style={styles.frameBottomLine} />
         </View>
       </View>
 
@@ -1905,7 +2093,13 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: rs(SPACING.lg),
+    // Account for banner ad at bottom - responsive padding
+    paddingBottom: Platform.OS === 'android'
+      ? SCREEN_HEIGHT < 700 ? rh(80) : rh(100)
+      : rh(90),
   },
   anniversarySection: {
     paddingTop: Platform.OS === 'android' && SCREEN_HEIGHT < 700
@@ -1976,34 +2170,150 @@ const styles = StyleSheet.create({
     textAlignVertical: 'center',
   },
   polaroidContainer: {
-    flex: 1,
+    alignItems: 'center',
+  },
+  frameTopSection: {
+    alignItems: 'center',
+    marginBottom: polaroidScale(10),
+    gap: polaroidScale(6),
+  },
+  frameUserIconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    marginLeft: polaroidScale(11),
+    marginBottom: polaroidScale(12),
+  },
+  frameCalendarRow: {
+    width: POLAROID_WIDTH + polaroidScale(22),
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  frameUserIcon: {
+    width: polaroidScale(28),
+    height: polaroidScale(28),
+    borderRadius: polaroidScale(14),
+    borderWidth: polaroidScale(2),
+    borderColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingBottom: Platform.OS === 'android' && SCREEN_HEIGHT < 700
-      ? rh(180)  // Less padding for compact screens
-      : rh(240),
+  },
+  frameCalendarIcon: {
+    width: polaroidScale(28),
+    height: polaroidScale(28),
+    borderRadius: polaroidScale(14),
+    borderWidth: polaroidScale(2),
+    borderColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  coupleNamesInline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: polaroidScale(10),
+  },
+  coupleNameInline: {
+    fontSize: Platform.OS === 'android' ? Math.max(fp(18), 16) : fp(18),
+    color: '#FFFFFF',
+    maxWidth: polaroidScale(100),
+    includeFontPadding: false,
+  },
+  coupleIconInline: {
+    marginHorizontal: polaroidScale(6),
+  },
+  frameDDaySection: {
+    width: POLAROID_WIDTH + polaroidScale(22),
+  },
+  frameIconsRow: {
+    width: POLAROID_WIDTH,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: polaroidScale(10),
+  },
+  frameIconsLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  frameIconSpacing: {
+    marginLeft: polaroidScale(14),
+  },
+  frameTopRow: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    marginTop: polaroidScale(8),
+  },
+  frameDaydateText: {
+    fontSize: Platform.OS === 'android' ? Math.max(fp(20), 18) : fp(20),
+    fontFamily: 'Jua',
+    color: '#FFFFFF',
+    includeFontPadding: false,
+  },
+  frameDDayTextRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    alignSelf: 'flex-end',
+    marginRight: polaroidScale(11),
+    marginTop: Platform.OS === 'android'
+      ? SCREEN_HEIGHT < 700 ? polaroidScale(20) : polaroidScale(22)
+      : polaroidScale(20),
+  },
+  frameDDayInline: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginLeft: polaroidScale(10),
+  },
+  frameDDayPrefix: {
+    fontSize: Platform.OS === 'android' ? Math.max(fp(20), 18) : fp(20),
+    color: '#FFFFFF',
+    fontFamily: 'Jua',
+    includeFontPadding: false,
+    marginRight: polaroidScale(4),
+  },
+  frameDDayNumber: {
+    fontSize: Platform.OS === 'android' ? Math.max(fp(40), 36) : fp(40),
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+  },
+  frameDDayUnit: {
+    fontSize: Platform.OS === 'android' ? Math.max(fp(20), 18) : fp(20),
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+    marginLeft: polaroidScale(4),
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+  },
+  frameTopLine: {
+    width: POLAROID_WIDTH + polaroidScale(22),
+    height: 0,
+    backgroundColor: 'transparent',
+    marginBottom: polaroidScale(12),
+  },
+  frameBottomLine: {
+    width: POLAROID_WIDTH + polaroidScale(22),
+    height: polaroidScale(3),
+    backgroundColor: '#FFFFFF',
+    marginTop: 0,
+  },
+  frameOuter: {
+    padding: polaroidScale(8),
+    borderWidth: polaroidScale(3),
+    borderColor: '#FFFFFF',
   },
   polaroid: {
     width: POLAROID_WIDTH,
-    backgroundColor: '#F8F6F1',
-    padding: polaroidScale(16),
-    paddingBottom: polaroidScale(60),
-    borderRadius: polaroidScale(2),
-    // Multi-layer shadow for realistic depth
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: polaroidScale(12) },
-    shadowOpacity: 0.25,
-    shadowRadius: polaroidScale(20),
-    elevation: 15,
     position: 'relative',
-    // Subtle border for paper edge effect
-    borderWidth: 0.5,
-    borderColor: 'rgba(0, 0, 0, 0.08)',
   },
   polaroidImageContainer: {
     aspectRatio: 1 / 1.15,
     overflow: 'hidden',
     backgroundColor: '#000',
+    borderRadius: 0,
   },
   polaroidImage: {
     width: '100%',
@@ -2104,6 +2414,12 @@ const styles = StyleSheet.create({
   imageChangeButton: {
     padding: polaroidScale(6),
     marginRight: polaroidScale(-4),
+  },
+  imageChangeButtonOverlay: {
+    position: 'absolute',
+    bottom: polaroidScale(4),
+    right: polaroidScale(4),
+    padding: polaroidScale(2),
   },
   edgeHighlight: {
     position: 'absolute',

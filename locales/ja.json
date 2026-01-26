@@ -52,6 +52,9 @@
     "more": "もっと見る"
   },
   "home": {
+    "dDay": {
+      "suffix": "日目"
+    },
     "anniversary": {
       "title": "記念日",
       "add": "記念日を追加",
@@ -82,7 +85,13 @@
     "tutorial": {
       "title": "背景画像を変更してみよう",
       "description": "このボタンを押してカップル写真で\n背景をカスタマイズできます"
-    }
+    },
+    "share": {
+      "savedTitle": "保存完了",
+      "savedAndShareFromGallery": "画像がギャラリーに保存されました。ギャラリーから共有できます。",
+      "permissionDenied": "ギャラリーへのアクセス権限が必要です。"
+    },
+    "shareError": "共有中にエラーが発生しました。"
   },
   "mission": {
     "title": "今日のミッション",

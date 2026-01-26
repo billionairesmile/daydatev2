@@ -178,6 +178,9 @@ interface CoupleSyncState {
   // Timezone mismatch detection
   hasTimezoneMismatch: boolean; // True if couple members have different device timezones and no shared timezone is set
   partnerDeviceTimezone: string | null; // Partner's device timezone for display
+
+  // Heart liked state (for real-time sync)
+  heartLikedBy: string | null; // User ID who liked the heart
 }
 
 interface CoupleSyncActions {
@@ -272,6 +275,9 @@ interface CoupleSyncActions {
   // Timezone mismatch detection
   updateDeviceTimezoneAndCheckMismatch: () => Promise<void>;
   dismissTimezoneMismatch: () => void;
+
+  // Heart liked sync
+  updateHeartLiked: (liked: boolean) => Promise<void>;
 }
 
 // Store channels for cleanup
@@ -323,6 +329,9 @@ const initialState: CoupleSyncState = {
   // Timezone mismatch detection
   hasTimezoneMismatch: false,
   partnerDeviceTimezone: null,
+
+  // Heart liked state
+  heartLikedBy: null,
 };
 
 export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
@@ -805,9 +814,9 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       }
     });
 
-    // 11. Couple updates subscription (for timezone sync and disconnection detection)
+    // 11. Couple updates subscription (for timezone sync, disconnection detection, and heart liked sync)
     coupleUpdatesChannel = db.couples.subscribeToCoupleUpdates(coupleId, (payload) => {
-      console.log('[CoupleSyncStore] Received couple update - status:', payload.status, 'timezone:', payload.timezone);
+      console.log('[CoupleSyncStore] Received couple update - status:', payload.status, 'timezone:', payload.timezone, 'heart_liked_by:', payload.heart_liked_by);
 
       // Check if couple was disconnected (partner deleted account or unpaired)
       if (payload.status === 'disconnected') {
@@ -836,6 +845,9 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
 
       // Sync timezone to timezoneStore when partner changes it
       useTimezoneStore.getState().syncFromCouple(payload.timezone);
+
+      // Sync heart liked state
+      set({ heartLikedBy: payload.heart_liked_by });
     });
 
     set({ isInitialized: true });
@@ -2837,6 +2849,29 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
 
   dismissTimezoneMismatch: () => {
     set({ hasTimezoneMismatch: false });
+  },
+
+  // Heart liked sync
+  updateHeartLiked: async (liked: boolean) => {
+    const { coupleId, userId } = get();
+    if (!coupleId || !userId) {
+      console.warn('[CoupleSyncStore] Cannot update heart liked - not initialized');
+      return;
+    }
+
+    const newHeartLikedBy = liked ? userId : null;
+    console.log('[CoupleSyncStore] Updating heart liked:', newHeartLikedBy);
+
+    // Optimistically update local state
+    set({ heartLikedBy: newHeartLikedBy });
+
+    // Update in database
+    const { error } = await db.couples.updateHeartLiked(coupleId, newHeartLikedBy);
+    if (error) {
+      console.error('[CoupleSyncStore] Failed to update heart liked:', error);
+      // Revert on error
+      set({ heartLikedBy: liked ? null : userId });
+    }
   },
 }),
   {

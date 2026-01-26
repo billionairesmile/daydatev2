@@ -819,6 +819,54 @@ export default function OnboardingScreen() {
             router.replace('/(tabs)');
             return;
           } else {
+            // Profile is incomplete in DB - check if local onboardingStore has complete data
+            const localData = useOnboardingStore.getState().data;
+            const hasLocalBirthDate = !!localData.birthDate;
+            const hasLocalMbti = !!localData.mbti;
+            const isLocalDataComplete = hasLocalBirthDate && hasLocalMbti;
+
+            console.log('[Onboarding] Email: Profile incomplete in DB, checking local data:', {
+              hasLocalBirthDate,
+              hasLocalMbti,
+              isLocalDataComplete,
+            });
+
+            if (isLocalDataComplete) {
+              // Local data is complete - save to DB and go to home
+              console.log('[Onboarding] Email: Local data complete, saving to DB and going to home');
+
+              try {
+                const preferences = {
+                  mbti: localData.mbti,
+                  gender: localData.gender,
+                  activityTypes: localData.activityTypes,
+                  dateWorries: localData.dateWorries,
+                  constraints: localData.constraints,
+                  relationshipType: localData.relationshipType,
+                };
+
+                await db.profiles.update(session.user.id, {
+                  nickname: localData.nickname || existingProfile?.nickname,
+                  birth_date: localData.birthDate ? formatDateToLocal(localData.birthDate) : null,
+                  birth_date_calendar_type: localData.birthDateCalendarType,
+                  preferences,
+                  couple_id: existingCouple.id,
+                  is_onboarding_complete: true,
+                });
+
+                console.log('[Onboarding] Email: Local data saved to DB successfully');
+              } catch (saveError) {
+                console.error('[Onboarding] Email: Error saving local data to DB:', saveError);
+              }
+
+              updateData({ isPairingConnected: true });
+              setIsRedirectingToHome(true);
+              setIsOnboardingComplete(true);
+              router.replace('/(tabs)');
+              return;
+            }
+
+            // Both DB and local data incomplete - go to basic_info
             updateData({ isPairingConnected: true });
             if (existingProfile?.birth_date) {
               updateData({ birthDate: parseDateAsLocal(existingProfile.birth_date) });
@@ -1293,12 +1341,12 @@ function WelcomeStep({ onSocialLogin, onEmailLogin }: {
   }, [showEmailModal, modalTranslateY]);
 
   // Font and style settings per language
-  // English/Spanish: Poetsen One, Japanese: Mochiy Pop One, Chinese: Chiron GoRound TC, Korean: Jua
+  // English/Spanish: Inter Bold, Japanese: Mochiy Pop One, Chinese: Chiron GoRound TC, Korean: Jua
   // Responsive sizing using HEIGHT_SCALE
   const getTaglineStyle = () => {
     const lang = i18n.language;
     if (['en', 'es'].includes(lang)) {
-      return { font: 'PoetsenOne', letterSpacing: 0, lineHeight: rh(48), fontSize: rh(38), fontWeight: '400' as const };
+      return { font: 'Anton', letterSpacing: 0, lineHeight: rh(55), fontSize: rh(38), fontWeight: '400' as const };
     } else if (lang === 'ja') {
       return { font: 'MochiyPopOne', letterSpacing: 0, lineHeight: rh(40), fontSize: rh(28), fontWeight: '400' as const };
     } else if (lang === 'zh-TW') {
