@@ -67,6 +67,7 @@
       "weddingAnniversary": "Wedding Anniversary",
       "datingAnniversary": "Dating",
       "birthday": "Birthday",
+      "birthdayWithName": "{{name}}'s Birthday",
       "lunar": "(Lunar)",
       "christmas": "Christmas",
       "valentinesDay": "Valentine's Day",
@@ -164,7 +165,8 @@
       "adNotCompleted": "Ad Not Completed",
       "adNotCompletedMessage": "Please watch the complete ad to refresh missions."
     },
-    "partnerWatchingAd": "Partner is watching an ad..."
+    "partnerWatchingAd": "Partner is watching an ad...",
+    "partnerWatchingAdWithName": "{{name}} is watching\nan ad"
   },
   "missionDetail": {
     "headerTitle": "Mission Details",
@@ -620,7 +622,7 @@
     "licenses": "Open Source Licenses"
   },
   "onboarding": {
-    "tagline": "Every day,\nnew date missions\nfor couples.",
+    "tagline": "Every day,\nnew date ideas\nfor couples.",
     "welcome": "Welcome",
     "welcomeTitle": "Welcome to\nDaydate",
     "welcomeSubtitle": "Record and share your special moments\ntogether as a couple",

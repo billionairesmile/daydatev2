@@ -349,21 +349,21 @@ const styles = StyleSheet.create({
   },
   cardInner: {
     flexDirection: 'row',
+    alignItems: 'flex-start', // cardContent가 자연스러운 높이를 가지도록 함
     gap: 16,
     padding: 16,
   },
   thumbnailContainer: {
     width: 96,
-    minHeight: 100,
+    // minHeight 제거 - 컨텐츠 높이에 따라 자연스럽게 조절
     maxHeight: 140, // 과도하게 길어지지 않도록 제한
     borderRadius: 16,
     overflow: 'hidden',
     flexShrink: 0,
-    alignSelf: 'stretch',
+    alignSelf: 'stretch', // 컨텐츠 영역 높이에 맞춤
   },
   thumbnail: {
-    width: '100%',
-    height: '100%',
+    ...StyleSheet.absoluteFillObject, // 절대 위치로 컨테이너를 채움
   },
   thumbnailOverlay: {
     position: 'absolute',
@@ -375,7 +375,7 @@ const styles = StyleSheet.create({
   cardContent: {
     flex: 1,
     minWidth: 0,
-    justifyContent: 'space-between',
+    // justifyContent: 'space-between' 제거 - 컨텐츠를 자연스럽게 쌓아서 높이 축소
   },
   missionTitle: {
     fontSize: 16,

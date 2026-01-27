@@ -1660,7 +1660,7 @@ export const db = {
       if (existing) {
         // If already generating or watching ad by someone else, fail
         if (
-          (existing.status === 'generating' || existing.status === 'ad_pending') &&
+          (existing.status === 'generating' || existing.status === 'ad_watching') &&
           existing.locked_by !== userId
         ) {
           // Check if lock is stale (older than 2 minutes)
@@ -1725,7 +1725,7 @@ export const db = {
       const { error } = await client
         .from('mission_generation_lock')
         .update({
-          status: 'ad_pending',
+          status: 'ad_watching',
           pending_missions: missions,
           pending_answers: answers,
           locked_by: userId,
@@ -1743,6 +1743,24 @@ export const db = {
         .update({
           pending_missions: null,
           pending_answers: null,
+        })
+        .eq('couple_id', coupleId);
+      return { error };
+    },
+
+    // Update lock status only (for ad_watching state - no pending missions)
+    async updateStatus(
+      coupleId: string,
+      status: string,
+      userId: string
+    ) {
+      const client = getSupabase();
+      const { error } = await client
+        .from('mission_generation_lock')
+        .update({
+          status,
+          locked_by: userId,
+          locked_at: new Date().toISOString(),
         })
         .eq('couple_id', coupleId);
       return { error };

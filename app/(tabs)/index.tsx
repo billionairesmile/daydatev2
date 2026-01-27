@@ -45,7 +45,7 @@ import { anniversaryService } from '@/services/anniversaryService';
 
 // Pre-load static images (outside component to avoid re-creation)
 const LOGO_IMAGE = require('@/assets/images/daydate-logo.png');
-const DEFAULT_BACKGROUND_IMAGE = require('@/assets/images/backgroundimage.jpg');
+const DEFAULT_BACKGROUND_IMAGE = require('@/assets/images/backgroundimage.png');
 
 // Preload images at module level
 Asset.fromModule(LOGO_IMAGE).downloadAsync();
@@ -1132,7 +1132,7 @@ export default function HomeScreen() {
 
       baseAnniversaries.push({
         id: idCounter++,
-        label: `${myNickname} ${t('home.anniversary.birthday')}${isLunar ? ` ${t('home.anniversary.lunar')}` : ''}`,
+        label: `${t('home.anniversary.birthdayWithName', { name: myNickname })}${isLunar ? ` ${t('home.anniversary.lunar')}` : ''}`,
         targetDate: nextBirthday,
         icon: '🎂',
         bgColor: 'rgba(251, 191, 36, 0.25)',
@@ -1150,7 +1150,7 @@ export default function HomeScreen() {
 
       baseAnniversaries.push({
         id: idCounter++,
-        label: `${partnerNickname} ${t('home.anniversary.birthday')}${isPartnerLunar ? ` ${t('home.anniversary.lunar')}` : ''}`,
+        label: `${t('home.anniversary.birthdayWithName', { name: partnerNickname })}${isPartnerLunar ? ` ${t('home.anniversary.lunar')}` : ''}`,
         targetDate: nextPartnerBirthday,
         icon: '🎂',
         bgColor: 'rgba(251, 191, 36, 0.25)',

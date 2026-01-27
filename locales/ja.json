@@ -67,6 +67,7 @@
       "weddingAnniversary": "結婚記念日",
       "datingAnniversary": "お付き合い",
       "birthday": "誕生日",
+      "birthdayWithName": "{{name}}の誕生日",
       "lunar": "(旧暦)",
       "christmas": "クリスマス",
       "valentinesDay": "バレンタインデー",
@@ -164,7 +165,8 @@
       "adNotCompleted": "広告視聴未完了",
       "adNotCompletedMessage": "ミッションを更新するには広告を最後まで視聴してください。"
     },
-    "partnerWatchingAd": "パートナーが広告を視聴中です..."
+    "partnerWatchingAd": "パートナーが広告を視聴中です...",
+    "partnerWatchingAdWithName": "{{name}}さんが\n広告を視聴中です"
   },
   "missionDetail": {
     "headerTitle": "ミッション詳細",

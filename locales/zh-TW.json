@@ -67,6 +67,7 @@
       "weddingAnniversary": "結婚紀念日",
       "datingAnniversary": "交往",
       "birthday": "生日",
+      "birthdayWithName": "{{name}}的生日",
       "lunar": "(農曆)",
       "christmas": "聖誕節",
       "valentinesDay": "情人節",
@@ -162,7 +163,8 @@
       "adNotCompleted": "廣告觀看未完成",
       "adNotCompletedMessage": "請觀看完整廣告以刷新任務。"
     },
-    "partnerWatchingAd": "對方正在觀看廣告..."
+    "partnerWatchingAd": "對方正在觀看廣告...",
+    "partnerWatchingAdWithName": "{{name}}正在\n觀看廣告"
   },
   "missionDetail": {
     "headerTitle": "任務詳情",

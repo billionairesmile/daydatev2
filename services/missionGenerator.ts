@@ -477,6 +477,63 @@ function getCustomAnniversaryInfo(
   return { upcoming: upcomingAnniversaries, isToday, todayLabel };
 }
 
+// Birthday info type
+interface BirthdayInfo {
+  upcoming: string[];
+  isToday: boolean;
+  todayLabel: string | null;
+}
+
+// Check if any birthday (user or partner) is coming up within D-3
+// Both users' birthdays are checked - birthday dates are great for special couple missions
+function getBirthdayInfo(
+  userABirthDate?: Date | string | null,
+  userBBirthDate?: Date | string | null
+): BirthdayInfo {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const upcomingBirthdays: string[] = [];
+  let isToday = false;
+  let todayLabel: string | null = null;
+
+  const checkBirthday = (birthDate: Date | string | null | undefined) => {
+    if (!birthDate) return;
+
+    const bDate = parseDateAsLocal(birthDate);
+    // Set to this year's birthday
+    const thisYearBirthday = new Date(today.getFullYear(), bDate.getMonth(), bDate.getDate());
+    thisYearBirthday.setHours(0, 0, 0, 0);
+
+    // If birthday has passed this year, check next year
+    let targetBirthday = thisYearBirthday;
+    if (thisYearBirthday < today) {
+      targetBirthday = new Date(today.getFullYear() + 1, bDate.getMonth(), bDate.getDate());
+      targetBirthday.setHours(0, 0, 0, 0);
+    }
+
+    const daysUntil = Math.round((targetBirthday.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+
+    if (daysUntil === 0) {
+      // Today is the birthday!
+      isToday = true;
+      todayLabel = 'Birthday';
+    } else if (daysUntil > 0 && daysUntil <= 3) {
+      // Within D-3
+      upcomingBirthdays.push(`Birthday (D-${daysUntil})`);
+    }
+  };
+
+  // Check both users' birthdays - either one's birthday is a reason for special date missions
+  checkBirthday(userABirthDate);
+  checkBirthday(userBBirthDate);
+
+  // Remove duplicates if both birthdays fall on the same day
+  const uniqueUpcoming = [...new Set(upcomingBirthdays)];
+
+  return { upcoming: uniqueUpcoming, isToday, todayLabel };
+}
+
 // ============================================
 // Context Builder (Priority-based)
 // ============================================
@@ -610,6 +667,22 @@ function buildContext(
     parts.push(`-> Categories: romantic, anniversary, surprise, memory`);
   } else if (allUpcoming.length > 0) {
     parts.push(`\n[Upcoming anniversary] ${allUpcoming.join(', ')} -> Include at least 1 anniversary-prep mission!`);
+  }
+
+  // === Birthday ===
+  const birthdayInfo = getBirthdayInfo(
+    input.userAPreferences?.birthDate,
+    input.userBPreferences?.birthDate
+  );
+
+  if (birthdayInfo.isToday && birthdayInfo.todayLabel) {
+    // Birthday TODAY! All missions should be birthday-themed
+    parts.push(`\n### TODAY IS BIRTHDAY!`);
+    parts.push(`-> ALL missions must be birthday/celebration themed!`);
+    parts.push(`-> Suggest birthday date ideas: surprise party planning, special dinner, gift hunting together, birthday cake making, photo spot visit`);
+    parts.push(`-> Categories: romantic, anniversary, surprise, memory`);
+  } else if (birthdayInfo.upcoming.length > 0) {
+    parts.push(`\n[Upcoming birthday] ${birthdayInfo.upcoming.join(', ')} -> Include at least 1 birthday-prep mission! (gift ideas, party planning, surprise preparation, reservation)`);
   }
 
   // === Minor Check ===

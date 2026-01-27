@@ -67,6 +67,7 @@
       "weddingAnniversary": "Aniversario de Boda",
       "datingAnniversary": "Noviazgo",
       "birthday": "Cumpleaños",
+      "birthdayWithName": "Cumpleaños de {{name}}",
       "lunar": "(Lunar)",
       "christmas": "Navidad",
       "valentinesDay": "San Valentín",
@@ -100,7 +101,7 @@
     "generating": "Generando...",
     "generatingMessage": "Creando tu misión",
     "pleaseWait": "Espera un momento",
-    "start": "Comenzar",
+    "start": "Empezar",
     "completed": "Completada",
     "kept": "Guardada",
     "keep": "Guardar",
@@ -162,7 +163,8 @@
       "adNotCompleted": "Anuncio No Completado",
       "adNotCompletedMessage": "Por favor, mira el anuncio completo para actualizar las misiones."
     },
-    "partnerWatchingAd": "Tu pareja está viendo un anuncio..."
+    "partnerWatchingAd": "Tu pareja está viendo un anuncio...",
+    "partnerWatchingAdWithName": "{{name}} está viendo\nun anuncio"
   },
   "missionDetail": {
     "headerTitle": "Detalles de Misión",
@@ -619,7 +621,7 @@
     "welcome": "Bienvenido",
     "welcomeTitle": "Bienvenido a\nDaydate",
     "welcomeSubtitle": "Registra y comparte tus momentos especiales\njuntos como pareja",
-    "start": "Comenzar",
+    "start": "Empezar",
     "skip": "Omitir",
     "complete": "Completar",
     "next": "Siguiente",
@@ -838,8 +840,8 @@
     "coupleSharing": "Compartir con pareja",
     "save27": "AHORRA 27%",
     "subscribe": "Suscribirse Ahora",
-    "subscribeAnnualCTA": "Comenzar con Plan Anual",
-    "subscribeMonthlyCTA": "Comenzar con Plan Mensual",
+    "subscribeAnnualCTA": "Empezar con Plan Anual",
+    "subscribeMonthlyCTA": "Empezar con Plan Mensual",
     "termsOfUse": "Términos de Uso",
     "paymentNoticeTitle": "Información de Pago",
     "paymentNotice1": "El pago se cargará a tu cuenta de App Store o Google Play tras la confirmación.",

@@ -36,6 +36,7 @@ import { updateUserLocationInDB, checkLocationPermission } from '@/lib/locationU
 import { initializeNetworkMonitoring, subscribeToNetwork } from '@/lib/useNetwork';
 import { offlineQueue } from '@/lib/offlineQueue';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { useWidgetSync } from '@/hooks/useWidgetSync';
 
 // Type for couple data from DB (includes timezone column)
 interface CoupleDbRow {
@@ -234,6 +235,9 @@ function RootLayoutNav() {
 
   // Initialize push notifications
   usePushNotifications();
+
+  // Sync widget data with completed missions (iOS only)
+  useWidgetSync();
 
   // Get signOut function from authStore
   const authSignOut = useAuthStore((state) => state.signOut);
@@ -1184,8 +1188,8 @@ function RootLayoutNav() {
   // Track if navigation has been performed to prevent re-navigation
   // Use ref instead of state to persist across hot reloads
   const hasNavigated = useRef(false);
-  // Track if Stack navigator is mounted
-  const isNavigatorMounted = useRef(false);
+  // Track if Stack navigator is mounted - USE STATE to trigger navigation effect re-run
+  const [isNavigatorMounted, setIsNavigatorMounted] = useState(false);
 
   // Calculate navigation state
   const inAuthGroup = segments?.[0] === '(auth)';
@@ -1203,7 +1207,7 @@ function RootLayoutNav() {
   useEffect(() => {
     if (!authHydrated || typeof isOnboardingComplete !== 'boolean') return;
     if (hasNavigated.current) return;
-    if (!isNavigatorMounted.current) return; // Wait for navigator to mount
+    if (!isNavigatorMounted) return; // Wait for navigator to mount
 
     if (needsNavigationToAuth) {
       hasNavigated.current = true;
@@ -1212,7 +1216,7 @@ function RootLayoutNav() {
       hasNavigated.current = true;
       router.replace('/');
     }
-  }, [authHydrated, isOnboardingComplete, needsNavigationToAuth, needsNavigationToTabs]);
+  }, [authHydrated, isOnboardingComplete, needsNavigationToAuth, needsNavigationToTabs, isNavigatorMounted]);
 
   // Reset navigation flag when onboarding state changes
   useEffect(() => {
@@ -1220,10 +1224,11 @@ function RootLayoutNav() {
   }, [isOnboardingComplete]);
 
   // Mark navigator as mounted when Stack renders
+  // Using state instead of ref ensures navigation effect re-runs when this changes
   useEffect(() => {
-    isNavigatorMounted.current = true;
+    setIsNavigatorMounted(true);
     return () => {
-      isNavigatorMounted.current = false;
+      setIsNavigatorMounted(false);
     };
   }, []);
 

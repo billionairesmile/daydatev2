@@ -173,7 +173,7 @@ export const FAQ_DATA: Record<'ko' | 'en' | 'es' | 'zh-TW' | 'ja', FAQItem[]> = 
     {
       id: 'es-3',
       question: '¿Cómo completo una misión?',
-      answer: "Toca el botón 'Comenzar' en una tarjeta de misión, toma una foto de verificación y escríbanse un mensaje mutuamente para completar la misión. La foto se guarda como un recuerdo solo para ustedes dos, así que capturen un momento memorable. El plan Gratis permite 1 misión completada por día, mientras que Premium ofrece completaciones ilimitadas.",
+      answer: "Toca el botón 'Empezar' en una tarjeta de misión, toma una foto de verificación y escríbanse un mensaje mutuamente para completar la misión. La foto se guarda como un recuerdo solo para ustedes dos, así que capturen un momento memorable. El plan Gratis permite 1 misión completada por día, mientras que Premium ofrece completaciones ilimitadas.",
       category: 'mission',
     },
     {
@@ -221,7 +221,7 @@ export const FAQ_DATA: Record<'ko' | 'en' | 'es' | 'zh-TW' | 'ja', FAQItem[]> = 
     {
       id: 'es-11',
       question: '¿Qué pasa si desemparejo?',
-      answer: 'Cuando se desempareja, ambos serán redirigidos a la pantalla de emparejamiento. Si vuelven a emparejarse con su pareja anterior en 30 días, todos los datos serán restaurados. Si se emparejan con una nueva pareja, comenzarán desde cero. Sin embargo, si alguno de los dos elimina su cuenta, la recuperación de datos no será posible.',
+      answer: 'Cuando se desempareja, ambos serán redirigidos a la pantalla de emparejamiento. Si vuelven a emparejarse con su pareja anterior en 30 días, todos los datos serán restaurados. Si se emparejan con una nueva pareja, empezarán desde cero. Sin embargo, si alguno de los dos elimina su cuenta, la recuperación de datos no será posible.',
       category: 'account',
     },
     {

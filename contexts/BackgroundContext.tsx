@@ -14,7 +14,7 @@ interface BackgroundContextType {
 }
 
 // Default background image
-const DEFAULT_BACKGROUND = require('@/assets/images/backgroundimage.jpg');
+const DEFAULT_BACKGROUND = require('@/assets/images/backgroundimage.png');
 const BACKGROUND_STORAGE_KEY = '@daydate_background_image';
 
 const BackgroundContext = createContext<BackgroundContextType | undefined>(undefined);

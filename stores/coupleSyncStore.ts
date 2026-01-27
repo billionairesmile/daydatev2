@@ -124,7 +124,7 @@ export interface SharedMissionData {
   status: string;
 }
 
-type MissionGenerationStatus = 'idle' | 'generating' | 'ad_pending' | 'completed';
+type MissionGenerationStatus = 'idle' | 'generating' | 'ad_watching' | 'completed';
 
 interface CoupleSyncState {
   // Connection
@@ -201,6 +201,7 @@ interface CoupleSyncActions {
   commitPendingMissions: (partnerId?: string, userNickname?: string) => Promise<void>;
   rollbackPendingMissions: () => Promise<void>;
   hasPendingMissions: () => boolean;
+  setAdWatchingStatus: () => Promise<boolean>;
 
   // Mission reminder notification
   sendMissionReminderNotifications: (userNickname: string, partnerNickname: string) => Promise<void>;
@@ -927,6 +928,37 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     set({ missionGenerationStatus: status, generatingUserId: null });
   },
 
+  // Set ad watching status (when user is watching rewarded ad before mission generation)
+  // This is a lightweight lock that doesn't save any pending missions
+  // Partner sees this status and knows to wait, but keeps their existing mission cards
+  setAdWatchingStatus: async () => {
+    const { coupleId, userId } = get();
+
+    if (!coupleId || !userId || isInTestMode()) {
+      set({
+        missionGenerationStatus: 'ad_watching',
+        generatingUserId: userId,
+      });
+      return true;
+    }
+
+    // Update lock table with ad_watching status (no missions, just status)
+    const { error } = await db.missionLock.updateStatus(coupleId, 'ad_watching', userId);
+
+    if (error) {
+      console.error('[CoupleSyncStore] Failed to set ad_watching status:', error);
+      return false;
+    }
+
+    set({
+      missionGenerationStatus: 'ad_watching',
+      generatingUserId: userId,
+    });
+
+    console.log('[CoupleSyncStore] Set ad_watching status - partner will see waiting state');
+    return true;
+  },
+
   // ============================================
   // PENDING MISSION MANAGEMENT (for ad-gated refresh)
   // ============================================
@@ -939,7 +971,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       set({
         pendingMissions: missions,
         pendingMissionsAnswers: answers,
-        missionGenerationStatus: 'ad_pending',
+        missionGenerationStatus: 'ad_watching',
         generatingUserId: userId,
       });
       return;
@@ -955,7 +987,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     set({
       pendingMissions: missions,
       pendingMissionsAnswers: answers,
-      missionGenerationStatus: 'ad_pending',
+      missionGenerationStatus: 'ad_watching',
       generatingUserId: userId,
     });
 
@@ -1159,9 +1191,9 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
         }
       }
 
-      // Handle 'ad_pending' status (when partner is watching ad or user closed app during ad)
+      // Handle 'ad_watching' status (when partner is watching ad or user closed app during ad)
       // Uses 3-minute timeout since ads typically complete within 30 seconds to 2 minutes
-      if (lockData && lockData.status === 'ad_pending') {
+      if (lockData && lockData.status === 'ad_watching') {
         const lockTime = lockData.locked_at ? new Date(lockData.locked_at) : null;
         const threeMinutesAgo = new Date(Date.now() - 3 * 60 * 1000);
 
@@ -1169,12 +1201,12 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
           // Lock is fresh (< 3 min) - partner might still be watching ad
           // Set state so UI shows loading/waiting state
           set({
-            missionGenerationStatus: 'ad_pending',
+            missionGenerationStatus: 'ad_watching',
             generatingUserId: lockData.locked_by,
           });
         } else {
           // Lock is stale (> 3 min) - ad viewing was likely abandoned
-          console.log('[CoupleSyncStore] Stale ad_pending lock detected (>3min), cleaning up');
+          console.log('[CoupleSyncStore] Stale ad_watching lock detected (>3min), cleaning up');
           await db.missionLock.clearPending(coupleId);
           await db.missionLock.release(coupleId, 'idle');
           set({
