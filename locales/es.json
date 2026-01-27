@@ -88,6 +88,7 @@
       "description": "Toca este botón para personalizar\nel fondo con tu foto de pareja"
     },
     "share": {
+      "dialogTitle": "Compartir",
       "savedTitle": "Guardado",
       "savedAndShareFromGallery": "La imagen se ha guardado en la galería. Puedes compartirla desde ahí.",
       "permissionDenied": "Se requiere permiso de acceso a la galería."
@@ -823,7 +824,7 @@
   },
   "premium": {
     "title": "Premium",
-    "subtitle": "Premium para citas más especiales",
+    "subtitle": "Disfruta juntos sin límites",
     "heroTitle": "DayDate Premium",
     "heroSubtitle": "Disfruta de citas más especiales con tu pareja",
     "heroTitleNew": "Desbloquea\nFunciones Premium",

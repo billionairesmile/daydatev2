@@ -88,6 +88,7 @@
       "description": "Tap this button to customize\nthe background with your couple photo"
     },
     "share": {
+      "dialogTitle": "Share",
       "savedTitle": "Saved",
       "savedAndShareFromGallery": "Image saved to gallery. You can share it from your gallery.",
       "permissionDenied": "Gallery access permission is required."
@@ -828,7 +829,7 @@
   },
   "premium": {
     "title": "Premium",
-    "subtitle": "Premium for more special dates",
+    "subtitle": "Enjoy together without limits",
     "heroTitle": "DayDate Premium",
     "heroSubtitle": "Enjoy more special dates with your partner",
     "heroTitleNew": "Unlock\nPremium Features",

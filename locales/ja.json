@@ -88,6 +88,7 @@
       "description": "このボタンを押してカップル写真で\n背景をカスタマイズできます"
     },
     "share": {
+      "dialogTitle": "共有する",
       "savedTitle": "保存完了",
       "savedAndShareFromGallery": "画像がギャラリーに保存されました。ギャラリーから共有できます。",
       "permissionDenied": "ギャラリーへのアクセス権限が必要です。"
@@ -826,7 +827,7 @@
   },
   "premium": {
     "title": "プレミアム",
-    "subtitle": "より特別なデートのためのプレミアム",
+    "subtitle": "制限なく一緒に楽しもう",
     "heroTitle": "DayDate プレミアム",
     "heroSubtitle": "恋人ともっと特別なデートを楽しもう",
     "heroTitleNew": "今すぐ、\nプレミアムを始めましょう。",

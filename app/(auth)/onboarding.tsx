@@ -87,6 +87,10 @@ const HEIGHT_SCALE = Math.min(height / BASE_HEIGHT, 1);
 // Responsive size function - scales any size based on screen height
 const rh = (size: number): number => Math.round(size * HEIGHT_SCALE);
 
+// Android-specific extra bottom padding for onboarding buttons
+// Adds more space at the bottom on Android devices to move buttons further down
+const ANDROID_ONBOARDING_EXTRA_PADDING = Platform.OS === 'android' ? rh(24) : 0;
+
 // UUID v4 generator function
 const generateUUID = (): string => {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
@@ -4360,7 +4364,7 @@ function PreferencesIntroStep({
       </View>
 
       {/* Bottom button - consistent position with other steps */}
-      <View style={{ width: '100%', paddingBottom: rh(SPACING.lg) + ANDROID_BOTTOM_PADDING }}>
+      <View style={{ width: '100%', paddingBottom: rh(SPACING.lg) + ANDROID_BOTTOM_PADDING + ANDROID_ONBOARDING_EXTRA_PADDING }}>
         <Pressable style={[styles.primaryButton, styles.primaryButtonFullWidth]} onPress={onNext}>
           <Text style={styles.primaryButtonText}>{t('onboarding.preferencesIntro.startAnalysis')}</Text>
         </Pressable>
@@ -4687,7 +4691,7 @@ function CompleteStep({
         </Text>
       </View>
 
-      <View style={{ width: '100%', paddingBottom: rh(SPACING.lg) + ANDROID_BOTTOM_PADDING }}>
+      <View style={{ width: '100%', paddingBottom: rh(SPACING.lg) + ANDROID_BOTTOM_PADDING + ANDROID_ONBOARDING_EXTRA_PADDING }}>
         <Pressable style={[styles.primaryButton, styles.primaryButtonFullWidth]} onPress={onComplete}>
           <Text style={styles.primaryButtonText}>{t('onboarding.start')}</Text>
         </Pressable>
@@ -4839,7 +4843,7 @@ const styles = StyleSheet.create({
   },
   welcomeBottomContainer: {
     width: '100%',
-    paddingBottom: scale(SPACING.lg) + ANDROID_BOTTOM_PADDING,
+    paddingBottom: scale(SPACING.lg) + ANDROID_BOTTOM_PADDING + ANDROID_ONBOARDING_EXTRA_PADDING,
   },
   welcomeSubtitle: {
     fontFamily: TYPOGRAPHY.fontFamily.display,
@@ -4874,7 +4878,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingBottom: scale(SPACING.lg) + ANDROID_BOTTOM_PADDING,
+    paddingBottom: scale(SPACING.lg) + ANDROID_BOTTOM_PADDING + ANDROID_ONBOARDING_EXTRA_PADDING,
   },
   welcomeContent: {
     flex: 1,
@@ -4981,7 +4985,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: rh(12),
     width: '100%',
-    paddingBottom: ANDROID_BOTTOM_PADDING,
+    paddingBottom: ANDROID_BOTTOM_PADDING + ANDROID_ONBOARDING_EXTRA_PADDING,
   },
   buttonFlex: {
     flex: 1,

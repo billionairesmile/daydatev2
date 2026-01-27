@@ -88,6 +88,7 @@
       "description": "이 버튼을 눌러 커플 사진으로\n배경을 꾸밀 수 있어요"
     },
     "share": {
+      "dialogTitle": "공유하기",
       "savedTitle": "저장 완료",
       "savedAndShareFromGallery": "이미지가 갤러리에 저장되었습니다. 갤러리에서 공유할 수 있습니다.",
       "permissionDenied": "갤러리 접근 권한이 필요합니다."
@@ -828,7 +829,7 @@
   },
   "premium": {
     "title": "프리미엄",
-    "subtitle": "더 특별한 데이트를 위한 프리미엄",
+    "subtitle": "제한 없이 함께 즐기기",
     "heroTitle": "DayDate 프리미엄",
     "heroSubtitle": "연인과 더 특별한 데이트를 즐겨보세요",
     "heroTitleNew": "지금,\n프리미엄을 시작하세요.",

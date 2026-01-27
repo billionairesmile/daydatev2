@@ -88,6 +88,7 @@
       "description": "點擊這個按鈕\n可以用情侶照片裝飾背景"
     },
     "share": {
+      "dialogTitle": "分享",
       "savedTitle": "已儲存",
       "savedAndShareFromGallery": "圖片已儲存至相簿。您可以從相簿分享。",
       "permissionDenied": "需要相簿存取權限。"
@@ -823,7 +824,7 @@
   },
   "premium": {
     "title": "Premium",
-    "subtitle": "為更特別的約會而設的Premium",
+    "subtitle": "無限制一起享受",
     "heroTitle": "DayDate Premium",
     "heroSubtitle": "與伴侶享受更特別的約會",
     "heroTitleNew": "現在，\n開始 Premium 方案。",

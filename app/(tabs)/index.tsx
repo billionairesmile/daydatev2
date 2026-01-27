@@ -477,7 +477,8 @@ export default function HomeScreen() {
 
       // Calculate crop area from top line to bottom line (full screen width, convert points to pixels)
       // Add offset to move capture area down slightly (matching content position adjustment)
-      const captureOffsetY = rh(15); // Responsive offset to shift capture down
+      // Android needs more offset to move capture area further down
+      const captureOffsetY = Platform.OS === 'android' ? rh(50) : rh(15); // Responsive offset to shift capture down
       const cropX = 0;
       const cropY = Math.max(0, Math.round((topMeasurement.y - topPadding + captureOffsetY) * pixelScale));
       const cropWidth = Math.round(SCREEN_WIDTH * pixelScale);
@@ -527,27 +528,36 @@ export default function HomeScreen() {
       setCapturedContentSize(null);
 
       if (Platform.OS === 'ios') {
-        // iOS: Share directly using file URI (no need to save to gallery first)
+        // iOS: Share directly using file URI
         await Share.share({
           url: brandedImage,
         });
       } else {
-        // Android: Need to save to gallery first, then user can share from there
-        // Request permission first
-        const { status } = await MediaLibrary.requestPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert(t('common.error'), t('home.share.permissionDenied'));
-          return;
+        // Android: Use expo-sharing to show native share sheet (dynamic import to avoid iOS crash)
+        try {
+          const Sharing = await import('expo-sharing');
+          const isAvailable = await Sharing.isAvailableAsync();
+          if (isAvailable) {
+            await Sharing.shareAsync(brandedImage, {
+              mimeType: 'image/png',
+              dialogTitle: t('home.share.dialogTitle'),
+            });
+          } else {
+            throw new Error('Sharing not available');
+          }
+        } catch {
+          // Fallback: Save to gallery if sharing is not available
+          const { status } = await MediaLibrary.requestPermissionsAsync();
+          if (status !== 'granted') {
+            Alert.alert(t('common.error'), t('home.share.permissionDenied'));
+            return;
+          }
+          await MediaLibrary.createAssetAsync(brandedImage);
+          Alert.alert(
+            t('home.share.savedTitle'),
+            t('home.share.savedAndShareFromGallery')
+          );
         }
-
-        // Save to gallery
-        await MediaLibrary.createAssetAsync(brandedImage);
-
-        // Notify user that image is saved and they can share from gallery
-        Alert.alert(
-          t('home.share.savedTitle'),
-          t('home.share.savedAndShareFromGallery')
-        );
       }
     } catch (error) {
       console.error('Error sharing:', error);
