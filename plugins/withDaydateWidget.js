@@ -2,13 +2,13 @@
  * Expo Config Plugin for Daydate Widget
  *
  * This plugin configures the iOS widget extension for the Daydate app.
- * It adds the widget target to the Xcode project and configures App Groups.
+ * It copies widget source files and configures the Xcode project.
  */
 
 const {
   withXcodeProject,
   withEntitlementsPlist,
-  withInfoPlist,
+  withDangerousMod,
 } = require('@expo/config-plugins');
 const path = require('path');
 const fs = require('fs');
@@ -17,6 +17,74 @@ const fs = require('fs');
 const WIDGET_NAME = 'DaydateWidget';
 const WIDGET_BUNDLE_ID = 'com.daydate.app.widget';
 const APP_GROUP_ID = 'group.com.daydate.app';
+
+/**
+ * Copy directory recursively
+ */
+function copyDirSync(src, dest) {
+  if (!fs.existsSync(src)) {
+    console.warn(`[withDaydateWidget] Source directory not found: ${src}`);
+    return false;
+  }
+
+  if (!fs.existsSync(dest)) {
+    fs.mkdirSync(dest, { recursive: true });
+  }
+
+  const entries = fs.readdirSync(src, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+
+    if (entry.isDirectory()) {
+      copyDirSync(srcPath, destPath);
+    } else {
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Copy widget source files to ios directory
+ */
+function withWidgetSourceFiles(config) {
+  return withDangerousMod(config, [
+    'ios',
+    async (modConfig) => {
+      const projectRoot = modConfig.modRequest.projectRoot;
+      const nativeWidgetsPath = path.join(projectRoot, 'native-widgets', 'ios');
+      const iosPath = path.join(projectRoot, 'ios');
+      const appName = modConfig.modRequest.projectName || 'Daydate';
+
+      // Copy DaydateWidget folder
+      const widgetSrc = path.join(nativeWidgetsPath, WIDGET_NAME);
+      const widgetDest = path.join(iosPath, WIDGET_NAME);
+
+      if (copyDirSync(widgetSrc, widgetDest)) {
+        console.log(`[withDaydateWidget] Copied widget files to ${widgetDest}`);
+      }
+
+      // Copy WidgetDataModule files to main app folder
+      const mainAppPath = path.join(iosPath, appName);
+
+      const moduleFiles = ['WidgetDataModule.swift', 'WidgetDataModule.m'];
+      for (const file of moduleFiles) {
+        const srcFile = path.join(nativeWidgetsPath, file);
+        const destFile = path.join(mainAppPath, file);
+
+        if (fs.existsSync(srcFile)) {
+          fs.copyFileSync(srcFile, destFile);
+          console.log(`[withDaydateWidget] Copied ${file} to ${mainAppPath}`);
+        }
+      }
+
+      return modConfig;
+    },
+  ]);
+}
 
 /**
  * Add App Groups entitlement to main app
@@ -36,6 +104,8 @@ function withWidgetExtension(config) {
     const xcodeProject = modConfig.modResults;
     const projectRoot = modConfig.modRequest.projectRoot;
     const widgetPath = path.join(projectRoot, 'ios', WIDGET_NAME);
+    const appName = modConfig.modRequest.projectName || 'Daydate';
+    const mainAppPath = path.join(projectRoot, 'ios', appName);
 
     // Check if widget files exist
     if (!fs.existsSync(widgetPath)) {
@@ -48,6 +118,18 @@ function withWidgetExtension(config) {
     if (!mainTarget) {
       console.warn('[withDaydateWidget] Could not find main app target');
       return modConfig;
+    }
+
+    // Add WidgetDataModule files to main app target
+    const nativeModuleFiles = ['WidgetDataModule.swift', 'WidgetDataModule.m'];
+    for (const file of nativeModuleFiles) {
+      const filePath = path.join(mainAppPath, file);
+      if (fs.existsSync(filePath)) {
+        // Check if file already in project
+        const fileRef = xcodeProject.getFirstProject().firstProject.mainGroup;
+        xcodeProject.addSourceFile(file, { target: mainTarget.uuid }, appName);
+        console.log(`[withDaydateWidget] Added ${file} to main app target`);
+      }
     }
 
     // Check if widget target already exists
@@ -92,13 +174,6 @@ function withWidgetExtension(config) {
       xcodeProject.addSourceFile(filePath, null, widgetTarget.uuid);
     });
 
-    // Add Assets.xcassets
-    xcodeProject.addResourceFile(
-      path.join(WIDGET_NAME, 'Assets.xcassets'),
-      null,
-      widgetTarget.uuid
-    );
-
     // Set build settings for widget
     const buildSettings = {
       ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME: 'WidgetBackground',
@@ -128,7 +203,6 @@ function withWidgetExtension(config) {
     Object.keys(configurations).forEach((key) => {
       const config = configurations[key];
       if (config.buildSettings && config.name) {
-        // Find widget target configurations
         const targetName = config.buildSettings.PRODUCT_NAME;
         if (targetName === '$(TARGET_NAME)' || targetName === WIDGET_NAME) {
           Object.assign(config.buildSettings, buildSettings);
@@ -154,10 +228,13 @@ function withWidgetExtension(config) {
  * Main plugin function
  */
 function withDaydateWidget(config) {
-  // Add App Groups entitlement
+  // Step 1: Copy source files (runs first during prebuild)
+  config = withWidgetSourceFiles(config);
+
+  // Step 2: Add App Groups entitlement
   config = withAppGroupsEntitlement(config);
 
-  // Add widget extension
+  // Step 3: Add widget extension to Xcode project
   config = withWidgetExtension(config);
 
   return config;
