@@ -9,6 +9,7 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "@callstack/liquid-glass": "^0.7.0",
     "@expo-google-fonts/anton": "^0.4.2",
     "@expo-google-fonts/bricolage-grotesque": "^0.4.1",
     "@expo-google-fonts/chiron-goround-tc": "^0.4.0",
@@ -43,6 +44,7 @@
     "expo-device": "~8.0.10",
     "expo-file-system": "~19.0.20",
     "expo-font": "~14.0.9",
+    "expo-glass-effect": "^0.1.8",
     "expo-haptics": "~15.0.8",
     "expo-image": "~3.0.11",
     "expo-image-manipulator": "~14.0.8",
@@ -90,6 +92,8 @@
     "zustand": "^5.0.8"
   },
   "devDependencies": {
+    "@expo/config-plugins": "^54.0.4",
+    "@expo/ngrok": "^4.1.0",
     "@types/react": "~19.1.0",
     "babel-plugin-transform-remove-console": "^6.9.4",
     "jsonwebtoken": "^9.0.3",

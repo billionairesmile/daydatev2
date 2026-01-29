@@ -199,6 +199,7 @@ export default function MoreScreen() {
       {Platform.OS === 'android' && (
         <BannerAdView placement="home" style={[styles.bannerAd, { bottom: bannerAdBottom }]} />
       )}
+
     </View>
   );
 }

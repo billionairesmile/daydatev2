@@ -1844,6 +1844,7 @@ export default function MissionScreen() {
       {Platform.OS === 'android' && (
         <BannerAdView placement="home" style={[styles.bannerAd, { bottom: bannerAdBottom }]} />
       )}
+
     </View>
   );
 }
@@ -2086,6 +2087,15 @@ function MissionCardContent({ mission, onStartPress, onKeepPress, isKept, canSta
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: COLORS.black,
+  },
+  tabBarBackground: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 120,
+    zIndex: 50,
   },
   // Android PagerView styles
   androidPagerContainer: {

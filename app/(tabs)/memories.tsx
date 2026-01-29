@@ -3934,6 +3934,7 @@ function PhotoDetailView({
           </Text>
         </View>
       </View>
+
     </View>
   );
 }
@@ -3941,6 +3942,7 @@ function PhotoDetailView({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: COLORS.black,
   },
   bannerAd: {
     position: 'absolute',
