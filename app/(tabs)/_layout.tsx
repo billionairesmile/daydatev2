@@ -5,6 +5,7 @@ import { BlurView } from 'expo-blur';
 import { Target, BookHeart, Home, Calendar, Menu } from 'lucide-react-native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useTranslation } from 'react-i18next';
+import * as Haptics from 'expo-haptics';
 
 import { COLORS, IS_TABLET, scale, scaleFont } from '@/constants/design';
 import { useTabBarBottom } from '@/hooks/useConsistentBottomInset';
@@ -149,6 +150,11 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
                 const isFocused = state.index === index;
 
                 const onPress = () => {
+                  // 가벼운 햅틱 피드백 (iOS & Android 모두 지원)
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {
+                    // 네이티브 모듈 미연결 시 무시
+                  });
+
                   const event = navigation.emit({
                     type: 'tabPress',
                     target: route.key,

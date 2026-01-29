@@ -49,7 +49,16 @@ import {
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
-import { COLORS, SPACING, RADIUS, TYPOGRAPHY, ANDROID_BOTTOM_PADDING, hp, rs, fp, SCREEN_HEIGHT } from '@/constants/design';
+import { COLORS, SPACING, RADIUS, TYPOGRAPHY, ANDROID_BOTTOM_PADDING, hp, rs, fp, SCREEN_HEIGHT, isFoldableDevice } from '@/constants/design';
+
+// Z Flip responsive sizing for user status section
+const IS_ZFLIP = Platform.OS === 'android' && isFoldableDevice();
+const ZFLIP_USER_ICON_SIZE = IS_ZFLIP ? 21 : 24;
+const ZFLIP_USER_LABEL_SIZE = IS_ZFLIP ? 10 : 10;
+const ZFLIP_USER_STATUS_SIZE = IS_ZFLIP ? 12 : 12;
+const ZFLIP_USER_PADDING = IS_ZFLIP ? 8 : 10;
+const ZFLIP_USER_GAP = IS_ZFLIP ? 6 : 8;
+const ZFLIP_USER_ICON_INNER = IS_ZFLIP ? 13 : 14;
 import { useMissionStore } from '@/stores/missionStore';
 import { setReturningFromBookmark } from '@/app/(tabs)/mission';
 import { useMemoryStore } from '@/stores/memoryStore';
@@ -231,7 +240,11 @@ export default function MissionDetailScreen() {
   const todayMissions = getTodayMissions();
 
   // Get couple info for DB storage
-  const { couple, user } = useAuthStore();
+  const { couple, user, partner } = useAuthStore();
+
+  // Get nicknames for display
+  const myNickname = user?.nickname || t('common.me');
+  const partnerNickname = partner?.nickname || t('common.partner');
 
   // Get mission progress sync store
   const {
@@ -1137,6 +1150,14 @@ export default function MissionDetailScreen() {
     }
   };
 
+  const handleEditMessage = () => {
+    // Allow editing if message exists and mission is not complete
+    if (user1Message && !isComplete) {
+      setMessageText(user1Message);
+      setShowMessageModal(true);
+    }
+  };
+
   const handleAddMessage = async () => {
     if (messageText.trim()) {
       const message = messageText.trim();
@@ -1838,7 +1859,11 @@ export default function MissionDetailScreen() {
 
                     {/* User Status Cards */}
                     <View style={styles.userStatusContainer}>
-                      <View style={styles.userStatus}>
+                      <Pressable
+                        style={styles.userStatus}
+                        onPress={user1Message && !isComplete ? handleEditMessage : undefined}
+                        disabled={!user1Message || !!isComplete}
+                      >
                         <View
                           style={[
                             styles.userIcon,
@@ -1847,11 +1872,11 @@ export default function MissionDetailScreen() {
                         >
                           <User
                             color={user1Message ? '#86efac' : 'rgba(255,255,255,0.5)'}
-                            size={14}
+                            size={ZFLIP_USER_ICON_INNER}
                           />
                         </View>
                         <View style={styles.userInfo}>
-                          <Text style={styles.userLabel}>{t('common.me')}</Text>
+                          <Text style={styles.userLabel}>{myNickname}</Text>
                           <Text
                             style={[
                               styles.userStatusText,
@@ -1861,7 +1886,7 @@ export default function MissionDetailScreen() {
                             {user1Message ? t('missionDetail.steps.message.written') : t('missionDetail.steps.message.notWritten')}
                           </Text>
                         </View>
-                      </View>
+                      </Pressable>
                       <View style={styles.userStatus}>
                         <View
                           style={[
@@ -1871,11 +1896,11 @@ export default function MissionDetailScreen() {
                         >
                           <User
                             color={user2Message ? '#86efac' : 'rgba(255,255,255,0.5)'}
-                            size={14}
+                            size={ZFLIP_USER_ICON_INNER}
                           />
                         </View>
                         <View style={styles.userInfo}>
-                          <Text style={styles.userLabel}>{t('common.partner')}</Text>
+                          <Text style={styles.userLabel}>{partnerNickname}</Text>
                           <Text
                             style={[
                               styles.userStatusText,
@@ -1956,9 +1981,10 @@ export default function MissionDetailScreen() {
         transparent
         animationType="fade"
         onRequestClose={() => setShowMessageModal(false)}
+        statusBarTranslucent={Platform.OS === 'android'}
       >
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior="padding"
           keyboardVerticalOffset={Platform.OS === 'ios' ? -100 : 0}
           style={styles.modalOverlay}
         >
@@ -1966,7 +1992,7 @@ export default function MissionDetailScreen() {
             style={styles.modalBackdrop}
             onPress={() => setShowMessageModal(false)}
           />
-          <View style={[styles.modalContainer, { width: width - 48 }]}>
+          <View style={[styles.modalContainer, { width: width - 48, marginBottom: Platform.OS === 'android' ? 20 : 0 }]}>
             <BlurView experimentalBlurMethod="dimezisBlurView" intensity={60} tint="dark" style={styles.modalBlur}>
               <View style={styles.modalContent}>
                 {/* Modal Header */}
@@ -2368,24 +2394,24 @@ const styles = StyleSheet.create({
   },
   userStatusContainer: {
     flexDirection: 'row',
-    marginTop: 12,
-    gap: 8,
+    marginTop: IS_ZFLIP ? 8 : 12,
+    gap: ZFLIP_USER_GAP,
   },
   userStatus: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 10,
+    padding: ZFLIP_USER_PADDING,
     backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: 100,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',
-    gap: 8,
+    gap: ZFLIP_USER_GAP,
   },
   userIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: ZFLIP_USER_ICON_SIZE,
+    height: ZFLIP_USER_ICON_SIZE,
+    borderRadius: ZFLIP_USER_ICON_SIZE / 2,
     backgroundColor: 'rgba(255,255,255,0.2)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.3)',
@@ -2400,11 +2426,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   userLabel: {
-    fontSize: 10,
+    fontSize: ZFLIP_USER_LABEL_SIZE,
     color: 'rgba(255,255,255,0.7)',
   },
   userStatusText: {
-    fontSize: 12,
+    fontSize: ZFLIP_USER_STATUS_SIZE,
     color: 'rgba(255,255,255,0.5)',
     fontWeight: '500',
   },
@@ -2534,7 +2560,7 @@ const styles = StyleSheet.create({
   bottomContent: {
     paddingHorizontal: SPACING.lg,
     paddingTop: SPACING.md,
-    paddingBottom: 28 + ANDROID_BOTTOM_PADDING,
+    paddingBottom: Platform.OS === 'android' ? 48 + ANDROID_BOTTOM_PADDING : 28,
     // Transparent background - no background
   },
   ctaButton: {

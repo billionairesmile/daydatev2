@@ -98,6 +98,11 @@
   "mission": {
     "title": "Mission",
     "subtitle": "What moments will you share today?",
+    "emptyState": {
+      "line1": "Ready for today's",
+      "line2": "mission?",
+      "button": "Get Started"
+    },
     "generate": "Get Missions",
     "generating": "Generating...",
     "generatingMessage": "Creating your mission",

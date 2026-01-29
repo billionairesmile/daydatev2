@@ -15,7 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ChevronLeft, Bookmark, Trash2, Check } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
-import { COLORS, SPACING } from '@/constants/design';
+import { COLORS, SPACING, isFoldableDevice } from '@/constants/design';
 import { useMissionStore } from '@/stores/missionStore';
 import { useCoupleSyncStore, type SyncedBookmark } from '@/stores/coupleSyncStore';
 import type { KeptMission, Mission } from '@/types';
@@ -23,6 +23,14 @@ import type { KeptMission, Mission } from '@/types';
 interface BookmarkedMissionsPageProps {
   onBack: () => void;
 }
+
+// Z Flip responsive sizing
+const IS_ZFLIP = Platform.OS === 'android' && isFoldableDevice();
+const ZFLIP_TITLE_SIZE = IS_ZFLIP ? 15 : 16;
+const ZFLIP_DESC_SIZE = IS_ZFLIP ? 12 : 13;
+const ZFLIP_BUTTON_HEIGHT = IS_ZFLIP ? 35 : 40;
+const ZFLIP_BUTTON_TEXT_SIZE = IS_ZFLIP ? 12 : 14;
+const ZFLIP_DELETE_ICON_SIZE = IS_ZFLIP ? 15 : 18;
 
 // Union type for both local and synced bookmarks
 type BookmarkItem = KeptMission | SyncedBookmark;
@@ -127,8 +135,8 @@ export function BookmarkedMissionsPage({ onBack }: BookmarkedMissionsPageProps) 
       {/* Blurred Background Overlay */}
       <BlurView
         experimentalBlurMethod="dimezisBlurView"
-        intensity={60}
-        tint="default"
+        intensity={Platform.OS === 'android' ? 40 : 60}
+        tint={Platform.OS === 'android' ? 'light' : 'default'}
         style={styles.blurOverlay}
       />
       <View style={styles.darkOverlay} />
@@ -172,7 +180,7 @@ export function BookmarkedMissionsPage({ onBack }: BookmarkedMissionsPageProps) 
 
             return (
               <View key={bookmarkId} style={styles.missionCard}>
-                <BlurView experimentalBlurMethod="dimezisBlurView" intensity={60} tint="default" style={StyleSheet.absoluteFill} />
+                <BlurView experimentalBlurMethod="dimezisBlurView" intensity={60} tint={Platform.OS === 'android' ? 'dark' : 'default'} style={StyleSheet.absoluteFill} />
                 <View style={styles.cardDarkOverlay} />
 
                 {/* Completed Badge */}
@@ -252,7 +260,7 @@ export function BookmarkedMissionsPage({ onBack }: BookmarkedMissionsPageProps) 
                       >
                         <Trash2
                           color={!canDelete ? 'rgba(255, 255, 255, 0.4)' : COLORS.white}
-                          size={18}
+                          size={ZFLIP_DELETE_ICON_SIZE}
                         />
                       </Pressable>
                     </View>
@@ -378,18 +386,18 @@ const styles = StyleSheet.create({
     // justifyContent: 'space-between' 제거 - 컨텐츠를 자연스럽게 쌓아서 높이 축소
   },
   missionTitle: {
-    fontSize: 16,
+    fontSize: ZFLIP_TITLE_SIZE,
     color: COLORS.white,
     fontWeight: '600',
-    lineHeight: 21,
-    marginBottom: 4,
+    lineHeight: IS_ZFLIP ? 17 : 21,
+    marginBottom: IS_ZFLIP ? 4 : 4,
   },
   missionDescription: {
-    fontSize: 13,
+    fontSize: ZFLIP_DESC_SIZE,
     color: 'rgba(255, 255, 255, 0.6)',
     fontWeight: '400',
-    lineHeight: 18,
-    marginBottom: 12,
+    lineHeight: IS_ZFLIP ? 15 : 18,
+    marginBottom: IS_ZFLIP ? 12 : 12,
   },
   actionButtonsRow: {
     flexDirection: 'row',
@@ -397,16 +405,16 @@ const styles = StyleSheet.create({
   },
   startButton: {
     flex: 1,
-    height: 40,
+    height: ZFLIP_BUTTON_HEIGHT,
     borderRadius: 100,
     backgroundColor: COLORS.white,
     alignItems: 'center',
     justifyContent: 'center',
   },
   deleteButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: ZFLIP_BUTTON_HEIGHT,
+    height: ZFLIP_BUTTON_HEIGHT,
+    borderRadius: ZFLIP_BUTTON_HEIGHT / 2,
     backgroundColor: '#FF4444',
     alignItems: 'center',
     justifyContent: 'center',
@@ -416,7 +424,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   startButtonText: {
-    fontSize: 14,
+    fontSize: ZFLIP_BUTTON_TEXT_SIZE,
     color: COLORS.black,
     fontWeight: '600',
   },

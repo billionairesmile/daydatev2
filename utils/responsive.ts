@@ -92,10 +92,18 @@ export const isSmallDevice = (): boolean => SCREEN_WIDTH < 375;
 export const isLargeDevice = (): boolean => SCREEN_WIDTH > 428;
 export const isCompactHeight = (): boolean => SCREEN_HEIGHT < 700;
 
+// Foldable device detection (Galaxy Z Flip, etc.)
+// Foldables have narrower screens with high aspect ratios
+export const aspectRatio = SCREEN_HEIGHT / SCREEN_WIDTH;
+export const isFoldableDevice = (): boolean => {
+  // Foldable phones typically have narrow width (< 385) and high aspect ratio (> 2.0)
+  return SCREEN_WIDTH < 385 && aspectRatio > 2.0;
+};
+
 // Platform-specific helpers
 export const isAndroid = Platform.OS === 'android';
 export const isIOS = Platform.OS === 'ios';
 
 // Android Navigation Bar Height (for bottom padding calculations)
 export const ANDROID_NAV_BAR_HEIGHT = isAndroid ? 48 : 0;
-export const ANDROID_BOTTOM_PADDING = isAndroid ? 32 : 0;
+export const ANDROID_BOTTOM_PADDING = isAndroid ? 16 : 0;

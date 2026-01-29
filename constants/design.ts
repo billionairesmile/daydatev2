@@ -15,6 +15,7 @@ import {
   isSmallDevice,
   isLargeDevice,
   isCompactHeight,
+  isFoldableDevice,
   ANDROID_NAV_BAR_HEIGHT as NAV_BAR_HEIGHT,
   ANDROID_BOTTOM_PADDING as BOTTOM_PADDING,
 } from '@/utils/responsive';
@@ -32,6 +33,7 @@ export {
   isSmallDevice,
   isLargeDevice,
   isCompactHeight,
+  isFoldableDevice,
 };
 
 // Android Navigation Bar Height (re-exported from responsive)
@@ -45,7 +47,7 @@ export const scaleFont = fp;
 
 // Legacy exports for backward compatibility (will be removed after full migration)
 export const IS_TABLET = false;
-export const IS_FOLDABLE = false;
+export const IS_FOLDABLE = isFoldableDevice();
 
 // ============================================
 // AUTO-SCALED DESIGN TOKENS

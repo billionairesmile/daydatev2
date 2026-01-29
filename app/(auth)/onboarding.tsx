@@ -20,7 +20,7 @@ import {
   Keyboard,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import {
   Heart,
@@ -88,8 +88,8 @@ const HEIGHT_SCALE = Math.min(height / BASE_HEIGHT, 1);
 const rh = (size: number): number => Math.round(size * HEIGHT_SCALE);
 
 // Android-specific extra bottom padding for onboarding buttons
-// Adds more space at the bottom on Android devices to move buttons further down
-const ANDROID_ONBOARDING_EXTRA_PADDING = Platform.OS === 'android' ? rh(24) : 0;
+// Minimal padding to position buttons just above the navigation bar
+const ANDROID_ONBOARDING_EXTRA_PADDING = Platform.OS === 'android' ? rh(8) : 0;
 
 // UUID v4 generator function
 const generateUUID = (): string => {
@@ -124,6 +124,7 @@ export default function OnboardingScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const { backgroundImage } = useBackground();
+  const insets = useSafeAreaInsets();
   const { setIsOnboardingComplete, updateNickname, setCouple, setUser, setPartner, setIsTestMode, user: currentUser, couple, isOnboardingComplete, isAuthenticated, _hasHydrated } = useAuthStore();
   const {
     currentStep,
@@ -1047,7 +1048,7 @@ export default function OnboardingScreen() {
   return (
     <KeyboardAvoidingView
       style={[styles.container, styles.whiteContainer]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior="padding"
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       enabled={effectiveStep !== 'basic_info' && effectiveStep !== 'pairing' && effectiveStep !== 'welcome'}
     >
@@ -1186,6 +1187,7 @@ export default function OnboardingScreen() {
               onBack={handlePairingBack}
               updateData={updateData}
               hideBackButton={isExistingUser}
+              bottomInset={insets.bottom}
             />
           )}
           {effectiveStep === 'basic_info' && (
@@ -1249,6 +1251,7 @@ export default function OnboardingScreen() {
             <PreferencesIntroStep
               onNext={handleNext}
               onBack={handleBack}
+              bottomInset={insets.bottom}
             />
           )}
           {effectiveStep === 'mbti' && (
@@ -2138,6 +2141,7 @@ function PairingStep({
   onBack,
   updateData,
   hideBackButton = false,
+  bottomInset = 0,
 }: {
   isCreatingCode: boolean;
   setIsCreatingCode: (value: boolean) => void;
@@ -2157,6 +2161,7 @@ function PairingStep({
   onBack: () => void;
   updateData: (data: Partial<OnboardingData>) => void;
   hideBackButton?: boolean;
+  bottomInset?: number;
 }) {
   const { t } = useTranslation();
   const [isLoading, setIsLoading] = React.useState(false);
@@ -4337,11 +4342,18 @@ function CoupleInfoStep({
 function PreferencesIntroStep({
   onNext,
   onBack,
+  bottomInset = 0,
 }: {
   onNext: () => void;
   onBack: () => void;
+  bottomInset?: number;
 }) {
   const { t } = useTranslation();
+  // Use consistent padding from styles
+  const bottomPadding = Platform.OS === 'android'
+    ? ANDROID_BOTTOM_PADDING + ANDROID_ONBOARDING_EXTRA_PADDING
+    : rh(SPACING.lg);
+
   return (
     <View style={styles.centeredStepContainer}>
       {/* Title fixed at top */}
@@ -4364,7 +4376,7 @@ function PreferencesIntroStep({
       </View>
 
       {/* Bottom button - consistent position with other steps */}
-      <View style={{ width: '100%', paddingBottom: rh(SPACING.lg) + ANDROID_BOTTOM_PADDING + ANDROID_ONBOARDING_EXTRA_PADDING }}>
+      <View style={{ width: '100%', paddingBottom: bottomPadding }}>
         <Pressable style={[styles.primaryButton, styles.primaryButtonFullWidth]} onPress={onNext}>
           <Text style={styles.primaryButtonText}>{t('onboarding.preferencesIntro.startAnalysis')}</Text>
         </Pressable>

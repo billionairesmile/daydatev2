@@ -17,6 +17,7 @@ import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
 import { getTodayInTimezone } from '@/stores/timezoneStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useSubscriptionStore } from '@/stores/subscriptionStore';
+import { useTimeValidationStore, getTimeDifferenceText } from '@/stores/timeValidationStore';
 import {
   checkLocationPermission,
   requestLocationPermission,
@@ -93,7 +94,7 @@ interface MissionActions {
   getTodayCompletedMissionId: () => string | null;
   isTodayCompletedMission: (missionId: string) => boolean;
   // Mission generation actions
-  generateTodayMissions: (answers: MissionGenerationAnswers, excludedMissions?: ExcludedMission[], options?: { deferSave?: boolean; forceRegenerate?: boolean }) => Promise<{ status: 'success' | 'pending_success' | 'locked' | 'exists' | 'location_required' | 'preferences_required' | 'limit_reached'; message?: string }>;
+  generateTodayMissions: (answers: MissionGenerationAnswers, excludedMissions?: ExcludedMission[], options?: { deferSave?: boolean; forceRegenerate?: boolean }) => Promise<{ status: 'success' | 'pending_success' | 'locked' | 'exists' | 'location_required' | 'preferences_required' | 'limit_reached' | 'time_invalid'; message?: string }>;
   hasTodayMissions: () => boolean;
   getTodayMissions: () => Mission[];
   checkAndResetMissions: () => void;
@@ -398,6 +399,25 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
         const { user, partner } = useAuthStore.getState();
 
         try {
+          // SECURITY: Validate device time against server time
+          // Block mission generation if time difference > 1 hour
+          const timeValidation = useTimeValidationStore.getState();
+          const isTimeValid = await timeValidation.validateTime();
+
+          if (!isTimeValid) {
+            const timeDiffText = getTimeDifferenceText(timeValidation.timeDifferenceMs);
+            console.warn('[MissionStore] Device time manipulation detected:', timeDiffText);
+            Alert.alert(
+              '시간 설정 오류',
+              `기기 시간이 서버 시간과 ${timeDiffText} 이상 차이가 납니다.\n\n정확한 미션 서비스 이용을 위해 기기의 '자동 날짜 및 시간' 설정을 활성화해 주세요.`,
+              [{ text: '확인' }]
+            );
+            return {
+              status: 'time_invalid' as const,
+              message: '기기 시간이 올바르지 않습니다.',
+            };
+          }
+
           // Check if partner has completed onboarding (required for mission generation)
           if (partner?.id) {
             const { data: partnerProfile } = await db.profiles.get(partner.id);

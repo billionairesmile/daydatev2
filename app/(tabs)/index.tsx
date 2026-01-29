@@ -55,15 +55,36 @@ Asset.fromModule(DEFAULT_BACKGROUND_IMAGE).downloadAsync();
 // Base: iPhone 16 (393px width) with 280px polaroid = 71.2% ratio
 const POLAROID_BASE_WIDTH = 280;
 
+// Detect Android screen types by aspect ratio
+// Galaxy S24: 1080x2340 = aspect ratio 2.17 (needs reduced content)
+// Z Flip: 1080x2640 = aspect ratio 2.44 (needs original larger content)
+const SCREEN_ASPECT_RATIO = SCREEN_HEIGHT / SCREEN_WIDTH;
+
+// Galaxy S24 type: aspect ratio 2.0 ~ 2.3 (tall but not ultra-tall)
+const isGalaxyS24Type = Platform.OS === 'android' && SCREEN_ASPECT_RATIO > 2.0 && SCREEN_ASPECT_RATIO <= 2.3;
+// Z Flip type: aspect ratio > 2.3 (ultra-tall foldable screens)
+const isZFlipType = Platform.OS === 'android' && SCREEN_ASPECT_RATIO > 2.3;
+// Legacy alias for backward compatibility
+const isTallAndroidScreen = isGalaxyS24Type;
+
 // Calculate responsive polaroid width and scale factor
 // For compact screens (height < 700), use smaller ratio
-// Android: slightly larger ratio (0.75) for better visual balance
-const POLAROID_WIDTH_RATIO = isCompactHeight() ? 0.55 : (Platform.OS === 'android' ? 0.75 : 0.712);
+// Galaxy S24 type (2.0-2.3 ratio): 0.62 ratio for better fit
+// Z Flip type (>2.3 ratio): 0.72 ratio (original size works better)
+// Android normal screens: 0.72 ratio
+// iOS: 0.712 ratio (iPhone 16 baseline)
+const POLAROID_WIDTH_RATIO = isCompactHeight()
+  ? 0.55
+  : Platform.OS === 'android'
+    ? (isGalaxyS24Type ? 0.62 : 0.72)  // Z Flip uses 0.72 (same as normal)
+    : 0.712;
 
 // Calculate polaroid width with min/max constraints for extreme screen sizes
-// Min: 200px (very small phones), Max: 320px (large phones/tablets)
+// Min: 200px (very small phones)
+// Max: 280px for Galaxy S24 type, 320px for others (including Z Flip)
 const rawPolaroidWidth = Math.round(SCREEN_WIDTH * POLAROID_WIDTH_RATIO);
-const POLAROID_WIDTH = Math.min(320, Math.max(200, rawPolaroidWidth));
+const POLAROID_MAX_WIDTH = isGalaxyS24Type ? 280 : 320;
+const POLAROID_WIDTH = Math.min(POLAROID_MAX_WIDTH, Math.max(200, rawPolaroidWidth));
 const POLAROID_SCALE = POLAROID_WIDTH / POLAROID_BASE_WIDTH;
 
 // Helper to scale polaroid-related values proportionally
@@ -1597,7 +1618,7 @@ export default function HomeScreen() {
             {/* Step: Add */}
             {anniversaryModalStep === 'add' && (
               <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                behavior="padding"
                 style={styles.keyboardAvoidingView}
               >
                 <View style={styles.addAnniversaryModalContent}>
@@ -1801,7 +1822,7 @@ export default function HomeScreen() {
             {/* Step: Edit */}
             {anniversaryModalStep === 'edit' && (
               <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                behavior="padding"
                 style={styles.keyboardAvoidingView}
               >
                 <View style={styles.addAnniversaryModalContent}>
@@ -2204,18 +2225,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: rs(SPACING.lg),
+    // Android: shift content up with negative marginTop (responsive to screen height)
+    // Tall screens (Galaxy S24 etc.): -50px, Normal Android: -35px, Compact: -25px
+    marginTop: Platform.OS === 'android'
+      ? (SCREEN_HEIGHT < 700
+        ? rh(-25)
+        : isTallAndroidScreen
+          ? rh(-50)  // More shift for tall screens
+          : rh(-35))
+      : 0,
     // Account for banner ad + tab bar at bottom - responsive padding
     // Small screens (< 700px): 100px, Medium (700-800): 110px, Large: 120px
-    // This ensures content doesn't overlap with ad area on any device
+    // Tall Android screens (Galaxy S24 etc.): 95px for more vertical space
     paddingBottom: Platform.OS === 'android'
-      ? SCREEN_HEIGHT < 700 ? rh(100) : SCREEN_HEIGHT < 800 ? rh(110) : rh(120)
+      ? (SCREEN_HEIGHT < 700
+        ? rh(100)
+        : isTallAndroidScreen
+          ? rh(95)  // Reduced for tall screens
+          : SCREEN_HEIGHT < 800 ? rh(110) : rh(120))
       : SCREEN_HEIGHT < 700 ? rh(100) : SCREEN_HEIGHT < 800 ? rh(110) : rh(120),
   },
   anniversarySection: {
-    paddingTop: Platform.OS === 'android' && SCREEN_HEIGHT < 700
-      ? Math.max(rh(60), 50)  // Smaller padding for compact screens
+    paddingTop: Platform.OS === 'android'
+      ? (SCREEN_HEIGHT < 700
+        ? Math.max(rh(60), 50)  // Compact screens
+        : isTallAndroidScreen
+          ? Math.max(rh(65), 55)  // Tall screens (Galaxy S24 etc.)
+          : Math.max(rh(90), 70))
       : Math.max(rh(90), 70),
-    paddingBottom: Math.max(rh(SPACING.md), 8),
+    paddingBottom: Math.max(rh(SPACING.sm), 6),
     alignItems: 'center',
     backgroundColor: 'transparent',
   },
@@ -2223,12 +2261,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: Platform.OS === 'android' && SCREEN_HEIGHT < 700
-      ? Math.max(rh(SPACING.md), 8)
+    marginBottom: Platform.OS === 'android'
+      ? (SCREEN_HEIGHT < 700
+        ? Math.max(rh(SPACING.md), 8)
+        : isTallAndroidScreen
+          ? Math.max(rh(SPACING.md), 10)  // Reduced for tall screens
+          : Math.max(rh(SPACING.xl), 16))
       : Math.max(rh(SPACING.xl), 16),
   },
   coupleNameText: {
-    fontSize: Platform.OS === 'android' ? Math.max(fp(20), 17) : Math.max(fp(18), 15), // Android: larger for readability
+    fontSize: Platform.OS === 'android'
+      ? (isTallAndroidScreen ? Math.max(fp(17), 15) : Math.max(fp(20), 17))  // Smaller for tall screens
+      : Math.max(fp(18), 15),
     color: COLORS.white,
     fontFamily: 'Jua', // Use Jua directly for better Android compatibility
     letterSpacing: rs(0.5),
@@ -2263,7 +2307,9 @@ const styles = StyleSheet.create({
     minHeight: 50,
   },
   dDayNumber: {
-    fontSize: Platform.OS === 'android' ? Math.max(rw(52), 44) : fp(52), // Android: 52→44 min
+    fontSize: Platform.OS === 'android'
+      ? (isTallAndroidScreen ? Math.max(rw(44), 38) : Math.max(rw(52), 44))  // Smaller for tall screens
+      : fp(52),
     color: '#FFFFFF',
     fontFamily: 'Jua',
     letterSpacing: 1,
@@ -2271,7 +2317,9 @@ const styles = StyleSheet.create({
     textAlignVertical: 'center',
   },
   dDayUnit: {
-    fontSize: Platform.OS === 'android' ? Math.max(rw(24), 20) : fp(24), // Android: 24→20 min
+    fontSize: Platform.OS === 'android'
+      ? (isTallAndroidScreen ? Math.max(rw(20), 18) : Math.max(rw(24), 20))  // Smaller for tall screens
+      : fp(24),
     color: '#FFFFFF',
     fontFamily: 'Jua',
     letterSpacing: 0.5,
@@ -2284,8 +2332,8 @@ const styles = StyleSheet.create({
   },
   frameTopSection: {
     alignItems: 'center',
-    marginBottom: polaroidScale(10),
-    gap: polaroidScale(6),
+    marginBottom: polaroidScale(isTallAndroidScreen ? 6 : 10),
+    gap: polaroidScale(isTallAndroidScreen ? 4 : 6),
   },
   frameUserIconRow: {
     flexDirection: 'row',
@@ -2322,9 +2370,11 @@ const styles = StyleSheet.create({
     marginLeft: polaroidScale(10),
   },
   coupleNameInline: {
-    fontSize: Platform.OS === 'android' ? Math.max(fp(18), 16) : fp(18),
+    fontSize: Platform.OS === 'android'
+      ? (isTallAndroidScreen ? Math.max(fp(15), 14) : Math.max(fp(18), 16))  // Smaller for tall screens
+      : fp(18),
     color: '#FFFFFF',
-    maxWidth: polaroidScale(100),
+    maxWidth: polaroidScale(isTallAndroidScreen ? 85 : 100),  // Narrower for tall screens
     includeFontPadding: false,
   },
   coupleIconInline: {
@@ -2339,7 +2389,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: polaroidScale(10),
+    marginTop: polaroidScale(isTallAndroidScreen ? 6 : 10),
   },
   frameIconsLeft: {
     flexDirection: 'row',
@@ -2356,7 +2406,9 @@ const styles = StyleSheet.create({
     marginTop: polaroidScale(8),
   },
   frameDaydateText: {
-    fontSize: Platform.OS === 'android' ? Math.max(fp(20), 18) : fp(20),
+    fontSize: Platform.OS === 'android'
+      ? (isTallAndroidScreen ? Math.max(fp(17), 15) : Math.max(fp(20), 18))  // Smaller for tall screens
+      : fp(20),
     fontFamily: 'Jua',
     color: '#FFFFFF',
     includeFontPadding: false,
@@ -2367,7 +2419,11 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-end',
     marginRight: polaroidScale(11),
     marginTop: Platform.OS === 'android'
-      ? SCREEN_HEIGHT < 700 ? polaroidScale(20) : polaroidScale(22)
+      ? (SCREEN_HEIGHT < 700
+        ? polaroidScale(20)
+        : isTallAndroidScreen
+          ? polaroidScale(16)  // Reduced for tall screens
+          : polaroidScale(22))
       : polaroidScale(20),
   },
   frameDDayInline: {
@@ -2376,21 +2432,27 @@ const styles = StyleSheet.create({
     marginLeft: polaroidScale(10),
   },
   frameDDayPrefix: {
-    fontSize: Platform.OS === 'android' ? Math.max(fp(20), 18) : fp(20),
+    fontSize: Platform.OS === 'android'
+      ? (isTallAndroidScreen ? Math.max(fp(17), 15) : Math.max(fp(20), 18))  // Smaller for tall screens
+      : fp(20),
     color: '#FFFFFF',
     fontFamily: 'Jua',
     includeFontPadding: false,
     marginRight: polaroidScale(4),
   },
   frameDDayNumber: {
-    fontSize: Platform.OS === 'android' ? Math.max(fp(40), 36) : fp(40),
+    fontSize: Platform.OS === 'android'
+      ? (isTallAndroidScreen ? Math.max(fp(34), 30) : Math.max(fp(40), 36))  // Smaller for tall screens
+      : fp(40),
     color: '#FFFFFF',
     letterSpacing: 0.5,
     includeFontPadding: false,
     textAlignVertical: 'center',
   },
   frameDDayUnit: {
-    fontSize: Platform.OS === 'android' ? Math.max(fp(20), 18) : fp(20),
+    fontSize: Platform.OS === 'android'
+      ? (isTallAndroidScreen ? Math.max(fp(17), 15) : Math.max(fp(20), 18))  // Smaller for tall screens
+      : fp(20),
     color: '#FFFFFF',
     letterSpacing: 0.5,
     marginLeft: polaroidScale(4),

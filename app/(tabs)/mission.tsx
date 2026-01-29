@@ -37,7 +37,7 @@ import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useUIStore } from '@/stores/uiStore';
 import * as Location from 'expo-location';
 
-import { COLORS, SPACING, rs, fp } from '@/constants/design';
+import { COLORS, SPACING, rs, fp, isFoldableDevice } from '@/constants/design';
 import { useMissionStore, MOOD_OPTIONS, TIME_OPTIONS, type TodayMood, type AvailableTime, type MissionGenerationAnswers } from '@/stores/missionStore';
 import type { ExcludedMission } from '@/services/missionGenerator';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
@@ -68,7 +68,13 @@ type CarouselItem = Mission | { type: 'ad'; id: string } | { type: 'refresh'; id
 
 // Fixed card dimensions (width is calculated dynamically in component)
 // Android uses slightly smaller height for visual balance
-const CARD_HEIGHT = Platform.OS === 'android' ? rs(455) : rs(468);
+// Foldable devices (Z Flip) keep original size, regular phones get reduced height
+const getCardHeight = () => {
+  if (Platform.OS === 'ios') return rs(468);
+  // Android: foldable keeps 455, regular phones reduced to 400
+  return isFoldableDevice() ? rs(455) : rs(400);
+};
+const CARD_HEIGHT = getCardHeight();
 const CARD_MARGIN = rs(10);
 
 // Easing gradient for smooth blur transition
@@ -174,7 +180,9 @@ export default function MissionScreen() {
 
   // Get screen dimensions dynamically
   const { width: screenWidth } = useWindowDimensions();
-  const CARD_WIDTH = screenWidth * 0.75;
+  // Foldable devices use 75% width, regular phones use 70%
+  const CARD_WIDTH_RATIO = Platform.OS === 'android' && !isFoldableDevice() ? 0.70 : 0.75;
+  const CARD_WIDTH = screenWidth * CARD_WIDTH_RATIO;
   const SNAP_INTERVAL = CARD_WIDTH + CARD_MARGIN * 2;
 
   // Handle returning from mission detail to bookmark page
@@ -289,6 +297,11 @@ export default function MissionScreen() {
 
   // Handle keeping/bookmarking a mission
   const handleKeepMission = useCallback(async (mission: Mission): Promise<boolean> => {
+    // Prefetch bookmark thumbnail image for faster loading in bookmark page
+    if (mission.imageUrl) {
+      ExpoImage.prefetch(`${mission.imageUrl}?w=300&h=400&fit=crop`).catch(() => {});
+    }
+
     if (isSyncInitialized) {
       // Use synced bookmarks
       return await addBookmark(mission);
@@ -601,10 +614,11 @@ export default function MissionScreen() {
         isWaitingForImagesRef.current = false;
         setPartnerGeneratingMessage(null);
 
-        // Reload shared missions to ensure data is fresh
-        await loadSharedMissions();
-        // Also check for date reset
+        // Check for date reset FIRST (before loading new data)
+        // This ensures proper comparison with old sharedMissionsDate
         checkAndResetMissions();
+        // Then reload shared missions to ensure data is fresh
+        await loadSharedMissions();
       }
       appStateRef.current = nextAppState;
     };
@@ -1487,7 +1501,7 @@ export default function MissionScreen() {
         />
         <BlurView experimentalBlurMethod="dimezisBlurView" intensity={Platform.OS === 'ios' ? 90 : 50} tint={Platform.OS === 'ios' ? 'light' : 'default'} style={StyleSheet.absoluteFill} />
       </View>
-      <View style={[styles.overlay, { backgroundColor: Platform.OS === 'ios' ? 'rgba(0, 0, 0, 0.3)' : 'rgba(0, 0, 0, 0.15)' }]} />
+      <View style={[styles.overlay, { backgroundColor: Platform.OS === 'ios' ? 'rgba(0, 0, 0, 0.3)' : 'rgba(0, 0, 0, 0.2)' }]} />
 
       {/* BookmarkedMissionsPage Overlay */}
       {showBookmarkedMissions && (
@@ -1651,18 +1665,24 @@ export default function MissionScreen() {
                 )}
               </View>
             ) : (
-              <Pressable
-                style={styles.glassGenerateButton}
-                onPress={handleGenerateButtonPress}
-              >
-                <BlurView
-                  experimentalBlurMethod="dimezisBlurView"
-                  intensity={Platform.OS === 'ios' ? 30 : 40}
-                  tint={Platform.OS === 'ios' ? 'dark' : 'default'}
-                  style={StyleSheet.absoluteFill}
-                />
-                <Text style={styles.glassGenerateButtonText}>{t('mission.title')}</Text>
-              </Pressable>
+              <View style={[styles.emptyStateCard, { width: CARD_WIDTH, height: CARD_WIDTH * 1.4 }]}>
+                <View style={styles.emptyStateCardContent}>
+                  <View style={styles.emptyStateTextContainer}>
+                    <Text style={styles.emptyStateQuestionText}>
+                      {t('mission.emptyState.line1')}
+                    </Text>
+                    <Text style={styles.emptyStateQuestionText}>
+                      {t('mission.emptyState.line2')}
+                    </Text>
+                  </View>
+                  <Pressable
+                    style={styles.emptyStateGenerateButton}
+                    onPress={handleGenerateButtonPress}
+                  >
+                    <Text style={styles.emptyStateGenerateButtonText}>{t('mission.emptyState.button')}</Text>
+                  </Pressable>
+                </View>
+              </View>
             )}
           </View>
         )}
@@ -2336,6 +2356,41 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: rs(SPACING.xl),
+  },
+  emptyStateCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: rs(45),
+    overflow: 'hidden',
+  },
+  emptyStateCardContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: rs(SPACING.xl),
+  },
+  emptyStateTextContainer: {
+    alignItems: 'center',
+    marginBottom: rs(100),
+  },
+  emptyStateQuestionText: {
+    fontSize: fp(24),
+    fontWeight: '700',
+    color: COLORS.black,
+    textAlign: 'center',
+    lineHeight: fp(32),
+  },
+  emptyStateGenerateButton: {
+    minWidth: rs(160),
+    paddingVertical: rs(16),
+    paddingHorizontal: rs(32),
+    backgroundColor: COLORS.black,
+    borderRadius: rs(44),
+    alignItems: 'center',
+  },
+  emptyStateGenerateButtonText: {
+    fontSize: fp(16),
+    fontWeight: '600',
+    color: COLORS.white,
   },
   glassGenerateButton: {
     paddingVertical: Platform.OS === 'android' ? rs(14) : rs(18),

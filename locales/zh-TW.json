@@ -98,6 +98,11 @@
   "mission": {
     "title": "今日任務",
     "subtitle": "今天要一起創造什麼樣的時刻呢？",
+    "emptyState": {
+      "line1": "準備好開始",
+      "line2": "今日任務了嗎？",
+      "button": "開始"
+    },
     "generate": "獲取今日任務",
     "generating": "生成中...",
     "generatingMessage": "正在生成任務",

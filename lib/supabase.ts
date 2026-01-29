@@ -1473,10 +1473,23 @@ export const db = {
 
   // Couple Missions (shared generated missions)
   coupleMissions: {
+    // Get server time to prevent client time manipulation
+    async getServerTime(): Promise<Date> {
+      const client = getSupabase();
+      const { data, error } = await client.rpc('get_server_time');
+      if (error || !data) {
+        // Fallback to client time if RPC fails (function may not exist yet)
+        console.warn('[Supabase] Failed to get server time, using client time:', error?.message);
+        return new Date();
+      }
+      return new Date(data);
+    },
+
     async getToday(coupleId: string) {
       const client = getSupabase();
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      // Use server time to prevent client time manipulation
+      const serverTime = await this.getServerTime();
+      serverTime.setHours(0, 0, 0, 0);
 
       // Use .gt() (greater than) instead of .gte() to correctly exclude
       // missions that expire at exactly midnight today
@@ -1487,7 +1500,7 @@ export const db = {
         .select('*')
         .eq('couple_id', coupleId)
         .eq('status', 'active')
-        .gt('expires_at', today.toISOString())
+        .gt('expires_at', serverTime.toISOString())
         .order('generated_at', { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -1532,12 +1545,14 @@ export const db = {
 
     async expireOld(coupleId: string) {
       const client = getSupabase();
+      // Use server time to prevent client time manipulation
+      const serverTime = await this.getServerTime();
       const { error } = await client
         .from('couple_missions')
         .update({ status: 'expired' })
         .eq('couple_id', coupleId)
         .eq('status', 'active')
-        .lt('expires_at', new Date().toISOString());
+        .lt('expires_at', serverTime.toISOString());
       return { error };
     },
 

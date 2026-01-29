@@ -98,6 +98,11 @@
   "mission": {
     "title": "今日のミッション",
     "subtitle": "今日はどんな時間を一緒に過ごす？",
+    "emptyState": {
+      "line1": "今日のミッションを",
+      "line2": "始めましょう",
+      "button": "始める"
+    },
     "generate": "今日のミッションを受け取る",
     "generating": "生成中...",
     "generatingMessage": "ミッションを作成しています",

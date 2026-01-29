@@ -98,6 +98,11 @@
   "mission": {
     "title": "오늘의 미션",
     "subtitle": "오늘은 어떤 순간을 함께할까요?",
+    "emptyState": {
+      "line1": "오늘의 미션을",
+      "line2": "시작해보세요",
+      "button": "시작하기"
+    },
     "generate": "오늘의 미션 받기",
     "generating": "생성 중...",
     "generatingMessage": "미션을 생성하고 있어요",

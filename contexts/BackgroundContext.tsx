@@ -248,10 +248,21 @@ export function BackgroundProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// Default background image (export for fallback use)
+const DEFAULT_BG = require('@/assets/images/backgroundimage.png');
+
 export function useBackground() {
   const context = useContext(BackgroundContext);
+
+  // Return default values if context is not available (prevents crash on Android race conditions)
   if (context === undefined) {
-    throw new Error('useBackground must be used within a BackgroundProvider');
+    return {
+      backgroundImage: DEFAULT_BG,
+      setBackgroundImage: async () => {},
+      resetToDefault: () => {},
+      isLoaded: false,
+      prefetchImages: async () => {},
+    };
   }
   return context;
 }

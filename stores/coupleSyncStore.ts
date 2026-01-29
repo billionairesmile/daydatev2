@@ -1058,8 +1058,24 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     }
 
     // Expire old missions first, then delete expired ones to prevent data bloat
+    // Note: expireOld now uses server time to prevent client time manipulation
     await db.coupleMissions.expireOld(coupleId);
     await db.coupleMissions.deleteExpired(coupleId);
+
+    // SECURITY: Check if active missions already exist (using server time)
+    // This prevents time manipulation abuse where user advances device time to reset,
+    // then reverts time to generate new missions
+    const { data: existingMissions } = await db.coupleMissions.getToday(coupleId);
+    if (existingMissions) {
+      console.warn('[CoupleSyncStore] Active missions already exist, skipping creation');
+      // Load existing missions instead of creating new ones
+      set({
+        sharedMissions: existingMissions.missions as Mission[],
+        sharedMissionsDate: today,
+        missionGenerationStatus: 'completed',
+      });
+      return;
+    }
 
     // Calculate expiration time based on couple's timezone setting
     const expiresAt = getNextMidnightInTimezone();

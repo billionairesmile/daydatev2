@@ -1038,8 +1038,10 @@ DIFFICULTY (MUST include at least 1 free mission):
 
 STYLE:
 - title: Emotional, poetic phrase (not direct like "Go to cafe")
-  Good: "Under the Sparkling Lights, Our Winter Story"
+  Good: "Under the Sparkling Lights, Our Winter Story", "A Canvas of Two Hearts", "Recipe for Us"
   Bad: "Visit a cafe", "Do escape room"
+  FORBIDDEN patterns: Do NOT start titles with "Whispers", "Whispered", "Echoes", "Shadows" - these are overused
+  Use VARIED opening words: verbs, nouns, adjectives, questions, metaphors
 - description: Specific action, MUST be 50-80 chars (not shorter, not longer)${canMeetToday ? '' : '\n- description: Must NOT imply physical meeting'}
 - Never mention prices
 - Activities should naturally lend themselves to photo verification

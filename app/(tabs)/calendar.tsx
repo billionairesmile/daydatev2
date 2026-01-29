@@ -1089,7 +1089,7 @@ export default function CalendarScreen() {
         />
         <BlurView experimentalBlurMethod="dimezisBlurView" intensity={Platform.OS === 'ios' ? 90 : 50} tint={Platform.OS === 'ios' ? 'light' : 'default'} style={StyleSheet.absoluteFill} />
       </View>
-      <View style={[styles.overlay, { backgroundColor: Platform.OS === 'ios' ? 'rgba(0, 0, 0, 0.3)' : 'rgba(0, 0, 0, 0.15)' }]} />
+      <View style={[styles.overlay, { backgroundColor: Platform.OS === 'ios' ? 'rgba(0, 0, 0, 0.3)' : 'rgba(0, 0, 0, 0.2)' }]} />
 
       {/* Header - Fixed at top */}
       <View style={styles.header}>
@@ -1499,7 +1499,7 @@ export default function CalendarScreen() {
               <View style={styles.modalBackdrop} />
             </TouchableWithoutFeedback>
             <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              behavior="padding"
               style={styles.keyboardAvoidingView}
             >
               <View style={styles.modalContent}>
@@ -1560,7 +1560,7 @@ export default function CalendarScreen() {
               <View style={styles.modalBackdrop} />
             </TouchableWithoutFeedback>
             <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              behavior="padding"
               style={styles.keyboardAvoidingView}
             >
               <View style={styles.modalContent}>
@@ -1618,7 +1618,7 @@ export default function CalendarScreen() {
               <View style={styles.modalBackdrop} />
             </TouchableWithoutFeedback>
             <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              behavior="padding"
               style={styles.keyboardAvoidingView}
             >
               <View style={styles.modalContent}>

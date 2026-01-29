@@ -553,10 +553,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+    rowGap: IS_TABLET ? SPACING.sm * 0.75 : scale(SPACING.sm),
     width: '100%',
   },
   benefitItem: {
-    width: '47%',
+    width: '48%',
+    flexGrow: 0,
+    flexShrink: 0,
     alignItems: 'center',
     paddingVertical: IS_TABLET ? SPACING.md * 0.75 : scale(SPACING.md),
     paddingHorizontal: IS_TABLET ? SPACING.sm * 0.75 : scale(SPACING.sm),
@@ -564,8 +567,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#F3F4F6',
     borderRadius: IS_TABLET ? RADIUS.md * 0.75 : scale(RADIUS.md),
-    marginBottom: IS_TABLET ? SPACING.sm * 0.75 : scale(SPACING.sm),
-    marginHorizontal: '1.5%',
     backgroundColor: COLORS.white,
   },
   benefitTitle: {
