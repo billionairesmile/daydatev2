@@ -1,73 +1,73 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Tabs } from 'expo-router';
-import { StyleSheet, View, Pressable, Text, Animated, LayoutChangeEvent, Platform, Dimensions } from 'react-native';
+import {
+  StyleSheet,
+  View,
+  Pressable,
+  Text,
+  Animated,
+  LayoutChangeEvent,
+  Platform,
+  Dimensions,
+  // eslint-disable-next-line react-native/split-platform-components
+  DynamicColorIOS,
+} from 'react-native';
 import { BlurView } from 'expo-blur';
+import { LiquidGlassView, isLiquidGlassSupported } from '@callstack/liquid-glass';
 import { Target, BookHeart, Home, Calendar, Menu } from 'lucide-react-native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useTranslation } from 'react-i18next';
-import * as Haptics from 'expo-haptics';
+
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, IS_TABLET, scale, scaleFont } from '@/constants/design';
-import { useTabBarBottom } from '@/hooks/useConsistentBottomInset';
+import { useTabBarBottom, USE_IOS_26_TAB_BAR } from '@/hooks/useConsistentBottomInset';
 import { useUIStore } from '@/stores/uiStore';
 
-// Android responsive scaling based on screen dimensions
-// Base: 360dp width, 844dp height (standard Android phone)
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const ANDROID_BASE_WIDTH = 360;
-const ANDROID_BASE_HEIGHT = 844;
-
-// Width and height scale factors
-const ANDROID_WIDTH_SCALE = Platform.OS === 'android'
-  ? Math.min(SCREEN_WIDTH / ANDROID_BASE_WIDTH, 1.1)
-  : 1;
-const ANDROID_HEIGHT_SCALE = Platform.OS === 'android'
-  ? Math.max(Math.min(SCREEN_HEIGHT / ANDROID_BASE_HEIGHT, 1), 0.7)
-  : 1;
-
-// Combined scale for compact screens (use the smaller of width/height scale)
-const ANDROID_COMPACT_SCALE = Platform.OS === 'android'
-  ? Math.min(ANDROID_WIDTH_SCALE, ANDROID_HEIGHT_SCALE)
-  : 1;
-
-// Helper function for Android-only responsive scaling
-const androidScale = (size: number): number => {
-  if (Platform.OS !== 'android') return size;
-  return Math.round(size * ANDROID_COMPACT_SCALE);
-};
-
-// Platform-specific sizes with compact screen support
-// For screens with height < 700, use smaller sizes
-const IS_COMPACT_ANDROID = Platform.OS === 'android' && SCREEN_HEIGHT < 700;
-const TAB_ICON_SIZE = Platform.OS === 'android'
-  ? (IS_COMPACT_ANDROID ? scale(20) : androidScale(scale(24)))
-  : scale(28);
-const TAB_LABEL_SIZE = Platform.OS === 'android'
-  ? (IS_COMPACT_ANDROID ? scaleFont(8) : androidScale(scaleFont(10)))
-  : scaleFont(11);
-const TAB_PADDING_VERTICAL = Platform.OS === 'android'
-  ? (IS_COMPACT_ANDROID ? scale(3) : androidScale(scale(5)))
-  : scale(6);
-const TAB_INNER_PADDING = Platform.OS === 'android'
-  ? (IS_COMPACT_ANDROID ? scale(3) : androidScale(scale(5)))
-  : scale(6);
-
-function TabBarIcon({
-  Icon,
-}: {
-  Icon: React.ComponentType<{ color: string; size: number; strokeWidth: number }>;
-}) {
-  return (
-    <Icon
-      color={COLORS.white}
-      size={TAB_ICON_SIZE}
-      strokeWidth={1.5}
-    />
-  );
+// Conditionally import NativeTabs (may not be available in all Expo versions)
+let NativeTabs: any = null;
+let NativeIcon: any = null;
+let NativeLabel: any = null;
+try {
+  const nativeTabsModule = require('expo-router/unstable-native-tabs');
+  NativeTabs = nativeTabsModule.NativeTabs;
+  NativeIcon = nativeTabsModule.Icon;
+  NativeLabel = nativeTabsModule.Label;
+} catch {
+  // NativeTabs not available, will use fallback
 }
 
-// Tab label translation keys mapping
-const TAB_LABEL_KEYS: Record<string, string> = {
+// ============================================
+// Platform Detection
+// ============================================
+const IS_IOS_26 = Platform.OS === 'ios' && isLiquidGlassSupported;
+const HAS_NATIVE_TABS = NativeTabs !== null;
+
+if (__DEV__) {
+  console.log('[TabBar] iOS 26 Liquid Glass:', IS_IOS_26);
+}
+
+// ============================================
+// Android Scaling
+// ============================================
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const IS_COMPACT_ANDROID = Platform.OS === 'android' && SCREEN_HEIGHT < 700;
+const ANDROID_SCALE = Platform.OS === 'android'
+  ? Math.min(Math.min(SCREEN_WIDTH / 360, 1.1), Math.max(Math.min(SCREEN_HEIGHT / 844, 1), 0.7))
+  : 1;
+const androidScale = (size: number) => Platform.OS === 'android' ? Math.round(size * ANDROID_SCALE) : size;
+
+// ============================================
+// iOS 26 Theme Colors
+// ============================================
+const IOS26_TINT_COLOR = '#FF6B9D'; // App's pink accent color
+const IOS26_INACTIVE_COLOR_LIGHT = '#00000090';
+const IOS26_INACTIVE_COLOR_DARK = '#FFFFFF90';
+
+// ============================================
+// Tab Configuration
+// ============================================
+const TAB_KEYS: Record<string, string> = {
   mission: 'tabs.mission',
   memories: 'tabs.memories',
   index: 'tabs.home',
@@ -83,112 +83,242 @@ const TAB_ICONS: Record<string, React.ComponentType<{ color: string; size: numbe
   more: Menu,
 };
 
-function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
-  const { t } = useTranslation();
-  const isTabBarHidden = useUIStore((s) => s.isTabBarHidden);
-  const tabBarBottom = useTabBarBottom();
-  const [tabWidth, setTabWidth] = useState(0);
-  const indicatorPosition = useRef(new Animated.Value(0)).current;
-  const indicatorOpacity = useRef(new Animated.Value(0)).current;
+// Android icon sizes
+const ANDROID_ICON_SIZES: Record<string, number> = {
+  mission: 25,
+  memories: 25,
+  index: 25,      // Home
+  calendar: 24,
+  more: 25,
+};
 
-  // Animate indicator when tab changes
+// Android icon vertical offset adjustments
+const ANDROID_ICON_OFFSETS: Record<string, number> = {
+  mission: 0,
+  memories: 0,
+  index: 1,       // Home - slightly lower
+  calendar: 0,
+  more: 0,
+};
+
+// SF Symbol names for iOS native icons
+const TAB_SF_SYMBOLS: Record<string, string> = {
+  mission: 'target',
+  memories: 'heart.text.square',
+  index: 'house',
+  calendar: 'calendar',
+  more: 'line.3.horizontal',
+};
+
+// ============================================
+// iOS 26 Native Tab Bar (using NativeTabs)
+// ============================================
+function NativeTabLayout() {
+  const { t } = useTranslation();
+
+  // Dynamic colors for iOS (matches DynamicColorIOS behavior)
+  const inactiveTintColor = Platform.OS === 'ios'
+    ? DynamicColorIOS({ light: IOS26_INACTIVE_COLOR_LIGHT, dark: IOS26_INACTIVE_COLOR_DARK })
+    : IOS26_INACTIVE_COLOR_DARK;
+
+  // Use the dynamically imported components
+  const Icon = NativeIcon;
+  const Label = NativeLabel;
+
+  return (
+    <NativeTabs
+      tintColor={
+        Platform.OS === 'ios'
+          ? DynamicColorIOS({ light: IOS26_TINT_COLOR, dark: IOS26_TINT_COLOR })
+          : IOS26_TINT_COLOR
+      }
+      labelStyle={{
+        color: Platform.OS === 'ios' && isLiquidGlassSupported
+          ? DynamicColorIOS({ light: '#000000', dark: '#FFFFFF' })
+          : inactiveTintColor,
+      }}
+      iconColor={
+        Platform.OS === 'ios' && isLiquidGlassSupported
+          ? DynamicColorIOS({ light: '#000000', dark: '#FFFFFF' })
+          : inactiveTintColor
+      }
+      labelVisibilityMode="labeled"
+      indicatorColor={IOS26_TINT_COLOR + '25'}
+      disableTransparentOnScrollEdge={true}
+    >
+      <NativeTabs.Trigger name="mission">
+        <Icon sf={TAB_SF_SYMBOLS.mission} />
+        <Label>{t(TAB_KEYS.mission)}</Label>
+      </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="memories">
+        <Icon sf={TAB_SF_SYMBOLS.memories} />
+        <Label>{t(TAB_KEYS.memories)}</Label>
+      </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="index">
+        <Icon sf={TAB_SF_SYMBOLS.index} />
+        <Label>{t(TAB_KEYS.index)}</Label>
+      </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="calendar">
+        <Icon sf={TAB_SF_SYMBOLS.calendar} />
+        <Label>{t(TAB_KEYS.calendar)}</Label>
+      </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="more">
+        <Icon sf={TAB_SF_SYMBOLS.more} />
+        <Label>{t(TAB_KEYS.more)}</Label>
+      </NativeTabs.Trigger>
+    </NativeTabs>
+  );
+}
+
+// ============================================
+// Android / Legacy iOS Tab Bar
+// ============================================
+function ClassicTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+  const { t } = useTranslation();
+  const tabBarBottom = useTabBarBottom();
+  const insets = useSafeAreaInsets();
+  const [tabWidth, setTabWidth] = useState(0);
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  const isIOS = Platform.OS === 'ios';
+  const isAndroid = Platform.OS === 'android';
+
+  // Android: Native style (icons only, full width)
+  // iOS: Legacy floating pill style
+  const ICON_SIZE = isAndroid
+    ? (IS_COMPACT_ANDROID ? 22 : 26)
+    : 24;
+  const TAB_PADDING = isAndroid
+    ? (IS_COMPACT_ANDROID ? 12 : 16)
+    : 6;
+
   useEffect(() => {
-    if (tabWidth > 0 && !isTabBarHidden) {
+    if (tabWidth > 0 && isIOS) {
       Animated.parallel([
-        Animated.spring(indicatorPosition, {
+        Animated.spring(slideAnim, {
           toValue: state.index * tabWidth,
           useNativeDriver: true,
           tension: 68,
-          friction: 15,
-          overshootClamping: true,
+          friction: 12,
         }),
-        Animated.timing(indicatorOpacity, {
+        Animated.timing(fadeAnim, {
           toValue: 1,
-          duration: 200,
+          duration: 150,
           useNativeDriver: true,
         }),
       ]).start();
     }
-  }, [state.index, tabWidth, indicatorPosition, indicatorOpacity, isTabBarHidden]);
+  }, [state.index, tabWidth, slideAnim, fadeAnim, isIOS]);
 
-  const handleTabsContainerLayout = (event: LayoutChangeEvent) => {
-    const { width } = event.nativeEvent.layout;
-    const singleTabWidth = width / state.routes.length;
-    setTabWidth(singleTabWidth);
-    // Set initial position without animation
-    indicatorPosition.setValue(state.index * singleTabWidth);
+  const onLayout = (e: LayoutChangeEvent) => {
+    const width = e.nativeEvent.layout.width / state.routes.length;
+    setTabWidth(width);
+    if (isIOS) {
+      slideAnim.setValue(state.index * width);
+    }
   };
 
-  // Don't render tab bar if hidden (must be after all hooks)
-  if (isTabBarHidden) {
-    return null;
+  const onTabPress = (routeName: string, routeKey: string, index: number) => {
+    const event = navigation.emit({
+      type: 'tabPress',
+      target: routeKey,
+      canPreventDefault: true,
+    });
+    if (state.index !== index && !event.defaultPrevented) {
+      navigation.navigate(routeName);
+    }
+  };
+
+  // Android: Full-width native style tab bar
+  // 탭바 배경을 화면 하단까지 확장 (배너 광고 영역 포함)
+  // 프리미엄 사용자가 네비바 미사용 시에도 배경이 화면 최하단까지 확장되도록 insets.bottom 보장
+  if (isAndroid) {
+    const actualPaddingBottom = Math.max(tabBarBottom, insets.bottom);
+    return (
+      <View style={[androidStyles.container, { bottom: 0, paddingBottom: actualPaddingBottom }]}>
+        <BlurView
+          experimentalBlurMethod="dimezisBlurView"
+          intensity={50}
+          tint="dark"
+          style={StyleSheet.absoluteFill}
+        />
+        <View style={androidStyles.inner} />
+        <View style={androidStyles.tabsRow} onLayout={onLayout}>
+          {state.routes.map((route, index) => {
+            const focused = state.index === index;
+            const IconComponent = TAB_ICONS[route.name] || Home;
+            const iconSize = ANDROID_ICON_SIZES[route.name] || ICON_SIZE;
+            const iconOffset = ANDROID_ICON_OFFSETS[route.name] || 0;
+
+            return (
+              <Pressable
+                key={route.key}
+                accessibilityRole="button"
+                accessibilityState={focused ? { selected: true } : {}}
+                accessibilityLabel={descriptors[route.key].options.tabBarAccessibilityLabel}
+                onPress={() => onTabPress(route.name, route.key, index)}
+                style={[androidStyles.tabButton, { paddingVertical: TAB_PADDING }]}
+              >
+                <View style={iconOffset ? { transform: [{ translateY: iconOffset }] } : undefined}>
+                  <IconComponent
+                    color={COLORS.white}
+                    size={iconSize}
+                    strokeWidth={focused ? 2.2 : 1.5}
+                  />
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+    );
   }
 
+  // iOS: Legacy floating pill style
   return (
-    <View style={[styles.tabBarContainer, { bottom: tabBarBottom }]}>
-      <View style={styles.tabBarOuter}>
-        <BlurView experimentalBlurMethod="dimezisBlurView" intensity={50} tint="dark" style={styles.tabBarBlur}>
-          <View style={styles.tabBarInner}>
-            {/* Tabs Container - indicator and tabs share the same reference */}
-            <View style={styles.tabsContainer} onLayout={handleTabsContainerLayout}>
-              {/* Animated Indicator */}
+    <View style={[classicStyles.container, { bottom: tabBarBottom }]}>
+      <View style={classicStyles.wrapper}>
+        <BlurView
+          experimentalBlurMethod="dimezisBlurView"
+          intensity={50}
+          tint="dark"
+          style={classicStyles.blur}
+        >
+          <View style={classicStyles.inner}>
+            <View style={classicStyles.tabsRow} onLayout={onLayout}>
               {tabWidth > 0 && (
                 <Animated.View
                   style={[
-                    styles.indicator,
+                    classicStyles.indicator,
                     {
                       width: tabWidth,
-                      opacity: indicatorOpacity,
-                      transform: [{ translateX: indicatorPosition }],
+                      opacity: fadeAnim,
+                      transform: [{ translateX: slideAnim }],
                     },
                   ]}
                 />
               )}
-
               {state.routes.map((route, index) => {
-                const { options } = descriptors[route.key];
-                const isFocused = state.index === index;
-
-                const onPress = () => {
-                  // 가벼운 햅틱 피드백 (iOS & Android 모두 지원)
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {
-                    // 네이티브 모듈 미연결 시 무시
-                  });
-
-                  const event = navigation.emit({
-                    type: 'tabPress',
-                    target: route.key,
-                    canPreventDefault: true,
-                  });
-
-                  if (!isFocused && !event.defaultPrevented) {
-                    navigation.navigate(route.name);
-                  }
-                };
-
+                const focused = state.index === index;
                 const IconComponent = TAB_ICONS[route.name] || Home;
-                const labelKey = TAB_LABEL_KEYS[route.name];
-                const label = labelKey ? t(labelKey) : route.name;
+                const label = t(TAB_KEYS[route.name] || route.name);
 
                 return (
                   <Pressable
                     key={route.key}
                     accessibilityRole="button"
-                    accessibilityState={isFocused ? { selected: true } : {}}
-                    accessibilityLabel={options.tabBarAccessibilityLabel}
-                    onPress={onPress}
-                    style={styles.tabItem}
+                    accessibilityState={focused ? { selected: true } : {}}
+                    accessibilityLabel={descriptors[route.key].options.tabBarAccessibilityLabel}
+                    onPress={() => onTabPress(route.name, route.key, index)}
+                    style={[classicStyles.tabButton, { paddingVertical: TAB_PADDING }]}
                   >
-                    <TabBarIcon Icon={IconComponent} />
-                    <Text
-                      style={[
-                        styles.tabLabel,
-                        {
-                          color: COLORS.white,
-                          fontWeight: '400',
-                        },
-                      ]}
-                    >
+                    <IconComponent color={COLORS.white} size={ICON_SIZE} strokeWidth={1.5} />
+                    <Text style={[classicStyles.label, { fontSize: 10, fontWeight: focused ? '600' : '400' }]}>
                       {label}
                     </Text>
                   </Pressable>
@@ -202,112 +332,142 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   );
 }
 
-export default function TabLayout() {
-  return (
-    <View style={styles.container}>
-      <Tabs
-        tabBar={(props) => <CustomTabBar {...props} />}
-        screenOptions={{
-          headerShown: false,
-          tabBarStyle: { display: 'none' },
-          animation: 'none', // 탭 전환 애니메이션 제거로 플래시 감소
-          lazy: false, // 모든 탭을 미리 렌더링하여 탭 전환 시 플래시 방지
-        }}
-        initialRouteName="index"
-      >
-        <Tabs.Screen
-          name="mission"
-          options={{
-            title: '미션',
-          }}
-        />
-        <Tabs.Screen
-          name="memories"
-          options={{
-            title: '추억',
-          }}
-        />
-        <Tabs.Screen
-          name="index"
-          options={{
-            title: '홈',
-          }}
-        />
-        <Tabs.Screen
-          name="calendar"
-          options={{
-            title: '캘린더',
-          }}
-        />
-        <Tabs.Screen
-          name="more"
-          options={{
-            title: '더보기',
-          }}
-        />
-      </Tabs>
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
+// Android native style tab bar styles
+const androidStyles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#000000',
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    zIndex: 100,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
   },
-  tabBarContainer: {
+  inner: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  tabsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  tabButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  label: {
+    marginTop: 2,
+    fontSize: IS_COMPACT_ANDROID ? 9 : 10,
+    color: COLORS.white,
+    textAlign: 'center',
+  },
+});
+
+const classicStyles = StyleSheet.create({
+  container: {
     position: 'absolute',
     left: 0,
     right: 0,
     alignItems: 'center',
-    zIndex: 50,
+    zIndex: 100,
   },
-  tabBarOuter: {
-    width: IS_TABLET ? '60%' : Platform.OS === 'android' ? (IS_COMPACT_ANDROID ? '82%' : '88%') : '90%',
-    maxWidth: Platform.OS === 'android' ? (IS_COMPACT_ANDROID ? scale(320) : androidScale(scale(380))) : scale(400),
-    borderRadius: Platform.OS === 'android' ? (IS_COMPACT_ANDROID ? scale(80) : androidScale(scale(100))) : scale(100),
+  wrapper: {
+    width: IS_TABLET ? '55%' : IS_COMPACT_ANDROID ? '82%' : '88%',
+    maxWidth: IS_COMPACT_ANDROID ? scale(320) : androidScale(scale(380)),
+    borderRadius: IS_COMPACT_ANDROID ? scale(80) : scale(100),
     overflow: 'hidden',
-    // Glass effect shadow
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: scale(8) },
-    shadowOpacity: 0.2,
-    shadowRadius: scale(32),
-    elevation: 8,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 24,
+    elevation: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
-  tabBarBlur: {
+  blur: {
     width: '100%',
     borderRadius: scale(100),
     overflow: 'hidden',
   },
-  tabBarInner: {
-    padding: TAB_INNER_PADDING,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  inner: {
+    paddingVertical: Platform.OS === 'ios' ? 3 : (IS_COMPACT_ANDROID ? scale(3) : scale(5)),
+    paddingHorizontal: Platform.OS === 'ios' ? 3 : (IS_COMPACT_ANDROID ? scale(3) : scale(5)),
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
   },
-  tabsContainer: {
+  tabsRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   indicator: {
     position: 'absolute',
-    left: 0,
     top: 0,
     bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    left: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
     borderRadius: scale(100),
   },
-  tabItem: {
+  tabButton: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: TAB_PADDING_VERTICAL,
-    paddingHorizontal: scale(2),
-    borderRadius: scale(100),
   },
-  tabLabel: {
-    fontSize: TAB_LABEL_SIZE,
-    marginTop: scale(2),
+  label: {
+    marginTop: 3,
+    color: COLORS.white,
     textAlign: 'center',
+  },
+});
+
+// ============================================
+// Classic Tab Bar Wrapper for non-iOS 26
+// ============================================
+function CustomTabBar(props: BottomTabBarProps) {
+  const hidden = useUIStore((s) => s.isTabBarHidden);
+  if (hidden) return null;
+  return <ClassicTabBar {...props} />;
+}
+
+// ============================================
+// Classic Tab Layout (for Android / Legacy iOS)
+// ============================================
+function ClassicTabLayout() {
+  return (
+    <View style={layoutStyles.root}>
+      <Tabs
+        tabBar={(props) => <CustomTabBar {...props} />}
+        screenOptions={{
+          headerShown: false,
+          tabBarStyle: { display: 'none' },
+          animation: 'none',
+          lazy: false,
+        }}
+        initialRouteName="index"
+      >
+        <Tabs.Screen name="mission" options={{ title: '미션' }} />
+        <Tabs.Screen name="memories" options={{ title: '추억' }} />
+        <Tabs.Screen name="index" options={{ title: '홈' }} />
+        <Tabs.Screen name="calendar" options={{ title: '캘린더' }} />
+        <Tabs.Screen name="more" options={{ title: '더보기' }} />
+      </Tabs>
+    </View>
+  );
+}
+
+// ============================================
+// Tab Layout Router
+// ============================================
+export default function TabLayout() {
+  // USE_IOS_26_TAB_BAR 상수로 iOS 26 탭바와 레거시 탭바 전환
+  // useConsistentBottomInset.ts에서 동일한 상수를 사용하여 배너 광고 위치도 동기화됨
+  if (USE_IOS_26_TAB_BAR && IS_IOS_26 && HAS_NATIVE_TABS) {
+    return <NativeTabLayout />;
+  }
+  return <ClassicTabLayout />;
+}
+
+const layoutStyles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: '#000000',
   },
 });

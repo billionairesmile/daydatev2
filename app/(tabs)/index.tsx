@@ -38,7 +38,7 @@ import { COLORS, SPACING, RADIUS, rs, fp, SCREEN_WIDTH, SCREEN_HEIGHT, rw, rh, i
 import { useBackground } from '@/contexts';
 import { useOnboardingStore, useAuthStore, useTimezoneStore } from '@/stores';
 import { BannerAdView } from '@/components/ads';
-import { useBannerAdBottom } from '@/hooks/useConsistentBottomInset';
+import { useBannerAdBottom, usePremiumContentPadding } from '@/hooks/useConsistentBottomInset';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
 import { db } from '@/lib/supabase';
 import { anniversaryService } from '@/services/anniversaryService';
@@ -393,6 +393,7 @@ export default function HomeScreen() {
   const { getEffectiveTimezone } = useTimezoneStore();
   const { coupleId, heartLikedBy, updateHeartLiked } = useCoupleSyncStore();
   const bannerAdBottom = useBannerAdBottom();
+  const premiumContentPadding = usePremiumContentPadding();
 
   // Determine nicknames - always show "나 ❤️ 파트너" from current user's perspective
   const isCurrentUserCoupleUser1 = user?.id === couple?.user1Id;
@@ -1439,13 +1440,14 @@ export default function HomeScreen() {
       />
       <BlurView
         experimentalBlurMethod="dimezisBlurView"
-        intensity={50}
-        tint="dark"
+        intensity={Platform.OS === 'ios' ? 90 : 50}
+        tint={Platform.OS === 'ios' ? 'light' : 'default'}
         style={StyleSheet.absoluteFill}
       />
+      <View style={[styles.overlay, { backgroundColor: Platform.OS === 'ios' ? 'rgba(0, 0, 0, 0.3)' : 'rgba(0, 0, 0, 0.2)' }]} />
 
-      {/* Content */}
-      <View style={styles.content}>
+      {/* Content - 프리미엄 사용자는 배너 광고 높이만큼 추가 패딩 */}
+      <View style={[styles.content, premiumContentPadding > 0 && { paddingBottom: premiumContentPadding }]}>
         {/* Photo centered */}
         <View style={styles.polaroidContainer}>
           {/* Top section: line + user icon/names (line matches names width) */}
@@ -2189,6 +2191,7 @@ export default function HomeScreen() {
           </View>
         </View>
       )}
+
     </View>
   );
 }
@@ -2217,8 +2220,11 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1.0 }],
   },
   overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   content: {
     flex: 1,
