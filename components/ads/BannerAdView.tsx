@@ -78,7 +78,8 @@ export default function BannerAdView({
   }
 
   // Don't show ads in Expo Go (native module not available)
-  if (isExpoGo || !BannerAd) {
+  // Temporarily disable ads on Android for production release
+  if (isExpoGo || !BannerAd || Platform.OS === 'android') {
     return null;
   }
 

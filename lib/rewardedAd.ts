@@ -47,9 +47,10 @@ class RewardedAdManager {
 
   /**
    * Check if rewarded ads are available (not in Expo Go)
+   * Temporarily disable ads on Android for production release
    */
   isAvailable(): boolean {
-    return !isExpoGo && RewardedAd !== null;
+    return !isExpoGo && RewardedAd !== null && Platform.OS !== 'android';
   }
 
   /**

@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.daydate.app",
-      "buildNumber": "47",
+      "buildNumber": "48",
       "usesAppleSignIn": true,
       "infoPlist": {
         "NSCameraUsageDescription": "Allow Daydate to access your camera to capture memories.",
@@ -60,7 +60,7 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.ACCESS_FINE_LOCATION"
       ],
-      "versionCode": 22
+      "versionCode": 24
     },
     "web": {
       "bundler": "metro",

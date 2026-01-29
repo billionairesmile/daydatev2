@@ -117,7 +117,8 @@ export default function NativeAdMissionCard({
   }, [shouldShowAds]);
 
   // Don't show ads in Expo Go (native module not available)
-  if (isExpoGo || !NativeAd || !NativeAdView) {
+  // Temporarily disable ads on Android for production release
+  if (isExpoGo || !NativeAd || !NativeAdView || Platform.OS === 'android') {
     return null;
   }
 
