@@ -26,19 +26,19 @@ if (!isExpoGo) {
   }
 }
 
-// Ad unit IDs (iOS: production, Android: test until approved)
+// Ad unit IDs for iOS and Android
 const getAdUnitIds = () => {
   const isIOS = Platform.OS === 'ios';
   return {
     HOME_BANNER: isIOS
       ? 'ca-app-pub-9357146388578422/7136705590'
-      : TestIds?.BANNER || '',
+      : 'ca-app-pub-9357146388578422/5678501308',
     CALENDAR_BANNER: isIOS
       ? 'ca-app-pub-9357146388578422/5280698445'
-      : TestIds?.BANNER || '',
+      : 'ca-app-pub-9357146388578422/4832501107',
     MEMORIES_BANNER: isIOS
       ? 'ca-app-pub-9357146388578422/7906861781'
-      : TestIds?.BANNER || '',
+      : 'ca-app-pub-9357146388578422/3215989496',
   };
 };
 
@@ -78,8 +78,7 @@ export default function BannerAdView({
   }
 
   // Don't show ads in Expo Go (native module not available)
-  // Temporarily disable ads on Android for production release
-  if (isExpoGo || !BannerAd || Platform.OS === 'android') {
+  if (isExpoGo || !BannerAd) {
     return null;
   }
 

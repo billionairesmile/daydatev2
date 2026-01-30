@@ -39,11 +39,11 @@ if (!isExpoGo) {
   }
 }
 
-// Ad unit ID (iOS: production, Android: test until approved)
+// Ad unit IDs for iOS and Android
 const getNativeAdUnitId = () => {
   return Platform.OS === 'ios'
     ? 'ca-app-pub-9357146388578422/7715290092'
-    : TestIds?.NATIVE || '';
+    : 'ca-app-pub-9357146388578422/8935220036';
 };
 
 interface NativeAdMissionCardProps {
@@ -117,8 +117,7 @@ export default function NativeAdMissionCard({
   }, [shouldShowAds]);
 
   // Don't show ads in Expo Go (native module not available)
-  // Temporarily disable ads on Android for production release
-  if (isExpoGo || !NativeAd || !NativeAdView || Platform.OS === 'android') {
+  if (isExpoGo || !NativeAd || !NativeAdView) {
     return null;
   }
 

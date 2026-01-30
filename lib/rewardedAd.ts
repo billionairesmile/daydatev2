@@ -22,11 +22,11 @@ if (!isExpoGo) {
   }
 }
 
-// Ad unit ID (iOS: production, Android: test until approved)
+// Ad unit IDs for iOS and Android
 const getRewardedAdUnitId = () => {
   return Platform.OS === 'ios'
     ? 'ca-app-pub-9357146388578422/5381012045'
-    : TestIds?.REWARDED || '';
+    : 'ca-app-pub-9357146388578422/2294340749';
 };
 
 interface RewardedAdCallbacks {
@@ -47,10 +47,9 @@ class RewardedAdManager {
 
   /**
    * Check if rewarded ads are available (not in Expo Go)
-   * Temporarily disable ads on Android for production release
    */
   isAvailable(): boolean {
-    return !isExpoGo && RewardedAd !== null && Platform.OS !== 'android';
+    return !isExpoGo && RewardedAd !== null;
   }
 
   /**
