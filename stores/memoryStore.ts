@@ -103,6 +103,8 @@ export const useMemoryStore = create<MemoryState & MemoryActions>()(
       },
 
       // Load memories from database
+      // Merges DB data with local-only memories to prevent race conditions
+      // (e.g., when mission is completed but not yet saved to DB)
       loadFromDB: async (coupleId: string) => {
         if (isInTestMode()) {
           return; // Use local data in demo/test mode
@@ -117,12 +119,50 @@ export const useMemoryStore = create<MemoryState & MemoryActions>()(
             throw error;
           }
 
+          const localMemories = get().memories;
+
           if (data && data.length > 0) {
-            const memories = data.map(dbToCompletedMission);
-            set({ memories, isLoading: false });
+            const dbMemories = data.map(dbToCompletedMission);
+
+            // Create a set of DB memory IDs for fast lookup
+            const dbIds = new Set(dbMemories.map(m => m.id));
+
+            // Also check by missionId + date to catch memories with temp IDs
+            const dbMissionDateKeys = new Set(
+              dbMemories.map(m => {
+                const dateStr = new Date(m.completedAt).toISOString().split('T')[0];
+                return `${m.missionId}-${dateStr}`;
+              })
+            );
+
+            // Preserve local-only memories (not yet in DB)
+            // These have temporary IDs like "memory-{timestamp}"
+            const localOnlyMemories = localMemories.filter(localMem => {
+              // Skip if this ID exists in DB
+              if (dbIds.has(localMem.id)) return false;
+
+              // Skip if this missionId + date combo exists in DB (same mission, different ID)
+              const localDateStr = new Date(localMem.completedAt).toISOString().split('T')[0];
+              const localKey = `${localMem.missionId}-${localDateStr}`;
+              if (dbMissionDateKeys.has(localKey)) return false;
+
+              // Keep local-only memories (temp IDs not in DB yet)
+              return localMem.id.startsWith('memory-');
+            });
+
+            // Merge: DB memories + local-only memories
+            const mergedMemories = [...dbMemories, ...localOnlyMemories];
+            console.log('[MemoryStore] Merged memories:', dbMemories.length, 'from DB +', localOnlyMemories.length, 'local-only');
+            set({ memories: mergedMemories, isLoading: false });
           } else {
-            // Clear memories when database returns empty (e.g., after deletion)
-            set({ memories: [], isLoading: false });
+            // DB is empty - preserve local-only memories with temp IDs
+            const localOnlyMemories = localMemories.filter(m => m.id.startsWith('memory-'));
+            if (localOnlyMemories.length > 0) {
+              console.log('[MemoryStore] DB empty, preserving', localOnlyMemories.length, 'local-only memories');
+              set({ memories: localOnlyMemories, isLoading: false });
+            } else {
+              set({ memories: [], isLoading: false });
+            }
           }
         } catch (error) {
           console.error('Error loading memories from DB:', error);

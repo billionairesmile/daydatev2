@@ -227,6 +227,7 @@ export default function PremiumSubscriptionModal({
         animationType="fade"
         transparent
         onRequestClose={onClose}
+        statusBarTranslucent={true}
       >
         <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
           <StatusBar barStyle="dark-content" />
@@ -281,6 +282,7 @@ export default function PremiumSubscriptionModal({
       animationType="fade"
       transparent
       onRequestClose={onClose}
+      statusBarTranslucent={true}
     >
       <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         <StatusBar barStyle="dark-content" />
@@ -476,6 +478,7 @@ export default function PremiumSubscriptionModal({
 
 const styles = StyleSheet.create({
   container: {
+    ...StyleSheet.absoluteFillObject,
     flex: 1,
     backgroundColor: COLORS.white,
   },

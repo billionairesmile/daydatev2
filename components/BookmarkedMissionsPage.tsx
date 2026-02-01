@@ -12,7 +12,7 @@ import { useTranslation } from 'react-i18next';
 import { Image } from 'expo-image';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ChevronLeft, Bookmark, Trash2, Check } from 'lucide-react-native';
+import { ChevronLeft, Bookmark, Trash2 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
 import { COLORS, SPACING, isFoldableDevice } from '@/constants/design';
@@ -82,7 +82,13 @@ export function BookmarkedMissionsPage({ onBack }: BookmarkedMissionsPageProps) 
     return (bookmark as KeptMission).keptId;
   };
 
-  const handleMissionPress = useCallback((missionId: string) => {
+  const handleMissionPress = useCallback((missionId: string, isCompleted: boolean) => {
+    // If completed, navigate to view the completed mission
+    if (isCompleted) {
+      router.push(`/mission/${missionId}?source=bookmark`);
+      return;
+    }
+
     // Show message if can't start (already completed another mission today or another in progress)
     if (!canStartMission(missionId) && !isTodayCompletedMission(missionId)) {
       if (isAnotherMissionInProgress(missionId)) {
@@ -183,13 +189,6 @@ export function BookmarkedMissionsPage({ onBack }: BookmarkedMissionsPageProps) 
                 <BlurView experimentalBlurMethod="dimezisBlurView" intensity={60} tint={Platform.OS === 'android' ? 'dark' : 'default'} style={StyleSheet.absoluteFill} />
                 <View style={styles.cardDarkOverlay} />
 
-                {/* Completed Badge */}
-                {isCompleted && (
-                  <View style={styles.completedBadge}>
-                    <Check color={COLORS.white} size={12} strokeWidth={3} />
-                    <Text style={styles.completedBadgeText}>{t('mission.completed')}</Text>
-                  </View>
-                )}
 
                 <View style={styles.cardInner}>
                   {/* Thumbnail */}
@@ -221,18 +220,17 @@ export function BookmarkedMissionsPage({ onBack }: BookmarkedMissionsPageProps) 
 
                     {/* Action Buttons */}
                     <View style={styles.actionButtonsRow}>
-                      {/* Start Button - disabled if completed */}
+                      {/* Start/View Button */}
                       <Pressable
                         style={[
                           styles.startButton,
-                          (isCompleted || (!canStartMission(mission.id) && !isTodayCompletedMission(mission.id))) && styles.startButtonDisabled,
+                          !isCompleted && (!canStartMission(mission.id) && !isTodayCompletedMission(mission.id)) && styles.startButtonDisabled,
                         ]}
-                        onPress={() => !isCompleted && handleMissionPress(mission.id)}
-                        disabled={isCompleted}
+                        onPress={() => handleMissionPress(mission.id, isCompleted)}
                       >
                         <Text style={[
                           styles.startButtonText,
-                          (isCompleted || (!canStartMission(mission.id) && !isTodayCompletedMission(mission.id))) && styles.startButtonTextDisabled,
+                          !isCompleted && (!canStartMission(mission.id) && !isTodayCompletedMission(mission.id)) && styles.startButtonTextDisabled,
                         ]}>
                           {isCompleted
                             ? t('mission.completed')
@@ -435,24 +433,6 @@ const styles = StyleSheet.create({
   },
   startButtonTextDisabled: {
     color: 'rgba(255, 255, 255, 0.5)',
-  },
-  completedBadge: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(76, 175, 80, 0.9)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-    zIndex: 10,
-  },
-  completedBadgeText: {
-    fontSize: 11,
-    color: COLORS.white,
-    fontWeight: '700',
   },
   thumbnailCompleted: {
     opacity: 0.5,

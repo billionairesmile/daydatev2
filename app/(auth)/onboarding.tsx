@@ -2092,6 +2092,7 @@ function TermsStep({
         animationType="slide"
         presentationStyle="pageSheet"
         onRequestClose={() => setPolicyModalVisible(false)}
+        statusBarTranslucent={true}
       >
         <SafeAreaView style={styles.policyModalContainer}>
           <View style={styles.policyModalHeader}>
@@ -5331,6 +5332,7 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
   emailModalOverlay: {
+    ...StyleSheet.absoluteFillObject,
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
@@ -5500,6 +5502,7 @@ const styles = StyleSheet.create({
     lineHeight: scale(18),
   },
   policyModalContainer: {
+    ...StyleSheet.absoluteFillObject,
     flex: 1,
     backgroundColor: COLORS.white,
   },

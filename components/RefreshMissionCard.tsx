@@ -12,9 +12,10 @@ import { usePremiumFeature } from '@/stores/subscriptionStore';
 
 interface RefreshMissionCardProps {
   onRefreshPress: () => void;
+  disabled?: boolean;
 }
 
-export default function RefreshMissionCard({ onRefreshPress }: RefreshMissionCardProps) {
+export default function RefreshMissionCard({ onRefreshPress, disabled }: RefreshMissionCardProps) {
   const { t } = useTranslation();
   const { isPremium } = usePremiumFeature();
 
@@ -31,8 +32,9 @@ export default function RefreshMissionCard({ onRefreshPress }: RefreshMissionCar
         </View>
 
         <Pressable
-          style={styles.refreshButton}
+          style={[styles.refreshButton, disabled && styles.refreshButtonDisabled]}
           onPress={onRefreshPress}
+          disabled={disabled}
         >
           <Text style={styles.refreshButtonText}>
             {t('mission.refresh.button')}
@@ -79,6 +81,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     backgroundColor: COLORS.black,
     borderRadius: RADIUS.lg,
+  },
+  refreshButtonDisabled: {
+    opacity: 0.5,
   },
   refreshButtonText: {
     fontSize: 16,

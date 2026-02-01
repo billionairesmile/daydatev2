@@ -138,7 +138,10 @@ export default function MoreScreen() {
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          Platform.OS === 'android' && { paddingBottom: rs(180) },
+        ]}
       >
         {/* Menu Sections */}
         {menuSections.map((section, sectionIndex) => (
@@ -195,9 +198,9 @@ export default function MoreScreen() {
         onClose={() => setShowPremiumModal(false)}
       />
 
-      {/* Banner Ad - Fixed at bottom (Android only) */}
-      {Platform.OS === 'android' && (
-        <BannerAdView placement="home" style={[styles.bannerAd, { bottom: bannerAdBottom }]} />
+      {/* Banner Ad - iOS only (Android renders banner inside tab bar) */}
+      {Platform.OS === 'ios' && (
+        <BannerAdView placement="more" style={[styles.bannerAd, { bottom: bannerAdBottom }]} />
       )}
 
     </View>
