@@ -1427,6 +1427,472 @@ export default function HomeScreen() {
     return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   };
 
+  // Render Anniversary Modal Content - extracted for Platform conditional
+  const renderAnniversaryModalContent = () => (
+    <>
+      <TouchableWithoutFeedback onPress={() => {
+        if (anniversaryModalStep === 'list') {
+          closeAnniversaryModal();
+        }
+      }}>
+        <View style={styles.modalBackdrop} />
+      </TouchableWithoutFeedback>
+
+      {/* Step: List */}
+      {anniversaryModalStep === 'list' && (
+        <View style={styles.anniversaryModalContent}>
+          <View style={styles.anniversaryModalHeader}>
+            <Text style={styles.anniversaryModalTitle}>{t('home.anniversary.title')}</Text>
+            <Pressable
+              onPress={closeAnniversaryModal}
+              style={styles.modalCloseButton}
+            >
+              <X color="rgba(255,255,255,0.8)" size={rs(20)} />
+            </Pressable>
+          </View>
+          <View style={styles.anniversaryHeaderDivider} />
+          <ScrollView
+            style={styles.anniversaryListContainer}
+            contentContainerStyle={styles.anniversaryListContent}
+            showsVerticalScrollIndicator={false}
+            bounces={true}
+          >
+            {anniversaries.map((anniversary) => (
+              <SwipeableAnniversaryCard
+                key={String(anniversary.id)}
+                anniversary={anniversary}
+                isCustom={anniversary.isCustom === true}
+                onEdit={() => handleEditAnniversary(anniversary)}
+                onDelete={() => handleDeleteAnniversary(anniversary)}
+                t={t}
+              />
+            ))}
+          </ScrollView>
+          <View style={styles.anniversaryFooterDivider} />
+          <View style={styles.anniversaryFooter}>
+            <Pressable
+              style={styles.addAnniversaryButton}
+              onPress={goToAddStep}
+            >
+              <Text style={styles.addAnniversaryText}>{t('home.anniversary.add')}</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+
+      {/* Step: Add */}
+      {anniversaryModalStep === 'add' && (
+        <KeyboardAvoidingView
+          behavior="padding"
+          style={styles.keyboardAvoidingView}
+        >
+          <View style={styles.addAnniversaryModalContent}>
+            <View style={styles.addAnniversaryHeader}>
+              <Text style={styles.addAnniversaryTitle}>{t('home.anniversary.add')}</Text>
+              <Pressable
+                onPress={goToListStep}
+                style={styles.modalCloseButton}
+              >
+                <X color="rgba(255,255,255,0.8)" size={rs(20)} />
+              </Pressable>
+            </View>
+            <View style={styles.anniversaryHeaderDivider} />
+
+            <ScrollView
+              style={styles.addAnniversaryForm}
+              contentContainerStyle={styles.addAnniversaryFormContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              <Pressable
+                style={styles.formSection}
+                onPress={() => showEmojiPicker && setShowEmojiPicker(false)}
+              >
+                <Text style={styles.formLabel}>{t('home.anniversary.name')}</Text>
+                <View style={styles.iconNameRow}>
+                  <Pressable
+                    style={styles.iconButton}
+                    onPress={() => setShowEmojiPicker(!showEmojiPicker)}
+                  >
+                    <Text style={styles.selectedIconSmall}>{newAnniversaryIcon}</Text>
+                  </Pressable>
+                  {showEmojiPicker ? (
+                    <Pressable
+                      style={styles.nameInput}
+                      onPress={() => setShowEmojiPicker(false)}
+                    >
+                      <Text style={[
+                        { color: newAnniversaryName ? COLORS.white : 'rgba(255,255,255,0.4)', fontSize: fp(15) }
+                      ]}>
+                        {newAnniversaryName || t('home.anniversary.namePlaceholder')}
+                      </Text>
+                    </Pressable>
+                  ) : (
+                    <TextInput
+                      ref={nameInputRef}
+                      style={styles.nameInput}
+                      placeholder={t('home.anniversary.namePlaceholder')}
+                      placeholderTextColor="rgba(255,255,255,0.4)"
+                      value={newAnniversaryName}
+                      onChangeText={setNewAnniversaryName}
+                    />
+                  )}
+                </View>
+
+                {showEmojiPicker && (
+                  <View style={styles.emojiPickerContainer}>
+                    <View style={styles.emojiGrid}>
+                      {emojiOptions.map((emoji, index) => (
+                        <Pressable
+                          key={index}
+                          style={[
+                            styles.emojiOption,
+                            newAnniversaryIcon === emoji && styles.emojiOptionSelected,
+                          ]}
+                          onPress={() => {
+                            setNewAnniversaryIcon(emoji);
+                            setShowEmojiPicker(false);
+                          }}
+                        >
+                          <Text style={styles.emojiOptionText}>{emoji}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+                )}
+              </Pressable>
+
+              <Pressable style={styles.formSection} onPress={() => setShowEmojiPicker(false)}>
+                <Text style={styles.formLabel}>{t('home.anniversary.date')}</Text>
+                <Pressable
+                  style={styles.datePickerButton}
+                  onPress={() => {
+                    setShowEmojiPicker(false);
+                    goToAddDatePickerStep();
+                  }}
+                >
+                  <Text style={styles.datePickerButtonText}>
+                    {formatDisplayDate(newAnniversaryDate)}
+                  </Text>
+                </Pressable>
+              </Pressable>
+            </ScrollView>
+
+            <View style={styles.anniversaryFooterDivider} />
+            <View style={styles.addAnniversaryFooter}>
+              <Pressable
+                style={[
+                  styles.submitButton,
+                  !newAnniversaryName.trim() && styles.submitButtonDisabled,
+                ]}
+                onPress={handleAddAnniversary}
+                disabled={!newAnniversaryName.trim()}
+              >
+                <View style={styles.submitButtonInner}>
+                  <Text style={styles.submitButtonText}>{t('common.done')}</Text>
+                </View>
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      )}
+
+      {/* Step: Add Date Picker */}
+      {anniversaryModalStep === 'addDatePicker' && (
+        <View style={styles.datePickerModalContent}>
+          <View style={styles.datePickerModalHeader}>
+            <Text style={styles.datePickerModalTitle}>{t('home.anniversary.selectDate') || '날짜 선택'}</Text>
+            <Pressable
+              onPress={() => goToAddFromDatePicker()}
+              style={styles.modalCloseButton}
+            >
+              <X color="rgba(255,255,255,0.8)" size={rs(20)} />
+            </Pressable>
+          </View>
+          <View style={styles.anniversaryHeaderDivider} />
+
+          <View style={styles.datePickerModalBody}>
+            <View style={styles.pickerMonthNav}>
+              <Pressable
+                onPress={() => setPickerMonth(new Date(pickerMonth.getFullYear(), pickerMonth.getMonth() - 1, 1))}
+                style={styles.pickerNavButton}
+              >
+                <ChevronLeft color={COLORS.white} size={rs(18)} />
+              </Pressable>
+              <Text style={styles.pickerMonthText}>
+                {i18n.language === 'ko'
+                  ? `${pickerMonth.getFullYear()}년 ${pickerMonth.getMonth() + 1}월`
+                  : pickerMonth.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}
+              </Text>
+              <Pressable
+                onPress={() => setPickerMonth(new Date(pickerMonth.getFullYear(), pickerMonth.getMonth() + 1, 1))}
+                style={styles.pickerNavButton}
+              >
+                <ChevronRight color={COLORS.white} size={rs(18)} />
+              </Pressable>
+            </View>
+
+            <View style={styles.pickerDayNames}>
+              {(t('calendar.dayNames', { returnObjects: true }) as string[]).map((day: string, idx: number) => (
+                <Text
+                  key={day}
+                  style={[
+                    styles.pickerDayName,
+                    idx === 0 && { color: '#ef4444' },
+                  ]}
+                >
+                  {day}
+                </Text>
+              ))}
+            </View>
+
+            <View style={styles.pickerGrid}>
+              {getPickerDaysArray(pickerMonth).map((day, index) => {
+                if (day === null) {
+                  return <View key={`empty-${index}`} style={styles.pickerDayCell} />;
+                }
+
+                const isSelected = isPickerDateSelected(day, newAnniversaryDate, pickerMonth);
+                const dayOfWeek = new Date(pickerMonth.getFullYear(), pickerMonth.getMonth(), day).getDay();
+                const isSunday = dayOfWeek === 0;
+
+                return (
+                  <Pressable
+                    key={day}
+                    style={styles.pickerDayCell}
+                    onPress={() => {
+                      const selectedDate = new Date(pickerMonth.getFullYear(), pickerMonth.getMonth(), day);
+                      goToAddFromDatePicker(selectedDate);
+                    }}
+                  >
+                    {isSelected ? (
+                      <View style={styles.pickerDayCellInnerSelected}>
+                        <Text style={styles.pickerDayTextSelected}>{day}</Text>
+                      </View>
+                    ) : (
+                      <View style={styles.pickerDayCellInner}>
+                        <Text style={[styles.pickerDayText, isSunday && { color: '#ef4444' }]}>
+                          {day}
+                        </Text>
+                      </View>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Step: Edit */}
+      {anniversaryModalStep === 'edit' && (
+        <KeyboardAvoidingView
+          behavior="padding"
+          style={styles.keyboardAvoidingView}
+        >
+          <View style={styles.addAnniversaryModalContent}>
+            <View style={styles.addAnniversaryHeader}>
+              <Text style={styles.addAnniversaryTitle}>{t('home.anniversary.edit')}</Text>
+              <Pressable
+                onPress={() => {
+                  setEditingAnniversary(null);
+                  goToListStep();
+                }}
+                style={styles.modalCloseButton}
+              >
+                <X color="rgba(255,255,255,0.8)" size={rs(20)} />
+              </Pressable>
+            </View>
+            <View style={styles.anniversaryHeaderDivider} />
+
+            <ScrollView
+              style={styles.addAnniversaryForm}
+              contentContainerStyle={styles.addAnniversaryFormContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              <Pressable
+                style={styles.formSection}
+                onPress={() => showEditEmojiPicker && setShowEditEmojiPicker(false)}
+              >
+                <Text style={styles.formLabel}>{t('home.anniversary.name')}</Text>
+                <View style={styles.iconNameRow}>
+                  <Pressable
+                    style={styles.iconButton}
+                    onPress={() => setShowEditEmojiPicker(!showEditEmojiPicker)}
+                  >
+                    <Text style={styles.selectedIconSmall}>{editAnniversaryIcon}</Text>
+                  </Pressable>
+                  {showEditEmojiPicker ? (
+                    <Pressable
+                      style={styles.nameInput}
+                      onPress={() => setShowEditEmojiPicker(false)}
+                    >
+                      <Text style={[
+                        { color: editAnniversaryName ? COLORS.white : 'rgba(255,255,255,0.4)', fontSize: fp(15) }
+                      ]}>
+                        {editAnniversaryName || t('home.anniversary.namePlaceholder')}
+                      </Text>
+                    </Pressable>
+                  ) : (
+                    <TextInput
+                      ref={editNameInputRef}
+                      style={styles.nameInput}
+                      placeholder={t('home.anniversary.namePlaceholder')}
+                      placeholderTextColor="rgba(255,255,255,0.4)"
+                      value={editAnniversaryName}
+                      onChangeText={setEditAnniversaryName}
+                    />
+                  )}
+                </View>
+
+                {showEditEmojiPicker && (
+                  <View style={styles.emojiPickerContainer}>
+                    <View style={styles.emojiGrid}>
+                      {emojiOptions.map((emoji, index) => (
+                        <Pressable
+                          key={index}
+                          style={[
+                            styles.emojiOption,
+                            editAnniversaryIcon === emoji && styles.emojiOptionSelected,
+                          ]}
+                          onPress={() => {
+                            setEditAnniversaryIcon(emoji);
+                            setShowEditEmojiPicker(false);
+                          }}
+                        >
+                          <Text style={styles.emojiOptionText}>{emoji}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+                )}
+              </Pressable>
+
+              <Pressable style={styles.formSection} onPress={() => setShowEditEmojiPicker(false)}>
+                <Text style={styles.formLabel}>{t('home.anniversary.date')}</Text>
+                <Pressable
+                  style={styles.datePickerButton}
+                  onPress={() => {
+                    setShowEditEmojiPicker(false);
+                    goToEditDatePickerStep();
+                  }}
+                >
+                  <Text style={styles.datePickerButtonText}>
+                    {formatDisplayDate(editAnniversaryDate)}
+                  </Text>
+                </Pressable>
+              </Pressable>
+            </ScrollView>
+
+            <View style={styles.anniversaryFooterDivider} />
+            <View style={styles.addAnniversaryFooter}>
+              <Pressable
+                style={[
+                  styles.submitButton,
+                  !editAnniversaryName.trim() && styles.submitButtonDisabled,
+                ]}
+                onPress={handleSaveEditAnniversary}
+                disabled={!editAnniversaryName.trim()}
+              >
+                <View style={styles.submitButtonInner}>
+                  <Text style={styles.submitButtonText}>{t('common.confirm')}</Text>
+                </View>
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      )}
+
+      {/* Step: Edit Date Picker */}
+      {anniversaryModalStep === 'editDatePicker' && (
+        <View style={styles.datePickerModalContent}>
+          <View style={styles.datePickerModalHeader}>
+            <Text style={styles.datePickerModalTitle}>{t('home.anniversary.selectDate') || '날짜 선택'}</Text>
+            <Pressable
+              onPress={() => goToEditFromDatePicker()}
+              style={styles.modalCloseButton}
+            >
+              <X color="rgba(255,255,255,0.8)" size={rs(20)} />
+            </Pressable>
+          </View>
+          <View style={styles.anniversaryHeaderDivider} />
+
+          <View style={styles.datePickerModalBody}>
+            <View style={styles.pickerMonthNav}>
+              <Pressable
+                onPress={() => setEditPickerMonth(new Date(editPickerMonth.getFullYear(), editPickerMonth.getMonth() - 1, 1))}
+                style={styles.pickerNavButton}
+              >
+                <ChevronLeft color={COLORS.white} size={rs(18)} />
+              </Pressable>
+              <Text style={styles.pickerMonthText}>
+                {i18n.language === 'ko'
+                  ? `${editPickerMonth.getFullYear()}년 ${editPickerMonth.getMonth() + 1}월`
+                  : editPickerMonth.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}
+              </Text>
+              <Pressable
+                onPress={() => setEditPickerMonth(new Date(editPickerMonth.getFullYear(), editPickerMonth.getMonth() + 1, 1))}
+                style={styles.pickerNavButton}
+              >
+                <ChevronRight color={COLORS.white} size={rs(18)} />
+              </Pressable>
+            </View>
+
+            <View style={styles.pickerDayNames}>
+              {(t('calendar.dayNames', { returnObjects: true }) as string[]).map((day: string, idx: number) => (
+                <Text
+                  key={day}
+                  style={[
+                    styles.pickerDayName,
+                    idx === 0 && { color: '#ef4444' },
+                  ]}
+                >
+                  {day}
+                </Text>
+              ))}
+            </View>
+
+            <View style={styles.pickerGrid}>
+              {getPickerDaysArray(editPickerMonth).map((day, index) => {
+                if (day === null) {
+                  return <View key={`empty-${index}`} style={styles.pickerDayCell} />;
+                }
+
+                const isSelected = isPickerDateSelected(day, editAnniversaryDate, editPickerMonth);
+                const dayOfWeek = new Date(editPickerMonth.getFullYear(), editPickerMonth.getMonth(), day).getDay();
+                const isSunday = dayOfWeek === 0;
+
+                return (
+                  <Pressable
+                    key={day}
+                    style={styles.pickerDayCell}
+                    onPress={() => {
+                      const selectedDate = new Date(editPickerMonth.getFullYear(), editPickerMonth.getMonth(), day);
+                      goToEditFromDatePicker(selectedDate);
+                    }}
+                  >
+                    {isSelected ? (
+                      <View style={styles.pickerDayCellInnerSelected}>
+                        <Text style={styles.pickerDayTextSelected}>{day}</Text>
+                      </View>
+                    ) : (
+                      <View style={styles.pickerDayCellInner}>
+                        <Text style={[styles.pickerDayText, isSunday && { color: '#ef4444' }]}>
+                          {day}
+                        </Text>
+                      </View>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+      )}
+    </>
+  );
+
   return (
     <View style={styles.container}>
       {/* Background Image */}
@@ -1545,14 +2011,17 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Banner Ad - Fixed at bottom, dynamically positioned above tab bar */}
-      <BannerAdView placement="home" style={[styles.bannerAd, { bottom: bannerAdBottom }]} />
+      {/* Banner Ad - iOS only (Android renders banner inside tab bar) */}
+      {Platform.OS === 'ios' && (
+        <BannerAdView placement="home" style={[styles.bannerAd, { bottom: bannerAdBottom }]} />
+      )}
 
       {/* Anniversary Modal with Blur - Single modal with step-based content */}
       <Modal
         visible={showAnniversaryModal}
         transparent
         animationType="fade"
+        statusBarTranslucent={true}
         onRequestClose={() => {
           if (anniversaryModalStep === 'list') {
             closeAnniversaryModal();
@@ -1567,466 +2036,7 @@ export default function HomeScreen() {
       >
         <View style={styles.blurContainer}>
           <BlurView experimentalBlurMethod="dimezisBlurView" intensity={80} tint="dark" style={styles.blurOverlay}>
-            <TouchableWithoutFeedback onPress={() => {
-              if (anniversaryModalStep === 'list') {
-                closeAnniversaryModal();
-              }
-            }}>
-              <View style={styles.modalBackdrop} />
-            </TouchableWithoutFeedback>
-
-            {/* Step: List */}
-            {anniversaryModalStep === 'list' && (
-              <View style={styles.anniversaryModalContent}>
-                <View style={styles.anniversaryModalHeader}>
-                  <Text style={styles.anniversaryModalTitle}>{t('home.anniversary.title')}</Text>
-                  <Pressable
-                    onPress={closeAnniversaryModal}
-                    style={styles.modalCloseButton}
-                  >
-                    <X color="rgba(255,255,255,0.8)" size={rs(20)} />
-                  </Pressable>
-                </View>
-                <View style={styles.anniversaryHeaderDivider} />
-                <ScrollView
-                  style={styles.anniversaryListContainer}
-                  contentContainerStyle={styles.anniversaryListContent}
-                  showsVerticalScrollIndicator={false}
-                  bounces={true}
-                >
-                  {anniversaries.map((anniversary) => (
-                    <SwipeableAnniversaryCard
-                      key={String(anniversary.id)}
-                      anniversary={anniversary}
-                      isCustom={anniversary.isCustom === true}
-                      onEdit={() => handleEditAnniversary(anniversary)}
-                      onDelete={() => handleDeleteAnniversary(anniversary)}
-                      t={t}
-                    />
-                  ))}
-                </ScrollView>
-                <View style={styles.anniversaryFooterDivider} />
-                <View style={styles.anniversaryFooter}>
-                  <Pressable
-                    style={styles.addAnniversaryButton}
-                    onPress={goToAddStep}
-                  >
-                    <Text style={styles.addAnniversaryText}>{t('home.anniversary.add')}</Text>
-                  </Pressable>
-                </View>
-              </View>
-            )}
-
-            {/* Step: Add */}
-            {anniversaryModalStep === 'add' && (
-              <KeyboardAvoidingView
-                behavior="padding"
-                style={styles.keyboardAvoidingView}
-              >
-                <View style={styles.addAnniversaryModalContent}>
-                  <View style={styles.addAnniversaryHeader}>
-                    <Text style={styles.addAnniversaryTitle}>{t('home.anniversary.add')}</Text>
-                    <Pressable
-                      onPress={goToListStep}
-                      style={styles.modalCloseButton}
-                    >
-                      <X color="rgba(255,255,255,0.8)" size={rs(20)} />
-                    </Pressable>
-                  </View>
-                  <View style={styles.anniversaryHeaderDivider} />
-
-                  <ScrollView
-                    style={styles.addAnniversaryForm}
-                    contentContainerStyle={styles.addAnniversaryFormContent}
-                    showsVerticalScrollIndicator={false}
-                    keyboardShouldPersistTaps="handled"
-                  >
-                    <Pressable
-                      style={styles.formSection}
-                      onPress={() => showEmojiPicker && setShowEmojiPicker(false)}
-                    >
-                      <Text style={styles.formLabel}>{t('home.anniversary.name')}</Text>
-                      <View style={styles.iconNameRow}>
-                        <Pressable
-                          style={styles.iconButton}
-                          onPress={() => setShowEmojiPicker(!showEmojiPicker)}
-                        >
-                          <Text style={styles.selectedIconSmall}>{newAnniversaryIcon}</Text>
-                        </Pressable>
-                        {showEmojiPicker ? (
-                          <Pressable
-                            style={styles.nameInput}
-                            onPress={() => setShowEmojiPicker(false)}
-                          >
-                            <Text style={[
-                              { color: newAnniversaryName ? COLORS.white : 'rgba(255,255,255,0.4)', fontSize: fp(15) }
-                            ]}>
-                              {newAnniversaryName || t('home.anniversary.namePlaceholder')}
-                            </Text>
-                          </Pressable>
-                        ) : (
-                          <TextInput
-                            ref={nameInputRef}
-                            style={styles.nameInput}
-                            placeholder={t('home.anniversary.namePlaceholder')}
-                            placeholderTextColor="rgba(255,255,255,0.4)"
-                            value={newAnniversaryName}
-                            onChangeText={setNewAnniversaryName}
-                          />
-                        )}
-                      </View>
-
-                      {showEmojiPicker && (
-                        <View style={styles.emojiPickerContainer}>
-                          <View style={styles.emojiGrid}>
-                            {emojiOptions.map((emoji, index) => (
-                              <Pressable
-                                key={index}
-                                style={[
-                                  styles.emojiOption,
-                                  newAnniversaryIcon === emoji && styles.emojiOptionSelected,
-                                ]}
-                                onPress={() => {
-                                  setNewAnniversaryIcon(emoji);
-                                  setShowEmojiPicker(false);
-                                }}
-                              >
-                                <Text style={styles.emojiOptionText}>{emoji}</Text>
-                              </Pressable>
-                            ))}
-                          </View>
-                        </View>
-                      )}
-                    </Pressable>
-
-                    <Pressable style={styles.formSection} onPress={() => setShowEmojiPicker(false)}>
-                      <Text style={styles.formLabel}>{t('home.anniversary.date')}</Text>
-                      <Pressable
-                        style={styles.datePickerButton}
-                        onPress={() => {
-                          setShowEmojiPicker(false);
-                          goToAddDatePickerStep();
-                        }}
-                      >
-                        <Text style={styles.datePickerButtonText}>
-                          {formatDisplayDate(newAnniversaryDate)}
-                        </Text>
-                      </Pressable>
-                    </Pressable>
-                  </ScrollView>
-
-                  <View style={styles.anniversaryFooterDivider} />
-                  <View style={styles.addAnniversaryFooter}>
-                    <Pressable
-                      style={[
-                        styles.submitButton,
-                        !newAnniversaryName.trim() && styles.submitButtonDisabled,
-                      ]}
-                      onPress={handleAddAnniversary}
-                      disabled={!newAnniversaryName.trim()}
-                    >
-                      <View style={styles.submitButtonInner}>
-                        <Text style={styles.submitButtonText}>{t('common.done')}</Text>
-                      </View>
-                    </Pressable>
-                  </View>
-                </View>
-              </KeyboardAvoidingView>
-            )}
-
-            {/* Step: Add Date Picker */}
-            {anniversaryModalStep === 'addDatePicker' && (
-              <View style={styles.datePickerModalContent}>
-                <View style={styles.datePickerModalHeader}>
-                  <Text style={styles.datePickerModalTitle}>{t('home.anniversary.selectDate') || '날짜 선택'}</Text>
-                  <Pressable
-                    onPress={() => goToAddFromDatePicker()}
-                    style={styles.modalCloseButton}
-                  >
-                    <X color="rgba(255,255,255,0.8)" size={rs(20)} />
-                  </Pressable>
-                </View>
-                <View style={styles.anniversaryHeaderDivider} />
-
-                <View style={styles.datePickerModalBody}>
-                  <View style={styles.pickerMonthNav}>
-                    <Pressable
-                      onPress={() => setPickerMonth(new Date(pickerMonth.getFullYear(), pickerMonth.getMonth() - 1, 1))}
-                      style={styles.pickerNavButton}
-                    >
-                      <ChevronLeft color={COLORS.white} size={rs(18)} />
-                    </Pressable>
-                    <Text style={styles.pickerMonthText}>
-                      {i18n.language === 'ko'
-                        ? `${pickerMonth.getFullYear()}년 ${pickerMonth.getMonth() + 1}월`
-                        : pickerMonth.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}
-                    </Text>
-                    <Pressable
-                      onPress={() => setPickerMonth(new Date(pickerMonth.getFullYear(), pickerMonth.getMonth() + 1, 1))}
-                      style={styles.pickerNavButton}
-                    >
-                      <ChevronRight color={COLORS.white} size={rs(18)} />
-                    </Pressable>
-                  </View>
-
-                  <View style={styles.pickerDayNames}>
-                    {(t('calendar.dayNames', { returnObjects: true }) as string[]).map((day: string, idx: number) => (
-                      <Text
-                        key={day}
-                        style={[
-                          styles.pickerDayName,
-                          idx === 0 && { color: '#ef4444' },
-                        ]}
-                      >
-                        {day}
-                      </Text>
-                    ))}
-                  </View>
-
-                  <View style={styles.pickerGrid}>
-                    {getPickerDaysArray(pickerMonth).map((day, index) => {
-                      if (day === null) {
-                        return <View key={`empty-${index}`} style={styles.pickerDayCell} />;
-                      }
-
-                      const isSelected = isPickerDateSelected(day, newAnniversaryDate, pickerMonth);
-                      const dayOfWeek = new Date(pickerMonth.getFullYear(), pickerMonth.getMonth(), day).getDay();
-                      const isSunday = dayOfWeek === 0;
-
-                      return (
-                        <Pressable
-                          key={day}
-                          style={styles.pickerDayCell}
-                          onPress={() => {
-                            const selectedDate = new Date(pickerMonth.getFullYear(), pickerMonth.getMonth(), day);
-                            goToAddFromDatePicker(selectedDate);
-                          }}
-                        >
-                          {isSelected ? (
-                            <View style={styles.pickerDayCellInnerSelected}>
-                              <Text style={styles.pickerDayTextSelected}>{day}</Text>
-                            </View>
-                          ) : (
-                            <View style={styles.pickerDayCellInner}>
-                              <Text style={[styles.pickerDayText, isSunday && { color: '#ef4444' }]}>
-                                {day}
-                              </Text>
-                            </View>
-                          )}
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                </View>
-              </View>
-            )}
-
-            {/* Step: Edit */}
-            {anniversaryModalStep === 'edit' && (
-              <KeyboardAvoidingView
-                behavior="padding"
-                style={styles.keyboardAvoidingView}
-              >
-                <View style={styles.addAnniversaryModalContent}>
-                  <View style={styles.addAnniversaryHeader}>
-                    <Text style={styles.addAnniversaryTitle}>{t('home.anniversary.edit')}</Text>
-                    <Pressable
-                      onPress={() => {
-                        setEditingAnniversary(null);
-                        goToListStep();
-                      }}
-                      style={styles.modalCloseButton}
-                    >
-                      <X color="rgba(255,255,255,0.8)" size={rs(20)} />
-                    </Pressable>
-                  </View>
-                  <View style={styles.anniversaryHeaderDivider} />
-
-                  <ScrollView
-                    style={styles.addAnniversaryForm}
-                    contentContainerStyle={styles.addAnniversaryFormContent}
-                    showsVerticalScrollIndicator={false}
-                    keyboardShouldPersistTaps="handled"
-                  >
-                    <Pressable
-                      style={styles.formSection}
-                      onPress={() => showEditEmojiPicker && setShowEditEmojiPicker(false)}
-                    >
-                      <Text style={styles.formLabel}>{t('home.anniversary.name')}</Text>
-                      <View style={styles.iconNameRow}>
-                        <Pressable
-                          style={styles.iconButton}
-                          onPress={() => setShowEditEmojiPicker(!showEditEmojiPicker)}
-                        >
-                          <Text style={styles.selectedIconSmall}>{editAnniversaryIcon}</Text>
-                        </Pressable>
-                        {showEditEmojiPicker ? (
-                          <Pressable
-                            style={styles.nameInput}
-                            onPress={() => setShowEditEmojiPicker(false)}
-                          >
-                            <Text style={[
-                              { color: editAnniversaryName ? COLORS.white : 'rgba(255,255,255,0.4)', fontSize: fp(15) }
-                            ]}>
-                              {editAnniversaryName || t('home.anniversary.namePlaceholder')}
-                            </Text>
-                          </Pressable>
-                        ) : (
-                          <TextInput
-                            ref={editNameInputRef}
-                            style={styles.nameInput}
-                            placeholder={t('home.anniversary.namePlaceholder')}
-                            placeholderTextColor="rgba(255,255,255,0.4)"
-                            value={editAnniversaryName}
-                            onChangeText={setEditAnniversaryName}
-                          />
-                        )}
-                      </View>
-
-                      {showEditEmojiPicker && (
-                        <View style={styles.emojiPickerContainer}>
-                          <View style={styles.emojiGrid}>
-                            {emojiOptions.map((emoji, index) => (
-                              <Pressable
-                                key={index}
-                                style={[
-                                  styles.emojiOption,
-                                  editAnniversaryIcon === emoji && styles.emojiOptionSelected,
-                                ]}
-                                onPress={() => {
-                                  setEditAnniversaryIcon(emoji);
-                                  setShowEditEmojiPicker(false);
-                                }}
-                              >
-                                <Text style={styles.emojiOptionText}>{emoji}</Text>
-                              </Pressable>
-                            ))}
-                          </View>
-                        </View>
-                      )}
-                    </Pressable>
-
-                    <Pressable style={styles.formSection} onPress={() => setShowEditEmojiPicker(false)}>
-                      <Text style={styles.formLabel}>{t('home.anniversary.date')}</Text>
-                      <Pressable
-                        style={styles.datePickerButton}
-                        onPress={() => {
-                          setShowEditEmojiPicker(false);
-                          goToEditDatePickerStep();
-                        }}
-                      >
-                        <Text style={styles.datePickerButtonText}>
-                          {formatDisplayDate(editAnniversaryDate)}
-                        </Text>
-                      </Pressable>
-                    </Pressable>
-                  </ScrollView>
-
-                  <View style={styles.anniversaryFooterDivider} />
-                  <View style={styles.addAnniversaryFooter}>
-                    <Pressable
-                      style={[
-                        styles.submitButton,
-                        !editAnniversaryName.trim() && styles.submitButtonDisabled,
-                      ]}
-                      onPress={handleSaveEditAnniversary}
-                      disabled={!editAnniversaryName.trim()}
-                    >
-                      <View style={styles.submitButtonInner}>
-                        <Text style={styles.submitButtonText}>{t('common.confirm')}</Text>
-                      </View>
-                    </Pressable>
-                  </View>
-                </View>
-              </KeyboardAvoidingView>
-            )}
-
-            {/* Step: Edit Date Picker */}
-            {anniversaryModalStep === 'editDatePicker' && (
-              <View style={styles.datePickerModalContent}>
-                <View style={styles.datePickerModalHeader}>
-                  <Text style={styles.datePickerModalTitle}>{t('home.anniversary.selectDate') || '날짜 선택'}</Text>
-                  <Pressable
-                    onPress={() => goToEditFromDatePicker()}
-                    style={styles.modalCloseButton}
-                  >
-                    <X color="rgba(255,255,255,0.8)" size={rs(20)} />
-                  </Pressable>
-                </View>
-                <View style={styles.anniversaryHeaderDivider} />
-
-                <View style={styles.datePickerModalBody}>
-                  <View style={styles.pickerMonthNav}>
-                    <Pressable
-                      onPress={() => setEditPickerMonth(new Date(editPickerMonth.getFullYear(), editPickerMonth.getMonth() - 1, 1))}
-                      style={styles.pickerNavButton}
-                    >
-                      <ChevronLeft color={COLORS.white} size={rs(18)} />
-                    </Pressable>
-                    <Text style={styles.pickerMonthText}>
-                      {i18n.language === 'ko'
-                        ? `${editPickerMonth.getFullYear()}년 ${editPickerMonth.getMonth() + 1}월`
-                        : editPickerMonth.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}
-                    </Text>
-                    <Pressable
-                      onPress={() => setEditPickerMonth(new Date(editPickerMonth.getFullYear(), editPickerMonth.getMonth() + 1, 1))}
-                      style={styles.pickerNavButton}
-                    >
-                      <ChevronRight color={COLORS.white} size={rs(18)} />
-                    </Pressable>
-                  </View>
-
-                  <View style={styles.pickerDayNames}>
-                    {(t('calendar.dayNames', { returnObjects: true }) as string[]).map((day: string, idx: number) => (
-                      <Text
-                        key={day}
-                        style={[
-                          styles.pickerDayName,
-                          idx === 0 && { color: '#ef4444' },
-                        ]}
-                      >
-                        {day}
-                      </Text>
-                    ))}
-                  </View>
-
-                  <View style={styles.pickerGrid}>
-                    {getPickerDaysArray(editPickerMonth).map((day, index) => {
-                      if (day === null) {
-                        return <View key={`empty-${index}`} style={styles.pickerDayCell} />;
-                      }
-
-                      const isSelected = isPickerDateSelected(day, editAnniversaryDate, editPickerMonth);
-                      const dayOfWeek = new Date(editPickerMonth.getFullYear(), editPickerMonth.getMonth(), day).getDay();
-                      const isSunday = dayOfWeek === 0;
-
-                      return (
-                        <Pressable
-                          key={day}
-                          style={styles.pickerDayCell}
-                          onPress={() => {
-                            const selectedDate = new Date(editPickerMonth.getFullYear(), editPickerMonth.getMonth(), day);
-                            goToEditFromDatePicker(selectedDate);
-                          }}
-                        >
-                          {isSelected ? (
-                            <View style={styles.pickerDayCellInnerSelected}>
-                              <Text style={styles.pickerDayTextSelected}>{day}</Text>
-                            </View>
-                          ) : (
-                            <View style={styles.pickerDayCellInner}>
-                              <Text style={[styles.pickerDayText, isSunday && { color: '#ef4444' }]}>
-                                {day}
-                              </Text>
-                            </View>
-                          )}
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                </View>
-              </View>
-            )}
+            {renderAnniversaryModalContent()}
           </BlurView>
         </View>
       </Modal>
@@ -2035,52 +2045,57 @@ export default function HomeScreen() {
       <Modal
         visible={showImagePickerModal}
         transparent
-        animationType={Platform.OS === 'android' ? 'none' : 'fade'}
+        animationType="fade"
+        statusBarTranslucent={true}
         onRequestClose={() => setShowImagePickerModal(false)}
       >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setShowImagePickerModal(false)}
-        >
+        <View style={styles.blurContainer}>
           <BlurView experimentalBlurMethod="dimezisBlurView" intensity={60} tint="dark" style={styles.blurOverlay}>
-            <Pressable onPress={(e) => e.stopPropagation()}>
-              <View style={styles.imagePickerModal}>
-                <View style={styles.imagePickerHeader}>
-                  <Text style={styles.imagePickerTitle}>{t('home.background.title')}</Text>
-                  <Pressable
-                    onPress={() => setShowImagePickerModal(false)}
-                    style={styles.modalCloseButton}
-                  >
-                    <X color={COLORS.white} size={rs(18)} />
-                  </Pressable>
-                </View>
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => setShowImagePickerModal(false)}
+            >
+              <View style={styles.imagePickerModalCenterWrapper}>
+                <Pressable onPress={(e) => e.stopPropagation()}>
+                  <View style={styles.imagePickerModal}>
+                    <View style={styles.imagePickerHeader}>
+                      <Text style={styles.imagePickerTitle}>{t('home.background.title')}</Text>
+                      <Pressable
+                        onPress={() => setShowImagePickerModal(false)}
+                        style={styles.modalCloseButton}
+                      >
+                        <X color={COLORS.white} size={rs(18)} />
+                      </Pressable>
+                    </View>
 
-                <Text style={styles.imagePickerDescription}>
-                  {t('home.background.description')}
-                </Text>
+                    <Text style={styles.imagePickerDescription}>
+                      {t('home.background.description')}
+                    </Text>
 
-                <View style={styles.imagePickerButtons}>
-                  <Pressable
-                    style={styles.imagePickerButtonPrimary}
-                    onPress={handlePickImage}
-                  >
-                    <Text style={styles.imagePickerButtonPrimaryText}>
-                      {t('home.background.selectFromGallery')}
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    style={styles.imagePickerButtonSecondary}
-                    onPress={handleResetBackground}
-                  >
-                    <Text style={styles.imagePickerButtonSecondaryText}>
-                      {t('home.background.resetToDefault')}
-                    </Text>
-                  </Pressable>
-                </View>
+                    <View style={styles.imagePickerButtons}>
+                      <Pressable
+                        style={styles.imagePickerButtonPrimary}
+                        onPress={handlePickImage}
+                      >
+                        <Text style={styles.imagePickerButtonPrimaryText}>
+                          {t('home.background.selectFromGallery')}
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        style={styles.imagePickerButtonSecondary}
+                        onPress={handleResetBackground}
+                      >
+                        <Text style={styles.imagePickerButtonSecondaryText}>
+                          {t('home.background.resetToDefault')}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                </Pressable>
               </View>
             </Pressable>
           </BlurView>
-        </Pressable>
+        </View>
       </Modal>
 
       {/* OLD MODALS REMOVED - Content moved to unified anniversary modal above */}
@@ -2635,12 +2650,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   blurContainer: {
-    flex: 1,
-    width: '100%',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
   },
   blurOverlay: {
-    flex: 1,
-    width: '100%',
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: rs(SPACING.lg),
@@ -2718,6 +2736,12 @@ const styles = StyleSheet.create({
     fontSize: fp(15),
     color: COLORS.black,
     fontWeight: '500',
+  },
+  imagePickerModalCenterWrapper: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: rs(SPACING.lg),
   },
   imagePickerModal: {
     width: width - rs(48),

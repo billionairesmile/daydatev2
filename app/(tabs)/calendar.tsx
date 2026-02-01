@@ -42,7 +42,7 @@ import { useBackground } from '@/contexts';
 import { useMemoryStore, SAMPLE_MEMORIES } from '@/stores/memoryStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useCoupleSyncStore, type SyncedTodo } from '@/stores/coupleSyncStore';
-import { useTimezoneStore } from '@/stores/timezoneStore';
+import { useTimezoneStore, formatDateInTimezone } from '@/stores/timezoneStore';
 import { isDemoMode } from '@/lib/supabase';
 import { BannerAdView } from '@/components/ads';
 import { useBannerAdBottom } from '@/hooks/useConsistentBottomInset';
@@ -682,14 +682,15 @@ export default function CalendarScreen() {
   const getMissionForDate = (day: number) => {
     // Get all memories for this date and sort by completedAt (earliest first)
     // This ensures we show the first completed mission's photo, with fallback if deleted
+    // Use timezone-consistent date comparison (same as isToday())
+    const timezone = getEffectiveTimezone();
+    const targetDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
     const memoriesForDate = memories
       .filter((memory) => {
-        const completedDate = new Date(memory.completedAt);
-        return (
-          completedDate.getFullYear() === year &&
-          completedDate.getMonth() === month &&
-          completedDate.getDate() === day
-        );
+        // Use formatDateInTimezone for consistent timezone handling
+        const memoryDateStr = formatDateInTimezone(new Date(memory.completedAt), timezone);
+        return memoryDateStr === targetDateStr;
       })
       .sort((a, b) => new Date(a.completedAt).getTime() - new Date(b.completedAt).getTime());
 
@@ -705,15 +706,11 @@ export default function CalendarScreen() {
       };
     }
 
-    // Then check SAMPLE_MEMORIES for development data (same logic)
+    // Then check SAMPLE_MEMORIES for development data (same timezone-consistent logic)
     const sampleMemoriesForDate = SAMPLE_MEMORIES
       .filter((memory) => {
-        const completedDate = new Date(memory.completedAt);
-        return (
-          completedDate.getFullYear() === year &&
-          completedDate.getMonth() === month &&
-          completedDate.getDate() === day
-        );
+        const memoryDateStr = formatDateInTimezone(new Date(memory.completedAt), timezone);
+        return memoryDateStr === targetDateStr;
       })
       .sort((a, b) => new Date(a.completedAt).getTime() - new Date(b.completedAt).getTime());
 
@@ -1412,14 +1409,17 @@ export default function CalendarScreen() {
 
       </ScrollView>
 
-      {/* Banner Ad - Fixed at bottom */}
-      <BannerAdView placement="calendar" style={[styles.bannerAd, { bottom: bannerAdBottom }]} />
+      {/* Banner Ad - iOS only (Android renders banner inside tab bar) */}
+      {Platform.OS === 'ios' && (
+        <BannerAdView placement="calendar" style={[styles.bannerAd, { bottom: bannerAdBottom }]} />
+      )}
 
       {/* Settings Modal */}
       <Modal
         visible={isSettingsOpen}
         transparent
         animationType="fade"
+        statusBarTranslucent={true}
         onRequestClose={() => closeSettingsModal(false)}
       >
         <View style={styles.blurContainer}>
@@ -1491,6 +1491,7 @@ export default function CalendarScreen() {
         visible={isAddTodoOpen}
         transparent
         animationType="fade"
+        statusBarTranslucent={true}
         onRequestClose={closeTodoModal}
       >
         <View style={styles.blurContainer}>
@@ -1552,6 +1553,7 @@ export default function CalendarScreen() {
         visible={isEditTodoOpen}
         transparent
         animationType="fade"
+        statusBarTranslucent={true}
         onRequestClose={closeEditTodoModal}
       >
         <View style={styles.blurContainer}>
@@ -1610,6 +1612,7 @@ export default function CalendarScreen() {
         visible={isPeriodSettingsOpen}
         transparent
         animationType="fade"
+        statusBarTranslucent={true}
         onRequestClose={() => periodModalStep === 'datePicker' ? closeDatePicker() : closePeriodModal(false)}
       >
         <View style={styles.blurContainer}>
@@ -1857,7 +1860,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: rs(SPACING.lg),
-    paddingBottom: rs(170),
+    paddingBottom: rs(180),
   },
   header: {
     flexDirection: 'row',
@@ -2349,14 +2352,18 @@ const styles = StyleSheet.create({
     fontWeight: '400',
   },
   // Modal styles - aligned with figma-designs dialog.tsx (glassmorphism)
-  // Fixed structure to prevent Android modal movement animation
+  // Fixed dimensions to prevent Android modal movement animation
+  // Using explicit screen dimensions instead of flex: 1 to avoid layout recalculation
   blurContainer: {
-    flex: 1,
-    width: '100%',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
   },
   blurOverlay: {
-    flex: 1,
-    width: '100%',
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: rs(SPACING.lg),

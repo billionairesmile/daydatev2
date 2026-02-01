@@ -65,6 +65,7 @@ import { useMemoryStore } from '@/stores/memoryStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
 import { useSubscriptionStore } from '@/stores/subscriptionStore';
+import { useConsistentBottomInset } from '@/hooks/useConsistentBottomInset';
 import { db, isDemoMode } from '@/lib/supabase';
 import type { CompletedMission, Mission } from '@/types';
 
@@ -89,6 +90,8 @@ const heroBlurLocations = heroGradientResult.locations as unknown as readonly [n
 export default function MissionDetailScreen() {
   // Get screen dimensions dynamically
   const { width, height } = useWindowDimensions();
+  // Get consistent insets for Android navigation bar and status bar
+  const { bottom: bottomInset } = useConsistentBottomInset();
   const router = useRouter();
   const { id, source } = useLocalSearchParams<{ id: string; source?: string }>();
   const { t, i18n } = useTranslation();
@@ -175,6 +178,7 @@ export default function MissionDetailScreen() {
   const overlayOpacity = useRef(new Animated.Value(1)).current; // Down arrow
   const secondContentOpacity = useRef(new Animated.Value(0)).current; // Second content (steps card)
   const buttonsOpacity = useRef(new Animated.Value(0)).current; // Action buttons
+  const backgroundDarkOverlay = useRef(new Animated.Value(0)).current; // Scroll-based background darkening
 
   // Handle scroll position change
   const handleScroll = useCallback((event: any) => {
@@ -187,6 +191,12 @@ export default function MissionDetailScreen() {
     // Check if scrolled to bottom (for action buttons)
     const bottomThreshold = 50; // pixels from bottom to trigger
     const scrolledToBottom = offsetY + layoutMeasurement.height >= contentSize.height - bottomThreshold;
+
+    // Update background dark overlay based on scroll position
+    // Gradually darken from 0 to 0.7 opacity over 300px scroll
+    const darkOverlayProgress = Math.min(offsetY / 300, 1);
+    const darkOverlayOpacity = darkOverlayProgress * 0.7; // Max 70% dark
+    backgroundDarkOverlay.setValue(darkOverlayOpacity);
 
     // Update down arrow and second content visibility
     if (scrolledAny !== hasScrolled) {
@@ -1598,6 +1608,14 @@ export default function MissionDetailScreen() {
               setShowPreview(false);
               showPreviewRef.current = false;
               setPreviewPhoto(null);
+              // Reset scroll state to hide action buttons until user scrolls to bottom again
+              setIsAtBottom(false);
+              setHasScrolled(false);
+              buttonsOpacity.setValue(0);
+              secondContentOpacity.setValue(0);
+              overlayOpacity.setValue(1);
+              // Reset scroll position to top
+              scrollViewRef.current?.scrollTo({ y: 0, animated: false });
             }}
             style={styles.cameraBackButton}
           >
@@ -1618,7 +1636,7 @@ export default function MissionDetailScreen() {
         </View>
 
         {/* Capture Button and Camera Switch */}
-        <View style={styles.captureButtonContainer}>
+        <View style={[styles.captureButtonContainer, Platform.OS === 'android' && { bottom: 40 + bottomInset }]}>
           <View style={styles.captureButtonSpacer} />
           <Pressable
             onPress={handleCapture}
@@ -1700,6 +1718,14 @@ export default function MissionDetailScreen() {
             />
           )}
         </View>
+        {/* Scroll-based dark overlay - fades in as user scrolls down */}
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: '#000000', opacity: backgroundDarkOverlay }
+          ]}
+          pointerEvents="none"
+        />
       </View>
 
       {/* Header - Absolute positioned (back button only) */}
@@ -1713,7 +1739,10 @@ export default function MissionDetailScreen() {
       <ScrollView
         ref={scrollViewRef}
         style={styles.contentScrollView}
-        contentContainerStyle={styles.contentScrollContentScrolled}
+        contentContainerStyle={[
+          styles.contentScrollContentScrolled,
+          Platform.OS === 'android' && { paddingBottom: rs(160) + bottomInset }
+        ]}
         showsVerticalScrollIndicator={false}
         onScroll={handleScroll}
         scrollEventThrottle={16}
@@ -1931,7 +1960,10 @@ export default function MissionDetailScreen() {
       {/* Bottom Action Buttons - Shown when scrolled to bottom */}
       <Animated.View style={[styles.actionButtonsContainer, { opacity: buttonsOpacity, pointerEvents: isAtBottom ? 'auto' : 'none' }]}>
         <View style={styles.bottomBar}>
-          <View style={styles.bottomContent}>
+          <View style={[
+            styles.bottomContent,
+            Platform.OS === 'android' && { paddingTop: rs(16), paddingBottom: rs(56) + bottomInset }
+          ]}>
             <Pressable
               style={[
                 styles.ctaButton,
@@ -1993,45 +2025,87 @@ export default function MissionDetailScreen() {
             onPress={() => setShowMessageModal(false)}
           />
           <View style={[styles.modalContainer, { width: width - 48, marginBottom: Platform.OS === 'android' ? 20 : 0 }]}>
-            <BlurView experimentalBlurMethod="dimezisBlurView" intensity={60} tint="dark" style={styles.modalBlur}>
-              <View style={styles.modalContent}>
-                {/* Modal Header */}
-                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>{t('missionDetail.modal.title')}</Text>
+            {Platform.OS === 'android' ? (
+              <View style={[styles.modalBlur, { backgroundColor: 'rgba(0,0,0,0.85)' }]}>
+                <View style={styles.modalContent}>
+                  {/* Modal Header */}
+                  <View style={styles.modalHeader}>
+                    <Text style={styles.modalTitle}>{t('missionDetail.modal.title')}</Text>
+                    <Pressable
+                      onPress={() => {
+                        setShowMessageModal(false);
+                        setMessageText('');
+                      }}
+                      style={styles.modalCloseButton}
+                    >
+                      <X color={COLORS.white} size={20} />
+                    </Pressable>
+                  </View>
+
+                  <View style={styles.textInputContainer}>
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder={t('missionDetail.modal.placeholder')}
+                      placeholderTextColor="rgba(255,255,255,0.5)"
+                      value={messageText}
+                      onChangeText={setMessageText}
+                      maxLength={100}
+                      multiline
+                      numberOfLines={4}
+                    />
+                    <Text style={styles.charCount}>{messageText.length}/100</Text>
+                  </View>
+
                   <Pressable
-                    onPress={() => {
-                      setShowMessageModal(false);
-                      setMessageText('');
-                    }}
-                    style={styles.modalCloseButton}
+                    style={[styles.submitButton, !messageText.trim() && styles.submitButtonDisabled]}
+                    onPress={handleAddMessage}
+                    disabled={!messageText.trim()}
                   >
-                    <X color={COLORS.white} size={20} />
+                    <Text style={styles.submitButtonText}>{t('common.done')}</Text>
                   </Pressable>
                 </View>
-
-                <View style={styles.textInputContainer}>
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder={t('missionDetail.modal.placeholder')}
-                    placeholderTextColor="rgba(255,255,255,0.5)"
-                    value={messageText}
-                    onChangeText={setMessageText}
-                    maxLength={100}
-                    multiline
-                    numberOfLines={4}
-                  />
-                  <Text style={styles.charCount}>{messageText.length}/100</Text>
-                </View>
-
-                <Pressable
-                  style={[styles.submitButton, !messageText.trim() && styles.submitButtonDisabled]}
-                  onPress={handleAddMessage}
-                  disabled={!messageText.trim()}
-                >
-                  <Text style={styles.submitButtonText}>{t('common.done')}</Text>
-                </Pressable>
               </View>
-            </BlurView>
+            ) : (
+              <BlurView experimentalBlurMethod="dimezisBlurView" intensity={60} tint="dark" style={styles.modalBlur}>
+                <View style={styles.modalContent}>
+                  {/* Modal Header */}
+                  <View style={styles.modalHeader}>
+                    <Text style={styles.modalTitle}>{t('missionDetail.modal.title')}</Text>
+                    <Pressable
+                      onPress={() => {
+                        setShowMessageModal(false);
+                        setMessageText('');
+                      }}
+                      style={styles.modalCloseButton}
+                    >
+                      <X color={COLORS.white} size={20} />
+                    </Pressable>
+                  </View>
+
+                  <View style={styles.textInputContainer}>
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder={t('missionDetail.modal.placeholder')}
+                      placeholderTextColor="rgba(255,255,255,0.5)"
+                      value={messageText}
+                      onChangeText={setMessageText}
+                      maxLength={100}
+                      multiline
+                      numberOfLines={4}
+                    />
+                    <Text style={styles.charCount}>{messageText.length}/100</Text>
+                  </View>
+
+                  <Pressable
+                    style={[styles.submitButton, !messageText.trim() && styles.submitButtonDisabled]}
+                    onPress={handleAddMessage}
+                    disabled={!messageText.trim()}
+                  >
+                    <Text style={styles.submitButtonText}>{t('common.done')}</Text>
+                  </Pressable>
+                </View>
+              </BlurView>
+            )}
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -2045,6 +2119,7 @@ export default function MissionDetailScreen() {
           resetEnlargedZoom();
           setShowEnlargedPhoto(false);
         }}
+        statusBarTranslucent={true}
       >
         <View
           style={styles.enlargedPhotoOverlay}
@@ -2560,7 +2635,9 @@ const styles = StyleSheet.create({
   bottomContent: {
     paddingHorizontal: SPACING.lg,
     paddingTop: SPACING.md,
-    paddingBottom: Platform.OS === 'android' ? 48 + ANDROID_BOTTOM_PADDING : 28,
+    // Android: paddingTop/paddingBottom set dynamically using bottomInset for symmetric spacing
+    // iOS: fixed padding
+    paddingBottom: Platform.OS === 'ios' ? 28 : 0,
     // Transparent background - no background
   },
   ctaButton: {
@@ -2997,6 +3074,7 @@ const styles = StyleSheet.create({
   },
   // Modal Styles - Small Todo-list Style
   modalOverlay: {
+    ...StyleSheet.absoluteFillObject,
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
@@ -3144,6 +3222,7 @@ const styles = StyleSheet.create({
   },
   // Enlarged photo modal styles
   enlargedPhotoOverlay: {
+    ...StyleSheet.absoluteFillObject,
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.95)',
     justifyContent: 'center',

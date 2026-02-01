@@ -67,12 +67,11 @@ export const setReturningFromBookmark = (value: boolean) => {
 type CarouselItem = Mission | { type: 'ad'; id: string } | { type: 'refresh'; id: string };
 
 // Fixed card dimensions (width is calculated dynamically in component)
-// Android uses slightly smaller height for visual balance
-// Foldable devices (Z Flip) keep original size, regular phones get reduced height
+// Android foldable (Z Flip) uses larger height to fill narrow screen better
 const getCardHeight = () => {
   if (Platform.OS === 'ios') return rs(468);
-  // Android: foldable keeps 455, regular phones reduced to 400
-  return isFoldableDevice() ? rs(455) : rs(400);
+  // Android: foldable gets 480 for better screen utilization, regular phones match iOS at 468
+  return isFoldableDevice() ? rs(480) : rs(468);
 };
 const CARD_HEIGHT = getCardHeight();
 const CARD_MARGIN = rs(10);
@@ -180,8 +179,8 @@ export default function MissionScreen() {
 
   // Get screen dimensions dynamically
   const { width: screenWidth } = useWindowDimensions();
-  // Foldable devices use 75% width, regular phones use 70%
-  const CARD_WIDTH_RATIO = Platform.OS === 'android' && !isFoldableDevice() ? 0.70 : 0.75;
+  // Foldable devices (Z Flip) use 80% width for better screen utilization, regular phones and iOS use 75%
+  const CARD_WIDTH_RATIO = Platform.OS === 'android' && isFoldableDevice() ? 0.80 : 0.75;
   const CARD_WIDTH = screenWidth * CARD_WIDTH_RATIO;
   const SNAP_INTERVAL = CARD_WIDTH + CARD_MARGIN * 2;
 
@@ -219,6 +218,7 @@ export default function MissionScreen() {
   // Track if carousel has been initialized to prevent reset during background sync
   const hasInitializedCarousel = useRef(false);
   const previousMissionsLength = useRef(0);
+  const previousMissionIds = useRef<string | null>(null);
 
   const {
     keptMissions,
@@ -391,6 +391,14 @@ export default function MissionScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [todayMissions, featuredMissions, hasGeneratedMissions, shouldShowAds, adPosition, refreshUsedDate, isSyncInitialized, sharedMissionsRefreshedAt, canPremiumRefresh, premiumRefreshCount, premiumRefreshDate]);
 
+  // Track mission IDs for detecting content changes (e.g., partner sync)
+  const missionIds = React.useMemo(() => {
+    return allMissions
+      .filter((item): item is Mission => !('type' in item))
+      .map(m => m.id)
+      .join(',');
+  }, [allMissions]);
+
   // Force FlatList to render properly when missions change from empty to populated
   // This handles cases where the list mounts before React has finished updating
   // IMPORTANT: Only reset scroll on initial load or explicit refresh, not on background sync updates
@@ -401,6 +409,13 @@ export default function MissionScreen() {
     if (!hasNow && previousMissionsLength.current > 0) {
       hasInitializedCarousel.current = false;
     }
+
+    // If mission content changed (e.g., partner sync), mark for re-initialization
+    // This ensures the first card displays at scale 1.0 instead of 0.9
+    if (previousMissionIds.current && previousMissionIds.current !== missionIds && hasNow) {
+      hasInitializedCarousel.current = false;
+    }
+    previousMissionIds.current = missionIds;
 
     previousMissionsLength.current = allMissions.length;
 
@@ -429,7 +444,7 @@ export default function MissionScreen() {
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [allMissions.length, isGenerating, isWaitingForImages, scrollX]);
+  }, [allMissions.length, missionIds, isGenerating, isWaitingForImages, scrollX]);
 
   // Handle image loading completion - hide loading when first image is rendered
   useEffect(() => {
@@ -608,11 +623,15 @@ export default function MissionScreen() {
         console.log('[MissionScreen] App came to foreground, refreshing mission data');
 
         // Reset any stuck loading states (e.g., if app was backgrounded during ad loading)
-        setIsGenerating(false);
+        // BUT skip reset if we're in the middle of rewarded ad flow
+        // (ad closing triggers foreground event, but onAdClosed handles the state)
+        if (!isLoadingAd) {
+          setIsGenerating(false);
+          setIsWaitingForImages(false);
+          isWaitingForImagesRef.current = false;
+          setPartnerGeneratingMessage(null);
+        }
         setIsLoadingAd(false);
-        setIsWaitingForImages(false);
-        isWaitingForImagesRef.current = false;
-        setPartnerGeneratingMessage(null);
 
         // Check for date reset FIRST (before loading new data)
         // This ensures proper comparison with old sharedMissionsDate
@@ -1043,6 +1062,9 @@ export default function MissionScreen() {
 
           // Check if ad was completed successfully
           if (adCompletedSuccessfully) {
+            // Ensure loading state is maintained (AppState change may have reset it)
+            setIsGenerating(true);
+
             // SUCCESS: NOW generate missions (after ad completion)
             console.log('[Mission Refresh] Ad completed - NOW starting mission generation');
 
@@ -1378,6 +1400,12 @@ export default function MissionScreen() {
     return 'type' in item && item.type === 'refresh';
   };
 
+  // Check if partner is generating/watching ad - used to disable refresh button
+  const isRefreshCardDisabled = useMemo((): boolean => {
+    const isPartnerAction = !!(generatingUserId && generatingUserId !== user?.id);
+    return (missionGenerationStatus === 'generating' || missionGenerationStatus === 'ad_watching') && isPartnerAction;
+  }, [generatingUserId, user?.id, missionGenerationStatus]);
+
   // Handle refresh button press - open modal in refresh mode
   // Check if partner is already generating before opening modal
   const handleRefreshPress = useCallback(() => {
@@ -1451,7 +1479,7 @@ export default function MissionScreen() {
               },
             ]}
           >
-            <RefreshMissionCard onRefreshPress={handleRefreshPress} />
+            <RefreshMissionCard onRefreshPress={handleRefreshPress} disabled={isRefreshCardDisabled} />
           </Animated.View>
         );
       }
@@ -1604,7 +1632,7 @@ export default function MissionScreen() {
                             <NativeAdMissionCard />
                           </View>
                         ) : isRefreshItem(item) ? (
-                          <RefreshMissionCard onRefreshPress={handleRefreshPress} />
+                          <RefreshMissionCard onRefreshPress={handleRefreshPress} disabled={isRefreshCardDisabled} />
                         ) : (
                           <View style={styles.cardInner}>
                             <MissionCardContent
@@ -1656,7 +1684,7 @@ export default function MissionScreen() {
                     {/* Normal loading - show circular animation + text */}
                     <CircularLoadingAnimation size={rs(100)} strokeWidth={rs(6)} color={COLORS.white} />
                     <Text style={styles.loadingAnimationText}>
-                      {isLoadingAd ? t('mission.refresh.loadingAd') : (partnerGeneratingMessage ? t('mission.generating') : t('mission.generatingMessage'))}
+                      {isLoadingAd ? t('mission.refresh.loadingAd') : t('mission.generatingMessage')}
                     </Text>
                     <Text style={styles.loadingAnimationSubtext}>
                       {t('mission.pleaseWait')}
@@ -1694,6 +1722,7 @@ export default function MissionScreen() {
         animationType="slide"
         transparent={true}
         onRequestClose={() => setShowGenerationModal(false)}
+        statusBarTranslucent={true}
       >
         <View style={styles.modalBackdrop}>
           <View style={[
@@ -1840,9 +1869,9 @@ export default function MissionScreen() {
         </View>
       </Modal>
 
-      {/* Banner Ad - Fixed at bottom (Android only) */}
-      {Platform.OS === 'android' && (
-        <BannerAdView placement="home" style={[styles.bannerAd, { bottom: bannerAdBottom }]} />
+      {/* Banner Ad - iOS only (Android renders banner inside tab bar) */}
+      {Platform.OS === 'ios' && (
+        <BannerAdView placement="mission" style={[styles.bannerAd, { bottom: bannerAdBottom }]} />
       )}
 
     </View>
@@ -2440,6 +2469,7 @@ const styles = StyleSheet.create({
   },
   // White Modal Styles
   modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
     flex: 1,
     justifyContent: 'flex-end',
   },

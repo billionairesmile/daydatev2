@@ -1266,6 +1266,790 @@ export default function MemoriesScreen() {
     }
   }, [showCoverEditModal]);
 
+  // Render function for Album Creation Modal content
+  // Used in both Android View and iOS BlurView branches
+  const renderAlbumModalContent = () => (
+    <>
+      {/* Preload all character images when modal opens */}
+      <CharacterPreloader />
+      <TouchableWithoutFeedback onPress={closeAlbumModal}>
+        <View style={styles.albumModalBackdrop} />
+      </TouchableWithoutFeedback>
+      <KeyboardAvoidingView
+        behavior="padding"
+        style={styles.keyboardAvoidingView}
+        keyboardVerticalOffset={-100}
+      >
+      <View
+        style={[
+          styles.albumModalContent,
+          albumStep === 'fontStyle' && styles.albumModalContentFontStyle,
+        ]}
+      >
+        {/* Header */}
+        <View style={styles.albumModalHeader}>
+          <Text style={styles.albumModalTitle}>
+            {albumStep === 'fontStyle' ? t('memories.album.fontStyle') : albumStep === 'name' ? t('memories.album.name') : t('memories.album.coverPhoto')}
+          </Text>
+          <Pressable
+            style={styles.albumModalCloseButton}
+            onPress={closeAlbumModal}
+          >
+            <X color="rgba(255,255,255,0.8)" size={20} />
+          </Pressable>
+        </View>
+        <View style={styles.albumModalHeaderDivider} />
+
+        <Animated.View style={{ opacity: stepOpacityAnim }}>
+          {albumStep === 'fontStyle' ? (
+            <>
+              {/* Step 0: Font Style Selection */}
+              <Text style={styles.albumModalSubtitle}>
+                {t('memories.album.fontStyleDesc')}
+              </Text>
+
+              <View style={styles.fontStyleOptions}>
+                {/* Basic Font Option */}
+                <Pressable
+                  style={[
+                    styles.fontStyleOption,
+                    fontStyle === 'basic' && styles.fontStyleOptionSelected,
+                  ]}
+                  onPress={() => {
+                    setFontStyle('basic');
+                    // Reset to medium size for basic font style [1.5, 2.25, 3.0]
+                    setTextScale(2.25);
+                  }}
+                >
+                  <View style={styles.fontStylePreviewContainer}>
+                    <Text style={styles.fontStylePreviewBasic}>{t('memories.album.basicFont')}</Text>
+                  </View>
+                  <Text style={styles.fontStyleLabel}>{t('memories.album.basicFontDesc')}</Text>
+                </Pressable>
+
+                {/* Ransom Font Option */}
+                <Pressable
+                  style={[
+                    styles.fontStyleOption,
+                    fontStyle === 'ransom' && styles.fontStyleOptionSelected,
+                  ]}
+                  onPress={() => {
+                    setFontStyle('ransom');
+                    // Reset to medium size for ransom font style [1.0, 1.5, 2.0]
+                    setTextScale(1.5);
+                    // Clear text if it contains Korean characters (not supported in ransom style)
+                    if (/[가-힣ㄱ-ㅎㅏ-ㅣ]/.test(albumName)) {
+                      setAlbumName('');
+                      setPreviewText('');
+                    }
+                  }}
+                >
+                  <View style={styles.fontStylePreviewContainer}>
+                    <RansomText
+                      text="FONT"
+                      seed={12345}
+                      characterSize={28}
+                      spacing={-4}
+                      enableRotation={true}
+                      enableYOffset={true}
+                    />
+                  </View>
+                  <Text style={styles.fontStyleLabel} numberOfLines={1} adjustsFontSizeToFit>{t('memories.album.ransomStyle')}</Text>
+                </Pressable>
+              </View>
+
+              <Pressable
+                style={[
+                  styles.albumModalButtonFullWidth,
+                  !fontStyle && styles.albumModalButtonDisabled,
+                ]}
+                onPress={() => transitionToNextStep('name')}
+                disabled={!fontStyle}
+              >
+                <Text style={styles.albumModalButtonText}>{t('common.next')}</Text>
+              </Pressable>
+            </>
+          ) : albumStep === 'name' ? (
+            <>
+              {/* Step 1: Album Name Input */}
+              <Text style={styles.albumModalSubtitle}>
+                {fontStyle === 'basic' ? t('memories.album.basicFontHint') : t('memories.album.ransomFontHint')}
+              </Text>
+
+              {/* Text Preview - Basic or Ransom Style */}
+              <View style={styles.ransomPreviewContainer}>
+                {fontStyle === 'basic' ? (
+                  // Basic Jua Font Style - Clean text without paper backgrounds
+                  albumName.length > 0 ? (
+                    <Text style={styles.basicFontPreview}>{albumName}</Text>
+                  ) : (
+                    <Text style={[styles.ransomPlaceholder, { fontFamily: 'Jua' }]}>{t('memories.album.name')}</Text>
+                  )
+                ) : (
+                  // Ransom Style - Use memoized component with deferred previewText
+                  previewText.length > 0 ? (
+                    <View style={isPending ? { opacity: 0.7 } : undefined}>
+                      <RansomPreview
+                        text={previewText}
+                        seed={ransomSeed}
+                        wrapText={wrapLongWordsForRansom}
+                      />
+                    </View>
+                  ) : (
+                    <Text style={styles.ransomPlaceholder}>{t('memories.album.name')}</Text>
+                  )
+                )}
+                {/* Refresh Button for Ransom Style */}
+                {fontStyle === 'ransom' && albumName.length > 0 && (
+                  <Pressable
+                    style={styles.refreshButton}
+                    onPress={() => setRansomSeed(Math.floor(Math.random() * 1000000))}
+                  >
+                    <RefreshCw color="rgba(255, 255, 255, 0.6)" size={18} />
+                  </Pressable>
+                )}
+              </View>
+
+              {/* Text Input */}
+              <TextInput
+                style={styles.albumNameInput}
+                value={albumName}
+                onChangeText={handleAlbumNameChange}
+                placeholder={fontStyle === 'ransom' ? t('memories.album.ransomPlaceholder') : t('memories.album.namePlaceholder')}
+                placeholderTextColor="rgba(255,255,255,0.4)"
+                maxLength={20}
+                autoFocus
+              />
+
+              {/* Button Row */}
+              <View style={styles.albumModalButtonRow}>
+                <Pressable
+                  style={styles.albumModalButtonSecondary}
+                  onPress={() => transitionToNextStep('fontStyle')}
+                >
+                  <Text style={styles.albumModalButtonSecondaryText}>{t('common.back')}</Text>
+                </Pressable>
+                <Pressable
+                  style={[
+                    styles.albumModalButton,
+                    !albumName.trim() && styles.albumModalButtonDisabled,
+                  ]}
+                  onPress={goToNextStep}
+                  disabled={!albumName.trim()}
+                >
+                  <Text style={styles.albumModalButtonText}>{t('common.next')}</Text>
+                </Pressable>
+              </View>
+            </>
+          ) : (
+            <>
+              {/* Step 2: Cover Photo Selection with Draggable Text */}
+              <Text style={styles.albumModalSubtitle}>
+                {t('memories.album.coverEditHint')}
+              </Text>
+
+              {/* Cover Photo Preview with Draggable Text */}
+              <View style={styles.coverPhotoContainer}>
+                <View style={styles.coverPhotoPickerContainer} onLayout={handleContainerLayout}>
+                  {/* Book Spine - Inward Curve Effect */}
+                  <LinearGradient
+                    colors={['rgba(0, 0, 0, 0.65)', 'rgba(0, 0, 0, 0.35)', 'rgba(0, 0, 0, 0.12)', 'rgba(255, 255, 255, 0.08)', 'transparent']}
+                    locations={[0, 0.25, 0.55, 0.8, 1]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.modalBookSpineCurve}
+                  />
+
+                  <Pressable
+                    style={styles.coverPhotoInner}
+                    onPress={handlePickCoverPhoto}
+                  >
+                    {albumCoverPhoto ? (
+                      <ExpoImage
+                        source={{ uri: albumCoverPhoto }}
+                        style={styles.coverPhotoPreview}
+                        contentFit="cover"
+                        cachePolicy="memory-disk"
+                        transition={100}
+                      />
+                    ) : (
+                      <View style={styles.coverPhotoPlaceholder}>
+                        <Plus color="rgba(255,255,255,0.6)" size={40} />
+                        <Text style={styles.coverPhotoPlaceholderText}>{t('memories.album.selectPhoto')}</Text>
+                      </View>
+                    )}
+                  </Pressable>
+
+                  {/* Draggable Album Name Overlay */}
+                  {albumCoverPhoto && (
+                    <Animated.View
+                      {...panResponder.panHandlers}
+                      style={[
+                        styles.draggableTextOverlay,
+                        {
+                          transform: [
+                            { translateX: panPosition.x },
+                            { translateY: panPosition.y },
+                          ],
+                        },
+                      ]}
+                    >
+                      {fontStyle === 'basic' ? (
+                        // Basic Jua Font Style
+                        <Text style={[
+                          styles.basicFontOverlay,
+                          {
+                            fontSize: 16 * textScale,
+                            lineHeight: 16 * textScale * 1.3,
+                            color: textColor === 'black' ? '#000000' : COLORS.white,
+                          }
+                        ]}>{albumName}</Text>
+                      ) : (
+                        // Ransom Style - Image-based (assets preloaded)
+                        albumName.length > 0 && (
+                          <RansomText
+                            text={albumName}
+                            seed={ransomSeed}
+                            characterSize={18 * textScale}
+                            spacing={-4}
+                            enableRotation={true}
+                            enableYOffset={true}
+                          />
+                        )
+                      )}
+                    </Animated.View>
+                  )}
+                </View>
+              </View>
+
+              {/* Drag instruction */}
+              {albumCoverPhoto && (
+                <Text style={styles.dragHintText}>{t('memories.album.dragHint')}</Text>
+              )}
+
+              {/* Text Style Selection - Different UI based on font style */}
+              {albumCoverPhoto && fontStyle === 'basic' && (
+                <View style={styles.textStyleSelectionContainer}>
+                  {/* Color Selection (Left) */}
+                  <View style={styles.colorSelectionSection}>
+                    <Text style={styles.selectionLabel}>{t('memories.album.color')}</Text>
+                    <View style={styles.colorButtonRow}>
+                      <Pressable
+                        style={[
+                          styles.colorButton,
+                          { backgroundColor: '#000000' },
+                          textColor === 'black' && styles.colorButtonSelected,
+                        ]}
+                        onPress={() => setTextColor('black')}
+                      />
+                      <Pressable
+                        style={[
+                          styles.colorButton,
+                          { backgroundColor: '#FFFFFF' },
+                          textColor === 'white' && styles.colorButtonSelected,
+                        ]}
+                        onPress={() => setTextColor('white')}
+                      />
+                    </View>
+                  </View>
+
+                  {/* Size Selection (Right) */}
+                  <View style={styles.sizeSelectionSection}>
+                    <Text style={styles.selectionLabel}>{t('memories.album.size')}</Text>
+                    <View style={styles.sizeButtonRow}>
+                      {[1.5, 2.25, 3.0].map((scale, index) => (
+                        <Pressable
+                          key={index}
+                          style={[
+                            styles.sizeButton,
+                            textScale === scale && styles.sizeButtonSelected,
+                          ]}
+                          onPress={() => setTextScale(scale)}
+                        >
+                          <Text style={[
+                            styles.sizeButtonText,
+                            { fontSize: 10 + index * 7 },
+                            textScale === scale && styles.sizeButtonTextSelected,
+                          ]}>A</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {/* Ransom Style - Size Only */}
+              {albumCoverPhoto && fontStyle === 'ransom' && (
+                <View style={styles.sizeSelectionContainer}>
+                  <Text style={styles.sizeSelectionLabel}>{t('memories.album.textSize')}</Text>
+                  <View style={styles.sizeButtonRow}>
+                    {[1.0, 1.5, 2.0].map((scale, index) => (
+                      <Pressable
+                        key={index}
+                        style={[
+                          styles.sizeButton,
+                          textScale === scale && styles.sizeButtonSelected,
+                        ]}
+                        onPress={() => setTextScale(scale)}
+                      >
+                        <Text style={[
+                          styles.sizeButtonText,
+                          { fontSize: 10 + index * 7 },
+                          textScale === scale && styles.sizeButtonTextSelected,
+                        ]}>A</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {/* Action Buttons */}
+              <View style={styles.albumModalButtonRow}>
+                <Pressable
+                  style={styles.albumModalButtonSecondary}
+                  onPress={() => transitionToNextStep('name')}
+                >
+                  <Text style={styles.albumModalButtonSecondaryText}>{t('common.back')}</Text>
+                </Pressable>
+                <Pressable
+                  style={[
+                    styles.albumModalButton,
+                    (!albumCoverPhoto || isCreatingAlbum) && styles.albumModalButtonDisabled
+                  ]}
+                  onPress={handleCreateAlbum}
+                  disabled={!albumCoverPhoto || isCreatingAlbum}
+                >
+                  {isCreatingAlbum ? (
+                    <ActivityIndicator size="small" color={COLORS.black} />
+                  ) : (
+                    <Text style={[
+                      styles.albumModalButtonText,
+                      !albumCoverPhoto && styles.albumModalButtonTextDisabled
+                    ]}>{t('common.done')}</Text>
+                  )}
+                </Pressable>
+              </View>
+            </>
+          )}
+        </Animated.View>
+      </View>
+    </KeyboardAvoidingView>
+
+      {/* Cover Photo Picker Overlay */}
+      {showCoverPhotoPicker && (
+        <View style={styles.missionPickerOverlay}>
+          <Pressable
+            style={styles.monthModalBackdrop}
+            onPress={closeCoverPhotoPicker}
+          >
+            <BlurView experimentalBlurMethod="dimezisBlurView" intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
+          </Pressable>
+          <Animated.View
+            style={[
+              styles.monthModalContent,
+              { transform: [{ translateY: coverPickerSlideAnim }] }
+            ]}
+          >
+            <View style={styles.monthModalHeader}>
+              <Text style={styles.monthModalTitle}>{t('memories.album.selectPhoto')}</Text>
+              <Pressable
+                style={styles.monthModalCloseButton}
+                onPress={closeCoverPhotoPicker}
+              >
+                <X color="rgba(255,255,255,0.8)" size={20} />
+              </Pressable>
+            </View>
+            <ScrollView contentContainerStyle={styles.monthModalGrid}>
+              {completedMemories.length === 0 ? (
+                <View style={styles.missionPickerEmpty}>
+                  <Text style={styles.missionPickerEmptyText}>{t('memories.empty')}</Text>
+                </View>
+              ) : (
+                completedMemories.map((mission) => (
+                  <Pressable
+                    key={mission.id}
+                    style={styles.monthModalItem}
+                    onPress={() => handleSelectCoverPhoto(mission.photoUrl)}
+                  >
+                    <View style={styles.monthModalItemInner}>
+                      <ExpoImage source={{ uri: mission.photoUrl }} style={styles.monthModalItemImage} contentFit="cover" cachePolicy="memory-disk" transition={100} />
+                    </View>
+                  </Pressable>
+                ))
+              )}
+            </ScrollView>
+          </Animated.View>
+        </View>
+      )}
+    </>
+  );
+
+  // Render function for Cover Edit Modal content
+  // Used in both Android View and iOS BlurView branches
+  const renderCoverEditModalContent = () => (
+    <>
+      <TouchableWithoutFeedback onPress={() => setShowCoverEditModal(false)}>
+        <View style={styles.albumModalBackdrop} />
+      </TouchableWithoutFeedback>
+      <KeyboardAvoidingView
+        behavior="padding"
+        style={styles.keyboardAvoidingView}
+        keyboardVerticalOffset={Platform.OS === 'android' ? -100 : 0}
+      >
+        <View style={[
+          styles.albumModalContent,
+          editAlbumStep === 'fontStyle' && styles.albumModalContentFontStyle,
+        ]}>
+          {/* Header */}
+          <View style={styles.albumModalHeader}>
+            <Text style={styles.albumModalTitle}>
+              {editAlbumStep === 'fontStyle' ? t('memories.album.fontStyle') : editAlbumStep === 'name' ? t('memories.album.name') : t('memories.album.coverPhoto')}
+            </Text>
+            <Pressable
+              style={styles.albumModalCloseButton}
+              onPress={() => setShowCoverEditModal(false)}
+            >
+              <X color="rgba(255,255,255,0.8)" size={20} />
+            </Pressable>
+          </View>
+          <View style={styles.albumModalHeaderDivider} />
+
+          {editAlbumStep === 'fontStyle' ? (
+            <>
+              {/* Step 0: Font Style Selection */}
+              <Text style={styles.albumModalSubtitle}>
+                {t('memories.album.fontStyleDesc')}
+              </Text>
+
+              <View style={styles.fontStyleOptions}>
+                {/* Basic Font Option */}
+                <Pressable
+                  style={[
+                    styles.fontStyleOption,
+                    editFontStyle === 'basic' && styles.fontStyleOptionSelected,
+                  ]}
+                  onPress={() => {
+                    setEditFontStyle('basic');
+                    // Reset to medium size for basic font style [1.5, 2.25, 3.0]
+                    setEditTextScale(2.25);
+                  }}
+                >
+                  <View style={styles.fontStylePreviewContainer}>
+                    <Text style={styles.fontStylePreviewBasic}>{t('memories.album.basicFont')}</Text>
+                  </View>
+                  <Text style={styles.fontStyleLabel}>{t('memories.album.basicFontDesc')}</Text>
+                </Pressable>
+
+                {/* Ransom Font Option */}
+                <Pressable
+                  style={[
+                    styles.fontStyleOption,
+                    editFontStyle === 'ransom' && styles.fontStyleOptionSelected,
+                  ]}
+                  onPress={() => {
+                    setEditFontStyle('ransom');
+                    // Reset to medium size for ransom font style [1.0, 1.5, 2.0]
+                    setEditTextScale(1.5);
+                    // Clear text if it contains Korean characters (not supported in ransom style)
+                    if (/[가-힣ㄱ-ㅎㅏ-ㅣ]/.test(editAlbumName)) {
+                      setEditAlbumName('');
+                    }
+                  }}
+                >
+                  <View style={styles.fontStylePreviewContainer}>
+                    <RansomText
+                      text="FONT"
+                      seed={12345}
+                      characterSize={28}
+                      spacing={-4}
+                      enableRotation={true}
+                      enableYOffset={true}
+                    />
+                  </View>
+                  <Text style={styles.fontStyleLabel} numberOfLines={1} adjustsFontSizeToFit>{t('memories.album.ransomStyle')}</Text>
+                </Pressable>
+              </View>
+
+              <Pressable
+                style={[
+                  styles.albumModalButtonFullWidth,
+                  !editFontStyle && styles.albumModalButtonDisabled,
+                ]}
+                onPress={() => setEditAlbumStep('name')}
+                disabled={!editFontStyle}
+              >
+                <Text style={styles.albumModalButtonText}>{t('common.next')}</Text>
+              </Pressable>
+            </>
+          ) : editAlbumStep === 'name' ? (
+            <>
+              {/* Step 1: Album Name Input */}
+              <Text style={styles.albumModalSubtitle}>
+                {editFontStyle === 'basic' ? t('memories.album.basicFontHint') : t('memories.album.ransomFontHint')}
+              </Text>
+
+              {/* Text Preview - Basic or Ransom Style */}
+              <View style={styles.ransomPreviewContainer}>
+                {editAlbumName.length > 0 ? (
+                  editFontStyle === 'basic' ? (
+                    <Text style={styles.basicFontPreview}>{editAlbumName}</Text>
+                  ) : (
+                    // Ransom Style - assets preloaded with 8-char wrapping
+                    editAlbumName.length > 0 ? (
+                      <RansomText
+                        text={wrapLongWordsForRansom(editAlbumName, 8)}
+                        seed={editRansomSeed}
+                        characterSize={36}
+                        spacing={-4}
+                        enableRotation={true}
+                        enableYOffset={true}
+                      />
+                    ) : null
+                  )
+                ) : (
+                  <Text style={[styles.ransomPlaceholder, editFontStyle === 'basic' && { fontFamily: 'Jua' }]}>{t('memories.album.name')}</Text>
+                )}
+                {/* Refresh Button for Ransom Style */}
+                {editFontStyle === 'ransom' && editAlbumName.length > 0 && (
+                  <Pressable
+                    style={styles.refreshButton}
+                    onPress={() => setEditRansomSeed(Math.floor(Math.random() * 1000000))}
+                  >
+                    <RefreshCw color="rgba(255, 255, 255, 0.6)" size={18} />
+                  </Pressable>
+                )}
+              </View>
+
+              {/* Text Input */}
+              <TextInput
+                style={styles.albumNameInput}
+                value={editAlbumName}
+                onChangeText={(text) => {
+                  // Filter Korean characters for ransom style
+                  if (editFontStyle === 'ransom') {
+                    const filteredText = text.replace(/[가-힣ㄱ-ㅎㅏ-ㅣ]/g, '');
+                    setEditAlbumName(filteredText);
+                  } else {
+                    setEditAlbumName(text);
+                  }
+                }}
+                placeholder={editFontStyle === 'ransom' ? t('memories.album.ransomPlaceholder') : t('memories.album.namePlaceholder')}
+                placeholderTextColor="rgba(255,255,255,0.4)"
+                maxLength={20}
+                autoFocus
+              />
+
+              {/* Button Row */}
+              <View style={styles.albumModalButtonRow}>
+                <Pressable
+                  style={styles.albumModalButtonSecondary}
+                  onPress={() => setEditAlbumStep('fontStyle')}
+                >
+                  <Text style={styles.albumModalButtonSecondaryText}>{t('common.back')}</Text>
+                </Pressable>
+                <Pressable
+                  style={[
+                    styles.albumModalButton,
+                    !editAlbumName.trim() && styles.albumModalButtonDisabled,
+                  ]}
+                  onPress={() => setEditAlbumStep('cover')}
+                  disabled={!editAlbumName.trim()}
+                >
+                  <Text style={styles.albumModalButtonText}>{t('common.next')}</Text>
+                </Pressable>
+              </View>
+            </>
+          ) : (
+            <>
+              {/* Step 2: Cover Photo Selection with Draggable Text */}
+              <Text style={styles.albumModalSubtitle}>
+                {t('memories.album.coverEditHint')}
+              </Text>
+
+              {/* Cover Photo Preview with Draggable Text */}
+              <View style={styles.coverPhotoContainer}>
+                <View style={styles.coverPhotoPickerContainer} onLayout={handleEditContainerLayout}>
+                  {/* Book Spine - Inward Curve Effect */}
+                  <LinearGradient
+                    colors={['rgba(0, 0, 0, 0.65)', 'rgba(0, 0, 0, 0.35)', 'rgba(0, 0, 0, 0.12)', 'rgba(255, 255, 255, 0.08)', 'transparent']}
+                    locations={[0, 0.25, 0.55, 0.8, 1]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.modalBookSpineCurve}
+                  />
+
+                  <Pressable
+                    style={styles.coverPhotoInner}
+                    onPress={handlePickEditCoverPhoto}
+                  >
+                    {editCoverPhoto ? (
+                      <ExpoImage
+                        source={{ uri: editCoverPhoto }}
+                        style={styles.coverPhotoPreview}
+                        contentFit="cover"
+                        cachePolicy="memory-disk"
+                        transition={100}
+                      />
+                    ) : (
+                      <View style={styles.coverPhotoPlaceholder}>
+                        <Plus color="rgba(255,255,255,0.6)" size={40} />
+                        <Text style={styles.coverPhotoPlaceholderText}>{t('memories.album.selectPhoto')}</Text>
+                      </View>
+                    )}
+                  </Pressable>
+
+                  {/* Draggable Album Name Overlay */}
+                  {editCoverPhoto && (
+                    <Animated.View
+                      {...editPanResponder.panHandlers}
+                      style={[
+                        styles.draggableTextOverlay,
+                        {
+                          transform: [
+                            { translateX: editPanPosition.x },
+                            { translateY: editPanPosition.y },
+                          ],
+                        },
+                      ]}
+                    >
+                      {editFontStyle === 'basic' ? (
+                        // Basic Jua Font Style
+                        <Text style={[
+                          styles.basicFontOverlay,
+                          {
+                            fontSize: 16 * editTextScale,
+                            lineHeight: 16 * editTextScale * 1.3,
+                            color: editTextColor === 'black' ? '#000000' : COLORS.white,
+                          }
+                        ]}>{editAlbumName}</Text>
+                      ) : (
+                        // Ransom Style - Image-based (assets preloaded)
+                        editAlbumName.length > 0 && (
+                          <RansomText
+                            text={editAlbumName}
+                            seed={editRansomSeed}
+                            characterSize={18 * editTextScale}
+                            spacing={-4}
+                            enableRotation={true}
+                            enableYOffset={true}
+                          />
+                        )
+                      )}
+                    </Animated.View>
+                  )}
+                </View>
+              </View>
+
+              {/* Drag instruction */}
+              {editCoverPhoto && (
+                <Text style={styles.dragHintText}>{t('memories.album.dragHint')}</Text>
+              )}
+
+              {/* Text Style Selection - Different UI based on font style */}
+              {editCoverPhoto && editFontStyle === 'basic' && (
+                <View style={styles.textStyleSelectionContainer}>
+                  {/* Color Selection (Left) */}
+                  <View style={styles.colorSelectionSection}>
+                    <Text style={styles.selectionLabel}>{t('memories.album.color')}</Text>
+                    <View style={styles.colorButtonRow}>
+                      <Pressable
+                        style={[
+                          styles.colorButton,
+                          { backgroundColor: '#000000' },
+                          editTextColor === 'black' && styles.colorButtonSelected,
+                        ]}
+                        onPress={() => setEditTextColor('black')}
+                      />
+                      <Pressable
+                        style={[
+                          styles.colorButton,
+                          { backgroundColor: '#FFFFFF' },
+                          editTextColor === 'white' && styles.colorButtonSelected,
+                        ]}
+                        onPress={() => setEditTextColor('white')}
+                      />
+                    </View>
+                  </View>
+
+                  {/* Size Selection (Right) */}
+                  <View style={styles.sizeSelectionSection}>
+                    <Text style={styles.selectionLabel}>{t('memories.album.size')}</Text>
+                    <View style={styles.sizeButtonRow}>
+                      {[1.5, 2.25, 3.0].map((scale, index) => (
+                        <Pressable
+                          key={index}
+                          style={[
+                            styles.sizeButton,
+                            editTextScale === scale && styles.sizeButtonSelected,
+                          ]}
+                          onPress={() => setEditTextScale(scale)}
+                        >
+                          <Text style={[
+                            styles.sizeButtonText,
+                            { fontSize: 10 + index * 7 },
+                            editTextScale === scale && styles.sizeButtonTextSelected,
+                          ]}>A</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {/* Ransom Style - Size Only */}
+              {editCoverPhoto && editFontStyle === 'ransom' && (
+                <View style={styles.sizeSelectionContainer}>
+                  <Text style={styles.sizeSelectionLabel}>{t('memories.album.textSize')}</Text>
+                  <View style={styles.sizeButtonRow}>
+                    {[1.0, 1.5, 2.0].map((scale, index) => (
+                      <Pressable
+                        key={index}
+                        style={[
+                          styles.sizeButton,
+                          editTextScale === scale && styles.sizeButtonSelected,
+                        ]}
+                        onPress={() => setEditTextScale(scale)}
+                      >
+                        <Text style={[
+                          styles.sizeButtonText,
+                          { fontSize: 10 + index * 7 },
+                          editTextScale === scale && styles.sizeButtonTextSelected,
+                        ]}>A</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {/* Action Buttons */}
+              <View style={styles.albumModalButtonRow}>
+                <Pressable
+                  style={styles.albumModalButtonSecondary}
+                  onPress={() => setEditAlbumStep('name')}
+                >
+                  <Text style={styles.albumModalButtonSecondaryText}>{t('common.back')}</Text>
+                </Pressable>
+                <Pressable
+                  style={[
+                    styles.albumModalButton,
+                    !editCoverPhoto && styles.albumModalButtonDisabled
+                  ]}
+                  onPress={handleSaveCoverEdit}
+                  disabled={!editCoverPhoto}
+                >
+                  <Text style={[
+                    styles.albumModalButtonText,
+                    !editCoverPhoto && styles.albumModalButtonTextDisabled
+                  ]}>{t('common.done')}</Text>
+                </Pressable>
+              </View>
+            </>
+          )}
+        </View>
+      </KeyboardAvoidingView>
+    </>
+  );
+
   return (
     <View style={styles.container}>
       {/* Background Image */}
@@ -1623,14 +2407,17 @@ export default function MemoriesScreen() {
         </ScrollView>
       )}
 
-      {/* Banner Ad - Fixed at bottom */}
-      <BannerAdView placement="memories" style={[styles.bannerAd, { bottom: bannerAdBottom }]} />
+      {/* Banner Ad - iOS only (Android renders banner inside tab bar) */}
+      {Platform.OS === 'ios' && (
+        <BannerAdView placement="memories" style={[styles.bannerAd, { bottom: bannerAdBottom }]} />
+      )}
 
       {/* Month Album Modal */}
       <Modal
         visible={!!selectedMonth}
         transparent
         animationType="fade"
+        statusBarTranslucent={true}
         onRequestClose={() => {
           if (selectedPhoto) {
             setSelectedPhoto(null);
@@ -1762,429 +2549,17 @@ export default function MemoriesScreen() {
         visible={showAlbumModal}
         transparent
         animationType="fade"
+        statusBarTranslucent={true}
         onRequestClose={closeAlbumModal}
       >
         <View style={styles.albumModalFadeWrapper}>
           <BlurView
             experimentalBlurMethod="dimezisBlurView"
-            intensity={80}
+            intensity={60}
             tint="dark"
-            style={[
-              styles.albumModalContainer,
-              { paddingBottom: Math.max(insets.bottom, rs(24)) }
-            ]}
+            style={[styles.albumModalContainer, { paddingBottom: Math.max(insets.bottom, rs(24)) }]}
           >
-            {/* Preload all character images when modal opens */}
-            <CharacterPreloader />
-            <TouchableWithoutFeedback onPress={closeAlbumModal}>
-              <View style={styles.albumModalBackdrop} />
-            </TouchableWithoutFeedback>
-            <KeyboardAvoidingView
-              behavior="padding"
-              style={styles.keyboardAvoidingView}
-              keyboardVerticalOffset={Platform.OS === 'android' ? -100 : 0}
-            >
-              <View
-                style={[
-                  styles.albumModalContent,
-                  albumStep === 'fontStyle' && styles.albumModalContentFontStyle,
-                ]}
-              >
-                {/* Header */}
-                <View style={styles.albumModalHeader}>
-                  <Text style={styles.albumModalTitle}>
-                    {albumStep === 'fontStyle' ? t('memories.album.fontStyle') : albumStep === 'name' ? t('memories.album.name') : t('memories.album.coverPhoto')}
-                  </Text>
-                  <Pressable
-                    style={styles.albumModalCloseButton}
-                    onPress={closeAlbumModal}
-                  >
-                    <X color="rgba(255,255,255,0.8)" size={20} />
-                  </Pressable>
-                </View>
-                <View style={styles.albumModalHeaderDivider} />
-
-                <Animated.View style={{ opacity: stepOpacityAnim }}>
-                  {albumStep === 'fontStyle' ? (
-                    <>
-                      {/* Step 0: Font Style Selection */}
-                      <Text style={styles.albumModalSubtitle}>
-                        {t('memories.album.fontStyleDesc')}
-                      </Text>
-
-                      <View style={styles.fontStyleOptions}>
-                        {/* Basic Font Option */}
-                        <Pressable
-                          style={[
-                            styles.fontStyleOption,
-                            fontStyle === 'basic' && styles.fontStyleOptionSelected,
-                          ]}
-                          onPress={() => {
-                            setFontStyle('basic');
-                            // Reset to medium size for basic font style [1.5, 2.25, 3.0]
-                            setTextScale(2.25);
-                          }}
-                        >
-                          <View style={styles.fontStylePreviewContainer}>
-                            <Text style={styles.fontStylePreviewBasic}>{t('memories.album.basicFont')}</Text>
-                          </View>
-                          <Text style={styles.fontStyleLabel}>{t('memories.album.basicFontDesc')}</Text>
-                        </Pressable>
-
-                        {/* Ransom Font Option */}
-                        <Pressable
-                          style={[
-                            styles.fontStyleOption,
-                            fontStyle === 'ransom' && styles.fontStyleOptionSelected,
-                          ]}
-                          onPress={() => {
-                            setFontStyle('ransom');
-                            // Reset to medium size for ransom font style [1.0, 1.5, 2.0]
-                            setTextScale(1.5);
-                            // Clear text if it contains Korean characters (not supported in ransom style)
-                            if (/[가-힣ㄱ-ㅎㅏ-ㅣ]/.test(albumName)) {
-                              setAlbumName('');
-                              setPreviewText('');
-                            }
-                          }}
-                        >
-                          <View style={styles.fontStylePreviewContainer}>
-                            <RansomText
-                              text="FONT"
-                              seed={12345}
-                              characterSize={28}
-                              spacing={-4}
-                              enableRotation={true}
-                              enableYOffset={true}
-                            />
-                          </View>
-                          <Text style={styles.fontStyleLabel} numberOfLines={1} adjustsFontSizeToFit>{t('memories.album.ransomStyle')}</Text>
-                        </Pressable>
-                      </View>
-
-                      <Pressable
-                        style={[
-                          styles.albumModalButtonFullWidth,
-                          !fontStyle && styles.albumModalButtonDisabled,
-                        ]}
-                        onPress={() => transitionToNextStep('name')}
-                        disabled={!fontStyle}
-                      >
-                        <Text style={styles.albumModalButtonText}>{t('common.next')}</Text>
-                      </Pressable>
-                    </>
-                  ) : albumStep === 'name' ? (
-                    <>
-                      {/* Step 1: Album Name Input */}
-                      <Text style={styles.albumModalSubtitle}>
-                        {fontStyle === 'basic' ? t('memories.album.basicFontHint') : t('memories.album.ransomFontHint')}
-                      </Text>
-
-                      {/* Text Preview - Basic or Ransom Style */}
-                      <View style={styles.ransomPreviewContainer}>
-                        {fontStyle === 'basic' ? (
-                          // Basic Jua Font Style - Clean text without paper backgrounds
-                          albumName.length > 0 ? (
-                            <Text style={styles.basicFontPreview}>{albumName}</Text>
-                          ) : (
-                            <Text style={[styles.ransomPlaceholder, { fontFamily: 'Jua' }]}>{t('memories.album.name')}</Text>
-                          )
-                        ) : (
-                          // Ransom Style - Use memoized component with deferred previewText
-                          previewText.length > 0 ? (
-                            <View style={isPending ? { opacity: 0.7 } : undefined}>
-                              <RansomPreview
-                                text={previewText}
-                                seed={ransomSeed}
-                                wrapText={wrapLongWordsForRansom}
-                              />
-                            </View>
-                          ) : (
-                            <Text style={styles.ransomPlaceholder}>{t('memories.album.name')}</Text>
-                          )
-                        )}
-                        {/* Refresh Button for Ransom Style */}
-                        {fontStyle === 'ransom' && albumName.length > 0 && (
-                          <Pressable
-                            style={styles.refreshButton}
-                            onPress={() => setRansomSeed(Math.floor(Math.random() * 1000000))}
-                          >
-                            <RefreshCw color="rgba(255, 255, 255, 0.6)" size={18} />
-                          </Pressable>
-                        )}
-                      </View>
-
-                      {/* Text Input */}
-                      <TextInput
-                        style={styles.albumNameInput}
-                        value={albumName}
-                        onChangeText={handleAlbumNameChange}
-                        placeholder={fontStyle === 'ransom' ? t('memories.album.ransomPlaceholder') : t('memories.album.namePlaceholder')}
-                        placeholderTextColor="rgba(255,255,255,0.4)"
-                        maxLength={20}
-                        autoFocus
-                      />
-
-                      {/* Button Row */}
-                      <View style={styles.albumModalButtonRow}>
-                        <Pressable
-                          style={styles.albumModalButtonSecondary}
-                          onPress={() => transitionToNextStep('fontStyle')}
-                        >
-                          <Text style={styles.albumModalButtonSecondaryText}>{t('common.back')}</Text>
-                        </Pressable>
-                        <Pressable
-                          style={[
-                            styles.albumModalButton,
-                            !albumName.trim() && styles.albumModalButtonDisabled,
-                          ]}
-                          onPress={goToNextStep}
-                          disabled={!albumName.trim()}
-                        >
-                          <Text style={styles.albumModalButtonText}>{t('common.next')}</Text>
-                        </Pressable>
-                      </View>
-                    </>
-                  ) : (
-                    <>
-                      {/* Step 2: Cover Photo Selection with Draggable Text */}
-                      <Text style={styles.albumModalSubtitle}>
-                        {t('memories.album.coverEditHint')}
-                      </Text>
-
-                      {/* Cover Photo Preview with Draggable Text */}
-                      <View style={styles.coverPhotoContainer}>
-                        <View style={styles.coverPhotoPickerContainer} onLayout={handleContainerLayout}>
-                          {/* Book Spine - Inward Curve Effect */}
-                          <LinearGradient
-                            colors={['rgba(0, 0, 0, 0.65)', 'rgba(0, 0, 0, 0.35)', 'rgba(0, 0, 0, 0.12)', 'rgba(255, 255, 255, 0.08)', 'transparent']}
-                            locations={[0, 0.25, 0.55, 0.8, 1]}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
-                            style={styles.modalBookSpineCurve}
-                          />
-
-                          <Pressable
-                            style={styles.coverPhotoInner}
-                            onPress={handlePickCoverPhoto}
-                          >
-                            {albumCoverPhoto ? (
-                              <ExpoImage
-                                source={{ uri: albumCoverPhoto }}
-                                style={styles.coverPhotoPreview}
-                                contentFit="cover"
-                                cachePolicy="memory-disk"
-                                transition={100}
-                              />
-                            ) : (
-                              <View style={styles.coverPhotoPlaceholder}>
-                                <Plus color="rgba(255,255,255,0.6)" size={40} />
-                                <Text style={styles.coverPhotoPlaceholderText}>{t('memories.album.selectPhoto')}</Text>
-                              </View>
-                            )}
-                          </Pressable>
-
-                          {/* Draggable Album Name Overlay */}
-                          {albumCoverPhoto && (
-                            <Animated.View
-                              {...panResponder.panHandlers}
-                              style={[
-                                styles.draggableTextOverlay,
-                                {
-                                  transform: [
-                                    { translateX: panPosition.x },
-                                    { translateY: panPosition.y },
-                                  ],
-                                },
-                              ]}
-                            >
-                              {fontStyle === 'basic' ? (
-                                // Basic Jua Font Style
-                                <Text style={[
-                                  styles.basicFontOverlay,
-                                  {
-                                    fontSize: 16 * textScale,
-                                    lineHeight: 16 * textScale * 1.3,
-                                    color: textColor === 'black' ? '#000000' : COLORS.white,
-                                  }
-                                ]}>{albumName}</Text>
-                              ) : (
-                                // Ransom Style - Image-based (assets preloaded)
-                                albumName.length > 0 && (
-                                  <RansomText
-                                    text={albumName}
-                                    seed={ransomSeed}
-                                    characterSize={18 * textScale}
-                                    spacing={-4}
-                                    enableRotation={true}
-                                    enableYOffset={true}
-                                  />
-                                )
-                              )}
-                            </Animated.View>
-                          )}
-                        </View>
-                      </View>
-
-                      {/* Drag instruction */}
-                      {albumCoverPhoto && (
-                        <Text style={styles.dragHintText}>{t('memories.album.dragHint')}</Text>
-                      )}
-
-                      {/* Text Style Selection - Different UI based on font style */}
-                      {albumCoverPhoto && fontStyle === 'basic' && (
-                        <View style={styles.textStyleSelectionContainer}>
-                          {/* Color Selection (Left) */}
-                          <View style={styles.colorSelectionSection}>
-                            <Text style={styles.selectionLabel}>{t('memories.album.color')}</Text>
-                            <View style={styles.colorButtonRow}>
-                              <Pressable
-                                style={[
-                                  styles.colorButton,
-                                  { backgroundColor: '#000000' },
-                                  textColor === 'black' && styles.colorButtonSelected,
-                                ]}
-                                onPress={() => setTextColor('black')}
-                              />
-                              <Pressable
-                                style={[
-                                  styles.colorButton,
-                                  { backgroundColor: '#FFFFFF' },
-                                  textColor === 'white' && styles.colorButtonSelected,
-                                ]}
-                                onPress={() => setTextColor('white')}
-                              />
-                            </View>
-                          </View>
-
-                          {/* Size Selection (Right) */}
-                          <View style={styles.sizeSelectionSection}>
-                            <Text style={styles.selectionLabel}>{t('memories.album.size')}</Text>
-                            <View style={styles.sizeButtonRow}>
-                              {[1.5, 2.25, 3.0].map((scale, index) => (
-                                <Pressable
-                                  key={index}
-                                  style={[
-                                    styles.sizeButton,
-                                    textScale === scale && styles.sizeButtonSelected,
-                                  ]}
-                                  onPress={() => setTextScale(scale)}
-                                >
-                                  <Text style={[
-                                    styles.sizeButtonText,
-                                    { fontSize: 10 + index * 7 },
-                                    textScale === scale && styles.sizeButtonTextSelected,
-                                  ]}>A</Text>
-                                </Pressable>
-                              ))}
-                            </View>
-                          </View>
-                        </View>
-                      )}
-
-                      {/* Ransom Style - Size Only */}
-                      {albumCoverPhoto && fontStyle === 'ransom' && (
-                        <View style={styles.sizeSelectionContainer}>
-                          <Text style={styles.sizeSelectionLabel}>{t('memories.album.textSize')}</Text>
-                          <View style={styles.sizeButtonRow}>
-                            {[1.0, 1.5, 2.0].map((scale, index) => (
-                              <Pressable
-                                key={index}
-                                style={[
-                                  styles.sizeButton,
-                                  textScale === scale && styles.sizeButtonSelected,
-                                ]}
-                                onPress={() => setTextScale(scale)}
-                              >
-                                <Text style={[
-                                  styles.sizeButtonText,
-                                  { fontSize: 10 + index * 7 },
-                                  textScale === scale && styles.sizeButtonTextSelected,
-                                ]}>A</Text>
-                              </Pressable>
-                            ))}
-                          </View>
-                        </View>
-                      )}
-
-                      {/* Action Buttons */}
-                      <View style={styles.albumModalButtonRow}>
-                        <Pressable
-                          style={styles.albumModalButtonSecondary}
-                          onPress={() => transitionToNextStep('name')}
-                        >
-                          <Text style={styles.albumModalButtonSecondaryText}>{t('common.back')}</Text>
-                        </Pressable>
-                        <Pressable
-                          style={[
-                            styles.albumModalButton,
-                            (!albumCoverPhoto || isCreatingAlbum) && styles.albumModalButtonDisabled
-                          ]}
-                          onPress={handleCreateAlbum}
-                          disabled={!albumCoverPhoto || isCreatingAlbum}
-                        >
-                          {isCreatingAlbum ? (
-                            <ActivityIndicator size="small" color={COLORS.black} />
-                          ) : (
-                            <Text style={[
-                              styles.albumModalButtonText,
-                              !albumCoverPhoto && styles.albumModalButtonTextDisabled
-                            ]}>{t('common.done')}</Text>
-                          )}
-                        </Pressable>
-                      </View>
-                    </>
-                  )}
-                </Animated.View>
-              </View>
-            </KeyboardAvoidingView>
-
-            {/* Cover Photo Picker Overlay */}
-            {showCoverPhotoPicker && (
-              <View style={styles.missionPickerOverlay}>
-                <Pressable
-                  style={styles.monthModalBackdrop}
-                  onPress={closeCoverPhotoPicker}
-                >
-                  <BlurView experimentalBlurMethod="dimezisBlurView" intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
-                </Pressable>
-                <Animated.View
-                  style={[
-                    styles.monthModalContent,
-                    { transform: [{ translateY: coverPickerSlideAnim }] }
-                  ]}
-                >
-                  <View style={styles.monthModalHeader}>
-                    <Text style={styles.monthModalTitle}>{t('memories.album.selectPhoto')}</Text>
-                    <Pressable
-                      style={styles.monthModalCloseButton}
-                      onPress={closeCoverPhotoPicker}
-                    >
-                      <X color="rgba(255,255,255,0.8)" size={20} />
-                    </Pressable>
-                  </View>
-                  <ScrollView contentContainerStyle={styles.monthModalGrid}>
-                    {completedMemories.length === 0 ? (
-                      <View style={styles.missionPickerEmpty}>
-                        <Text style={styles.missionPickerEmptyText}>{t('memories.empty')}</Text>
-                      </View>
-                    ) : (
-                      completedMemories.map((mission) => (
-                        <Pressable
-                          key={mission.id}
-                          style={styles.monthModalItem}
-                          onPress={() => handleSelectCoverPhoto(mission.photoUrl)}
-                        >
-                          <View style={styles.monthModalItemInner}>
-                            <ExpoImage source={{ uri: mission.photoUrl }} style={styles.monthModalItemImage} contentFit="cover" cachePolicy="memory-disk" transition={100} />
-                          </View>
-                        </Pressable>
-                      ))
-                    )}
-                  </ScrollView>
-                </Animated.View>
-              </View>
-            )}
+            {renderAlbumModalContent()}
           </BlurView>
         </View>
       </Modal>
@@ -2194,6 +2569,7 @@ export default function MemoriesScreen() {
         visible={showAlbumDetailModal}
         transparent
         animationType="fade"
+        statusBarTranslucent={true}
         onRequestClose={closeAlbumDetailModal}
       >
         <View style={styles.albumDetailFullScreen}>
@@ -2804,359 +3180,16 @@ export default function MemoriesScreen() {
               visible={showCoverEditModal}
               transparent
               animationType="fade"
+              statusBarTranslucent={true}
               onRequestClose={() => setShowCoverEditModal(false)}
             >
-              <BlurView experimentalBlurMethod="dimezisBlurView" intensity={80} tint="dark" style={styles.albumModalContainer}>
-                <TouchableWithoutFeedback onPress={() => setShowCoverEditModal(false)}>
-                  <View style={styles.albumModalBackdrop} />
-                </TouchableWithoutFeedback>
-                <KeyboardAvoidingView
-                  behavior="padding"
-                  style={styles.keyboardAvoidingView}
-                  keyboardVerticalOffset={Platform.OS === 'android' ? -100 : 0}
-                >
-                  <View style={[
-                    styles.albumModalContent,
-                    editAlbumStep === 'fontStyle' && styles.albumModalContentFontStyle,
-                  ]}>
-                    {/* Header */}
-                    <View style={styles.albumModalHeader}>
-                      <Text style={styles.albumModalTitle}>
-                        {editAlbumStep === 'fontStyle' ? t('memories.album.fontStyle') : editAlbumStep === 'name' ? t('memories.album.name') : t('memories.album.coverPhoto')}
-                      </Text>
-                      <Pressable
-                        style={styles.albumModalCloseButton}
-                        onPress={() => setShowCoverEditModal(false)}
-                      >
-                        <X color="rgba(255,255,255,0.8)" size={20} />
-                      </Pressable>
-                    </View>
-                    <View style={styles.albumModalHeaderDivider} />
-
-                    {editAlbumStep === 'fontStyle' ? (
-                      <>
-                        {/* Step 0: Font Style Selection */}
-                        <Text style={styles.albumModalSubtitle}>
-                          {t('memories.album.fontStyleDesc')}
-                        </Text>
-
-                        <View style={styles.fontStyleOptions}>
-                          {/* Basic Font Option */}
-                          <Pressable
-                            style={[
-                              styles.fontStyleOption,
-                              editFontStyle === 'basic' && styles.fontStyleOptionSelected,
-                            ]}
-                            onPress={() => {
-                              setEditFontStyle('basic');
-                              // Reset to medium size for basic font style [1.5, 2.25, 3.0]
-                              setEditTextScale(2.25);
-                            }}
-                          >
-                            <View style={styles.fontStylePreviewContainer}>
-                              <Text style={styles.fontStylePreviewBasic}>{t('memories.album.basicFont')}</Text>
-                            </View>
-                            <Text style={styles.fontStyleLabel}>{t('memories.album.basicFontDesc')}</Text>
-                          </Pressable>
-
-                          {/* Ransom Font Option */}
-                          <Pressable
-                            style={[
-                              styles.fontStyleOption,
-                              editFontStyle === 'ransom' && styles.fontStyleOptionSelected,
-                            ]}
-                            onPress={() => {
-                              setEditFontStyle('ransom');
-                              // Reset to medium size for ransom font style [1.0, 1.5, 2.0]
-                              setEditTextScale(1.5);
-                              // Clear text if it contains Korean characters (not supported in ransom style)
-                              if (/[가-힣ㄱ-ㅎㅏ-ㅣ]/.test(editAlbumName)) {
-                                setEditAlbumName('');
-                              }
-                            }}
-                          >
-                            <View style={styles.fontStylePreviewContainer}>
-                              <RansomText
-                                text="FONT"
-                                seed={12345}
-                                characterSize={28}
-                                spacing={-4}
-                                enableRotation={true}
-                                enableYOffset={true}
-                              />
-                            </View>
-                            <Text style={styles.fontStyleLabel} numberOfLines={1} adjustsFontSizeToFit>{t('memories.album.ransomStyle')}</Text>
-                          </Pressable>
-                        </View>
-
-                        <Pressable
-                          style={[
-                            styles.albumModalButtonFullWidth,
-                            !editFontStyle && styles.albumModalButtonDisabled,
-                          ]}
-                          onPress={() => setEditAlbumStep('name')}
-                          disabled={!editFontStyle}
-                        >
-                          <Text style={styles.albumModalButtonText}>{t('common.next')}</Text>
-                        </Pressable>
-                      </>
-                    ) : editAlbumStep === 'name' ? (
-                      <>
-                        {/* Step 1: Album Name Input */}
-                        <Text style={styles.albumModalSubtitle}>
-                          {editFontStyle === 'basic' ? t('memories.album.basicFontHint') : t('memories.album.ransomFontHint')}
-                        </Text>
-
-                        {/* Text Preview - Basic or Ransom Style */}
-                        <View style={styles.ransomPreviewContainer}>
-                          {editAlbumName.length > 0 ? (
-                            editFontStyle === 'basic' ? (
-                              <Text style={styles.basicFontPreview}>{editAlbumName}</Text>
-                            ) : (
-                              // Ransom Style - assets preloaded with 8-char wrapping
-                              editAlbumName.length > 0 ? (
-                                <RansomText
-                                  text={wrapLongWordsForRansom(editAlbumName, 8)}
-                                  seed={editRansomSeed}
-                                  characterSize={36}
-                                  spacing={-4}
-                                  enableRotation={true}
-                                  enableYOffset={true}
-                                />
-                              ) : null
-                            )
-                          ) : (
-                            <Text style={[styles.ransomPlaceholder, editFontStyle === 'basic' && { fontFamily: 'Jua' }]}>{t('memories.album.name')}</Text>
-                          )}
-                          {/* Refresh Button for Ransom Style */}
-                          {editFontStyle === 'ransom' && editAlbumName.length > 0 && (
-                            <Pressable
-                              style={styles.refreshButton}
-                              onPress={() => setEditRansomSeed(Math.floor(Math.random() * 1000000))}
-                            >
-                              <RefreshCw color="rgba(255, 255, 255, 0.6)" size={18} />
-                            </Pressable>
-                          )}
-                        </View>
-
-                        {/* Text Input */}
-                        <TextInput
-                          style={styles.albumNameInput}
-                          value={editAlbumName}
-                          onChangeText={handleEditAlbumNameChange}
-                          placeholder={editFontStyle === 'ransom' ? t('memories.album.ransomPlaceholder') : t('memories.album.namePlaceholder')}
-                          placeholderTextColor="rgba(255,255,255,0.4)"
-                          maxLength={20}
-                          autoFocus
-                        />
-
-                        {/* Button Row - Previous and Next */}
-                        <View style={styles.albumModalButtonRow}>
-                          <Pressable
-                            style={styles.albumModalButtonSecondary}
-                            onPress={() => setEditAlbumStep('fontStyle')}
-                          >
-                            <Text style={styles.albumModalButtonSecondaryText}>{t('common.back')}</Text>
-                          </Pressable>
-                          <Pressable
-                            style={[
-                              styles.albumModalButton,
-                              !editAlbumName.trim() && styles.albumModalButtonDisabled,
-                            ]}
-                            onPress={() => setEditAlbumStep('cover')}
-                            disabled={!editAlbumName.trim()}
-                          >
-                            <Text style={styles.albumModalButtonText}>{t('common.next')}</Text>
-                          </Pressable>
-                        </View>
-                      </>
-                    ) : (
-                      <>
-                        {/* Step 2: Cover Photo Selection with Draggable Text */}
-                        <Text style={styles.albumModalSubtitle}>
-                          {t('memories.album.coverEditHint')}
-                        </Text>
-
-                        {/* Cover Photo Preview with Draggable Text */}
-                        <View style={styles.coverPhotoContainer}>
-                          <View style={styles.coverPhotoPickerContainer} onLayout={handleEditContainerLayout}>
-                            {/* Book Spine - Inward Curve Effect */}
-                            <LinearGradient
-                              colors={['rgba(0, 0, 0, 0.65)', 'rgba(0, 0, 0, 0.35)', 'rgba(0, 0, 0, 0.12)', 'rgba(255, 255, 255, 0.08)', 'transparent']}
-                              locations={[0, 0.25, 0.55, 0.8, 1]}
-                              start={{ x: 0, y: 0 }}
-                              end={{ x: 1, y: 0 }}
-                              style={styles.modalBookSpineCurve}
-                            />
-
-                            <Pressable
-                              style={styles.coverPhotoInner}
-                              onPress={handlePickEditCoverPhoto}
-                            >
-                              {editCoverPhoto ? (
-                                <ExpoImage
-                                  source={{ uri: editCoverPhoto }}
-                                  style={styles.coverPhotoPreview}
-                                  contentFit="cover"
-                                  cachePolicy="memory-disk"
-                                  transition={100}
-                                />
-                              ) : (
-                                <View style={styles.coverPhotoPlaceholder}>
-                                  <Plus color="rgba(255,255,255,0.6)" size={40} />
-                                  <Text style={styles.coverPhotoPlaceholderText}>{t('memories.album.selectPhoto')}</Text>
-                                </View>
-                              )}
-                            </Pressable>
-
-                            {/* Draggable Album Name Overlay */}
-                            {editCoverPhoto && (
-                              <Animated.View
-                                {...editPanResponder.panHandlers}
-                                style={[
-                                  styles.draggableTextOverlay,
-                                  {
-                                    transform: [
-                                      { translateX: editPanPosition.x },
-                                      { translateY: editPanPosition.y },
-                                    ],
-                                  },
-                                ]}
-                              >
-                                {editFontStyle === 'basic' ? (
-                                  <Text style={[
-                                    styles.basicFontOverlay,
-                                    {
-                                      fontSize: 16 * editTextScale,
-                                      lineHeight: 16 * editTextScale * 1.3,
-                                      color: editTextColor === 'black' ? '#000000' : COLORS.white,
-                                    }
-                                  ]}>{editAlbumName}</Text>
-                                ) : (
-                                  // Ransom Style - assets preloaded
-                                  editAlbumName.length > 0 && (
-                                    <RansomText
-                                      text={editAlbumName}
-                                      seed={editRansomSeed}
-                                      characterSize={18 * editTextScale}
-                                      spacing={-4}
-                                      enableRotation={true}
-                                      enableYOffset={true}
-                                    />
-                                  )
-                                )}
-                              </Animated.View>
-                            )}
-                          </View>
-                        </View>
-
-                        {/* Drag instruction */}
-                        {editCoverPhoto && (
-                          <Text style={styles.dragHintText}>{t('memories.album.dragHint')}</Text>
-                        )}
-
-                        {/* Text Style Selection - Different UI based on font style */}
-                        {editCoverPhoto && editFontStyle === 'basic' && (
-                          <View style={styles.textStyleSelectionContainer}>
-                            {/* Color Selection (Left) */}
-                            <View style={styles.colorSelectionSection}>
-                              <Text style={styles.selectionLabel}>{t('memories.album.color')}</Text>
-                              <View style={styles.colorButtonRow}>
-                                <Pressable
-                                  style={[
-                                    styles.colorButton,
-                                    { backgroundColor: '#000000' },
-                                    editTextColor === 'black' && styles.colorButtonSelected,
-                                  ]}
-                                  onPress={() => setEditTextColor('black')}
-                                />
-                                <Pressable
-                                  style={[
-                                    styles.colorButton,
-                                    { backgroundColor: '#FFFFFF' },
-                                    editTextColor === 'white' && styles.colorButtonSelected,
-                                  ]}
-                                  onPress={() => setEditTextColor('white')}
-                                />
-                              </View>
-                            </View>
-
-                            {/* Size Selection (Right) */}
-                            <View style={styles.sizeSelectionSection}>
-                              <Text style={styles.selectionLabel}>{t('memories.album.size')}</Text>
-                              <View style={styles.sizeButtonRow}>
-                                {[1.5, 2.25, 3.0].map((scale, index) => (
-                                  <Pressable
-                                    key={index}
-                                    style={[
-                                      styles.sizeButton,
-                                      editTextScale === scale && styles.sizeButtonSelected,
-                                    ]}
-                                    onPress={() => setEditTextScale(scale)}
-                                  >
-                                    <Text style={[
-                                      styles.sizeButtonText,
-                                      { fontSize: 10 + index * 7 },
-                                      editTextScale === scale && styles.sizeButtonTextSelected,
-                                    ]}>A</Text>
-                                  </Pressable>
-                                ))}
-                              </View>
-                            </View>
-                          </View>
-                        )}
-
-                        {/* Ransom Style - Size Only */}
-                        {editCoverPhoto && editFontStyle === 'ransom' && (
-                          <View style={styles.sizeSelectionContainer}>
-                            <Text style={styles.sizeSelectionLabel}>{t('memories.album.textSize')}</Text>
-                            <View style={styles.sizeButtonRow}>
-                              {[1.0, 1.5, 2.0].map((scale, index) => (
-                                <Pressable
-                                  key={index}
-                                  style={[
-                                    styles.sizeButton,
-                                    editTextScale === scale && styles.sizeButtonSelected,
-                                  ]}
-                                  onPress={() => setEditTextScale(scale)}
-                                >
-                                  <Text style={[
-                                    styles.sizeButtonText,
-                                    { fontSize: 10 + index * 7 },
-                                    editTextScale === scale && styles.sizeButtonTextSelected,
-                                  ]}>A</Text>
-                                </Pressable>
-                              ))}
-                            </View>
-                          </View>
-                        )}
-
-                        {/* Action Buttons */}
-                        <View style={styles.albumModalButtonRow}>
-                          <Pressable
-                            style={styles.albumModalButtonSecondary}
-                            onPress={() => setEditAlbumStep('name')}
-                          >
-                            <Text style={styles.albumModalButtonSecondaryText}>{t('common.back')}</Text>
-                          </Pressable>
-                          <Pressable
-                            style={[
-                              styles.albumModalButton,
-                              !editCoverPhoto && styles.albumModalButtonDisabled
-                            ]}
-                            onPress={handleSaveEdit}
-                            disabled={!editCoverPhoto}
-                          >
-                            <Text style={[
-                              styles.albumModalButtonText,
-                              !editCoverPhoto && styles.albumModalButtonTextDisabled
-                            ]}>{t('common.done')}</Text>
-                          </Pressable>
-                        </View>
-                      </>
-                    )}
-                  </View>
-                </KeyboardAvoidingView>
+              <BlurView
+                experimentalBlurMethod="dimezisBlurView"
+                intensity={80}
+                tint="dark"
+                style={[styles.albumModalContainer, { paddingBottom: Math.max(insets.bottom, rs(24)) }]}
+              >
+                {renderCoverEditModalContent()}
               </BlurView>
             </Modal>
           )}
@@ -4051,7 +4084,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   mainContentContainer: {
-    paddingBottom: rs(170),
+    paddingBottom: rs(180),
   },
   yearSection: {
     marginTop: rs(SPACING.md),
@@ -4229,7 +4262,11 @@ const styles = StyleSheet.create({
     marginBottom: rs(SPACING.md),
   },
   monthModalContainer: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
   },
   missionPickerOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -4917,10 +4954,18 @@ const styles = StyleSheet.create({
   },
   // Album Modal Styles
   albumModalFadeWrapper: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
   },
   albumModalContainer: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
     justifyContent: 'center',
     alignItems: 'center',
     // paddingBottom applied dynamically with safe area insets
@@ -5773,7 +5818,11 @@ const styles = StyleSheet.create({
   },
   // Album Detail Full Screen Styles
   albumDetailFullScreen: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
   },
   albumDetailContent: {
     flex: 1,

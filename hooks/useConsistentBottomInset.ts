@@ -67,10 +67,10 @@ export function useConsistentBottomPadding(): number {
 /**
  * Android 배너 광고 및 탭바 위치 계산 훅
  *
- * 레이아웃 순서 (아래에서 위로):
- * 1. 시스템 네비바 (있으면)
- * 2. 배너 광고 (네비바 바로 위)
- * 3. 탭바 (배너 광고 바로 위)
+ * 레이아웃 순서 (위에서 아래로):
+ * 1. 탭바 아이콘 (풀와이드 배경)
+ * 2. 배너 광고 (탭바 아래)
+ * 3. 시스템 네비바 (있으면)
  */
 
 // 배너와 탭바 사이 간격
@@ -106,26 +106,8 @@ export function useBannerAdBottom(): number {
 }
 
 export function useTabBarBottom(): number {
-  const insets = useSafeAreaInsets();
-  // 구독 상태를 직접 참조하여 상태 변경 시 리렌더링 발생하도록 함
-  const isPremium = useSubscriptionStore((state) => state.isPremium);
-  const partnerIsPremium = useSubscriptionStore((state) => state.partnerIsPremium);
-  const showAds = !isPremium && !partnerIsPremium;
-  // 실제 로드된 배너 광고 높이를 사용하여 반응형 포지셔닝
-  const bannerAdHeight = useUIStore((state) => state.bannerAdHeight);
-
-  if (Platform.OS === 'android') {
-    if (showAds) {
-      // 무료 사용자: 탭바는 배너 광고 위에 위치
-      // 탭바 bottom = 네비바 높이 + 실제 배너 높이 + 간격
-      return insets.bottom + bannerAdHeight + BANNER_TAB_GAP;
-    } else {
-      // 프리미엄 사용자: 광고 없음, 풀와이드 탭바가 네비바 바로 위에 위치
-      return insets.bottom;
-    }
-  }
-
-  // iOS: 기존 로직 유지
+  // iOS 전용: 레거시 플로팅 필 탭바 위치
+  // Android는 _layout.tsx에서 배너를 탭바 내부에 직접 렌더링하므로 이 훅 사용 안함
   return scale(24);
 }
 

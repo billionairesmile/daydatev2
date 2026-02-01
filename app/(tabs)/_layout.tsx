@@ -23,6 +23,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, IS_TABLET, scale, scaleFont } from '@/constants/design';
 import { useTabBarBottom, USE_IOS_26_TAB_BAR } from '@/hooks/useConsistentBottomInset';
 import { useUIStore } from '@/stores/uiStore';
+import { useSubscriptionStore } from '@/stores/subscriptionStore';
+import BannerAdView, { BannerAdPlacement } from '@/components/ads/BannerAdView';
 
 // Conditionally import NativeTabs (may not be available in all Expo versions)
 let NativeTabs: any = null;
@@ -179,14 +181,25 @@ function NativeTabLayout() {
 // ============================================
 function ClassicTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const { t } = useTranslation();
-  const tabBarBottom = useTabBarBottom();
   const insets = useSafeAreaInsets();
   const [tabWidth, setTabWidth] = useState(0);
   const slideAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
+  // Subscription status for showing ads
+  const isPremium = useSubscriptionStore((s) => s.isPremium);
+  const partnerIsPremium = useSubscriptionStore((s) => s.partnerIsPremium);
+  const showAds = !isPremium && !partnerIsPremium;
+
   const isIOS = Platform.OS === 'ios';
   const isAndroid = Platform.OS === 'android';
+
+  // iOS legacy tab bar position (Android handles banner inside tab bar now)
+  const tabBarBottom = useTabBarBottom();
+
+  // Get current screen name for banner ad placement
+  const currentRouteName = state.routes[state.index]?.name || 'index';
+  const bannerPlacement: BannerAdPlacement = (currentRouteName as BannerAdPlacement);
 
   // Android: Native style (icons only, full width)
   // iOS: Legacy floating pill style
@@ -235,12 +248,11 @@ function ClassicTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   };
 
   // Android: Full-width native style tab bar
-  // 탭바 배경을 화면 하단까지 확장 (배너 광고 영역 포함)
-  // 프리미엄 사용자가 네비바 미사용 시에도 배경이 화면 최하단까지 확장되도록 insets.bottom 보장
+  // 레이아웃 순서 (위에서 아래로): 탭 아이콘 → 배너 광고 → 네비바 영역
+  // 배너 광고를 탭바 컴포넌트 내부에 렌더링하여 z-order 문제 해결
   if (isAndroid) {
-    const actualPaddingBottom = Math.max(tabBarBottom, insets.bottom);
     return (
-      <View style={[androidStyles.container, { bottom: 0, paddingBottom: actualPaddingBottom }]}>
+      <View style={[androidStyles.container, { bottom: 0 }]}>
         <BlurView
           experimentalBlurMethod="dimezisBlurView"
           intensity={50}
@@ -248,6 +260,7 @@ function ClassicTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
           style={StyleSheet.absoluteFill}
         />
         <View style={androidStyles.inner} />
+        {/* Tab icons row */}
         <View style={androidStyles.tabsRow} onLayout={onLayout}>
           {state.routes.map((route, index) => {
             const focused = state.index === index;
@@ -275,6 +288,14 @@ function ClassicTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             );
           })}
         </View>
+        {/* Banner ad - rendered inside tab bar to ensure proper z-order */}
+        {showAds && (
+          <View style={androidStyles.bannerContainer}>
+            <BannerAdView placement={bannerPlacement} />
+          </View>
+        )}
+        {/* Navigation bar safe area padding */}
+        <View style={{ height: insets.bottom }} />
       </View>
     );
   }
@@ -339,6 +360,7 @@ const androidStyles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 100,
+    elevation: 10,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: 'rgba(255, 255, 255, 0.1)',
   },
@@ -360,6 +382,10 @@ const androidStyles = StyleSheet.create({
     fontSize: IS_COMPACT_ANDROID ? 9 : 10,
     color: COLORS.white,
     textAlign: 'center',
+  },
+  bannerContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 
