@@ -44,6 +44,7 @@ class RewardedAdManager {
   private unsubscribeLoaded: (() => void) | null = null;
   private unsubscribeClosed: (() => void) | null = null;
   private unsubscribeEarnedReward: (() => void) | null = null;
+  private unsubscribeError: (() => void) | null = null;
 
   /**
    * Check if rewarded ads are available (not in Expo Go)
@@ -74,11 +75,13 @@ class RewardedAdManager {
     }
 
     this.callbacks = callbacks || {};
-    this.isLoading = true;
 
     try {
       // Clean up any previous ad
       this.cleanup();
+
+      // Set isLoading AFTER cleanup (cleanup resets it to false)
+      this.isLoading = true;
 
       const adUnitId = getRewardedAdUnitId();
       console.log('[RewardedAd] Loading ad with unit ID:', adUnitId);
@@ -116,6 +119,18 @@ class RewardedAdManager {
           (reward: { type: string; amount: number }) => {
             console.log('[RewardedAd] User earned reward:', reward);
             this.callbacks.onEarnedReward?.(reward);
+          }
+        );
+
+        // Subscribe to error event - handles immediate load failures
+        this.unsubscribeError = this.rewardedAd.addAdEventListener(
+          AdEventType.ERROR,
+          (error: any) => {
+            console.log('[RewardedAd] Ad load error:', error);
+            this.isLoading = false;
+            this.isLoaded = false;
+            this.callbacks.onAdFailedToLoad?.(error);
+            resolve(false);
           }
         );
 
@@ -189,9 +204,11 @@ class RewardedAdManager {
     this.unsubscribeLoaded?.();
     this.unsubscribeClosed?.();
     this.unsubscribeEarnedReward?.();
+    this.unsubscribeError?.();
     this.unsubscribeLoaded = null;
     this.unsubscribeClosed = null;
     this.unsubscribeEarnedReward = null;
+    this.unsubscribeError = null;
     this.rewardedAd = null;
     this.isLoaded = false;
     this.isLoading = false;

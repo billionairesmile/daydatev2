@@ -2034,7 +2034,7 @@ export default function MemoriesScreen() {
                     styles.albumModalButton,
                     !editCoverPhoto && styles.albumModalButtonDisabled
                   ]}
-                  onPress={handleSaveCoverEdit}
+                  onPress={handleSaveEdit}
                   disabled={!editCoverPhoto}
                 >
                   <Text style={[

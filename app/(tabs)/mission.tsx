@@ -50,7 +50,7 @@ import NativeAdMissionCard from '@/components/ads/NativeAdMissionCard';
 import { BannerAdView } from '@/components/ads';
 import RefreshMissionCard from '@/components/RefreshMissionCard';
 import type { Mission, FeaturedMission } from '@/types';
-import { db, isDemoMode } from '@/lib/supabase';
+import { db, isDemoMode, supabase } from '@/lib/supabase';
 import { rewardedAdManager } from '@/lib/rewardedAd';
 import { cancelHourlyReminders, cancelMissionReminderNotification } from '@/lib/pushNotifications';
 import { useNetwork } from '@/lib/useNetwork';
@@ -762,8 +762,80 @@ export default function MissionScreen() {
     }
   }, [missionGenerationStatus, generatingUserId, user?.id]);
 
-  // Automatic polling for stale lock recovery when partner is generating
-  // This helps User B recover automatically when User A force-closes app during ad
+  // Supabase Realtime subscription for instant lock status updates
+  // This allows User B to be notified immediately when User A releases the lock
+  useEffect(() => {
+    if (!coupleId || isDemoMode || !supabase) {
+      return;
+    }
+
+    const currentUserId = user?.id;
+    const isPartnerGenerating = generatingUserId && generatingUserId !== currentUserId;
+
+    // Only subscribe when partner is generating or watching ad
+    if (!isPartnerGenerating || (missionGenerationStatus !== 'generating' && missionGenerationStatus !== 'ad_watching')) {
+      return;
+    }
+
+    console.log('[Mission] Setting up Realtime subscription for mission_generation_lock, coupleId:', coupleId);
+
+    const channel = supabase
+      .channel(`mission_lock:${coupleId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'mission_generation_lock',
+          filter: `couple_id=eq.${coupleId}`,
+        },
+        async (payload) => {
+          console.log('[Mission] Realtime lock update received:', payload.new);
+
+          const newStatus = (payload.new as { status?: string })?.status;
+
+          // If status changed to idle, immediately update UI
+          if (newStatus === 'idle' || newStatus === 'completed') {
+            console.log('[Mission] Realtime: Partner released lock, resetting UI immediately');
+
+            // Refresh missions to get latest data
+            await loadSharedMissions();
+
+            // Reset UI loading states
+            setIsGenerating(false);
+            setPartnerGeneratingMessage(null);
+
+            // Reset carousel state for proper first card scale
+            setIsScrollInitialized(false);
+            hasInitializedCarousel.current = false;
+            setCurrentIndex(0);
+            scrollX.setValue(0);
+
+            setTimeout(() => {
+              if (scrollViewRef.current) {
+                scrollViewRef.current.scrollToOffset({ offset: 1, animated: false });
+                setTimeout(() => {
+                  scrollViewRef.current?.scrollToOffset({ offset: 0, animated: false });
+                  setIsScrollInitialized(true);
+                }, 50);
+              }
+            }, 150);
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('[Mission] Realtime subscription status:', status);
+      });
+
+    return () => {
+      console.log('[Mission] Cleaning up Realtime subscription for coupleId:', coupleId);
+      supabase?.removeChannel(channel);
+    };
+  }, [coupleId, missionGenerationStatus, generatingUserId, user?.id, loadSharedMissions, scrollX]);
+
+  // Fallback polling for stale lock recovery (in case Realtime fails)
+  // This helps User B recover when User A force-closes app during ad
+  // Interval reduced since Realtime handles normal cases instantly
   useEffect(() => {
     let intervalId: ReturnType<typeof setInterval> | null = null;
 
@@ -773,11 +845,12 @@ export default function MissionScreen() {
       const isPartnerGenerating = generatingUserId && generatingUserId !== currentUserId;
 
       if (isPartnerGenerating) {
-        // Dynamic poll interval: ad_watching = 60s (ads take longer), generating = 30s
-        const pollInterval = missionGenerationStatus === 'ad_watching' ? 60000 : 30000;
+        // Reduced poll interval since Realtime handles most cases
+        // This is just a fallback for edge cases (force close, network issues)
+        const pollInterval = 15000; // 15 seconds
         // Poll to check for stale locks
         intervalId = setInterval(async () => {
-          console.log('[Mission] Polling for stale lock recovery (interval:', pollInterval / 1000, 's)...');
+          console.log('[Mission] Fallback polling for stale lock recovery...');
 
           // Get status before polling
           const statusBeforePoll = useCoupleSyncStore.getState().missionGenerationStatus;
