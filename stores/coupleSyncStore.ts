@@ -1365,7 +1365,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
 
   // Check and reset shared missions if date changed (called from missionStore.checkAndResetMissions)
   checkAndResetSharedMissions: () => {
-    const { sharedMissionsDate, sharedMissions, allMissionProgress, lastMissionUpdate } = get();
+    const { sharedMissionsDate, sharedMissions, allMissionProgress, lastMissionUpdate, sharedBookmarks } = get();
     const today = getTodayInTimezone();
 
     // Check if date changed in the user's effective timezone
@@ -1408,6 +1408,31 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
         activeMissionProgress: lockedProgress || todayProgress[0] || null,
         lockedMissionId: lockedProgress?.mission_id || null,
       });
+    }
+
+    // Cleanup completed bookmarks when date changes (remove bookmarks completed before today)
+    if (dateChanged && sharedBookmarks.length > 0) {
+      const activeBookmarks = sharedBookmarks.filter((b) => {
+        // Keep non-completed bookmarks
+        if (!b.completed_at) return true;
+
+        // Extract date from completed_at timestamp (YYYY-MM-DD)
+        const completedDateString = b.completed_at.split('T')[0];
+
+        // Keep only if completed today, remove if completed on previous days
+        return completedDateString === today;
+      });
+
+      if (activeBookmarks.length !== sharedBookmarks.length) {
+        const removedCount = sharedBookmarks.length - activeBookmarks.length;
+        console.log(`[CoupleSyncStore] Cleaned up ${removedCount} completed bookmarks from previous days`);
+        set({ sharedBookmarks: activeBookmarks });
+
+        // Also trigger DB cleanup (async, don't wait)
+        get().cleanupCompletedBookmarks().catch((err) => {
+          console.warn('[CoupleSyncStore] Failed to cleanup bookmarks in DB:', err);
+        });
+      }
     }
   },
 
