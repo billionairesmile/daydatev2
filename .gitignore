@@ -48,6 +48,11 @@ supabase/.temp/
 *.apk
 *.ipa
 
+# keystore files (keep debug.keystore for development)
+*-release.keystore
+*.jks
+!debug.keystore
+
 # yarn (using npm)
 .yarn/
 .yarnrc.yml
