@@ -2407,10 +2407,8 @@ export default function MemoriesScreen() {
         </ScrollView>
       )}
 
-      {/* Banner Ad - iOS only (Android renders banner inside tab bar) */}
-      {Platform.OS === 'ios' && (
-        <BannerAdView placement="memories" style={[styles.bannerAd, { bottom: bannerAdBottom }]} />
-      )}
+      {/* Banner Ad - positioned above tab bar */}
+      <BannerAdView placement="memories" style={[styles.bannerAd, { bottom: bannerAdBottom }]} />
 
       {/* Month Album Modal */}
       <Modal

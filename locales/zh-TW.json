@@ -165,6 +165,8 @@
       "partnerGeneratingMessage": "您的伴侶正在生成新任務。請稍後再試。",
       "adLoadingFailed": "廣告載入失敗",
       "adLoadingFailedMessage": "廣告載入失敗。\n請稍後再試。",
+      "devModeTitle": "開發模式",
+      "devModeMessage": "廣告僅在正式版本中顯示。刷新任務需要觀看廣告。",
       "generating": "正在生成新任務...",
       "loadingAd": "正在準備廣告...",
       "adNotCompleted": "廣告觀看未完成",

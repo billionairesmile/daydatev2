@@ -2011,10 +2011,8 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Banner Ad - iOS only (Android renders banner inside tab bar) */}
-      {Platform.OS === 'ios' && (
-        <BannerAdView placement="home" style={[styles.bannerAd, { bottom: bannerAdBottom }]} />
-      )}
+      {/* Banner Ad - positioned above tab bar */}
+      <BannerAdView placement="home" style={[styles.bannerAd, { bottom: bannerAdBottom }]} />
 
       {/* Anniversary Modal with Blur - Single modal with step-based content */}
       <Modal

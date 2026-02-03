@@ -198,10 +198,8 @@ export default function MoreScreen() {
         onClose={() => setShowPremiumModal(false)}
       />
 
-      {/* Banner Ad - iOS only (Android renders banner inside tab bar) */}
-      {Platform.OS === 'ios' && (
-        <BannerAdView placement="more" style={[styles.bannerAd, { bottom: bannerAdBottom }]} />
-      )}
+      {/* Banner Ad - positioned above tab bar */}
+      <BannerAdView placement="more" style={[styles.bannerAd, { bottom: bannerAdBottom }]} />
 
     </View>
   );

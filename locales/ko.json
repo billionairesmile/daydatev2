@@ -167,6 +167,8 @@
       "partnerGeneratingMessage": "파트너가 새로운 미션을 생성하고 있습니다. 잠시 후 다시 시도해주세요.",
       "adLoadingFailed": "광고 로딩 실패",
       "adLoadingFailedMessage": "광고를 불러오는데 실패했어요.\n잠시 후 다시 시도해주세요.",
+      "devModeTitle": "개발 모드",
+      "devModeMessage": "광고는 프로덕션 빌드에서만 표시됩니다. 미션 새로고침은 광고 시청 후 사용 가능합니다.",
       "generating": "새로운 미션 생성 중...",
       "loadingAd": "광고 준비 중...",
       "adNotCompleted": "광고 시청 미완료",

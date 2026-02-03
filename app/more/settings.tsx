@@ -46,6 +46,7 @@ import { useMissionStore } from '@/stores/missionStore';
 import { db, isDemoMode, supabase } from '@/lib/supabase';
 import { signOut as supabaseSignOut } from '@/lib/socialAuth';
 import { notifyPartnerUnpaired, getNotificationPermissionStatus } from '@/lib/pushNotifications';
+import { useBackground } from '@/contexts';
 
 const { width } = Dimensions.get('window');
 
@@ -59,6 +60,7 @@ export default function SettingsScreen() {
   const { timezone, updateTimezoneInDb, getEffectiveTimezone } = useTimezoneStore();
   const { isPremium } = useSubscriptionStore();
   const { hasTimezoneMismatch, partnerDeviceTimezone, dismissTimezoneMismatch } = useCoupleSyncStore();
+  const { resetBackgroundState } = useBackground();
 
   // Notification settings
   const [pushEnabled, setPushEnabled] = useState(true);
@@ -307,17 +309,33 @@ export default function SettingsScreen() {
             resetMemory();
             resetSubscription();
 
+            // Reset background image state to prevent showing previous user's background
+            // CRITICAL: Must await to ensure AsyncStorage is cleared before login
+            await resetBackgroundState();
+
             // Sign out from Supabase (removes push token, cancels scheduled notifications)
             if (!isDemoMode) {
               await supabaseSignOut().catch(err => console.error('[Settings] Supabase signOut error:', err));
             }
 
-            // Clear all auth data (user, couple, partner)
-            signOut();
-            // Reset onboarding steps to welcome
+            // Reset onboarding steps to welcome BEFORE clearing auth data
+            // This ensures proper state synchronization
             resetOnboarding();
-            // Note: Don't clear hasSeenHomeTutorial - it should persist so returning users don't see the tutorial again
-            // Navigation is handled by _layout.tsx effect when isOnboardingComplete becomes false
+
+            // Clear all auth data (user, couple, partner)
+            // This sets isOnboardingComplete to false
+            signOut();
+
+            // CRITICAL: Clear AsyncStorage auth data to ensure clean logout
+            // Without this, persist middleware may reload old state before navigation completes
+            await AsyncStorage.removeItem('daydate-auth-storage');
+
+            // Small delay to ensure state updates propagate before navigation
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // CRITICAL: Explicit navigation to fix intermittent navigation bug
+            // Don't rely solely on _layout.tsx effect due to useEffect race condition
+            router.replace('/(auth)/onboarding');
           },
         },
       ]
@@ -469,21 +487,29 @@ export default function SettingsScreen() {
       setOnboardingStep('welcome');
       resetOnboarding();
 
+      // Step 3.5: Reset background image state to prevent showing previous user's background
+      // CRITICAL: Must await to ensure AsyncStorage is cleared before login
+      await resetBackgroundState();
+
       // Step 4: Clear Zustand auth stores - this sets isOnboardingComplete to false
       signOut();
 
-      // Step 5: Explicitly navigate to onboarding screen immediately
-      // This prevents the brief flash of intermediate screens that would occur
-      // if we relied on _layout.tsx useEffect to handle navigation
+      // CRITICAL: Clear AsyncStorage auth data to ensure clean logout
+      // Without this, persist middleware may reload old state before navigation completes
+      await AsyncStorage.removeItem('daydate-auth-storage');
+
+      // Small delay to ensure state updates propagate before navigation
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // CRITICAL: Explicit navigation to fix intermittent navigation bug
+      // Don't rely solely on _layout.tsx effect due to useEffect race condition
       router.replace('/(auth)/onboarding');
 
       // Show success alert after navigation completes
-      setTimeout(() => {
-        Alert.alert(
-          t('settings.deleteAccount.success'),
-          t('settings.deleteAccount.successMessage')
-        );
-      }, 100);
+      Alert.alert(
+        t('settings.deleteAccount.success'),
+        t('settings.deleteAccount.successMessage')
+      );
     } catch (error) {
       console.error('[Settings] Account deletion error:', error);
       setIsDeleting(false);

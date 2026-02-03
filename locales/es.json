@@ -165,6 +165,8 @@
       "partnerGeneratingMessage": "Tu pareja está generando nuevas misiones. Por favor, inténtalo más tarde.",
       "adLoadingFailed": "Error al Cargar Anuncio",
       "adLoadingFailedMessage": "Error al cargar el anuncio.\nPor favor, inténtalo más tarde.",
+      "devModeTitle": "Modo de Desarrollo",
+      "devModeMessage": "Los anuncios solo están disponibles en compilaciones de producción. La actualización de misiones requiere ver un anuncio.",
       "generating": "Generando nuevas misiones...",
       "loadingAd": "Cargando anuncio...",
       "adNotCompleted": "Anuncio No Completado",

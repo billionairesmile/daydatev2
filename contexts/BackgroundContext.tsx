@@ -9,6 +9,7 @@ interface BackgroundContextType {
   backgroundImage: any;
   setBackgroundImage: (image: any, skipPrefetch?: boolean) => Promise<void>;
   resetToDefault: () => void;
+  resetBackgroundState: () => Promise<void>;
   isLoaded: boolean;
   prefetchImages: (urls: string[]) => Promise<void>;
 }
@@ -220,6 +221,15 @@ export function BackgroundProvider({ children }: { children: ReactNode }) {
     }
   }, [isSyncInitialized, syncBackgroundImage]);
 
+  // Reset background state on logout (clear React state AND AsyncStorage without syncing to partner)
+  const resetBackgroundState = useCallback(async () => {
+    console.log('[Background] Resetting background state on logout');
+    setBackgroundImageState(DEFAULT_BACKGROUND);
+    setIsLoaded(false);
+    // CRITICAL: Remove AsyncStorage to prevent previous user's background from loading
+    await AsyncStorage.removeItem(BACKGROUND_STORAGE_KEY);
+  }, []);
+
   // Utility function to prefetch multiple images at once (for splash screen)
   const prefetchImages = useCallback(async (urls: string[]) => {
     if (!urls || urls.length === 0) return;
@@ -240,6 +250,7 @@ export function BackgroundProvider({ children }: { children: ReactNode }) {
       backgroundImage,
       setBackgroundImage,
       resetToDefault,
+      resetBackgroundState,
       isLoaded,
       prefetchImages,
     }}>
@@ -260,6 +271,7 @@ export function useBackground() {
       backgroundImage: DEFAULT_BG,
       setBackgroundImage: async () => {},
       resetToDefault: () => {},
+      resetBackgroundState: async () => {},
       isLoaded: false,
       prefetchImages: async () => {},
     };

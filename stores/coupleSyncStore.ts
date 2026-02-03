@@ -136,6 +136,7 @@ interface CoupleSyncState {
   sharedMissions: Mission[];
   sharedMissionsDate: string | null; // Track the date missions were generated (YYYY-MM-DD)
   sharedMissionsRefreshedAt: string | null; // Track when missions were refreshed (synced between users)
+  missionsReady: boolean; // Track if mission generator has finished loading images
   missionGenerationStatus: MissionGenerationStatus;
   generatingUserId: string | null;
   lastMissionUpdate: Date | null;
@@ -191,7 +192,9 @@ interface CoupleSyncActions {
   // Mission sync
   acquireMissionLock: () => Promise<boolean>;
   releaseMissionLock: (status?: 'completed' | 'idle') => Promise<void>;
+  broadcastAdCancelled: () => Promise<void>;
   saveSharedMissions: (missions: Mission[], answers: unknown, partnerId?: string, userNickname?: string) => Promise<void>;
+  setMissionsReady: () => Promise<void>;
   loadSharedMissions: () => Promise<Mission[] | null>;
   resetAllMissions: () => Promise<void>;
   checkAndResetSharedMissions: () => void;
@@ -302,6 +305,7 @@ const initialState: CoupleSyncState = {
   sharedMissions: [],
   sharedMissionsDate: null,
   sharedMissionsRefreshedAt: null,
+  missionsReady: false,
   missionGenerationStatus: 'idle',
   generatingUserId: null,
   lastMissionUpdate: null,
@@ -406,16 +410,30 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
         return;
       }
 
-      // Handle UPDATE event - missions were updated (e.g., refreshed_at changed)
+      // Handle UPDATE event - missions were updated (e.g., refreshed_at changed or missions_ready changed)
       if (payload.eventType === 'UPDATE') {
-        console.log('[CoupleSyncStore] Received UPDATE event - syncing refreshed_at:', payload.refreshed_at);
-        // Only update refreshed_at and missions data, preserve other state
-        const missions = payload.missions as Mission[];
-        set({
-          sharedMissions: missions,
-          sharedMissionsRefreshedAt: payload.refreshed_at || null,
-          lastMissionUpdate: new Date(),
-        });
+        console.log('[CoupleSyncStore] Received UPDATE event');
+
+        // Check if missions_ready flag was updated
+        if ('missions_ready' in payload && typeof payload.missions_ready === 'boolean') {
+          console.log('[CoupleSyncStore] missions_ready updated to:', payload.missions_ready);
+          set({
+            missionsReady: payload.missions_ready,
+            // When missions become ready, mark generation as completed
+            missionGenerationStatus: payload.missions_ready ? 'completed' : get().missionGenerationStatus,
+          });
+        }
+
+        // Update missions data if present
+        if (payload.missions) {
+          const missions = payload.missions as Mission[];
+          set({
+            sharedMissions: missions,
+            sharedMissionsRefreshedAt: payload.refreshed_at || null,
+            lastMissionUpdate: new Date(),
+          });
+        }
+
         return;
       }
 
@@ -429,16 +447,46 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
         sharedMissions: missions,
         sharedMissionsDate: missionDate, // Set the actual date when missions were generated
         sharedMissionsRefreshedAt: payload.refreshed_at || null, // Also include refreshed_at on insert
+        missionsReady: payload.missions_ready === true, // Set from payload (should be false initially)
         lastMissionUpdate: new Date(),
-        missionGenerationStatus: 'completed',
+        // Keep status as 'generating' until missionsReady becomes true
+        // This ensures B continues showing loading state while A loads images
+        missionGenerationStatus: payload.missions_ready === true ? 'completed' : 'generating',
         generatingUserId: payload.generated_by,
       });
     });
 
     // 2. Lock subscription
     lockChannel = db.missionLock.subscribeToLock(coupleId, (payload) => {
+      const prevStatus = get().missionGenerationStatus;
+      const newStatus = payload.status as MissionGenerationStatus;
+
+      // Detect ad cancellation: status changed from 'ad_watching' to 'idle'
+      if (prevStatus === 'ad_watching' && newStatus === 'idle') {
+        console.log('[CoupleSyncStore] Partner cancelled ad - reloading missions');
+        // Reload missions to ensure both users see the same (old) missions
+        get().loadSharedMissions().catch((err) => {
+          console.error('[CoupleSyncStore] Failed to reload missions after ad cancellation:', err);
+        });
+      }
+
+      // Prevent status change from 'ad_watching' to 'generating' for B (partner)
+      // B should stay in 'ad_watching' state until missions INSERT event arrives
+      // This keeps "Partner watching ad" message consistent
+      if (prevStatus === 'ad_watching' && newStatus === 'generating') {
+        const currentUserId = useAuthStore.getState().user?.id;
+        const isPartnerGenerating = payload.locked_by && payload.locked_by !== currentUserId;
+
+        if (isPartnerGenerating) {
+          console.log('[CoupleSyncStore] Partner finished ad and started generating - keeping ad_watching status for B');
+          // Don't update status - keep showing "Partner watching ad" message
+          // Status will change to 'generating' when missions INSERT event arrives
+          return;
+        }
+      }
+
       set({
-        missionGenerationStatus: payload.status as MissionGenerationStatus,
+        missionGenerationStatus: newStatus,
         generatingUserId: payload.locked_by,
       });
     });
@@ -928,6 +976,41 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     set({ missionGenerationStatus: status, generatingUserId: null });
   },
 
+  // Broadcast ad cancellation to partner (releases lock to 'idle')
+  // Partner's lock subscription will detect this and can trigger UI reset
+  broadcastAdCancelled: async () => {
+    const { coupleId } = get();
+    if (!coupleId || isInTestMode()) return;
+
+    await db.missionLock.release(coupleId, 'idle');
+    console.log('[CoupleSyncStore] Broadcast ad cancelled via lock release');
+  },
+
+  // Set missions ready flag (when mission generator has loaded all images)
+  // This signals to partner that missions are ready to display
+  setMissionsReady: async () => {
+    const { coupleId } = get();
+    if (!coupleId || isInTestMode() || !supabase) return;
+
+    console.log('[CoupleSyncStore] Setting missions_ready flag');
+
+    // Update local state first
+    set({ missionsReady: true });
+
+    // Then update database to notify partner via Realtime
+    const { error } = await supabase
+      .from('couple_missions')
+      .update({ missions_ready: true })
+      .eq('couple_id', coupleId)
+      .eq('status', 'active');
+
+    if (error) {
+      console.error('[CoupleSyncStore] Failed to set missions_ready:', error);
+      // Rollback local state on error
+      set({ missionsReady: false });
+    }
+  },
+
   // Set ad watching status (when user is watching rewarded ad before mission generation)
   // This is a lightweight lock that doesn't save any pending missions
   // Partner sees this status and knows to wait, but keeps their existing mission cards
@@ -1067,14 +1150,38 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     // then reverts time to generate new missions
     const { data: existingMissions } = await db.coupleMissions.getToday(coupleId);
     if (existingMissions) {
-      console.warn('[CoupleSyncStore] Active missions already exist, skipping creation');
-      // Load existing missions instead of creating new ones
-      set({
-        sharedMissions: existingMissions.missions as Mission[],
-        sharedMissionsDate: today,
-        missionGenerationStatus: 'completed',
+      console.warn('[CoupleSyncStore] Active missions already exist');
+      console.warn('[CoupleSyncStore] Existing missions:', {
+        id: existingMissions.id,
+        generated_at: existingMissions.generated_at,
+        expires_at: existingMissions.expires_at,
+        generated_by: existingMissions.generated_by,
+        mission_count: (existingMissions.missions as Mission[]).length,
       });
-      return;
+
+      // Check if this is a refresh scenario (missionGenerationStatus was 'ad_watching' or 'generating')
+      // In refresh mode, we want to replace old missions with new ones
+      const currentStatus = get().missionGenerationStatus;
+      const isRefreshMode = currentStatus === 'ad_watching' || currentStatus === 'generating';
+
+      if (isRefreshMode) {
+        console.log('[CoupleSyncStore] Refresh mode detected - deleting old active missions before creating new ones');
+        // Delete old active missions to allow new ones
+        const { error: deleteError } = await db.coupleMissions.deleteActive(coupleId);
+        if (deleteError) {
+          console.error('[CoupleSyncStore] Failed to delete old missions:', deleteError);
+          // Continue anyway - the insert might fail with duplicate constraint
+        }
+      } else {
+        console.log('[CoupleSyncStore] Not refresh mode - loading existing missions');
+        // Load existing missions instead of creating new ones
+        set({
+          sharedMissions: existingMissions.missions as Mission[],
+          sharedMissionsDate: today,
+          missionGenerationStatus: 'completed',
+        });
+        return;
+      }
     }
 
     // Calculate expiration time based on couple's timezone setting
@@ -1088,6 +1195,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
         sharedMissions: missions,
         sharedMissionsDate: today,
         sharedMissionsRefreshedAt: null, // Reset refreshed state for new missions
+        missionsReady: false, // A will set to true after loading images
         lastMissionUpdate: new Date(),
         missionGenerationStatus: 'completed',
       });

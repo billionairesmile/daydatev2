@@ -1537,6 +1537,7 @@ export const db = {
           generated_by: userId,
           expires_at: expiresAtString,
           status: 'active',
+          missions_ready: false, // A will set to true after loading images
         })
         .select()
         .single();
@@ -1593,7 +1594,7 @@ export const db = {
 
     subscribeToMissions(
       coupleId: string,
-      callback: (payload: { missions: unknown[]; generated_by: string; generated_at: string; eventType: 'INSERT' | 'DELETE' | 'UPDATE'; refreshed_at?: string | null }) => void
+      callback: (payload: { missions: unknown[]; generated_by: string; generated_at: string; eventType: 'INSERT' | 'DELETE' | 'UPDATE'; refreshed_at?: string | null; missions_ready?: boolean }) => void
     ) {
       const client = getSupabase();
       const channel = client
@@ -1607,8 +1608,8 @@ export const db = {
             filter: `couple_id=eq.${coupleId}`,
           },
           (payload) => {
-            const record = payload.new as { missions: unknown[]; generated_by: string; generated_at: string; refreshed_at?: string | null };
-            callback({ missions: record.missions, generated_by: record.generated_by, generated_at: record.generated_at, eventType: 'INSERT', refreshed_at: record.refreshed_at });
+            const record = payload.new as { missions: unknown[]; generated_by: string; generated_at: string; refreshed_at?: string | null; missions_ready?: boolean };
+            callback({ missions: record.missions, generated_by: record.generated_by, generated_at: record.generated_at, eventType: 'INSERT', refreshed_at: record.refreshed_at, missions_ready: record.missions_ready });
           }
         )
         .on(
@@ -1620,10 +1621,10 @@ export const db = {
             filter: `couple_id=eq.${coupleId}`,
           },
           (payload) => {
-            // When missions are updated (e.g., refreshed_at is set), sync the state
-            const record = payload.new as { missions: unknown[]; generated_by: string; generated_at: string; refreshed_at?: string | null };
-            console.log('[Supabase] couple_missions UPDATE event received, refreshed_at:', record.refreshed_at);
-            callback({ missions: record.missions, generated_by: record.generated_by, generated_at: record.generated_at, eventType: 'UPDATE', refreshed_at: record.refreshed_at });
+            // When missions are updated (e.g., refreshed_at or missions_ready is set), sync the state
+            const record = payload.new as { missions: unknown[]; generated_by: string; generated_at: string; refreshed_at?: string | null; missions_ready?: boolean };
+            console.log('[Supabase] couple_missions UPDATE event received, refreshed_at:', record.refreshed_at, 'missions_ready:', record.missions_ready);
+            callback({ missions: record.missions, generated_by: record.generated_by, generated_at: record.generated_at, eventType: 'UPDATE', refreshed_at: record.refreshed_at, missions_ready: record.missions_ready });
           }
         )
         .on(

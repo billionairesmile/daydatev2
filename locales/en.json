@@ -167,6 +167,8 @@
       "partnerGeneratingMessage": "Your partner is generating new missions. Please try again later.",
       "adLoadingFailed": "Ad Loading Failed",
       "adLoadingFailedMessage": "Failed to load the ad.\nPlease try again later.",
+      "devModeTitle": "Development Mode",
+      "devModeMessage": "Ads are only available in production builds. Mission refresh requires watching an ad.",
       "generating": "Generating new missions...",
       "loadingAd": "Loading ad...",
       "adNotCompleted": "Ad Not Completed",

@@ -694,6 +694,11 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
         // Use timezone-aware date for sync store comparison (sync store uses getTodayInTimezone)
         const todayTimezone = getTodayInTimezone();
 
+        // NEW: During ad_watching, hide old missions
+        if (syncStore.missionGenerationStatus === 'ad_watching') {
+          return false;
+        }
+
         // Check synced state FIRST - this is the source of truth for couples
         if (syncStore.isInitialized && syncStore.sharedMissions.length > 0 && syncStore.sharedMissionsDate === todayTimezone) {
           return true;

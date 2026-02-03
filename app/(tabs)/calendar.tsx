@@ -679,55 +679,54 @@ export default function CalendarScreen() {
     return days;
   };
 
-  const getMissionForDate = (day: number) => {
-    // Get all memories for this date and sort by completedAt (earliest first)
-    // This ensures we show the first completed mission's photo, with fallback if deleted
-    // Use timezone-consistent date comparison (same as isToday())
+  // Create stable cache of missions by date to prevent image reload on every render
+  const missionsByDate = React.useMemo(() => {
+    const cache: Record<string, { imageUrl: string; title: string }> = {};
     const timezone = getEffectiveTimezone();
-    const targetDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
-    const memoriesForDate = memories
-      .filter((memory) => {
-        // Use formatDateInTimezone for consistent timezone handling
-        const memoryDateStr = formatDateInTimezone(new Date(memory.completedAt), timezone);
-        return memoryDateStr === targetDateStr;
-      })
-      .sort((a, b) => new Date(a.completedAt).getTime() - new Date(b.completedAt).getTime());
+    // Process real memories
+    memories.forEach((memory) => {
+      const dateStr = formatDateInTimezone(new Date(memory.completedAt), timezone);
+      // Only store if we don't have a mission for this date yet and photo URL is valid
+      if (!cache[dateStr] && memory.photoUrl?.trim()) {
+        cache[dateStr] = {
+          imageUrl: memory.photoUrl,
+          title: memory.mission?.title || '미션 완료',
+        };
+      }
+    });
 
-    // Find the first memory with a valid photo URL
-    const memoryWithPhoto = memoriesForDate.find(
-      (memory) => memory.photoUrl && memory.photoUrl.trim() !== ''
-    );
+    // Add sample memories for development (if no real memory exists for that date)
+    SAMPLE_MEMORIES.forEach((memory) => {
+      const dateStr = formatDateInTimezone(new Date(memory.completedAt), timezone);
+      if (!cache[dateStr] && memory.photoUrl?.trim()) {
+        cache[dateStr] = {
+          imageUrl: memory.photoUrl,
+          title: memory.mission?.title || '미션 완료',
+        };
+      }
+    });
 
-    if (memoryWithPhoto) {
-      return {
-        imageUrl: memoryWithPhoto.photoUrl,
-        title: memoryWithPhoto.mission?.title || '미션 완료',
-      };
+    return cache;
+  }, [memories, year, month]);
+
+  const getMissionForDate = useCallback((day: number) => {
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    return missionsByDate[dateStr];
+  }, [missionsByDate, year, month]);
+
+  // Prefetch all mission images for the current month to prevent flickering
+  useEffect(() => {
+    const imagesToPrefetch = Object.values(missionsByDate)
+      .map(mission => mission.imageUrl)
+      .filter(Boolean);
+
+    if (imagesToPrefetch.length > 0) {
+      // Prefetch images in background
+      Promise.all(imagesToPrefetch.map(url => ExpoImage.prefetch(url)))
+        .catch(error => console.log('[Calendar] Image prefetch error:', error));
     }
-
-    // Then check SAMPLE_MEMORIES for development data (same timezone-consistent logic)
-    const sampleMemoriesForDate = SAMPLE_MEMORIES
-      .filter((memory) => {
-        const memoryDateStr = formatDateInTimezone(new Date(memory.completedAt), timezone);
-        return memoryDateStr === targetDateStr;
-      })
-      .sort((a, b) => new Date(a.completedAt).getTime() - new Date(b.completedAt).getTime());
-
-    const sampleMemoryWithPhoto = sampleMemoriesForDate.find(
-      (memory) => memory.photoUrl && memory.photoUrl.trim() !== ''
-    );
-
-    if (sampleMemoryWithPhoto) {
-      return {
-        imageUrl: sampleMemoryWithPhoto.photoUrl,
-        title: sampleMemoryWithPhoto.mission?.title || '미션 완료',
-      };
-    }
-
-    // No mission data with valid photo found
-    return undefined;
-  };
+  }, [missionsByDate]);
 
   const getHolidayForDate = (day: number) => {
     const dateKey = `${year}-${month + 1}-${day}`;
@@ -1182,7 +1181,10 @@ export default function CalendarScreen() {
                       style={styles.missionImage}
                       contentFit="cover"
                       cachePolicy="memory-disk"
-                      transition={100}
+                      transition={0}
+                      recyclingKey={mission.imageUrl}
+                      priority="high"
+                      placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}
                     />
                     <View style={styles.missionOverlay}>
                       <Text
@@ -1409,10 +1411,8 @@ export default function CalendarScreen() {
 
       </ScrollView>
 
-      {/* Banner Ad - iOS only (Android renders banner inside tab bar) */}
-      {Platform.OS === 'ios' && (
-        <BannerAdView placement="calendar" style={[styles.bannerAd, { bottom: bannerAdBottom }]} />
-      )}
+      {/* Banner Ad - positioned above tab bar */}
+      <BannerAdView placement="calendar" style={[styles.bannerAd, { bottom: bannerAdBottom }]} />
 
       {/* Settings Modal */}
       <Modal

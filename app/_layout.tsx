@@ -17,7 +17,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { StyleSheet, AppState, AppStateStatus, Alert, Platform } from 'react-native';
+import { StyleSheet, AppState, AppStateStatus, Alert, Platform, View } from 'react-native';
 import 'react-native-reanimated';
 
 // Initialize i18n (must be imported before any component that uses translations)
@@ -37,6 +37,7 @@ import { initializeNetworkMonitoring, subscribeToNetwork } from '@/lib/useNetwor
 import { offlineQueue } from '@/lib/offlineQueue';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useWidgetSync } from '@/hooks/useWidgetSync';
+import BannerAdView from '@/components/ads/BannerAdView';
 
 // Type for couple data from DB (includes timezone column)
 interface CoupleDbRow {
@@ -1240,6 +1241,14 @@ function RootLayoutNav() {
     return <StatusBar style="light" />;
   }
 
+  // Check subscription status for showing ads
+  const isPremium = useSubscriptionStore.getState().isPremium;
+  const partnerIsPremium = useSubscriptionStore.getState().partnerIsPremium;
+  const showAds = !isPremium && !partnerIsPremium;
+
+  // Get current route to hide banner on auth screens (segments already declared above)
+  const isAuthScreen = segments[0] === '(auth)' || segments[0] === 'auth';
+
   return (
     <>
       <StatusBar style="light" />
@@ -1276,6 +1285,7 @@ function RootLayoutNav() {
           }}
         />
       </Stack>
+      {/* Banner ad disabled - now shown inside tab bar component */}
     </>
   );
 }

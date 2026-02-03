@@ -65,12 +65,16 @@ export function useConsistentBottomPadding(): number {
 }
 
 /**
- * Android 배너 광고 및 탭바 위치 계산 훅
+ * Android 배너 광고 위치 계산 훅
  *
  * 레이아웃 순서 (위에서 아래로):
- * 1. 탭바 아이콘 (풀와이드 배경)
- * 2. 배너 광고 (탭바 아래)
- * 3. 시스템 네비바 (있으면)
+ * 1. 탭바 아이콘 (풀와이드 배경) - bottom: insets.bottom + 배너광고높이
+ * 2. 배너 광고 - bottom: insets.bottom (네비바 바로 위)
+ * 3. 시스템 네비바 (있으면 insets.bottom > 0, 없으면 insets.bottom ≈ 0)
+ *
+ * 반응형 동작:
+ * - 네비바 있음: 배너가 네비바 위, 탭바가 배너 위
+ * - 네비바 없음: 배너가 화면 최하단, 탭바가 배너 위
  */
 
 // 배너와 탭바 사이 간격
@@ -82,7 +86,7 @@ export function useBannerAdBottom(): number {
   const bannerAdHeight = useUIStore((state) => state.bannerAdHeight);
 
   if (Platform.OS === 'android') {
-    // 배너 광고는 네비바 바로 위에 위치
+    // 배너 광고는 네비바 바로 위에 위치 (탭바 아래)
     return insets.bottom;
   }
 

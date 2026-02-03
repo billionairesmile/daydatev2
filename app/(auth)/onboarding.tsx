@@ -2179,6 +2179,7 @@ function PairingStep({
   const coupleCreationInProgressRef = React.useRef<boolean>(false); // Mutex to prevent duplicate couple creation
   const isReconnectionRef = React.useRef<boolean>(false); // Track if this is a 30-day reconnection scenario
   const pairingCompletedRef = React.useRef<boolean>(false); // Signals pairing completed to prevent race condition
+  const hasAutoFollowedRef = React.useRef<boolean>(false); // Track if creator has already auto-followed joiner once
 
   // Reset isPairingConnected on mount based on actual DB state
   React.useEffect(() => {
@@ -2900,8 +2901,11 @@ function PairingStep({
 
           // Subscribe to changes (realtime) - use finalCode which might be existing or new
           channelRef.current = db.pairingCodes.subscribeToCode(finalCode, async (payload) => {
-            // When joiner proceeds to next screen, auto-follow
-            if (payload.joiner_proceeded_at) {
+            // When joiner proceeds to next screen, auto-follow ONCE (from pairing to basic_info only)
+            // After that, creator controls their own navigation pace
+            if (payload.joiner_proceeded_at && !hasAutoFollowedRef.current) {
+              console.log('[PairingStep] Creator: Auto-following joiner to next screen (one-time)');
+              hasAutoFollowedRef.current = true;
               onNext();
               return;
             }

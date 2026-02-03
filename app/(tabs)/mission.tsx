@@ -206,6 +206,7 @@ export default function MissionScreen() {
   const [isWaitingForImages, setIsWaitingForImages] = useState(false);
   const [isRefreshMode, setIsRefreshMode] = useState(false);
   const [isLoadingAd, setIsLoadingAd] = useState(false);
+  const [shouldHideOldMissions, setShouldHideOldMissions] = useState(false);
   const [dotCount, setDotCount] = useState(1); // For animated dots (1→2→3→1)
   const isWaitingForImagesRef = useRef(false);
   const firstImageLoadedRef = useRef(false);
@@ -249,6 +250,7 @@ export default function MissionScreen() {
     sharedMissionsDate,
     sharedMissionsRefreshedAt,
     sharedBookmarks,
+    missionsReady,
     isInitialized: isSyncInitialized,
     addBookmark,
     isBookmarked,
@@ -260,6 +262,8 @@ export default function MissionScreen() {
     generatingUserId,
     setAdWatchingStatus,
     releaseMissionLock,
+    broadcastAdCancelled,
+    setMissionsReady,
   } = useCoupleSyncStore();
 
   // Get user and partner info from auth store
@@ -391,6 +395,9 @@ export default function MissionScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [todayMissions, featuredMissions, hasGeneratedMissions, shouldShowAds, adPosition, refreshUsedDate, isSyncInitialized, sharedMissionsRefreshedAt, canPremiumRefresh, premiumRefreshCount, premiumRefreshDate]);
 
+  // Hide old missions while partner is watching ad
+  const missionsToShow = shouldHideOldMissions ? [] : allMissions;
+
   // Track mission IDs for detecting content changes (e.g., partner sync)
   const missionIds = React.useMemo(() => {
     return allMissions
@@ -448,9 +455,19 @@ export default function MissionScreen() {
 
   // Handle image loading completion - hide loading when first image is rendered
   useEffect(() => {
-    if (isWaitingForImages && loadedImagesCount >= totalImagesToLoad && totalImagesToLoad > 0) {
-      // First image loaded, hide loading with minimal delay (image is already rendered)
-      const timer = setTimeout(() => {
+    // CRITICAL: Handle both cases - images loading AND images already cached
+    // If totalImagesToLoad is 0, images are cached and we should proceed immediately
+    const shouldComplete = isWaitingForImages && (
+      (totalImagesToLoad > 0 && loadedImagesCount >= totalImagesToLoad) ||
+      totalImagesToLoad === 0
+    );
+
+    if (shouldComplete) {
+      // First image loaded (or cached), hide loading with minimal delay
+      const timer = setTimeout(async () => {
+        // Signal partner that missions are ready to display (synchronization)
+        await setMissionsReady();
+
         setIsGenerating(false);
         setIsWaitingForImages(false);
         isWaitingForImagesRef.current = false;
@@ -721,28 +738,43 @@ export default function MissionScreen() {
       // Check if partner is generating (not self)
       const isPartnerAction = generatingUserId && generatingUserId !== currentUserId;
 
-      if (missionGenerationStatus === 'generating' && isPartnerAction) {
-        // Partner is generating - show loading state
-        setIsGenerating(true);
-        setPartnerGeneratingMessage(t('mission.generatingMessage'));
-      } else if (missionGenerationStatus === 'ad_watching' && isPartnerAction) {
+      if (missionGenerationStatus === 'ad_watching' && isPartnerAction) {
         // Partner is watching ad - show full loading UI to prevent B from starting missions
         // Use partner's nickname in the message
         const partnerNickname = partner?.nickname || t('common.partner');
         setIsGenerating(true);
         setPartnerGeneratingMessage(t('mission.partnerWatchingAdWithName', { name: partnerNickname }));
-      } else if (missionGenerationStatus === 'completed' && sharedMissions.length > 0 && isPartnerAction) {
-        // Only hide loading if partner was generating (not self)
-        // Self-generation handles its own loading state via initializeImageWait()
-        setIsGenerating(false);
-        setPartnerGeneratingMessage(null);
+
+        // Hide old missions during ad
+        setShouldHideOldMissions(true);
+
+        // Extend timeout to 60s for mission reload fallback
+        // If partner is still watching ad after 60s, assume they closed app or ad failed
+        // Reset to showing old missions
+        const timer = setTimeout(async () => {
+          console.log('[Mission] 60s timeout reached - partner may have closed app, resetting to old missions');
+          await loadSharedMissions();
+          setIsGenerating(false);
+          setPartnerGeneratingMessage(null);
+          setShouldHideOldMissions(false);
+        }, 60000); // 60s
+
+        return () => {
+          clearTimeout(timer);
+        };
+      } else if (missionGenerationStatus === 'generating' && isPartnerAction) {
+        // Partner is generating - show loading state and wait for missionsReady
+        setIsGenerating(true);
+        setPartnerGeneratingMessage(t('mission.generatingMessage'));
+        setShouldHideOldMissions(true); // Keep hiding until missionsReady
       } else if (missionGenerationStatus === 'idle' && isPartnerAction) {
         // Partner cancelled/rolled back - hide loading
         setIsGenerating(false);
         setPartnerGeneratingMessage(null);
+        setShouldHideOldMissions(false);
       }
     }
-  }, [isSyncInitialized, missionGenerationStatus, sharedMissions.length, generatingUserId, user?.id, t, partner?.nickname]);
+  }, [isSyncInitialized, missionGenerationStatus, generatingUserId, user?.id, t, partner?.nickname, loadSharedMissions]);
 
   // Animated dots for partner watching ad message (1→2→3→1 repeating)
   useEffect(() => {
@@ -794,32 +826,42 @@ export default function MissionScreen() {
 
           const newStatus = (payload.new as { status?: string })?.status;
 
-          // If status changed to idle, immediately update UI
+          // CRITICAL: Only refresh missions, don't reset UI states
+          // UI states are handled by missionGenerationStatus useEffect
+          // This prevents premature loading removal when A transitions from ad → generating
           if (newStatus === 'idle' || newStatus === 'completed') {
-            console.log('[Mission] Realtime: Partner released lock, resetting UI immediately');
+            console.log('[Mission] Realtime: Lock status changed to', newStatus);
+
+            // Store current mission IDs before refresh
+            const missionIdsBefore = missionIds;
 
             // Refresh missions to get latest data
             await loadSharedMissions();
 
-            // Reset UI loading states
-            setIsGenerating(false);
-            setPartnerGeneratingMessage(null);
+            // CRITICAL: Only reset carousel if missions actually changed
+            // This prevents first card size bug when ad loading fails (missions unchanged)
+            const missionsChanged = missionIds !== missionIdsBefore;
 
-            // Reset carousel state for proper first card scale
-            setIsScrollInitialized(false);
-            hasInitializedCarousel.current = false;
-            setCurrentIndex(0);
-            scrollX.setValue(0);
+            if (missionsChanged) {
+              console.log('[Mission] Realtime: Missions changed, resetting carousel');
+              // Reset carousel for smooth animation (for both self and partner)
+              setIsScrollInitialized(false);
+              hasInitializedCarousel.current = false;
+              setCurrentIndex(0);
+              scrollX.setValue(0);
 
-            setTimeout(() => {
-              if (scrollViewRef.current) {
-                scrollViewRef.current.scrollToOffset({ offset: 1, animated: false });
-                setTimeout(() => {
-                  scrollViewRef.current?.scrollToOffset({ offset: 0, animated: false });
-                  setIsScrollInitialized(true);
-                }, 50);
-              }
-            }, 150);
+              setTimeout(() => {
+                if (scrollViewRef.current) {
+                  scrollViewRef.current.scrollToOffset({ offset: 1, animated: false });
+                  setTimeout(() => {
+                    scrollViewRef.current?.scrollToOffset({ offset: 0, animated: false });
+                    setIsScrollInitialized(true);
+                  }, 50);
+                }
+              }, 150);
+            } else {
+              console.log('[Mission] Realtime: Missions unchanged, keeping carousel state');
+            }
           }
         }
       )
@@ -832,6 +874,51 @@ export default function MissionScreen() {
       supabase?.removeChannel(channel);
     };
   }, [coupleId, missionGenerationStatus, generatingUserId, user?.id, loadSharedMissions, scrollX]);
+
+  // Watch for missionsReady flag changes (B waits for A to finish loading images)
+  useEffect(() => {
+    if (!isSyncInitialized) return;
+
+    const currentUserId = user?.id;
+    const isSelfGenerated = generatingUserId && generatingUserId === currentUserId;
+
+    // TIMEOUT FALLBACK: If missions_ready doesn't arrive within 5 seconds, show anyway
+    // This prevents infinite loading if A's setMissionsReady() fails
+    if (isGenerating && !isSelfGenerated && sharedMissions.length > 0 && !missionsReady) {
+      console.log('[Mission] Setting up missions_ready timeout fallback for B');
+      const timeoutId = setTimeout(() => {
+        console.warn('[Mission] missions_ready timeout - showing missions anyway');
+        setIsGenerating(false);
+        setIsWaitingForImages(false);
+        setPartnerGeneratingMessage(null);
+        setShouldHideOldMissions(false);
+      }, 5000); // 5 second fallback
+
+      return () => clearTimeout(timeoutId);
+    }
+
+    // If missions are ready and user is partner (not self), show missions
+    if (missionsReady && sharedMissions.length > 0 && !isSelfGenerated) {
+      console.log('[Mission] missionsReady signal received - showing missions for partner');
+
+      // Preload first image if available
+      if (sharedMissions[0]?.imageUrl) {
+        ExpoImage.prefetch(sharedMissions[0].imageUrl)
+          .then(() => {
+            console.log('[Mission] First image prefetched for B');
+          })
+          .catch((error) => {
+            console.log('[Mission] Image prefetch failed, showing anyway:', error);
+          });
+      }
+
+      // Hide loading and show missions
+      setIsGenerating(false);
+      setIsWaitingForImages(false);
+      setPartnerGeneratingMessage(null);
+      setShouldHideOldMissions(false);
+    }
+  }, [missionsReady, generatingUserId, user?.id, sharedMissions, isSyncInitialized, isGenerating]);
 
   // Fallback polling for stale lock recovery (in case Realtime fails)
   // This helps User B recover when User A force-closes app during ad
@@ -852,8 +939,9 @@ export default function MissionScreen() {
         intervalId = setInterval(async () => {
           console.log('[Mission] Fallback polling for stale lock recovery...');
 
-          // Get status before polling
+          // Get status and mission IDs before polling
           const statusBeforePoll = useCoupleSyncStore.getState().missionGenerationStatus;
+          const missionIdsBefore = missionIds;
 
           await loadSharedMissions(); // This function auto-releases stale locks
 
@@ -865,27 +953,35 @@ export default function MissionScreen() {
             (statusBeforePoll === 'generating' || statusBeforePoll === 'ad_watching') &&
             statusAfterPoll === 'idle'
           ) {
-            console.log('[Mission] Polling detected stale lock recovery, resetting UI and carousel');
+            console.log('[Mission] Polling detected stale lock recovery, resetting UI');
 
             // Reset UI loading states
             setIsGenerating(false);
             setPartnerGeneratingMessage(null);
 
-            // Reset carousel state for proper first card scale
-            setIsScrollInitialized(false);
-            hasInitializedCarousel.current = false;
-            setCurrentIndex(0);
-            scrollX.setValue(0);
+            // CRITICAL: Only reset carousel if missions actually changed
+            const missionsChanged = missionIds !== missionIdsBefore;
 
-            setTimeout(() => {
-              if (scrollViewRef.current) {
-                scrollViewRef.current.scrollToOffset({ offset: 1, animated: false });
-                setTimeout(() => {
-                  scrollViewRef.current?.scrollToOffset({ offset: 0, animated: false });
-                  setIsScrollInitialized(true);
-                }, 50);
-              }
-            }, 150);
+            if (missionsChanged) {
+              console.log('[Mission] Polling: Missions changed, resetting carousel');
+              // Reset carousel state for proper first card scale
+              setIsScrollInitialized(false);
+              hasInitializedCarousel.current = false;
+              setCurrentIndex(0);
+              scrollX.setValue(0);
+
+              setTimeout(() => {
+                if (scrollViewRef.current) {
+                  scrollViewRef.current.scrollToOffset({ offset: 1, animated: false });
+                  setTimeout(() => {
+                    scrollViewRef.current?.scrollToOffset({ offset: 0, animated: false });
+                    setIsScrollInitialized(true);
+                  }, 50);
+                }
+              }, 150);
+            } else {
+              console.log('[Mission] Polling: Missions unchanged, keeping carousel state');
+            }
           }
         }, pollInterval);
       }
@@ -1131,25 +1227,37 @@ export default function MissionScreen() {
           adCompletedSuccessfully = true;
         },
         onAdClosed: async () => {
+          console.log('[Mission Refresh] Ad closed. Reward earned:', adCompletedSuccessfully);
           setIsLoadingAd(false);
+
+          // DEV MODE: Test ads often don't trigger onEarnedReward callback
+          // This is a known Google Mobile Ads limitation with test ads
+          // Automatically proceed with generation in dev mode for testing
+          if (__DEV__ && !adCompletedSuccessfully) {
+            console.log('[Mission Refresh] DEV MODE: Test ad did not fire onEarnedReward (expected behavior)');
+            console.log('[Mission Refresh] DEV MODE: Bypassing reward requirement for testing');
+            adCompletedSuccessfully = true; // Allow testing without real ad rewards
+          }
 
           // Check if ad was completed successfully
           if (adCompletedSuccessfully) {
-            // Ensure loading state is maintained (AppState change may have reset it)
-            setIsGenerating(true);
-
             // SUCCESS: NOW generate missions (after ad completion)
             console.log('[Mission Refresh] Ad completed - NOW starting mission generation');
 
             try {
+              // Ensure loading state is maintained (AppState change may have reset it)
+              setIsGenerating(true);
+
+              // Keep ad_watching status during mission generation to prevent empty state
+              // Status will change to 'generating' when acquireMissionLock is called in generateTodayMissions
+              // This prevents B from seeing old missions disappear and prevents A from showing empty state
+
               // Reset local generated mission state
               resetGeneratedMissions();
 
-              // Reset existing shared missions before generating new ones
-              await resetAllMissions();
-
               // Generate new missions (deferSave: false - save directly to DB)
               // forceRegenerate: true to skip 'exists' check since we're refreshing
+              // NOTE: This will call acquireMissionLock internally, changing status to 'generating'
               const result = await generateTodayMissions(answers, excludedMissionsForAd, {
                 deferSave: false,  // Save directly to active DB
                 forceRegenerate: true
@@ -1214,15 +1322,17 @@ export default function MissionScreen() {
                   console.log('Image prefetch error:', error);
                 }
 
-                // Wait for first card image to actually render before hiding loading
-                if (newMissions[0]?.imageUrl) {
-                  initializeImageWait();
-                  // isGenerating stays true, useEffect will hide it when first image onLoad fires
-                  // Carousel reset will be handled by useEffect
-                } else {
-                  // No image URL, hide loading immediately
+                // CRITICAL FIX: Since images are prefetched, signal ready immediately
+                // No need to wait for onLoad events which may not fire for cached images
+                console.log('[Mission Refresh] Signaling missions ready after prefetch');
+                await setMissionsReady();
+
+                // Hide loading with minimal delay for smooth transition
+                setTimeout(() => {
                   setIsGenerating(false);
-                }
+                  setIsWaitingForImages(false);
+                  isWaitingForImagesRef.current = false;
+                }, 100);
               } else {
                 // No missions with images
                 setIsGenerating(false);
@@ -1240,14 +1350,23 @@ export default function MissionScreen() {
             }
 
           } else {
-            // Ad was not completed (user closed early) - release lock, keep existing missions
-            console.log('[Mission Refresh] Ad not completed - releasing lock, keeping existing missions');
+            // FAILURE: Ad closed early - RESET TO OLD MISSIONS
+            console.log('[Mission] Ad not completed - resetting');
+
+            // 1. Release lock and reset status
             await releaseMissionLock('idle');
 
+            // 2. Broadcast cancellation to partner
+            await broadcastAdCancelled();
+
+            // 3. Reset UI states
             setIsGenerating(false);
             setPartnerGeneratingMessage(null);
 
-            // Inform user that ad must be completed
+            // 4. Reload existing missions (no change)
+            await loadSharedMissions();
+
+            // 5. Show message
             Alert.alert(
               t('mission.refresh.adNotCompleted') || '광고 시청 미완료',
               t('mission.refresh.adNotCompletedMessage') || '미션을 새로고침하려면 광고를 끝까지 시청해주세요.',
@@ -1267,12 +1386,8 @@ export default function MissionScreen() {
           // Release lock since ad failed
           await releaseMissionLock('idle');
 
-          // Show error alert
-          Alert.alert(
-            t('mission.refresh.adLoadingFailed'),
-            t('mission.refresh.adLoadingFailedMessage'),
-            [{ text: t('common.confirm') }]
-          );
+          // Don't show alert here - will be handled in the !adShown block below
+          // to prevent duplicate alerts (영어/한국어 중복 방지)
         },
       });
 
@@ -1286,12 +1401,12 @@ export default function MissionScreen() {
         setIsGenerating(false);
         setPartnerGeneratingMessage(null);
 
-        // In development (Expo Go), show info message
+        // Show alert with proper translation based on environment
         if (__DEV__) {
           Alert.alert(
-            '개발 모드',
-            '광고는 프로덕션 빌드에서만 표시됩니다. 미션 새로고침은 광고 시청 후 사용 가능합니다.',
-            [{ text: t('common.confirm') || '확인' }]
+            t('mission.refresh.devModeTitle'),
+            t('mission.refresh.devModeMessage'),
+            [{ text: t('common.confirm') }]
           );
         } else {
           // Production - ad failed to load
@@ -1509,8 +1624,9 @@ export default function MissionScreen() {
       ];
 
       // For the first card, use full scale (1.0) until scroll is initialized
-      // This prevents the intermittent bug where first card appears smaller
-      const scale = index === 0 && !isScrollInitialized
+      // OR when currentIndex is 0 (first card is centered)
+      // This prevents the intermittent bug where first card appears smaller after Alert dismissal
+      const scale = index === 0 && (!isScrollInitialized || currentIndex === 0)
         ? 1
         : scrollX.interpolate({
           inputRange,
@@ -1584,7 +1700,7 @@ export default function MissionScreen() {
         </Animated.View>
       );
     },
-    [scrollX, handleMissionPress, handleKeepMission, checkIsKept, canStartMission, isTodayCompletedMission, lockedMissionId, isScrollInitialized, isAnotherMissionInProgress, handleMissionImageLoad, handleRefreshPress, SNAP_INTERVAL, CARD_WIDTH]
+    [scrollX, handleMissionPress, handleKeepMission, checkIsKept, canStartMission, isTodayCompletedMission, lockedMissionId, isScrollInitialized, currentIndex, isAnotherMissionInProgress, handleMissionImageLoad, handleRefreshPress, SNAP_INTERVAL, CARD_WIDTH]
   );
 
   return (
@@ -1642,9 +1758,9 @@ export default function MissionScreen() {
             {/* iOS: Original Animated.FlatList (don't modify) */}
             {Platform.OS === 'ios' ? (
               <Animated.FlatList
-                key={`mission-list-${allMissions.length}`}
+                key={`mission-list-${missionsToShow.length}`}
                 ref={scrollViewRef}
-                data={allMissions}
+                data={missionsToShow}
                 keyExtractor={(item) => item.id}
                 renderItem={renderCard}
                 horizontal
@@ -1669,7 +1785,7 @@ export default function MissionScreen() {
                   offset: SNAP_INTERVAL * index,
                   index,
                 })}
-                extraData={[hasGeneratedMissions, allMissions.map(m => m.id).join(','), lockedMissionId, todayCompletedMission, allMissionProgress]}
+                extraData={[hasGeneratedMissions, missionsToShow.map(m => m.id).join(','), lockedMissionId, todayCompletedMission, allMissionProgress]}
                 initialNumToRender={3}
                 maxToRenderPerBatch={3}
                 windowSize={5}
@@ -1692,7 +1808,7 @@ export default function MissionScreen() {
                   offscreenPageLimit={2}
                   overdrag={true}
                 >
-                  {allMissions.map((item, index) => (
+                  {missionsToShow.map((item, index) => (
                     <View key={item.id} style={styles.androidPageWrapper} collapsable={false}>
                       <AndroidCardWrapper
                         index={index}
@@ -1730,7 +1846,7 @@ export default function MissionScreen() {
 
             {/* Dots Indicator - Positioned at bottom of carousel */}
             <View style={styles.dotsContainer}>
-              {allMissions.map((_, index) => (
+              {missionsToShow.map((_, index) => (
                 <Pressable
                   key={index}
                   onPress={() => handleDotPress(index)}
@@ -1942,10 +2058,8 @@ export default function MissionScreen() {
         </View>
       </Modal>
 
-      {/* Banner Ad - iOS only (Android renders banner inside tab bar) */}
-      {Platform.OS === 'ios' && (
-        <BannerAdView placement="mission" style={[styles.bannerAd, { bottom: bannerAdBottom }]} />
-      )}
+      {/* Banner Ad - positioned above tab bar */}
+      <BannerAdView placement="mission" style={[styles.bannerAd, { bottom: bannerAdBottom }]} />
 
     </View>
   );

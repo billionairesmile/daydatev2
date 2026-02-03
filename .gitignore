@@ -42,3 +42,13 @@ yarn-error.*
 /ios
 /android
 supabase/.temp/
+
+# build artifacts
+*.aab
+*.apk
+*.ipa
+
+# yarn (using npm)
+.yarn/
+.yarnrc.yml
+yarn.lock

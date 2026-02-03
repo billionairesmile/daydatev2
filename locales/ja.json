@@ -167,6 +167,8 @@
       "partnerGeneratingMessage": "パートナーが新しいミッションを生成中です。しばらくしてからもう一度お試しください。",
       "adLoadingFailed": "広告の読み込み失敗",
       "adLoadingFailedMessage": "広告の読み込みに失敗しました。\n後でもう一度お試しください。",
+      "devModeTitle": "開発モード",
+      "devModeMessage": "広告はプロダクションビルドでのみ表示されます。ミッションの更新には広告視聴が必要です。",
       "generating": "新しいミッションを生成中...",
       "loadingAd": "広告を準備中...",
       "adNotCompleted": "広告視聴未完了",

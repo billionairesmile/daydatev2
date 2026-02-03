@@ -23,8 +23,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, IS_TABLET, scale, scaleFont } from '@/constants/design';
 import { useTabBarBottom, USE_IOS_26_TAB_BAR } from '@/hooks/useConsistentBottomInset';
 import { useUIStore } from '@/stores/uiStore';
-import { useSubscriptionStore } from '@/stores/subscriptionStore';
-import BannerAdView, { BannerAdPlacement } from '@/components/ads/BannerAdView';
 
 // Conditionally import NativeTabs (may not be available in all Expo versions)
 let NativeTabs: any = null;
@@ -50,7 +48,7 @@ if (__DEV__) {
 }
 
 // ============================================
-// Android Scaling
+// Android Scaling & Layout
 // ============================================
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const IS_COMPACT_ANDROID = Platform.OS === 'android' && SCREEN_HEIGHT < 700;
@@ -58,6 +56,12 @@ const ANDROID_SCALE = Platform.OS === 'android'
   ? Math.min(Math.min(SCREEN_WIDTH / 360, 1.1), Math.max(Math.min(SCREEN_HEIGHT / 844, 1), 0.7))
   : 1;
 const androidScale = (size: number) => Platform.OS === 'android' ? Math.round(size * ANDROID_SCALE) : size;
+
+// Android Tab Bar Layout:
+// - Banner ad positioned at: insets.bottom (directly above nav bar)
+// - Tab bar positioned at: insets.bottom + bannerHeight (above banner ad)
+// - With nav bar: banner → nav bar, tab bar → banner
+// - Without nav bar: banner → screen bottom, tab bar → banner
 
 // ============================================
 // iOS 26 Theme Colors
@@ -186,20 +190,14 @@ function ClassicTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const slideAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
-  // Subscription status for showing ads
-  const isPremium = useSubscriptionStore((s) => s.isPremium);
-  const partnerIsPremium = useSubscriptionStore((s) => s.partnerIsPremium);
-  const showAds = !isPremium && !partnerIsPremium;
-
   const isIOS = Platform.OS === 'ios';
   const isAndroid = Platform.OS === 'android';
 
-  // iOS legacy tab bar position (Android handles banner inside tab bar now)
+  // iOS legacy tab bar position
   const tabBarBottom = useTabBarBottom();
 
-  // Get current screen name for banner ad placement
-  const currentRouteName = state.routes[state.index]?.name || 'index';
-  const bannerPlacement: BannerAdPlacement = (currentRouteName as BannerAdPlacement);
+  // Android: Get banner ad height for tab bar positioning (tab bar sits above banner)
+  const bannerAdHeight = useUIStore((s) => s.bannerAdHeight);
 
   // Android: Native style (icons only, full width)
   // iOS: Legacy floating pill style
@@ -248,11 +246,14 @@ function ClassicTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   };
 
   // Android: Full-width native style tab bar
-  // 레이아웃 순서 (위에서 아래로): 탭 아이콘 → 배너 광고 → 네비바 영역
-  // 배너 광고를 탭바 컴포넌트 내부에 렌더링하여 z-order 문제 해결
+  // Tab bar sits above banner ad (banner ad is directly above nav bar)
+  // Responsive to navigation bar presence and banner ad height
   if (isAndroid) {
+    // Default banner height if not yet loaded (standard AdMob banner is ~50dp)
+    const bannerHeight = bannerAdHeight > 0 ? bannerAdHeight : 50;
+
     return (
-      <View style={[androidStyles.container, { bottom: 0 }]}>
+      <View style={[androidStyles.container, { bottom: insets.bottom + bannerHeight }]}>
         <BlurView
           experimentalBlurMethod="dimezisBlurView"
           intensity={50}
@@ -288,14 +289,6 @@ function ClassicTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             );
           })}
         </View>
-        {/* Banner ad - rendered inside tab bar to ensure proper z-order */}
-        {showAds && (
-          <View style={androidStyles.bannerContainer}>
-            <BannerAdView placement={bannerPlacement} />
-          </View>
-        )}
-        {/* Navigation bar safe area padding */}
-        <View style={{ height: insets.bottom }} />
       </View>
     );
   }
