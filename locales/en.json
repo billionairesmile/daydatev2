@@ -961,6 +961,12 @@
       "continueDelete": "Continue Delete"
     }
   },
+  "update": {
+    "title": "Update Available",
+    "message": "A new version is available.\nPlease update for a better experience.",
+    "confirm": "Update",
+    "cancel": "Later"
+  },
   "errors": {
     "networkError": "Network error occurred",
     "tryAgain": "Please try again",

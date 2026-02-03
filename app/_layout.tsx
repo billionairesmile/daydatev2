@@ -38,6 +38,7 @@ import { offlineQueue } from '@/lib/offlineQueue';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useWidgetSync } from '@/hooks/useWidgetSync';
 import BannerAdView from '@/components/ads/BannerAdView';
+import { checkForUpdates } from '@/lib/versionCheck';
 
 // Type for couple data from DB (includes timezone column)
 interface CoupleDbRow {
@@ -329,6 +330,20 @@ function RootLayoutNav() {
 
     verifyInitialSession();
   }, [authHydrated, authSignOut, cleanupSync, setIsOnboardingComplete]);
+
+  // Check for app updates on startup
+  useEffect(() => {
+    if (!authHydrated) return;
+
+    // Delay version check slightly to avoid blocking initial app load
+    const timer = setTimeout(() => {
+      checkForUpdates().catch((err) => {
+        console.error('[Layout] Version check failed:', err);
+      });
+    }, 2000); // 2 second delay after auth hydration
+
+    return () => clearTimeout(timer);
+  }, [authHydrated]);
 
   // Initialize subscription/premium status when user is authenticated
   useEffect(() => {

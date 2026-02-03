@@ -956,6 +956,12 @@
       "continueDelete": "Continuar Eliminando"
     }
   },
+  "update": {
+    "title": "Actualización Disponible",
+    "message": "Una nueva versión está disponible.\nActualiza para una mejor experiencia.",
+    "confirm": "Actualizar",
+    "cancel": "Más Tarde"
+  },
   "errors": {
     "networkError": "Error de red",
     "tryAgain": "Por favor inténtalo de nuevo",

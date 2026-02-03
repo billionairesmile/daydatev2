@@ -958,6 +958,12 @@
       "continueDelete": "繼續刪除"
     }
   },
+  "update": {
+    "title": "更新通知",
+    "message": "新版本已發布。\n請更新以獲得更好的體驗。",
+    "confirm": "更新",
+    "cancel": "稍後"
+  },
   "errors": {
     "networkError": "發生網路錯誤",
     "tryAgain": "請重試",

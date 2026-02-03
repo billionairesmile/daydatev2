@@ -966,6 +966,12 @@
       "continueDelete": "계속 삭제하기"
     }
   },
+  "update": {
+    "title": "업데이트 알림",
+    "message": "새로운 버전이 출시되었습니다.\n더 나은 경험을 위해 업데이트해주세요.",
+    "confirm": "업데이트",
+    "cancel": "나중에"
+  },
   "errors": {
     "networkError": "네트워크 오류가 발생했습니다",
     "tryAgain": "다시 시도해주세요",
