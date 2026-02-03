@@ -330,12 +330,9 @@ export default function SettingsScreen() {
             // Without this, persist middleware may reload old state before navigation completes
             await AsyncStorage.removeItem('daydate-auth-storage');
 
-            // Small delay to ensure state updates propagate before navigation
+            // Small delay to ensure state updates propagate
+            // _layout.tsx will automatically redirect to onboarding when isOnboardingComplete becomes false
             await new Promise(resolve => setTimeout(resolve, 100));
-
-            // CRITICAL: Explicit navigation to fix intermittent navigation bug
-            // Don't rely solely on _layout.tsx effect due to useEffect race condition
-            router.replace('/(auth)/onboarding');
           },
         },
       ]
@@ -498,14 +495,11 @@ export default function SettingsScreen() {
       // Without this, persist middleware may reload old state before navigation completes
       await AsyncStorage.removeItem('daydate-auth-storage');
 
-      // Small delay to ensure state updates propagate before navigation
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Small delay to ensure state updates propagate
+      // _layout.tsx will automatically redirect to onboarding when isOnboardingComplete becomes false
+      await new Promise(resolve => setTimeout(resolve, 200));
 
-      // CRITICAL: Explicit navigation to fix intermittent navigation bug
-      // Don't rely solely on _layout.tsx effect due to useEffect race condition
-      router.replace('/(auth)/onboarding');
-
-      // Show success alert after navigation completes
+      // Show success alert after state update completes
       Alert.alert(
         t('settings.deleteAccount.success'),
         t('settings.deleteAccount.successMessage')
