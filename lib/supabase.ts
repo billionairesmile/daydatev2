@@ -1731,6 +1731,7 @@ export const db = {
     },
 
     // Update lock with pending missions during ad viewing
+    // Uses UPSERT to create record if it doesn't exist
     async updatePending(
       coupleId: string,
       missions: unknown[],
@@ -1740,14 +1741,16 @@ export const db = {
       const client = getSupabase();
       const { error } = await client
         .from('mission_generation_lock')
-        .update({
+        .upsert({
+          couple_id: coupleId,
           status: 'ad_watching',
           pending_missions: missions,
           pending_answers: answers,
           locked_by: userId,
           locked_at: new Date().toISOString(),
-        })
-        .eq('couple_id', coupleId);
+        }, {
+          onConflict: 'couple_id',
+        });
       return { error };
     },
 
@@ -1765,6 +1768,7 @@ export const db = {
     },
 
     // Update lock status only (for ad_watching state - no pending missions)
+    // Uses UPSERT to create record if it doesn't exist
     async updateStatus(
       coupleId: string,
       status: string,
@@ -1773,12 +1777,14 @@ export const db = {
       const client = getSupabase();
       const { error } = await client
         .from('mission_generation_lock')
-        .update({
+        .upsert({
+          couple_id: coupleId,
           status,
           locked_by: userId,
           locked_at: new Date().toISOString(),
-        })
-        .eq('couple_id', coupleId);
+        }, {
+          onConflict: 'couple_id',
+        });
       return { error };
     },
 
