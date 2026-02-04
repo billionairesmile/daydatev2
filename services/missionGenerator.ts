@@ -400,7 +400,7 @@ function getAnniversaryInfo(
         // Today is the milestone!
         isToday = true;
         todayLabel = `${milestone}일`;
-      } else if (daysUntil > 0 && daysUntil <= 14) {
+      } else if (daysUntil > 0 && daysUntil <= 7) {
         upcomingAnniversaries.push(`${milestone}일 (D-${daysUntil})`);
       }
     }
@@ -420,11 +420,11 @@ function getAnniversaryInfo(
       isToday = true;
       todayLabel = relationshipType === 'married' ? `결혼 ${year}주년` : `연애 ${year}주년`;
       break;
-    } else if (daysUntil > 0 && daysUntil <= 30) {
+    } else if (daysUntil > 0 && daysUntil <= 7) {
       const label = relationshipType === 'married' ? `결혼 ${year}주년` : `연애 ${year}주년`;
       upcomingAnniversaries.push(`${label} (D-${daysUntil})`);
       break;
-    } else if (daysUntil > 30) {
+    } else if (daysUntil > 7) {
       break;
     }
   }
