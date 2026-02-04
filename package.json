@@ -92,10 +92,13 @@
     "zustand": "^5.0.8"
   },
   "devDependencies": {
+    "@babel/core": "^7.29.0",
     "@expo/config-plugins": "^54.0.4",
     "@expo/ngrok": "^4.1.0",
+    "@types/babel__core": "^7",
     "@types/react": "~19.1.0",
     "babel-plugin-transform-remove-console": "^6.9.4",
+    "babel-preset-expo": "^54.0.10",
     "jsonwebtoken": "^9.0.3",
     "react-test-renderer": "19.1.0",
     "typescript": "~5.9.2"

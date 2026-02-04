@@ -175,7 +175,14 @@
       "adNotCompletedMessage": "Please watch the complete ad to refresh missions."
     },
     "partnerWatchingAd": "Partner is watching an ad...",
-    "partnerWatchingAdWithName": "{{name}} is watching\nan ad"
+    "partnerWatchingAdWithName": "{{name}} is watching\nan ad",
+    "timeError": {
+      "title": "Time Setting Error",
+      "message": "Your device time differs from the server.\n\nPlease enable 'Automatic Date & Time' in your device settings for accurate mission service.",
+      "confirm": "OK",
+      "minutes": "{{count}} min",
+      "hours": "{{count}} hours"
+    }
   },
   "missionDetail": {
     "headerTitle": "Mission Details",
@@ -348,7 +355,7 @@
       "coverPhoto": "Cover Photo",
       "fontStyle": "Font Style",
       "fontStyleDesc": "Select a font style for your album title",
-      "basicFont": "Basic Font",
+      "basicFont": "Font",
       "basicFontDesc": "Clean style",
       "ransomStyle": "Ransom Note",
       "basicFontHint": "A clean font will be applied",

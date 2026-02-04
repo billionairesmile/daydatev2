@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { LiquidGlassView, isLiquidGlassSupported } from '@callstack/liquid-glass';
-import { Target, BookHeart, Home, Calendar, Menu } from 'lucide-react-native';
+import { Flame, BookHeart, Home, Calendar, Menu } from 'lucide-react-native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useTranslation } from 'react-i18next';
 
@@ -82,7 +82,7 @@ const TAB_KEYS: Record<string, string> = {
 };
 
 const TAB_ICONS: Record<string, React.ComponentType<{ color: string; size: number; strokeWidth: number }>> = {
-  mission: Target,
+  mission: Flame,
   memories: BookHeart,
   index: Home,
   calendar: Calendar,

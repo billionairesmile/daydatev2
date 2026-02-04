@@ -782,16 +782,22 @@ export default function MissionScreen() {
         setIsGenerating(false);
         setPartnerGeneratingMessage(null);
         setShouldHideOldMissions(false);
-      } else if (missionGenerationStatus === 'completed' && shouldHideOldMissions) {
-        // Status jumped to completed (e.g., from loadSharedMissions during ad_watching)
-        // Reset UI to show missions - missionsReady useEffect may not fire in this case
-        console.log('[Mission] Status completed while shouldHideOldMissions=true, resetting UI');
-        setIsGenerating(false);
-        setPartnerGeneratingMessage(null);
-        setShouldHideOldMissions(false);
       }
     }
-  }, [isSyncInitialized, missionGenerationStatus, generatingUserId, user?.id, t, partner?.nickname, loadSharedMissions, shouldHideOldMissions]);
+  }, [isSyncInitialized, missionGenerationStatus, generatingUserId, user?.id, t, partner?.nickname, loadSharedMissions]);
+
+  // Separate effect: When status jumps to 'completed' while old missions are hidden,
+  // reset UI to show the new missions. This is split from the main effect to avoid
+  // shouldHideOldMissions in the dependency array, which caused a re-trigger loop
+  // (effect sets shouldHideOldMissions → dep change → effect re-runs → repeat)
+  useEffect(() => {
+    if (missionGenerationStatus === 'completed' && shouldHideOldMissions) {
+      console.log('[Mission] Status completed while shouldHideOldMissions=true, resetting UI');
+      setIsGenerating(false);
+      setPartnerGeneratingMessage(null);
+      setShouldHideOldMissions(false);
+    }
+  }, [missionGenerationStatus, shouldHideOldMissions]);
 
   // Animated dots for partner watching ad message (1→2→3→1 repeating)
   useEffect(() => {
@@ -829,7 +835,7 @@ export default function MissionScreen() {
     console.log('[Mission] Setting up Realtime subscription for mission_generation_lock, coupleId:', coupleId);
 
     const channel = supabase
-      .channel(`mission_lock:${coupleId}`)
+      .channel(`mission_lock_ui:${coupleId}`)
       .on(
         'postgres_changes',
         {
@@ -901,7 +907,9 @@ export default function MissionScreen() {
 
     // TIMEOUT FALLBACK: If missions_ready doesn't arrive within 5 seconds, show anyway
     // This prevents infinite loading if A's setMissionsReady() fails
-    if (isGenerating && !isSelfGenerated && sharedMissions.length > 0 && !missionsReady) {
+    // NOTE: Skip during ad_watching - missions haven't been generated yet, so this timeout
+    // would incorrectly reset shouldHideOldMissions causing old missions to flash briefly
+    if (isGenerating && !isSelfGenerated && sharedMissions.length > 0 && !missionsReady && missionGenerationStatus !== 'ad_watching') {
       console.log('[Mission] Setting up missions_ready timeout fallback for B');
       const timeoutId = setTimeout(() => {
         console.warn('[Mission] missions_ready timeout - showing missions anyway');
@@ -935,7 +943,7 @@ export default function MissionScreen() {
       setPartnerGeneratingMessage(null);
       setShouldHideOldMissions(false);
     }
-  }, [missionsReady, generatingUserId, user?.id, sharedMissions, isSyncInitialized, isGenerating]);
+  }, [missionsReady, generatingUserId, user?.id, sharedMissions, isSyncInitialized, isGenerating, missionGenerationStatus]);
 
   // Fallback polling for stale lock recovery (in case Realtime fails)
   // This helps User B recover when User A force-closes app during ad

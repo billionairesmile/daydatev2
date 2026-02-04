@@ -1258,6 +1258,32 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
           generatingUserId: preserveStatus ? get().generatingUserId : data.generated_by,
           isLoadingMissions: false,
         });
+
+        // FALLBACK: When status is NOT preserved (idle/completed), check lock table
+        // to catch partner's ad_watching/generating that was missed by Realtime
+        // (e.g., iOS WebSocket dropped while app was backgrounded)
+        if (!preserveStatus) {
+          try {
+            const { data: lockData } = await db.missionLock.getStatus(coupleId);
+            if (lockData && (lockData.status === 'ad_watching' || lockData.status === 'generating')) {
+              const lockTime = lockData.locked_at ? new Date(lockData.locked_at) : null;
+              const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+              const currentUserId = get().userId;
+
+              // Only apply if lock is fresh (<5min) and belongs to partner (not self)
+              if (lockTime && lockTime > fiveMinutesAgo && lockData.locked_by && lockData.locked_by !== currentUserId) {
+                console.log('[CoupleSyncStore] Lock fallback: detected partner', lockData.status, 'via DB check');
+                set({
+                  missionGenerationStatus: lockData.status as MissionGenerationStatus,
+                  generatingUserId: lockData.locked_by,
+                });
+              }
+            }
+          } catch (lockError) {
+            console.log('[CoupleSyncStore] Lock fallback check failed:', lockError);
+          }
+        }
+
         return missions;
       }
 

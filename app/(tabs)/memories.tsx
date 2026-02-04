@@ -1467,9 +1467,6 @@ export default function MemoriesScreen() {
           ) : (
             <>
               {/* Step 2: Cover Photo Selection with Draggable Text */}
-              <Text style={styles.albumModalSubtitle}>
-                {t('memories.album.coverEditHint')}
-              </Text>
 
               {/* Cover Photo Preview with Draggable Text */}
               <View style={styles.coverPhotoContainer}>
@@ -1886,9 +1883,6 @@ export default function MemoriesScreen() {
           ) : (
             <>
               {/* Step 2: Cover Photo Selection with Draggable Text */}
-              <Text style={styles.albumModalSubtitle}>
-                {t('memories.album.coverEditHint')}
-              </Text>
 
               {/* Cover Photo Preview with Draggable Text */}
               <View style={styles.coverPhotoContainer}>
@@ -5170,6 +5164,7 @@ const styles = StyleSheet.create({
     width: '100%',
     position: 'relative',
     marginBottom: rs(12),
+    alignItems: 'center',
   },
   coverPhotoPickerContainer: {
     width: '100%',

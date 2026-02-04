@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { db } from '@/lib/supabase';
+import i18n from 'i18next';
 
 // Maximum allowed time difference between device and server (in milliseconds)
 // 1 hour = 60 * 60 * 1000 = 3,600,000 ms
@@ -76,15 +77,15 @@ export const useTimeValidationStore = create<TimeValidationState>((set, get) => 
   },
 }));
 
-// Helper function to get time difference in human-readable format
+// Helper function to get time difference in human-readable format (i18n)
 export function getTimeDifferenceText(timeDifferenceMs: number | null): string {
   if (timeDifferenceMs === null) return '';
 
   const minutes = Math.round(timeDifferenceMs / 1000 / 60);
   if (minutes < 60) {
-    return `${minutes}분`;
+    return i18n.t('mission.timeError.minutes', { count: minutes });
   }
 
   const hours = Math.round(minutes / 60);
-  return `${hours}시간`;
+  return i18n.t('mission.timeError.hours', { count: hours });
 }

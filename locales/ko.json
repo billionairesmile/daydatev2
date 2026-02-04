@@ -175,7 +175,14 @@
       "adNotCompletedMessage": "미션을 새로고침하려면 광고를 끝까지 시청해주세요."
     },
     "partnerWatchingAd": "파트너가 광고를 시청 중입니다...",
-    "partnerWatchingAdWithName": "{{name}}님이\n광고를 시청하고 있습니다"
+    "partnerWatchingAdWithName": "{{name}}님이\n광고를 시청하고 있습니다",
+    "timeError": {
+      "title": "시간 설정 오류",
+      "message": "기기 시간이 서버 시간과 차이가 납니다.\n\n정확한 미션 서비스 이용을 위해 기기의 '자동 날짜 및 시간' 설정을 활성화해 주세요.",
+      "confirm": "확인",
+      "minutes": "{{count}}분",
+      "hours": "{{count}}시간"
+    }
   },
   "missionDetail": {
     "headerTitle": "미션 상세",
@@ -348,7 +355,7 @@
       "coverPhoto": "대표 사진",
       "fontStyle": "폰트 스타일",
       "fontStyleDesc": "앨범 제목에 사용할 폰트 스타일을 선택하세요",
-      "basicFont": "기본폰트",
+      "basicFont": "폰트",
       "basicFontDesc": "깔끔한 스타일",
       "ransomStyle": "랜섬노트 스타일",
       "basicFontHint": "깔끔한 폰트가 적용됩니다",

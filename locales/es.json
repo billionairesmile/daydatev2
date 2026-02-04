@@ -173,7 +173,14 @@
       "adNotCompletedMessage": "Por favor, mira el anuncio completo para actualizar las misiones."
     },
     "partnerWatchingAd": "Tu pareja está viendo un anuncio...",
-    "partnerWatchingAdWithName": "{{name}} está viendo\nun anuncio"
+    "partnerWatchingAdWithName": "{{name}} está viendo\nun anuncio",
+    "timeError": {
+      "title": "Error de hora",
+      "message": "La hora de tu dispositivo difiere del servidor.\n\nPor favor, activa 'Fecha y hora automáticas' en la configuración de tu dispositivo para un servicio de misiones preciso.",
+      "confirm": "Aceptar",
+      "minutes": "{{count}} min",
+      "hours": "{{count}} horas"
+    }
   },
   "missionDetail": {
     "headerTitle": "Detalles de Misión",
@@ -345,7 +352,7 @@
       "coverPhoto": "Foto de Portada",
       "fontStyle": "Estilo de Fuente",
       "fontStyleDesc": "Selecciona un estilo de fuente para el título",
-      "basicFont": "Fuente\nBásica",
+      "basicFont": "Fuente",
       "basicFontDesc": "Estilo limpio",
       "ransomStyle": "Estilo Recorte",
       "basicFontHint": "Se aplicará una fuente limpia",

@@ -175,7 +175,14 @@
       "adNotCompletedMessage": "ミッションを更新するには広告を最後まで視聴してください。"
     },
     "partnerWatchingAd": "パートナーが広告を視聴中です...",
-    "partnerWatchingAdWithName": "{{name}}さんが\n広告を視聴中です"
+    "partnerWatchingAdWithName": "{{name}}さんが\n広告を視聴中です",
+    "timeError": {
+      "title": "時刻設定エラー",
+      "message": "端末の時刻がサーバーとずれています。\n\n正確なミッションサービスをご利用いただくため、端末の「日付と時刻の自動設定」を有効にしてください。",
+      "confirm": "確認",
+      "minutes": "{{count}}分",
+      "hours": "{{count}}時間"
+    }
   },
   "missionDetail": {
     "headerTitle": "ミッション詳細",
@@ -348,7 +355,7 @@
       "coverPhoto": "カバー写真",
       "fontStyle": "フォントスタイル",
       "fontStyleDesc": "アルバムタイトルに使用するフォントを選択",
-      "basicFont": "基本\nフォント",
+      "basicFont": "フォント",
       "basicFontDesc": "シンプル",
       "ransomStyle": "ランサムノートスタイル",
       "basicFontHint": "シンプルなフォントが適用されます",

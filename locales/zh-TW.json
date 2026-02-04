@@ -173,7 +173,14 @@
       "adNotCompletedMessage": "請觀看完整廣告以刷新任務。"
     },
     "partnerWatchingAd": "對方正在觀看廣告...",
-    "partnerWatchingAdWithName": "{{name}}正在\n觀看廣告"
+    "partnerWatchingAdWithName": "{{name}}正在\n觀看廣告",
+    "timeError": {
+      "title": "時間設定錯誤",
+      "message": "您的裝置時間與伺服器不一致。\n\n為確保任務服務正常運作，請在裝置設定中啟用「自動設定日期與時間」。",
+      "confirm": "確認",
+      "minutes": "{{count}}分鐘",
+      "hours": "{{count}}小時"
+    }
   },
   "missionDetail": {
     "headerTitle": "任務詳情",
@@ -345,7 +352,7 @@
       "coverPhoto": "封面照片",
       "fontStyle": "字體風格",
       "fontStyleDesc": "選擇相簿標題使用的字體風格",
-      "basicFont": "基本字體",
+      "basicFont": "字體",
       "basicFontDesc": "簡潔風格",
       "ransomStyle": "剪報風格",
       "basicFontHint": "套用簡潔字體",

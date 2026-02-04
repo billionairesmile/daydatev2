@@ -679,7 +679,9 @@ export default function CalendarScreen() {
     return days;
   };
 
-  // Create stable cache of missions by date to prevent image reload on every render
+  // Create stable cache of missions by date - only depends on memories data, NOT year/month
+  // year/month are not used in the computation, so removing them prevents
+  // unnecessary cache rebuilds when navigating between months
   const missionsByDate = React.useMemo(() => {
     const cache: Record<string, { imageUrl: string; title: string }> = {};
     const timezone = getEffectiveTimezone();
@@ -708,22 +710,23 @@ export default function CalendarScreen() {
     });
 
     return cache;
-  }, [memories, year, month]);
+  }, [memories]);
 
   const getMissionForDate = useCallback((day: number) => {
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     return missionsByDate[dateStr];
   }, [missionsByDate, year, month]);
 
-  // Prefetch all mission images for the current month to prevent flickering
+  // Prefetch all mission images into MEMORY+DISK cache to prevent Android flickering
+  // Default prefetch only caches to disk; on Android disk reads are async causing placeholder flash
+  // 'memory-disk' ensures images are instantly available from memory on component mount
   useEffect(() => {
     const imagesToPrefetch = Object.values(missionsByDate)
       .map(mission => mission.imageUrl)
       .filter(Boolean);
 
     if (imagesToPrefetch.length > 0) {
-      // Prefetch images in background
-      Promise.all(imagesToPrefetch.map(url => ExpoImage.prefetch(url)))
+      ExpoImage.prefetch(imagesToPrefetch, 'memory-disk')
         .catch(error => console.log('[Calendar] Image prefetch error:', error));
     }
   }, [missionsByDate]);
@@ -1177,7 +1180,7 @@ export default function CalendarScreen() {
                     ]}
                   >
                     <ExpoImage
-                      source={{ uri: mission.imageUrl }}
+                      source={mission.imageUrl}
                       style={styles.missionImage}
                       contentFit="cover"
                       cachePolicy="memory-disk"
