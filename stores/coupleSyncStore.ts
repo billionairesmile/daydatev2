@@ -1265,16 +1265,20 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
         if (!preserveStatus) {
           try {
             const { data: lockData } = await db.missionLock.getStatus(coupleId);
-            if (lockData && (lockData.status === 'ad_watching' || lockData.status === 'generating')) {
+            // Only fall back to 'generating' status, NOT 'ad_watching'
+            // ad_watching should only be set via Realtime subscription for freshness
+            // Re-setting ad_watching from DB fallback causes infinite loops when
+            // partner force-closes app (stale lock stays in DB, gets re-read on every loadSharedMissions)
+            if (lockData && lockData.status === 'generating') {
               const lockTime = lockData.locked_at ? new Date(lockData.locked_at) : null;
               const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
               const currentUserId = get().userId;
 
               // Only apply if lock is fresh (<5min) and belongs to partner (not self)
               if (lockTime && lockTime > fiveMinutesAgo && lockData.locked_by && lockData.locked_by !== currentUserId) {
-                console.log('[CoupleSyncStore] Lock fallback: detected partner', lockData.status, 'via DB check');
+                console.log('[CoupleSyncStore] Lock fallback: detected partner generating via DB check');
                 set({
-                  missionGenerationStatus: lockData.status as MissionGenerationStatus,
+                  missionGenerationStatus: 'generating',
                   generatingUserId: lockData.locked_by,
                 });
               }

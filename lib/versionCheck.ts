@@ -5,7 +5,7 @@ import i18n from 'i18next';
 
 // Store URLs
 const STORE_URLS = {
-  ios: 'https://apps.apple.com/app/daydate/id6739075876',
+  ios: 'https://apps.apple.com/app/daydate/id6757266824',
   android: 'https://play.google.com/store/apps/details?id=com.daydate.app',
 };
 

@@ -761,12 +761,23 @@ export default function MissionScreen() {
         // Reset to showing old missions
         const timer = setTimeout(async () => {
           console.log('[Mission] 60s timeout reached - partner may have closed app, resetting to old missions');
-          // Reset status FIRST so loadSharedMissions doesn't preserve the stale ad_watching status
+          // CRITICAL: Release stale lock in DB FIRST
+          // Without this, loadSharedMissions's lock fallback would re-read the stale
+          // 'ad_watching' from DB and re-set it, causing an infinite loop
+          if (coupleId) {
+            try {
+              await db.missionLock.release(coupleId, 'idle');
+              console.log('[Mission] 60s timeout: released stale lock in DB');
+            } catch (e) {
+              console.log('[Mission] 60s timeout: failed to release lock:', e);
+            }
+          }
+          // Reset local status AFTER DB cleanup
           useCoupleSyncStore.setState({ missionGenerationStatus: 'idle', generatingUserId: null });
-          await loadSharedMissions();
           setIsGenerating(false);
           setPartnerGeneratingMessage(null);
           setShouldHideOldMissions(false);
+          await loadSharedMissions();
         }, 60000); // 60s
 
         return () => {
@@ -786,18 +797,19 @@ export default function MissionScreen() {
     }
   }, [isSyncInitialized, missionGenerationStatus, generatingUserId, user?.id, t, partner?.nickname, loadSharedMissions]);
 
-  // Separate effect: When status jumps to 'completed' while old missions are hidden,
-  // reset UI to show the new missions. This is split from the main effect to avoid
-  // shouldHideOldMissions in the dependency array, which caused a re-trigger loop
-  // (effect sets shouldHideOldMissions → dep change → effect re-runs → repeat)
+  // Separate effect: When status is 'completed' AND missionsReady is true while old missions
+  // are hidden, reset UI to show the new missions. We gate on missionsReady to prevent
+  // showing old/unloaded missions briefly before new ones are ready.
+  // This is split from the main effect to avoid shouldHideOldMissions in the dependency array,
+  // which caused a re-trigger loop (effect sets shouldHideOldMissions → dep change → re-runs)
   useEffect(() => {
-    if (missionGenerationStatus === 'completed' && shouldHideOldMissions) {
-      console.log('[Mission] Status completed while shouldHideOldMissions=true, resetting UI');
+    if (missionGenerationStatus === 'completed' && shouldHideOldMissions && missionsReady) {
+      console.log('[Mission] Status completed + missionsReady while shouldHideOldMissions=true, resetting UI');
       setIsGenerating(false);
       setPartnerGeneratingMessage(null);
       setShouldHideOldMissions(false);
     }
-  }, [missionGenerationStatus, shouldHideOldMissions]);
+  }, [missionGenerationStatus, shouldHideOldMissions, missionsReady]);
 
   // Animated dots for partner watching ad message (1→2→3→1 repeating)
   useEffect(() => {
@@ -849,11 +861,14 @@ export default function MissionScreen() {
 
           const newStatus = (payload.new as { status?: string })?.status;
 
-          // CRITICAL: Only refresh missions, don't reset UI states
-          // UI states are handled by missionGenerationStatus useEffect
-          // This prevents premature loading removal when A transitions from ad → generating
-          if (newStatus === 'idle' || newStatus === 'completed') {
-            console.log('[Mission] Realtime: Lock status changed to', newStatus);
+          // Only handle 'idle' (partner cancelled ad) here
+          // 'completed' is intentionally NOT handled - it flows through:
+          //   coupleSyncStore missions subscription → missionsReady effect
+          // This prevents old mission cards from flashing briefly before new ones load,
+          // because loadSharedMissions would set status='completed' which triggers
+          // shouldHideOldMissions=false BEFORE new missions/images are ready
+          if (newStatus === 'idle') {
+            console.log('[Mission] Realtime: Lock status changed to idle (partner cancelled)');
 
             // Store current mission IDs before refresh
             const missionIdsBefore = missionIds;
@@ -994,7 +1009,17 @@ export default function MissionScreen() {
               setShouldHideOldMissions(false);
               await loadSharedMissions();
             } else if (isStale) {
-              console.log('[Mission] Fallback polling: lock is stale (', Math.round(lockAge / 1000), 's), resetting');
+              console.log('[Mission] Fallback polling: lock is stale (', Math.round(lockAge / 1000), 's), releasing in DB and resetting');
+              // CRITICAL: Release the stale lock in DB to prevent loadSharedMissions
+              // from re-reading it and re-setting ad_watching status (infinite loop)
+              if (coupleId) {
+                try {
+                  await db.missionLock.release(coupleId, 'idle');
+                } catch (e) {
+                  console.log('[Mission] Fallback polling: failed to release lock:', e);
+                }
+              }
+              useCoupleSyncStore.setState({ missionGenerationStatus: 'idle', generatingUserId: null });
               setIsGenerating(false);
               setPartnerGeneratingMessage(null);
               setShouldHideOldMissions(false);
