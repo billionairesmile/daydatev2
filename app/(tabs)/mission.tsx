@@ -639,16 +639,24 @@ export default function MissionScreen() {
       ) {
         console.log('[MissionScreen] App came to foreground, refreshing mission data');
 
+        // Don't reset loading states if partner is actively watching ad or generating
+        // Check Zustand store directly for fresh values (avoid stale closure)
+        const currentSyncStatus = useCoupleSyncStore.getState().missionGenerationStatus;
+        const currentGeneratingUser = useCoupleSyncStore.getState().generatingUserId;
+        const isPartnerActivelyGenerating = (currentSyncStatus === 'ad_watching' || currentSyncStatus === 'generating')
+          && currentGeneratingUser && currentGeneratingUser !== user?.id;
+
         // Reset any stuck loading states (e.g., if app was backgrounded during ad loading)
-        // BUT skip reset if we're in the middle of rewarded ad flow
-        // (ad closing triggers foreground event, but onAdClosed handles the state)
-        if (!isLoadingAd) {
+        // BUT skip reset if we're in the middle of rewarded ad flow OR partner is watching ad
+        if (!isLoadingAd && !isPartnerActivelyGenerating) {
           setIsGenerating(false);
           setIsWaitingForImages(false);
           isWaitingForImagesRef.current = false;
           setPartnerGeneratingMessage(null);
         }
-        setIsLoadingAd(false);
+        if (!isPartnerActivelyGenerating) {
+          setIsLoadingAd(false);
+        }
 
         // Check for date reset FIRST (before loading new data)
         // This ensures proper comparison with old sharedMissionsDate
@@ -753,6 +761,8 @@ export default function MissionScreen() {
         // Reset to showing old missions
         const timer = setTimeout(async () => {
           console.log('[Mission] 60s timeout reached - partner may have closed app, resetting to old missions');
+          // Reset status FIRST so loadSharedMissions doesn't preserve the stale ad_watching status
+          useCoupleSyncStore.setState({ missionGenerationStatus: 'idle', generatingUserId: null });
           await loadSharedMissions();
           setIsGenerating(false);
           setPartnerGeneratingMessage(null);
@@ -772,9 +782,16 @@ export default function MissionScreen() {
         setIsGenerating(false);
         setPartnerGeneratingMessage(null);
         setShouldHideOldMissions(false);
+      } else if (missionGenerationStatus === 'completed' && shouldHideOldMissions) {
+        // Status jumped to completed (e.g., from loadSharedMissions during ad_watching)
+        // Reset UI to show missions - missionsReady useEffect may not fire in this case
+        console.log('[Mission] Status completed while shouldHideOldMissions=true, resetting UI');
+        setIsGenerating(false);
+        setPartnerGeneratingMessage(null);
+        setShouldHideOldMissions(false);
       }
     }
-  }, [isSyncInitialized, missionGenerationStatus, generatingUserId, user?.id, t, partner?.nickname, loadSharedMissions]);
+  }, [isSyncInitialized, missionGenerationStatus, generatingUserId, user?.id, t, partner?.nickname, loadSharedMissions, shouldHideOldMissions]);
 
   // Animated dots for partner watching ad message (1→2→3→1 repeating)
   useEffect(() => {
@@ -922,7 +939,7 @@ export default function MissionScreen() {
 
   // Fallback polling for stale lock recovery (in case Realtime fails)
   // This helps User B recover when User A force-closes app during ad
-  // Interval reduced since Realtime handles normal cases instantly
+  // Polls the lock table directly to detect stale locks without overriding active states
   useEffect(() => {
     let intervalId: ReturnType<typeof setInterval> | null = null;
 
@@ -931,57 +948,52 @@ export default function MissionScreen() {
       const currentUserId = user?.id;
       const isPartnerGenerating = generatingUserId && generatingUserId !== currentUserId;
 
-      if (isPartnerGenerating) {
-        // Reduced poll interval since Realtime handles most cases
-        // This is just a fallback for edge cases (force close, network issues)
-        const pollInterval = 15000; // 15 seconds
-        // Poll to check for stale locks
+      if (isPartnerGenerating && coupleId) {
+        // Poll interval: check for stale locks every 15 seconds
+        const pollInterval = 15000;
         intervalId = setInterval(async () => {
-          console.log('[Mission] Fallback polling for stale lock recovery...');
+          console.log('[Mission] Fallback polling: checking lock table for stale locks...');
 
-          // Get status and mission IDs before polling
-          const statusBeforePoll = useCoupleSyncStore.getState().missionGenerationStatus;
-          const missionIdsBefore = missionIds;
+          try {
+            // Check lock table directly (don't use loadSharedMissions which would override status)
+            const { data: lockData } = await db.missionLock.getStatus(coupleId);
 
-          await loadSharedMissions(); // This function auto-releases stale locks
-
-          // Get status after polling
-          const statusAfterPoll = useCoupleSyncStore.getState().missionGenerationStatus;
-
-          // If status changed from generating/ad_watching to idle, reset UI and carousel
-          if (
-            (statusBeforePoll === 'generating' || statusBeforePoll === 'ad_watching') &&
-            statusAfterPoll === 'idle'
-          ) {
-            console.log('[Mission] Polling detected stale lock recovery, resetting UI');
-
-            // Reset UI loading states
-            setIsGenerating(false);
-            setPartnerGeneratingMessage(null);
-
-            // CRITICAL: Only reset carousel if missions actually changed
-            const missionsChanged = missionIds !== missionIdsBefore;
-
-            if (missionsChanged) {
-              console.log('[Mission] Polling: Missions changed, resetting carousel');
-              // Reset carousel state for proper first card scale
-              setIsScrollInitialized(false);
-              hasInitializedCarousel.current = false;
-              setCurrentIndex(0);
-              scrollX.setValue(0);
-
-              setTimeout(() => {
-                if (scrollViewRef.current) {
-                  scrollViewRef.current.scrollToOffset({ offset: 1, animated: false });
-                  setTimeout(() => {
-                    scrollViewRef.current?.scrollToOffset({ offset: 0, animated: false });
-                    setIsScrollInitialized(true);
-                  }, 50);
-                }
-              }, 150);
-            } else {
-              console.log('[Mission] Polling: Missions unchanged, keeping carousel state');
+            if (!lockData) {
+              // No lock record - partner may have force-closed, reset to idle
+              console.log('[Mission] Fallback polling: no lock record found, resetting');
+              useCoupleSyncStore.getState().releaseMissionLock('idle');
+              setIsGenerating(false);
+              setPartnerGeneratingMessage(null);
+              setShouldHideOldMissions(false);
+              await loadSharedMissions();
+              return;
             }
+
+            // Check if lock is stale (older than 60 seconds)
+            const lockAge = Date.now() - new Date(lockData.locked_at).getTime();
+            const isStale = lockAge > 60000; // 60 seconds
+
+            // Check if status changed to idle/completed in DB (Realtime may have missed it)
+            const dbStatus = lockData.status;
+            if (dbStatus === 'idle' || dbStatus === 'completed') {
+              console.log('[Mission] Fallback polling: DB status is', dbStatus, '- resetting UI');
+              useCoupleSyncStore.setState({
+                missionGenerationStatus: dbStatus as 'idle' | 'completed',
+                generatingUserId: lockData.locked_by,
+              });
+              setIsGenerating(false);
+              setPartnerGeneratingMessage(null);
+              setShouldHideOldMissions(false);
+              await loadSharedMissions();
+            } else if (isStale) {
+              console.log('[Mission] Fallback polling: lock is stale (', Math.round(lockAge / 1000), 's), resetting');
+              setIsGenerating(false);
+              setPartnerGeneratingMessage(null);
+              setShouldHideOldMissions(false);
+              await loadSharedMissions();
+            }
+          } catch (error) {
+            console.error('[Mission] Fallback polling error:', error);
           }
         }, pollInterval);
       }
@@ -992,7 +1004,7 @@ export default function MissionScreen() {
         clearInterval(intervalId);
       }
     };
-  }, [missionGenerationStatus, generatingUserId, user?.id, loadSharedMissions, scrollX]);
+  }, [missionGenerationStatus, generatingUserId, user?.id, coupleId, loadSharedMissions, scrollX]);
 
   // Check location permission
   const checkLocationPermission = async (): Promise<boolean> => {

@@ -109,7 +109,7 @@ const ANDROID_ICON_OFFSETS: Record<string, number> = {
 
 // SF Symbol names for iOS native icons
 const TAB_SF_SYMBOLS: Record<string, string> = {
-  mission: 'target',
+  mission: 'flame.fill',
   memories: 'heart.text.square',
   index: 'house',
   calendar: 'calendar',

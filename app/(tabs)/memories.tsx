@@ -80,6 +80,29 @@ const RansomPreview = React.memo(function RansomPreview({
 // Font style type
 type FontStyleType = 'basic' | 'ransom' | null;
 
+// Detect font by text content (language-aware basic font)
+const getBasicFontByText = (text: string): string => {
+  if (!text) return 'LoraSemiBold';
+  // Korean characters
+  if (/[\uAC00-\uD7AF\u1100-\u11FF]/.test(text)) return 'Jua';
+  // Japanese characters (Hiragana, Katakana)
+  if (/[\u3040-\u309F\u30A0-\u30FF]/.test(text)) return 'MochiyPopOne';
+  // Chinese characters
+  if (/[\u4E00-\u9FFF]/.test(text)) return 'ChironGoRoundTC';
+  // Default (English, Spanish, Latin)
+  return 'LoraSemiBold';
+};
+
+// Get basic font by app language (for modal preview before text input)
+const getBasicFontByLanguage = (lang: string): string => {
+  switch (lang) {
+    case 'ko': return 'Jua';
+    case 'ja': return 'MochiyPopOne';
+    case 'zh-TW': return 'ChironGoRoundTC';
+    default: return 'LoraSemiBold'; // en, es, etc.
+  }
+};
+
 // Album type
 interface Album {
   id: string;
@@ -1322,9 +1345,9 @@ export default function MemoriesScreen() {
                   }}
                 >
                   <View style={styles.fontStylePreviewContainer}>
-                    <Text style={styles.fontStylePreviewBasic}>{t('memories.album.basicFont')}</Text>
+                    <Text style={[styles.fontStylePreviewBasic, { fontFamily: getBasicFontByLanguage(i18n.language) }]}>{t('memories.album.basicFont')}</Text>
                   </View>
-                  <Text style={styles.fontStyleLabel}>{t('memories.album.basicFontDesc')}</Text>
+                  <Text style={[styles.fontStyleLabel, { fontFamily: getBasicFontByLanguage(i18n.language) }]}>{t('memories.album.basicFontDesc')}</Text>
                 </Pressable>
 
                 {/* Ransom Font Option */}
@@ -1379,11 +1402,11 @@ export default function MemoriesScreen() {
               {/* Text Preview - Basic or Ransom Style */}
               <View style={styles.ransomPreviewContainer}>
                 {fontStyle === 'basic' ? (
-                  // Basic Jua Font Style - Clean text without paper backgrounds
+                  // Basic Font Style - language-aware clean text
                   albumName.length > 0 ? (
-                    <Text style={styles.basicFontPreview}>{albumName}</Text>
+                    <Text style={[styles.basicFontPreview, { fontFamily: getBasicFontByText(albumName) }]}>{albumName}</Text>
                   ) : (
-                    <Text style={[styles.ransomPlaceholder, { fontFamily: 'Jua' }]}>{t('memories.album.name')}</Text>
+                    <Text style={[styles.ransomPlaceholder, { fontFamily: getBasicFontByLanguage(i18n.language) }]}>{t('memories.album.name')}</Text>
                   )
                 ) : (
                   // Ransom Style - Use memoized component with deferred previewText
@@ -1495,10 +1518,11 @@ export default function MemoriesScreen() {
                       ]}
                     >
                       {fontStyle === 'basic' ? (
-                        // Basic Jua Font Style
+                        // Basic Font Style - language-aware
                         <Text style={[
                           styles.basicFontOverlay,
                           {
+                            fontFamily: getBasicFontByText(albumName),
                             fontSize: 16 * textScale,
                             lineHeight: 16 * textScale * 1.3,
                             color: textColor === 'black' ? '#000000' : COLORS.white,
@@ -1735,9 +1759,9 @@ export default function MemoriesScreen() {
                   }}
                 >
                   <View style={styles.fontStylePreviewContainer}>
-                    <Text style={styles.fontStylePreviewBasic}>{t('memories.album.basicFont')}</Text>
+                    <Text style={[styles.fontStylePreviewBasic, { fontFamily: getBasicFontByLanguage(i18n.language) }]}>{t('memories.album.basicFont')}</Text>
                   </View>
-                  <Text style={styles.fontStyleLabel}>{t('memories.album.basicFontDesc')}</Text>
+                  <Text style={[styles.fontStyleLabel, { fontFamily: getBasicFontByLanguage(i18n.language) }]}>{t('memories.album.basicFontDesc')}</Text>
                 </Pressable>
 
                 {/* Ransom Font Option */}
@@ -1792,7 +1816,7 @@ export default function MemoriesScreen() {
               <View style={styles.ransomPreviewContainer}>
                 {editAlbumName.length > 0 ? (
                   editFontStyle === 'basic' ? (
-                    <Text style={styles.basicFontPreview}>{editAlbumName}</Text>
+                    <Text style={[styles.basicFontPreview, { fontFamily: getBasicFontByText(editAlbumName) }]}>{editAlbumName}</Text>
                   ) : (
                     // Ransom Style - assets preloaded with 8-char wrapping
                     editAlbumName.length > 0 ? (
@@ -1807,7 +1831,7 @@ export default function MemoriesScreen() {
                     ) : null
                   )
                 ) : (
-                  <Text style={[styles.ransomPlaceholder, editFontStyle === 'basic' && { fontFamily: 'Jua' }]}>{t('memories.album.name')}</Text>
+                  <Text style={[styles.ransomPlaceholder, editFontStyle === 'basic' && { fontFamily: getBasicFontByLanguage(i18n.language) }]}>{t('memories.album.name')}</Text>
                 )}
                 {/* Refresh Button for Ransom Style */}
                 {editFontStyle === 'ransom' && editAlbumName.length > 0 && (
@@ -1913,10 +1937,11 @@ export default function MemoriesScreen() {
                       ]}
                     >
                       {editFontStyle === 'basic' ? (
-                        // Basic Jua Font Style
+                        // Basic Font Style - language-aware
                         <Text style={[
                           styles.basicFontOverlay,
                           {
+                            fontFamily: getBasicFontByText(editAlbumName),
                             fontSize: 16 * editTextScale,
                             lineHeight: 16 * editTextScale * 1.3,
                             color: editTextColor === 'black' ? '#000000' : COLORS.white,
@@ -2167,7 +2192,7 @@ export default function MemoriesScreen() {
                             ]}>
                               {album.fontStyle === 'basic' ? (
                                 // Basic Jua Font Style
-                                <Text style={[styles.basicFontTiny, { fontSize: 16 * (album.textScale || 1) * getDynamicAlbumScaleRatio(), lineHeight: 16 * (album.textScale || 1) * getDynamicAlbumScaleRatio() * 1.3, color: album.textColor === 'black' ? '#000000' : '#FFFFFF' }]}>{album.name}</Text>
+                                <Text style={[styles.basicFontTiny, { fontFamily: getBasicFontByText(album.name), fontSize: 16 * (album.textScale || 1) * getDynamicAlbumScaleRatio(), lineHeight: 16 * (album.textScale || 1) * getDynamicAlbumScaleRatio() * 1.3, color: album.textColor === 'black' ? '#000000' : '#FFFFFF' }]}>{album.name}</Text>
                               ) : (
                                 // Ransom Style - Image-based
                                 <RansomText
@@ -2381,7 +2406,7 @@ export default function MemoriesScreen() {
                             ]}>
                               {album.fontStyle === 'basic' ? (
                                 // Basic Jua Font Style
-                                <Text style={[styles.basicFontTiny, { fontSize: 16 * (album.textScale || 1) * getDynamicAlbumScaleRatio(), lineHeight: 16 * (album.textScale || 1) * getDynamicAlbumScaleRatio() * 1.3, color: album.textColor === 'black' ? '#000000' : '#FFFFFF' }]}>{album.name}</Text>
+                                <Text style={[styles.basicFontTiny, { fontFamily: getBasicFontByText(album.name), fontSize: 16 * (album.textScale || 1) * getDynamicAlbumScaleRatio(), lineHeight: 16 * (album.textScale || 1) * getDynamicAlbumScaleRatio() * 1.3, color: album.textColor === 'black' ? '#000000' : '#FFFFFF' }]}>{album.name}</Text>
                               ) : (
                                 // Ransom Style - Image-based
                                 <RansomText
@@ -2759,7 +2784,7 @@ export default function MemoriesScreen() {
                         getAlbumDetailPosition(selectedAlbum.namePosition)
                       ]}>
                         {selectedAlbum.fontStyle === 'basic' ? (
-                          <Text style={[styles.basicFontOverlay, { fontSize: 16 * selectedAlbum.textScale * getDynamicAlbumDetailScaleRatio(), lineHeight: 16 * selectedAlbum.textScale * getDynamicAlbumDetailScaleRatio() * 1.3, color: selectedAlbum.textColor === 'black' ? '#000000' : '#FFFFFF' }]}>
+                          <Text style={[styles.basicFontOverlay, { fontFamily: getBasicFontByText(selectedAlbum.name), fontSize: 16 * selectedAlbum.textScale * getDynamicAlbumDetailScaleRatio(), lineHeight: 16 * selectedAlbum.textScale * getDynamicAlbumDetailScaleRatio() * 1.3, color: selectedAlbum.textColor === 'black' ? '#000000' : '#FFFFFF' }]}>
                             {selectedAlbum.name}
                           </Text>
                         ) : (

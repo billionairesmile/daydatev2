@@ -246,11 +246,6 @@ export function BookmarkedMissionsPage({ onBack }: BookmarkedMissionsPageProps) 
                         ]}
                         onPress={() => {
                           if (!canDelete) {
-                            Alert.alert(
-                              t('bookmark.cannotDelete'),
-                              t('bookmark.missionInProgressMessage'),
-                              [{ text: t('common.confirm') }]
-                            );
                             return;
                           }
                           handleRemove(bookmark, mission.title);

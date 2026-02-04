@@ -345,7 +345,7 @@
       "coverPhoto": "Foto de Portada",
       "fontStyle": "Estilo de Fuente",
       "fontStyleDesc": "Selecciona un estilo de fuente para el título",
-      "basicFont": "Fuente Básica",
+      "basicFont": "Fuente\nBásica",
       "basicFontDesc": "Estilo limpio",
       "ransomStyle": "Estilo Recorte",
       "basicFontHint": "Se aplicará una fuente limpia",

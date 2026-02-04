@@ -1245,13 +1245,17 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
         // This ensures proper date comparison in checkAndResetSharedMissions
         const timezone = useTimezoneStore.getState().getEffectiveTimezone();
         const missionDate = data.generated_at ? formatDateInTimezone(new Date(data.generated_at), timezone) : today;
+        // Preserve ad_watching/generating status - don't override with 'completed'
+        // when partner is actively watching ad or generating missions
+        const currentStatus = get().missionGenerationStatus;
+        const preserveStatus = currentStatus === 'ad_watching' || currentStatus === 'generating';
         set({
           sharedMissions: missions,
           sharedMissionsDate: missionDate,
           sharedMissionsRefreshedAt: refreshedAt,
           lastMissionUpdate: new Date(data.generated_at),
-          missionGenerationStatus: 'completed',
-          generatingUserId: data.generated_by,
+          missionGenerationStatus: preserveStatus ? currentStatus : 'completed',
+          generatingUserId: preserveStatus ? get().generatingUserId : data.generated_by,
           isLoadingMissions: false,
         });
         return missions;
