@@ -1,6 +1,6 @@
 import { Platform, Alert, Linking } from 'react-native';
 import Constants from 'expo-constants';
-import { supabase } from './supabase';
+import { supabase, isDemoMode } from './supabase';
 import i18n from 'i18next';
 
 // Store URLs
@@ -43,6 +43,11 @@ export function getCurrentAppVersion(): string {
  */
 export async function getLatestAppVersion(): Promise<string | null> {
   try {
+    if (!supabase || isDemoMode) {
+      console.log('[VersionCheck] Supabase not initialized, skipping version check');
+      return null;
+    }
+
     const { data, error } = await supabase
       .from('app_config')
       .select('ios_latest_version, android_latest_version')
