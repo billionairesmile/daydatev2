@@ -2555,7 +2555,7 @@ export default function MemoriesScreen() {
             experimentalBlurMethod="dimezisBlurView"
             intensity={60}
             tint="dark"
-            style={[styles.albumModalContainer, { paddingBottom: Math.max(insets.bottom, rs(24)) }]}
+            style={[styles.albumModalContainer, { paddingTop: insets.top + rs(8), paddingBottom: Math.max(insets.bottom, rs(24)) }]}
           >
             {renderAlbumModalContent()}
           </BlurView>
@@ -3185,7 +3185,7 @@ export default function MemoriesScreen() {
                 experimentalBlurMethod="dimezisBlurView"
                 intensity={80}
                 tint="dark"
-                style={[styles.albumModalContainer, { paddingBottom: Math.max(insets.bottom, rs(24)) }]}
+                style={[styles.albumModalContainer, { paddingTop: insets.top + rs(8), paddingBottom: Math.max(insets.bottom, rs(24)) }]}
               >
                 {renderCoverEditModalContent()}
               </BlurView>
@@ -5149,6 +5149,7 @@ const styles = StyleSheet.create({
   coverPhotoPickerContainer: {
     width: '100%',
     aspectRatio: 3 / 4, // 3:4 aspect ratio
+    maxHeight: SCREEN_HEIGHT * 0.42, // Prevent modal from going above Dynamic Island on smaller screens
     borderRadius: rs(16),
     overflow: 'hidden',
     position: 'relative',
