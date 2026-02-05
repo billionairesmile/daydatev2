@@ -1733,7 +1733,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     return bookmark?.completed_at !== null && bookmark?.completed_at !== undefined;
   },
 
-  // Mark a bookmark as completed (will be removed at noon the next day)
+  // Mark a bookmark as completed (will be removed at midnight when date changes)
   markBookmarkCompleted: async (missionId: string) => {
     const { coupleId, sharedBookmarks } = get();
 
@@ -1784,24 +1784,22 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     return true;
   },
 
-  // Cleanup completed bookmarks that have passed noon the next day
+  // Cleanup completed bookmarks when date changes (at midnight)
   cleanupCompletedBookmarks: async () => {
     const { coupleId, sharedBookmarks } = get();
 
     if (!coupleId || isInTestMode()) {
-      // Demo mode: cleanup locally based on time threshold
+      // Demo mode: cleanup locally - remove bookmarks completed before today
       const now = new Date();
-      const noonToday = new Date(now);
-      noonToday.setHours(12, 0, 0, 0);
+      const todayMidnight = new Date(now);
+      todayMidnight.setHours(0, 0, 0, 0);
 
       set({
         sharedBookmarks: sharedBookmarks.filter((b) => {
           if (!b.completed_at) return true; // Keep non-completed bookmarks
           const completedDate = new Date(b.completed_at);
-          const noonNextDay = new Date(completedDate);
-          noonNextDay.setDate(noonNextDay.getDate() + 1);
-          noonNextDay.setHours(12, 0, 0, 0);
-          return now < noonNextDay; // Keep if not yet past noon next day
+          // Keep only if completed today or later
+          return completedDate >= todayMidnight;
         }),
       });
       return;
@@ -2276,7 +2274,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
           console.error('[CoupleSyncStore] Failed to cancel reminder notifications:', err);
         });
 
-        // Mark bookmark as completed (will be removed at noon the next day)
+        // Mark bookmark as completed (will be removed at midnight when date changes)
         get().markBookmarkCompleted(targetProgress.mission_id).catch((err) => {
           console.warn('[CoupleSyncStore] Failed to mark bookmark as completed:', err);
         });
@@ -2312,7 +2310,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
         console.error('[CoupleSyncStore] Failed to cancel reminder notifications:', err);
       });
 
-      // Mark bookmark as completed (will be removed at noon the next day)
+      // Mark bookmark as completed (will be removed at midnight when date changes)
       get().markBookmarkCompleted(targetProgress.mission_id).catch((err) => {
         console.warn('[CoupleSyncStore] Failed to mark bookmark as completed:', err);
       });

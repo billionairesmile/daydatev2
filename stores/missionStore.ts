@@ -265,7 +265,7 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
           keptMissions: updatedKeptMissions,
         });
 
-        // Mark bookmark as completed in Supabase (will be removed at noon the next day)
+        // Mark bookmark as completed in Supabase (will be removed at midnight when date changes)
         // This is async but we don't need to wait for it
         const syncStore = useCoupleSyncStore.getState();
         if (syncStore.isInitialized && syncStore.coupleId) {
