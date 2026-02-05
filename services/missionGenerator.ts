@@ -353,6 +353,7 @@ interface AnniversaryInfo {
   upcoming: string[];
   isToday: boolean;
   todayLabel: string | null;
+  anniversaryType: 'wedding' | 'dating' | null;  // Type of anniversary for clear context
 }
 
 // Parse date string as local date (not UTC) to avoid timezone issues
@@ -378,7 +379,7 @@ function getAnniversaryInfo(
   relationshipType: string | undefined,
   anniversaryDate: Date | string | null | undefined
 ): AnniversaryInfo {
-  if (!anniversaryDate) return { upcoming: [], isToday: false, todayLabel: null };
+  if (!anniversaryDate) return { upcoming: [], isToday: false, todayLabel: null, anniversaryType: null };
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -388,10 +389,12 @@ function getAnniversaryInfo(
   const upcomingAnniversaries: string[] = [];
   let isToday = false;
   let todayLabel: string | null = null;
+  // Track anniversary type: 'wedding' for married couples, 'dating' for dating couples
+  const anniversaryType: 'wedding' | 'dating' | null = relationshipType === 'married' ? 'wedding' : relationshipType === 'dating' ? 'dating' : null;
 
   const daysPassed = Math.floor((today.getTime() - annDate.getTime()) / (24 * 60 * 60 * 1000)) + 1;
 
-  // Check day milestones (100일, 200일, etc.)
+  // Check day milestones (100일, 200일, etc.) - only for dating couples
   if (relationshipType === 'dating') {
     const milestones = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1500, 2000];
     for (const milestone of milestones) {
@@ -429,7 +432,7 @@ function getAnniversaryInfo(
     }
   }
 
-  return { upcoming: upcomingAnniversaries, isToday, todayLabel };
+  return { upcoming: upcomingAnniversaries, isToday, todayLabel, anniversaryType };
 }
 
 // Check custom (user-created) anniversaries within D-7
@@ -437,7 +440,7 @@ function getCustomAnniversaryInfo(
   customAnniversaries?: CustomAnniversaryForMission[]
 ): AnniversaryInfo {
   if (!customAnniversaries || customAnniversaries.length === 0) {
-    return { upcoming: [], isToday: false, todayLabel: null };
+    return { upcoming: [], isToday: false, todayLabel: null, anniversaryType: null };
   }
 
   const today = new Date();
@@ -474,7 +477,8 @@ function getCustomAnniversaryInfo(
     }
   }
 
-  return { upcoming: upcomingAnniversaries, isToday, todayLabel };
+  // Custom anniversaries don't have wedding/dating type distinction
+  return { upcoming: upcomingAnniversaries, isToday, todayLabel, anniversaryType: null };
 }
 
 // Birthday info type
@@ -660,13 +664,31 @@ function buildContext(
   const isAnyAnniversaryToday = anniversaryInfo.isToday || customAnniversaryInfo.isToday;
   const todayLabels = [anniversaryInfo.todayLabel, customAnniversaryInfo.todayLabel].filter(Boolean);
 
+  // Get the explicit anniversary type for clearer prompt context
+  const anniversaryTypeLabel = anniversaryInfo.anniversaryType === 'wedding'
+    ? 'WEDDING ANNIVERSARY (결혼 기념일)'
+    : anniversaryInfo.anniversaryType === 'dating'
+    ? 'DATING ANNIVERSARY (연애 기념일)'
+    : null;
+
   if (isAnyAnniversaryToday && todayLabels.length > 0) {
     // Anniversary TODAY! All missions should be anniversary-themed
     parts.push(`\n### TODAY IS ${todayLabels.join(', ')}!`);
+    // Add explicit anniversary type instruction for GPT
+    if (anniversaryTypeLabel) {
+      parts.push(`### CRITICAL: This is a ${anniversaryTypeLabel}, NOT ${anniversaryInfo.anniversaryType === 'wedding' ? 'dating anniversary' : 'wedding anniversary'}!`);
+      parts.push(`-> When mentioning anniversary in mission titles, use "${anniversaryInfo.anniversaryType === 'wedding' ? '결혼 기념일/Wedding Anniversary' : '연애 기념일/Dating Anniversary'}" terminology`);
+    }
     parts.push(`-> ALL missions must be anniversary/celebration themed!`);
     parts.push(`-> Categories: romantic, anniversary, surprise, memory`);
   } else if (allUpcoming.length > 0) {
-    parts.push(`\n[Upcoming anniversary] ${allUpcoming.join(', ')} -> Include at least 1 anniversary-prep mission!`);
+    // Upcoming anniversary - add type context
+    let upcomingContext = `\n[Upcoming anniversary] ${allUpcoming.join(', ')}`;
+    if (anniversaryTypeLabel) {
+      upcomingContext += ` (Type: ${anniversaryTypeLabel})`;
+    }
+    upcomingContext += ` -> Include at least 1 anniversary-prep mission!`;
+    parts.push(upcomingContext);
   }
 
   // === Birthday ===
