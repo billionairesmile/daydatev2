@@ -1863,8 +1863,13 @@ export const db = {
         .update({ completed_at: new Date().toISOString() })
         .eq('couple_id', coupleId)
         .eq('mission_id', missionId)
-        .select()
-        .single();
+        .select();
+
+      // Log if no rows were updated (bookmark might not exist)
+      if (!error && (!data || data.length === 0)) {
+        console.log('[Bookmark] No bookmark found to mark as completed:', missionId);
+      }
+
       return { data, error };
     },
 

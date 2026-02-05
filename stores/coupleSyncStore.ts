@@ -1754,8 +1754,8 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     const { data, error } = await db.coupleBookmarks.markCompleted(coupleId, missionId);
 
     if (error) {
-      console.warn('[Bookmark] DB mark completed failed:', error);
-      // Still update local state
+      console.error('[Bookmark] DB mark completed failed:', error);
+      // Still update local state even if DB fails
       set({
         sharedBookmarks: sharedBookmarks.map((b) =>
           b.mission_id === missionId
@@ -1766,6 +1766,12 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       return false;
     }
 
+    // Check if bookmark actually existed and was updated
+    if (!data || data.length === 0) {
+      console.log('[Bookmark] Mission was not in bookmarks, skipping mark completed');
+      return true; // Not an error - just wasn't bookmarked
+    }
+
     // Success - update local state
     set({
       sharedBookmarks: sharedBookmarks.map((b) =>
@@ -1774,7 +1780,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
           : b
       ),
     });
-    console.log('[Bookmark] Successfully marked bookmark as completed');
+    console.log('[Bookmark] Successfully marked bookmark as completed:', data.length, 'bookmark(s)');
     return true;
   },
 
