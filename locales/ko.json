@@ -127,8 +127,8 @@
       "allday": "하루종일"
     },
     "moodOptions": {
-      "fun": "웃고 싶어요",
-      "deep_talk": "대화가 필요해",
+      "cozy": "집콕·홈데이트",
+      "foodie": "맛집·미식",
       "active": "활동·에너지",
       "healing": "휴식·힐링",
       "culture": "문화·감성",

@@ -731,6 +731,34 @@ export default function CalendarScreen() {
     }
   }, [missionsByDate]);
 
+  // Prefetch images for current month + adjacent months on month change
+  // This prevents flickering when swiping to a new month for the first time
+  useEffect(() => {
+    const imagesToPrefetch: string[] = [];
+
+    // Current month, previous month, next month (-1, 0, +1)
+    [-1, 0, 1].forEach(offset => {
+      const targetDate = new Date(year, month + offset, 1);
+      const targetYear = targetDate.getFullYear();
+      const targetMonth = targetDate.getMonth();
+      const daysInMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const mission = missionsByDate[dateStr];
+        if (mission?.imageUrl) {
+          imagesToPrefetch.push(mission.imageUrl);
+        }
+      }
+    });
+
+    if (imagesToPrefetch.length > 0) {
+      const uniqueUrls = [...new Set(imagesToPrefetch)];
+      ExpoImage.prefetch(uniqueUrls, 'memory-disk')
+        .catch(() => {}); // Silently ignore prefetch errors
+    }
+  }, [year, month, missionsByDate]);
+
   const getHolidayForDate = (day: number) => {
     const dateKey = `${year}-${month + 1}-${day}`;
     return HOLIDAYS_2025[dateKey];

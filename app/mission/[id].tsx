@@ -1434,6 +1434,15 @@ export default function MissionDetailScreen() {
 
                 // Increment completion count for subscription tracking
                 await subscriptionStore.incrementCompletionCount(couple.id);
+
+                // Mark bookmark as completed (will be removed at midnight when date changes)
+                // This is a backup call in case other paths didn't trigger it
+                const syncStore = useCoupleSyncStore.getState();
+                if (syncStore.isInitialized && syncStore.coupleId) {
+                  syncStore.markBookmarkCompleted(mission.id).catch((err) => {
+                    console.warn('[MissionComplete] Failed to mark bookmark as completed:', err);
+                  });
+                }
               }
             } catch (error) {
               console.error('Error auto-saving memory to DB:', error);

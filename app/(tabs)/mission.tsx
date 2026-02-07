@@ -554,7 +554,27 @@ export default function MissionScreen() {
 
     setIsLoadingFeatured(true);
     try {
-      const { data, error } = await db.featuredMissions.getActiveForToday();
+      // Build user targeting context from user profile and device locale
+      const userTargetingContext: { latitude?: number; longitude?: number; countryCode?: string } = {};
+
+      // Get user location if available
+      if (user?.locationLatitude && user?.locationLongitude) {
+        userTargetingContext.latitude = user.locationLatitude;
+        userTargetingContext.longitude = user.locationLongitude;
+      }
+
+      // Get country code from device locale (e.g., 'ko-KR' -> 'KR')
+      const locale = i18n.language;
+      const localeToCountry: Record<string, string> = {
+        'ko': 'KR',
+        'en': 'US', // Default to US for English
+        'ja': 'JP',
+        'zh-TW': 'TW',
+        'es': 'ES',
+      };
+      userTargetingContext.countryCode = localeToCountry[locale] || 'US';
+
+      const { data, error } = await db.featuredMissions.getActiveForToday(userTargetingContext);
 
       if (error) {
         console.error('Error loading featured missions:', error);
@@ -595,7 +615,7 @@ export default function MissionScreen() {
     } finally {
       setIsLoadingFeatured(false);
     }
-  }, [i18n.language, coupleId]);
+  }, [i18n.language, coupleId, user?.locationLatitude, user?.locationLongitude]);
 
   // Check for date reset on focus
   useFocusEffect(

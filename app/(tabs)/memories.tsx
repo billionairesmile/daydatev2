@@ -27,7 +27,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as MediaLibrary from 'expo-media-library';
 import { Paths, File as ExpoFile } from 'expo-file-system';
-import { ChevronDown, MapPin, Clock, X, Plus, ImageIcon, RefreshCw, BookHeart, MoreHorizontal, Edit2, Trash2, Check, Download, Lock } from 'lucide-react-native';
+import { ChevronDown, MapPin, Clock, X, Plus, ImageIcon, RefreshCw, BookHeart, MoreHorizontal, Edit2, Trash2, Check, Download, Lock, Copy } from 'lucide-react-native';
 import ReanimatedModule, {
   useSharedValue,
   useAnimatedScrollHandler,
@@ -2321,11 +2321,8 @@ export default function MemoriesScreen() {
 
                           {/* Multiple Photos Icon */}
                           {hasMultiple && (
-                            <View style={styles.multipleIcon}>
-                              <View style={styles.stackIcon}>
-                                <View style={styles.stackBack} />
-                                <View style={styles.stackFront} />
-                              </View>
+                            <View style={[styles.multipleIcon, { transform: [{ scaleX: -1 }] }]}>
+                              <Copy color={COLORS.white} size={rs(14)} strokeWidth={2} />
                             </View>
                           )}
                         </View>
@@ -4207,33 +4204,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: rs(12),
     right: rs(12),
-  },
-  stackIcon: {
-    width: rs(14),
-    height: rs(14),
-    position: 'relative',
-  },
-  stackBack: {
-    position: 'absolute',
-    top: rs(3),
-    left: rs(3),
-    width: rs(10),
-    height: rs(10),
-    borderRadius: rs(2),
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.15)',
-  },
-  stackFront: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: rs(10),
-    height: rs(10),
-    borderRadius: rs(2),
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.15)',
   },
   collageSection: {
     paddingHorizontal: rs(SPACING.lg),

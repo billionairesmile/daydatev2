@@ -60,7 +60,7 @@ export interface Mission {
   tags: string[];
   imageUrl: string;
   isPremium: boolean;
-  moodTags?: ('fun' | 'deep_talk' | 'romantic' | 'healing' | 'adventure' | 'active' | 'culture')[];
+  moodTags?: ('cozy' | 'foodie' | 'romantic' | 'healing' | 'adventure' | 'active' | 'culture')[];
 }
 
 export type MissionCategory =
@@ -152,6 +152,15 @@ export interface KeptMission extends Mission {
   keptDate: Date;
 }
 
+// Target audience structure
+export interface TargetAudience {
+  type: 'all' | 'country' | 'location' | 'custom';
+  country?: string;
+  center?: { lat: number; lng: number };
+  radiusKm?: number;
+  [key: string]: unknown;
+}
+
 // Featured Mission (Admin-created special missions)
 export interface FeaturedMission {
   id: string;
@@ -169,7 +178,12 @@ export interface FeaturedMission {
   endDate?: Date;
   isActive: boolean;
   priority: number;
-  targetAudience: string;
+  // Targeting fields
+  targetAudience: TargetAudience;
+  targetCountry?: string;
+  targetCenterLat?: number;
+  targetCenterLng?: number;
+  targetRadiusKm?: number;
   // Additional promotional content (affiliate links, 1-2 sentences)
   additionalContent?: string;
   additionalContentEn?: string;

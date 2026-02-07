@@ -5,6 +5,7 @@ import { File as ExpoFile } from 'expo-file-system';
 import { decode } from 'base64-arraybuffer';
 import { formatDateToLocal, formatDateInTimezone } from './dateUtils';
 import * as ImageManipulator from 'expo-image-manipulator';
+import { filterMissionsByTargeting, UserTargetingContext } from './locationUtils';
 
 // Note: useTimezoneStore is imported dynamically to avoid require cycle
 // supabase.ts <-> timezoneStore.ts
@@ -1256,7 +1257,11 @@ export const db = {
 
   // Featured Missions (Admin-created special missions)
   featuredMissions: {
-    async getActiveForToday() {
+    /**
+     * Get active featured missions for today, optionally filtered by user targeting
+     * @param userContext - Optional user location/country for targeting filter
+     */
+    async getActiveForToday(userContext?: UserTargetingContext) {
       const client = getSupabase();
       // Use effective timezone for date comparison
       // Dynamic import to avoid require cycle (supabase.ts <-> timezoneStore.ts)
@@ -1278,11 +1283,16 @@ export const db = {
       }
 
       // Filter by date range in JavaScript for reliable NULL handling
-      const filteredData = allData.filter(mission => {
+      let filteredData = allData.filter(mission => {
         const startOk = !mission.start_date || mission.start_date <= today;
         const endOk = !mission.end_date || mission.end_date >= today;
         return startOk && endOk;
-      }); // 개수 제한 없음
+      });
+
+      // Apply targeting filter if user context is provided
+      if (userContext) {
+        filteredData = filterMissionsByTargeting(filteredData, userContext);
+      }
 
       return { data: filteredData, error: null };
     },

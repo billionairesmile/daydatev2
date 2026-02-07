@@ -1552,17 +1552,31 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
       });
     }
 
-    // Cleanup completed bookmarks when date changes (remove bookmarks completed before today)
-    if (dateChanged && sharedBookmarks.length > 0) {
+    // Cleanup completed bookmarks (remove bookmarks completed before today)
+    // This should run regardless of whether mission date changed
+    console.log('[CoupleSyncStore] checkAndResetSharedMissions - checking bookmarks:', sharedBookmarks.length);
+
+    if (sharedBookmarks.length > 0) {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      console.log('[CoupleSyncStore] Today start (local):', todayStart.toISOString());
+
       const activeBookmarks = sharedBookmarks.filter((b) => {
         // Keep non-completed bookmarks
-        if (!b.completed_at) return true;
+        if (!b.completed_at) {
+          console.log('[CoupleSyncStore] Bookmark not completed, keeping:', b.mission_id);
+          return true;
+        }
 
-        // Extract date from completed_at timestamp (YYYY-MM-DD)
-        const completedDateString = b.completed_at.split('T')[0];
+        // Parse completed_at as Date and compare with today's start in user's timezone
+        const completedAt = new Date(b.completed_at);
+        const shouldKeep = completedAt >= todayStart;
+        console.log('[CoupleSyncStore] Bookmark completed_at:', b.completed_at,
+          '| completedAt:', completedAt.toISOString(),
+          '| shouldKeep:', shouldKeep);
 
-        // Keep only if completed today, remove if completed on previous days
-        return completedDateString === today;
+        // Keep only if completed today (on or after midnight), remove if completed before today
+        return shouldKeep;
       });
 
       if (activeBookmarks.length !== sharedBookmarks.length) {
@@ -1574,6 +1588,8 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
         get().cleanupCompletedBookmarks().catch((err) => {
           console.warn('[CoupleSyncStore] Failed to cleanup bookmarks in DB:', err);
         });
+      } else {
+        console.log('[CoupleSyncStore] No bookmarks to cleanup');
       }
     }
   },

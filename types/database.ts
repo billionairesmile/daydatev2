@@ -118,6 +118,15 @@ export interface MissionCompletion {
   created_at?: string;
 }
 
+// Target audience JSONB structure
+export interface TargetAudience {
+  type: 'all' | 'country' | 'location' | 'custom';
+  country?: string;
+  center?: { lat: number; lng: number };
+  radius_km?: number;
+  [key: string]: unknown;
+}
+
 export interface FeaturedMission {
   id: string;
   mission_id?: string;
@@ -134,7 +143,12 @@ export interface FeaturedMission {
   end_date?: string;
   is_active: boolean;
   priority: number;
-  target_audience: string;
+  // Targeting fields
+  target_audience: TargetAudience;
+  target_country?: string;
+  target_center_lat?: number;
+  target_center_lng?: number;
+  target_radius_km?: number;
   // Additional promotional content (affiliate links, 1-2 sentences)
   additional_content?: string;
   additional_content_en?: string;

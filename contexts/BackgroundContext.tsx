@@ -128,21 +128,22 @@ export function BackgroundProvider({ children }: { children: ReactNode }) {
         }
       });
 
-      // Prefetch all images in background (limit to first 30 for performance)
+      // Prefetch all images in background (limit to first 50 for performance)
       if (imagesToPrefetch.length > 0) {
         // Remove duplicates
         const uniqueUrls = [...new Set(imagesToPrefetch)];
-        const limitedUrls = uniqueUrls.slice(0, 30);
+        const limitedUrls = uniqueUrls.slice(0, 50);
         console.log('[Background] Prefetching', limitedUrls.length, 'app images');
 
-        // Non-blocking prefetch
-        Promise.allSettled(
-          limitedUrls.map(url => ExpoImage.prefetch(url))
-        ).then(() => {
-          console.log('[Background] App images prefetch complete');
-        }).catch(() => {
-          // Ignore prefetch errors
-        });
+        // Non-blocking prefetch with memory-disk cache policy
+        // 'memory-disk' ensures images are instantly available from memory (prevents Android flickering)
+        ExpoImage.prefetch(limitedUrls, 'memory-disk')
+          .then(() => {
+            console.log('[Background] App images prefetch complete');
+          })
+          .catch(() => {
+            // Ignore prefetch errors
+          });
       }
     };
 

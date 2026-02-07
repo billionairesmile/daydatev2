@@ -2,7 +2,7 @@
   "expo": {
     "name": "Daydate",
     "slug": "daydate",
-    "version": "1.1.4",
+    "version": "1.1.6",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "daydate",
@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.daydate.app",
-      "buildNumber": "54",
+      "buildNumber": "56",
       "usesAppleSignIn": true,
       "infoPlist": {
         "NSCameraUsageDescription": "Allow Daydate to access your camera to capture memories.",
@@ -27,7 +27,12 @@
           "en",
           "ko"
         ],
-        "CFBundleDevelopmentRegion": "en"
+        "CFBundleDevelopmentRegion": "en",
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true,
+          "NSAllowsArbitraryLoadsForMedia": true,
+          "NSAllowsArbitraryLoadsInWebContent": true
+        }
       }
     },
     "locales": {
@@ -60,7 +65,7 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.ACCESS_FINE_LOCATION"
       ],
-      "versionCode": 38
+      "versionCode": 40
     },
     "web": {
       "bundler": "metro",

@@ -349,6 +349,35 @@ function calculateAge(birthDate: Date): number {
   return age;
 }
 
+// Calculate relationship duration and phase
+function getRelationshipDuration(
+  anniversaryDate: Date | string | null | undefined
+): { years: number; months: number; totalMonths: number; phase: string } | null {
+  if (!anniversaryDate) return null;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const annDate = parseDateAsLocal(anniversaryDate);
+  annDate.setHours(0, 0, 0, 0);
+
+  const totalMonths =
+    (today.getFullYear() - annDate.getFullYear()) * 12 +
+    (today.getMonth() - annDate.getMonth());
+  if (totalMonths < 0) return null;
+
+  const years = Math.floor(totalMonths / 12);
+  const months = totalMonths % 12;
+
+  let phase: string;
+  if (totalMonths < 6) phase = 'honeymoon';         // ~6개월 미만
+  else if (totalMonths < 24) phase = 'building';     // 6개월~2년
+  else if (totalMonths < 60) phase = 'established';  // 2~5년
+  else if (totalMonths < 120) phase = 'mature';      // 5~10년
+  else phase = 'deep';                               // 10년+
+
+  return { years, months, totalMonths, phase };
+}
+
 interface AnniversaryInfo {
   upcoming: string[];
   isToday: boolean;
@@ -574,7 +603,31 @@ function buildContext(
     parts.push(`### CONSTRAINTS (Violation = Invalid Mission)\n${constraintList}`);
   }
 
-  // === Priority 2: MBTI Combination ===
+  // === Priority 2: Relationship Status & Duration ===
+  const relationshipType = input.userAPreferences?.relationshipType;
+  const duration = getRelationshipDuration(input.userAPreferences?.anniversaryDate);
+  if (relationshipType || duration) {
+    const typeLabel = relationshipType === 'married' ? 'Married' : relationshipType === 'dating' ? 'Dating' : null;
+    const phaseGuide: Record<string, string> = {
+      honeymoon: 'New couple (<6mo) -> Exciting first experiences, discovery dates, playful activities',
+      building: 'Growing couple (6mo-2yr) -> Deeper bonding, shared hobbies, relationship-building activities',
+      established: 'Established couple (2-5yr) -> Fresh surprises, break routine, new challenges together',
+      mature: 'Mature couple (5-10yr) -> Meaningful experiences, revisit early memories, appreciation dates',
+      deep: 'Long-term couple (10yr+) -> Bucket list adventures, comfort activities, celebrating journey together',
+    };
+    let relationshipContext = '\n[RELATIONSHIP]';
+    if (typeLabel) relationshipContext += ` ${typeLabel}`;
+    if (duration) {
+      const durationStr = duration.years > 0
+        ? `${duration.years}yr ${duration.months}mo`
+        : `${duration.months}mo`;
+      relationshipContext += ` | Together: ${durationStr}`;
+      relationshipContext += `\n-> ${phaseGuide[duration.phase] || phaseGuide.established}`;
+    }
+    parts.push(relationshipContext);
+  }
+
+  // === Priority 3: MBTI Combination ===
   const mbtiA = input.userAPreferences?.mbti;
   const mbtiB = input.userBPreferences?.mbti;
   if (mbtiA || mbtiB) {
@@ -617,7 +670,7 @@ function buildContext(
 
   // === Priority 4: Today's Situation ===
   const moodMap: Record<string, string> = {
-    fun: 'Fun', deep_talk: 'Deep talk', active: 'Active',
+    cozy: 'Cozy/Home date', foodie: 'Food/Restaurant', active: 'Active',
     healing: 'Healing', culture: 'Culture', adventure: 'Adventure', romantic: 'Romantic',
   };
   const timeMap: Record<string, string> = {
@@ -637,8 +690,12 @@ function buildContext(
   parts.push(`- Distance: ${distanceMap[availableTime]} -> Suggest places within this range from user's location`);
   parts.push(`- Mood: ${moodStr}`);
 
-  // === Priority 5: Weather/Season ===
-  parts.push(`\n[WEATHER] ${weather.seasonLabel} | ${weather.condition} ${weather.temperature}C | Outdoor: ${weather.isOutdoorFriendly ? 'OK' : 'Not ideal'}`);
+  // === Priority 5: Date + Weather/Season ===
+  const now = new Date();
+  const todayMonth = now.getMonth() + 1;
+  const todayDay = now.getDate();
+  parts.push(`\n[DATE] ${todayMonth}/${todayDay} | ${weather.seasonLabel} | ${weather.condition} ${weather.temperature}C | Outdoor: ${weather.isOutdoorFriendly ? 'OK' : 'Not ideal'}`)
+  parts.push(`-> Only suggest holiday/event-themed missions if relevant to this date (e.g., Christmas only near Dec 20-25, Valentine's near Feb 14, Halloween near Oct 25-31)`);
 
   // === Priority 6: Preferred Activities ===
   const allActivities = [
@@ -1068,6 +1125,21 @@ STYLE:
 - Never mention prices
 - Activities should naturally lend themselves to photo verification
 - Each mission: DIFFERENT category
+- IMPRACTICAL COMBOS TO AVOID:
+  * Indoor activities outdoors (puzzles/board games at park, cooking outside)
+  * Activities needing equipment in wrong setting (stargazing + activities needing light)
+  * Weather-dependent activities without shelter backup
+  * Activities requiring extensive prep for casual dates
+
+RELATIONSHIP STAGE GUIDE:
+- New couple (<6mo): First experiences together, playful/exciting dates, getting-to-know activities
+- Growing couple (6mo-2yr): Deeper bonding, trying new hobbies together, relationship milestones
+- Established couple (2-5yr): Break routine with fresh surprises, new challenges, rediscover each other
+- Mature couple (5-10yr): Meaningful quality time, revisit favorite memories, appreciation gestures
+- Long-term couple (10yr+): Bucket list adventures, comfortable but special, celebrating the journey
+- Married couples: Can include domestic/home-building activities, family planning dates, deeper commitment themes
+- Dating couples: Focus on excitement, discovery, romantic gestures, building memories
+-> Match mission tone and activity type to the couple's [RELATIONSHIP] info in the user context
 
 CONTEXT (${regionCode}, ${season}):
 Tone: ${culture.toneGuide}
@@ -1205,6 +1277,12 @@ REQUIRED:
 - At least 1 FREE mission (difficulty:1)
 - Unique, creative ideas (not generic "walk/cafe/restaurant")
 - DISTANCE LIMIT: STRICTLY follow the Distance constraint in [TODAY] section. Do NOT suggest places beyond the specified radius (e.g., don't suggest Han River for someone in Ansan with 5km limit)
+- PRACTICALITY: Missions must be realistically doable. Ask yourself: "Would a real couple actually do this?"
+  * Bad: "Stargazing while doing puzzles outdoors" (impractical - puzzles need light/table)
+  * Bad: "Cook gourmet meal at park" (no kitchen outdoors)
+  * Good: "Stargazing with hot chocolate" (simple, romantic, doable)
+  * Good: "Puzzle night at home with candles" (cozy, practical)
+- APPEAL: Missions should sound fun and inviting, not like homework or chores
 ${canMeetToday ? '- Examples: puzzle challenge, workout+brunch, flea market, cooking together' : '- Examples: video call game night, same recipe cooking apart, online movie watch party'}
 
 ${fewShotExamples}

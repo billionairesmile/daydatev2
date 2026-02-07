@@ -34,7 +34,7 @@ const getTodayDateString = (): string => {
 };
 
 // Mission generation types
-export type TodayMood = 'fun' | 'deep_talk' | 'romantic' | 'healing' | 'adventure' | 'active' | 'culture';
+export type TodayMood = 'cozy' | 'foodie' | 'romantic' | 'healing' | 'adventure' | 'active' | 'culture';
 export type AvailableTime = '30min' | '1hour' | '2hour' | 'allday';
 
 export interface MissionGenerationAnswers {
@@ -66,8 +66,8 @@ export interface InProgressMissionData {
 }
 
 export const MOOD_OPTIONS: { id: TodayMood; label: string; icon: string }[] = [
-  { id: 'fun', label: '웃고 싶어요', icon: '😆' },
-  { id: 'deep_talk', label: '대화가 필요해', icon: '💬' },
+  { id: 'cozy', label: '집콕·홈데이트', icon: '🏠' },
+  { id: 'foodie', label: '맛집·미식', icon: '🍽️' },
   { id: 'active', label: '활동·에너지', icon: '🏃🏻' },
   { id: 'healing', label: '휴식·힐링', icon: '🌿' },
   { id: 'culture', label: '문화·감성', icon: '📸' },
@@ -246,9 +246,18 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
         const today = getTodayDateString();
         const { todayCompletedMission, keptMissions } = get();
 
+        // Mark bookmark as completed in Supabase (will be removed at midnight when date changes)
+        // This must be called BEFORE the early return to handle multiple completions per day (premium users)
+        const syncStore = useCoupleSyncStore.getState();
+        if (syncStore.isInitialized && syncStore.coupleId) {
+          syncStore.markBookmarkCompleted(missionId).catch((err) => {
+            console.warn('[Mission] Failed to mark bookmark as completed:', err);
+          });
+        }
+
         // Check if already completed a mission today
         if (todayCompletedMission && todayCompletedMission.date === today) {
-          return; // Already completed today
+          return; // Already completed today (but bookmark was still marked above)
         }
 
         // Set today's completed mission
@@ -264,15 +273,6 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
           todayCompletedMission: newCompletedMission,
           keptMissions: updatedKeptMissions,
         });
-
-        // Mark bookmark as completed in Supabase (will be removed at midnight when date changes)
-        // This is async but we don't need to wait for it
-        const syncStore = useCoupleSyncStore.getState();
-        if (syncStore.isInitialized && syncStore.coupleId) {
-          syncStore.markBookmarkCompleted(missionId).catch((err) => {
-            console.warn('[Mission] Failed to mark bookmark as completed:', err);
-          });
-        }
       },
 
       // Check if any mission is completed today

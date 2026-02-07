@@ -127,8 +127,8 @@
       "allday": "Todo el día"
     },
     "moodOptions": {
-      "fun": "Quiero reír",
-      "deep_talk": "Necesito hablar",
+      "cozy": "Cita en Casa",
+      "foodie": "Gastronomía",
       "active": "Activo",
       "healing": "Relajarme",
       "culture": "Cultura",
