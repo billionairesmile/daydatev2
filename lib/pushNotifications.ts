@@ -578,7 +578,8 @@ export async function notifyMissionReminder(
 export async function notifyPartnerPhotoUploaded(
   partnerId: string,
   uploaderNickname: string,
-  _language?: SupportedLanguage // Deprecated: language is now fetched from recipient's profile
+  _language?: SupportedLanguage, // Deprecated: language is now fetched from recipient's profile
+  missionId?: string
 ): Promise<boolean> {
   // Fetch the recipient's language preference
   const recipientLanguage = await getUserLanguage(partnerId);
@@ -588,7 +589,7 @@ export async function notifyPartnerPhotoUploaded(
     type: 'photo_uploaded',
     title: messages.title,
     body: messages.body(uploaderNickname),
-    data: { screen: 'mission' },
+    data: { screen: 'mission', missionId: missionId || '' },
   });
 }
 
@@ -621,7 +622,8 @@ export async function notifyPartnerUnpaired(
 export async function notifyPartnerMessageWritten(
   partnerId: string,
   writerNickname: string,
-  _language?: SupportedLanguage // Deprecated: language is now fetched from recipient's profile
+  _language?: SupportedLanguage, // Deprecated: language is now fetched from recipient's profile
+  missionId?: string
 ): Promise<boolean> {
   // Fetch the recipient's language preference
   const recipientLanguage = await getUserLanguage(partnerId);
@@ -631,7 +633,7 @@ export async function notifyPartnerMessageWritten(
     type: 'partner_message_written',
     title: messages.title,
     body: messages.body(writerNickname),
-    data: { screen: 'mission' },
+    data: { screen: 'mission', missionId: missionId || '' },
   });
 }
 

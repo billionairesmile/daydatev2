@@ -1168,6 +1168,17 @@ export default function MissionDetailScreen() {
     }
   };
 
+  const MAX_LINES = 5;
+  const handleMessageTextChange = (text: string) => {
+    const lines = text.split('\n');
+    if (lines.length > MAX_LINES) {
+      // Keep only the first MAX_LINES lines
+      setMessageText(lines.slice(0, MAX_LINES).join('\n'));
+      return;
+    }
+    setMessageText(text);
+  };
+
   const handleAddMessage = async () => {
     if (messageText.trim()) {
       const message = messageText.trim();
@@ -2057,7 +2068,7 @@ export default function MissionDetailScreen() {
                       placeholder={t('missionDetail.modal.placeholder')}
                       placeholderTextColor="rgba(255,255,255,0.5)"
                       value={messageText}
-                      onChangeText={setMessageText}
+                      onChangeText={handleMessageTextChange}
                       maxLength={100}
                       multiline
                       numberOfLines={4}
@@ -2097,7 +2108,7 @@ export default function MissionDetailScreen() {
                       placeholder={t('missionDetail.modal.placeholder')}
                       placeholderTextColor="rgba(255,255,255,0.5)"
                       value={messageText}
-                      onChangeText={setMessageText}
+                      onChangeText={handleMessageTextChange}
                       maxLength={100}
                       multiline
                       numberOfLines={4}

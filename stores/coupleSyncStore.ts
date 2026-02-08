@@ -2229,8 +2229,8 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
             });
           });
 
-          // Send push notification to partner
-          notifyPartnerPhotoUploaded(partnerId, currentUserNickname, language).catch((err) => {
+          // Send push notification to partner with mission ID for deep linking
+          notifyPartnerPhotoUploaded(partnerId, currentUserNickname, language, targetProgress.mission_id).catch((err) => {
             console.error('[CoupleSyncStore] Failed to notify partner of photo upload:', err);
           });
         }
@@ -2331,8 +2331,8 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
         console.warn('[CoupleSyncStore] Failed to mark bookmark as completed:', err);
       });
     } else if (partnerId) {
-      // Mission not complete yet - notify partner that message was written
-      notifyPartnerMessageWritten(partnerId, currentUserNickname, language).catch((err) => {
+      // Mission not complete yet - notify partner that message was written with mission ID for deep linking
+      notifyPartnerMessageWritten(partnerId, currentUserNickname, language, targetProgress.mission_id).catch((err) => {
         console.error('[CoupleSyncStore] Failed to send partner message notification:', err);
       });
     }

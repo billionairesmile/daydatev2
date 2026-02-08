@@ -690,6 +690,14 @@ function buildContext(
   parts.push(`- Distance: ${distanceMap[availableTime]} -> Suggest places within this range from user's location`);
   parts.push(`- Mood: ${moodStr}`);
 
+  // Add mood-specific constraints
+  if (todayMoods.includes('cozy')) {
+    parts.push(`-> COZY MOOD RULE: ALL missions MUST be home-based or indoor at home. NO outdoor activities, NO restaurants, NO parks, NO walks outside. Only: home cooking, movie at home, board games, puzzles, crafts at home, reading together, home spa, etc.`);
+  }
+  if (todayMoods.includes('foodie')) {
+    parts.push(`-> FOODIE MOOD RULE: ALL missions MUST involve food/dining. Restaurants, cafes, food markets, cooking classes, bakery tours, food truck visits, etc.`);
+  }
+
   // === Priority 5: Date + Weather/Season ===
   const now = new Date();
   const todayMonth = now.getMonth() + 1;
@@ -1116,10 +1124,13 @@ DIFFICULTY (MUST include at least 1 free mission):
 3 = PAID ($10+): ${canMeetToday ? 'restaurants, cafes, classes, entertainment' : 'online classes together, subscription services'}
 
 STYLE:
-- title: Emotional, poetic phrase (not direct like "Go to cafe")
+${language === 'ko' ? `- title: 감성적이고 자연스러운 한국어 문구 (10~20자). 영어를 번역한 듯한 어색한 표현 절대 금지!
+  Good: "반짝이는 조명 아래, 우리의 겨울", "퍼즐 한 조각씩, 완성되는 우리", "땀 흘린 후의 달콤함", "새로운 레시피 도전기"
+  Bad: "카페 가기", "방탈출 하기", "속삭이는 별빛의 메아리" (번역체)
+  FORBIDDEN: "속삭임", "메아리", "그림자" 등 영어 직역 표현. 자연스러운 한국어 감성 표현 사용!` : `- title: Emotional, poetic phrase (not direct like "Go to cafe")
   Good: "Under the Sparkling Lights, Our Winter Story", "A Canvas of Two Hearts", "Recipe for Us"
   Bad: "Visit a cafe", "Do escape room"
-  FORBIDDEN patterns: Do NOT start titles with "Whispers", "Whispered", "Echoes", "Shadows" - these are overused
+  FORBIDDEN patterns: Do NOT start titles with "Whispers", "Whispered", "Echoes", "Shadows" - these are overused`}
   Use VARIED opening words: verbs, nouns, adjectives, questions, metaphors
 - description: Specific action, MUST be 50-80 chars (not shorter, not longer)${canMeetToday ? '' : '\n- description: Must NOT imply physical meeting'}
 - Never mention prices
