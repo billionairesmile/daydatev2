@@ -2813,6 +2813,65 @@ export const db = {
       return { data, error };
     },
 
+    async addBatch(albumId: string, memoryIds: string[], userId: string) {
+      const client = getSupabase();
+      console.log('[db.albumPhotos.addBatch] Inserting batch:', { albumId, count: memoryIds.length });
+
+      const rows = memoryIds.map(memoryId => ({
+        album_id: albumId,
+        memory_id: memoryId,
+        added_by: userId,
+      }));
+
+      const { data, error } = await client
+        .from('album_photos')
+        .upsert(rows, { onConflict: 'album_id,memory_id', ignoreDuplicates: true })
+        .select();
+
+      if (error) {
+        console.error('[db.albumPhotos.addBatch] Batch insert error:', error);
+      } else {
+        console.log('[db.albumPhotos.addBatch] Batch insert successful:', data?.length, 'photos');
+        // Touch album updated_at ONCE for real-time sync
+        const { error: touchError } = await client
+          .from('couple_albums')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('id', albumId);
+        if (touchError) {
+          console.warn('[db.albumPhotos.addBatch] Failed to touch album updated_at:', touchError);
+        }
+      }
+
+      return { data, error };
+    },
+
+    async removeBatch(albumId: string, memoryIds: string[]) {
+      const client = getSupabase();
+      console.log('[db.albumPhotos.removeBatch] Deleting batch:', { albumId, count: memoryIds.length });
+
+      const { error } = await client
+        .from('album_photos')
+        .delete()
+        .eq('album_id', albumId)
+        .in('memory_id', memoryIds);
+
+      if (error) {
+        console.error('[db.albumPhotos.removeBatch] Batch delete error:', error);
+      } else {
+        console.log('[db.albumPhotos.removeBatch] Batch delete successful');
+        // Touch album updated_at ONCE for real-time sync
+        const { error: touchError } = await client
+          .from('couple_albums')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('id', albumId);
+        if (touchError) {
+          console.warn('[db.albumPhotos.removeBatch] Failed to touch album updated_at:', touchError);
+        }
+      }
+
+      return { error };
+    },
+
     async remove(albumId: string, memoryId: string) {
       const client = getSupabase();
       console.log('[db.albumPhotos.remove] Deleting:', { albumId, memoryId });

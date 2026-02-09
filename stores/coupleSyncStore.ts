@@ -266,7 +266,9 @@ interface CoupleSyncActions {
   deleteAlbum: (albumId: string) => Promise<void>;
   loadAlbums: () => Promise<void>;
   addPhotoToAlbum: (albumId: string, memoryId: string) => Promise<void>;
+  addPhotosToAlbum: (albumId: string, memoryIds: string[]) => Promise<void>;
   removePhotoFromAlbum: (albumId: string, memoryId: string) => Promise<void>;
+  removePhotosFromAlbum: (albumId: string, memoryIds: string[]) => Promise<void>;
   loadAlbumPhotos: (albumId: string) => Promise<void>;
 
   // State setters (for internal use)
@@ -2853,6 +2855,83 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     console.log('[addPhotoToAlbum] ========== ADD COMPLETE ==========');
   },
 
+  addPhotosToAlbum: async (albumId: string, memoryIds: string[]) => {
+    const { userId, albumPhotosMap } = get();
+
+    console.log('[addPhotosToAlbum] ========== BATCH ADD START ==========');
+    console.log('[addPhotosToAlbum] Parameters:', { albumId, count: memoryIds.length });
+
+    if (!userId || isInTestMode() || memoryIds.length === 0) {
+      console.log('[addPhotosToAlbum] Skipping - no userId, test mode, or empty list');
+      return;
+    }
+
+    // Filter out duplicates and non-UUID memoryIds
+    const isValidUUID = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const existingPhotos = albumPhotosMap[albumId] || [];
+    const newMemoryIds = memoryIds.filter(
+      id => isValidUUID(id) && !existingPhotos.some(p => p.memory_id === id)
+    );
+
+    if (newMemoryIds.length === 0) {
+      console.log('[addPhotosToAlbum] No new photos to add after filtering');
+      return;
+    }
+
+    // Single optimistic update for ALL photos
+    const now = Date.now();
+    const optimisticPhotos: AlbumPhoto[] = newMemoryIds.map((memoryId, i) => ({
+      id: `temp-${now}-${i}`,
+      album_id: albumId,
+      memory_id: memoryId,
+      added_by: userId,
+      added_at: new Date().toISOString(),
+    }));
+
+    set((state) => ({
+      albumPhotosMap: {
+        ...state.albumPhotosMap,
+        [albumId]: [...optimisticPhotos, ...(state.albumPhotosMap[albumId] || [])],
+      },
+    }));
+    console.log('[addPhotosToAlbum] Optimistic update applied for', optimisticPhotos.length, 'photos');
+
+    // Single DB batch insert
+    const { data, error } = await db.albumPhotos.addBatch(albumId, newMemoryIds, userId);
+
+    if (error) {
+      console.error('[addPhotosToAlbum] Batch insert error:', error);
+      // Rollback all optimistic photos
+      const tempIds = new Set(optimisticPhotos.map(p => p.id));
+      set((state) => ({
+        albumPhotosMap: {
+          ...state.albumPhotosMap,
+          [albumId]: (state.albumPhotosMap[albumId] || []).filter(p => !tempIds.has(p.id)),
+        },
+      }));
+      console.log('[addPhotosToAlbum] Rolled back optimistic update');
+      return;
+    }
+
+    // Replace temp photos with real server data
+    if (data && Array.isArray(data)) {
+      set((state) => ({
+        albumPhotosMap: {
+          ...state.albumPhotosMap,
+          [albumId]: (state.albumPhotosMap[albumId] || []).map(p => {
+            if (p.id.startsWith('temp-')) {
+              const realPhoto = (data as AlbumPhoto[]).find(d => d.memory_id === p.memory_id);
+              return realPhoto || p;
+            }
+            return p;
+          }),
+        },
+      }));
+      console.log('[addPhotosToAlbum] Replaced temp photos with server data');
+    }
+    console.log('[addPhotosToAlbum] ========== BATCH ADD COMPLETE ==========');
+  },
+
   removePhotoFromAlbum: async (albumId: string, memoryId: string) => {
     const { albumPhotosMap, isInitialized, coupleId } = get();
 
@@ -2910,6 +2989,49 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     } else {
       console.log('[removePhotoFromAlbum] DB delete successful');
       console.log('[removePhotoFromAlbum] ========== REMOVAL COMPLETE ==========');
+    }
+  },
+
+  removePhotosFromAlbum: async (albumId: string, memoryIds: string[]) => {
+    const { albumPhotosMap } = get();
+
+    console.log('[removePhotosFromAlbum] ========== BATCH REMOVAL START ==========');
+    console.log('[removePhotosFromAlbum] Parameters:', { albumId, count: memoryIds.length });
+
+    if (isInTestMode() || memoryIds.length === 0) {
+      console.log('[removePhotosFromAlbum] Skipping - test mode or empty list');
+      return;
+    }
+
+    const memoryIdSet = new Set(memoryIds);
+    const existingPhotos = albumPhotosMap[albumId] || [];
+
+    // Single optimistic removal for ALL photos
+    set((state) => ({
+      albumPhotosMap: {
+        ...state.albumPhotosMap,
+        [albumId]: (state.albumPhotosMap[albumId] || []).filter(
+          p => !memoryIdSet.has(p.memory_id)
+        ),
+      },
+    }));
+    console.log('[removePhotosFromAlbum] Optimistic removal applied for', memoryIds.length, 'photos');
+
+    // Single DB batch delete
+    const { error } = await db.albumPhotos.removeBatch(albumId, memoryIds);
+
+    if (error) {
+      console.error('[removePhotosFromAlbum] Batch delete error:', error);
+      // Rollback to previous state
+      set((state) => ({
+        albumPhotosMap: {
+          ...state.albumPhotosMap,
+          [albumId]: existingPhotos,
+        },
+      }));
+      console.log('[removePhotosFromAlbum] Rolled back to previous state');
+    } else {
+      console.log('[removePhotosFromAlbum] ========== BATCH REMOVAL COMPLETE ==========');
     }
   },
 

@@ -1688,10 +1688,10 @@ export default function MissionScreen() {
         (index + 1) * SNAP_INTERVAL,
       ];
 
-      // For the first card, use full scale (1.0) until scroll is initialized
-      // OR when currentIndex is 0 (first card is centered)
-      // This prevents the intermittent bug where first card appears smaller after Alert dismissal
-      const scale = index === 0 && (!isScrollInitialized || currentIndex === 0)
+      // For the first card, use full scale (1.0) only until scroll is initialized
+      // Once user starts dragging, switch to interpolation for smooth animation
+      // (onScrollBeginDrag fires when scrollX ≈ 0, so interpolation starts at ~1.0 with no jump)
+      const scale = index === 0 && !isScrollInitialized
         ? 1
         : scrollX.interpolate({
           inputRange,
@@ -1765,7 +1765,7 @@ export default function MissionScreen() {
         </Animated.View>
       );
     },
-    [scrollX, handleMissionPress, handleKeepMission, checkIsKept, canStartMission, isTodayCompletedMission, lockedMissionId, isScrollInitialized, currentIndex, isAnotherMissionInProgress, handleMissionImageLoad, handleRefreshPress, SNAP_INTERVAL, CARD_WIDTH]
+    [scrollX, handleMissionPress, handleKeepMission, checkIsKept, canStartMission, isTodayCompletedMission, lockedMissionId, isScrollInitialized, isAnotherMissionInProgress, handleMissionImageLoad, handleRefreshPress, SNAP_INTERVAL, CARD_WIDTH]
   );
 
   return (

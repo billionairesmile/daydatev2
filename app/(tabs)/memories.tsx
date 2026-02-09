@@ -214,7 +214,9 @@ export default function MemoriesScreen() {
     updateAlbum: syncUpdateAlbum,
     deleteAlbum: syncDeleteAlbum,
     addPhotoToAlbum: syncAddPhotoToAlbum,
+    addPhotosToAlbum: syncAddPhotosToAlbum,
     removePhotoFromAlbum: syncRemovePhotoFromAlbum,
+    removePhotosFromAlbum: syncRemovePhotosFromAlbum,
     loadAlbums: syncLoadAlbums,
   } = useCoupleSyncStore();
 
@@ -2682,7 +2684,7 @@ export default function MemoriesScreen() {
                     )}
                     {/* Delete Album - Always available */}
                     <Pressable
-                      style={[styles.albumMenuItem, styles.albumMenuItemDanger]}
+                      style={[styles.albumMenuItem, !isSelectedAlbumReadOnly && styles.albumMenuItemDanger]}
                       onPress={() => {
                         setShowAlbumMenu(false);
                         Alert.alert(
@@ -2799,8 +2801,8 @@ export default function MemoriesScreen() {
                     <Text style={styles.albumPhotosSectionTitle}>
                       {selectedAlbum ? t('memories.itemCount', { count: (albumPhotos[selectedAlbum.id] || []).length }) : t('memories.itemCount', { count: 0 })}
                     </Text>
-                    {/* Select/Delete/Cancel Buttons */}
-                    {selectedAlbum && (albumPhotos[selectedAlbum.id] || []).length > 0 && (
+                    {/* Select/Delete/Cancel Buttons - Hidden for read-only albums */}
+                    {selectedAlbum && !isSelectedAlbumReadOnly && (albumPhotos[selectedAlbum.id] || []).length > 0 && (
                       <View style={styles.albumPhotoActionButtons}>
                         {isSelectingAlbumPhotos ? (
                           <>
@@ -2853,16 +2855,12 @@ export default function MemoriesScreen() {
                                             console.log('[AlbumRemove] Real photos:', realPhotos.length, 'Sample photos:', samplePhotos.length);
                                             console.log('[AlbumRemove] isSyncInitialized:', isSyncInitialized, 'isDemoMode:', isDemoMode);
 
-                                            // Remove real photos via sync
+                                            // Remove real photos via sync (batch)
                                             if (isSyncInitialized && !isDemoMode && realPhotos.length > 0) {
-                                              console.log('[AlbumRemove] Calling syncRemovePhotoFromAlbum for each real photo...');
+                                              console.log('[AlbumRemove] Calling syncRemovePhotosFromAlbum (batch)...');
                                               try {
-                                                // Remove each real photo from the album in sync store
-                                                for (const photo of realPhotos) {
-                                                  console.log('[AlbumRemove] Removing photo:', photo.id);
-                                                  await syncRemovePhotoFromAlbum(selectedAlbum.id, photo.id);
-                                                }
-                                                console.log('[AlbumRemove] All removals completed');
+                                                await syncRemovePhotosFromAlbum(selectedAlbum.id, realPhotos.map(p => p.id));
+                                                console.log('[AlbumRemove] Batch removal completed');
                                               } catch (error) {
                                                 console.error('[AlbumRemove] Error syncing photo removal:', error);
                                               }
@@ -2917,8 +2915,8 @@ export default function MemoriesScreen() {
 
                 {/* Index 2+: Photos Grid */}
                 <View style={styles.albumPhotosGridContainer}>
-                  {/* Empty state - Add Photo Button */}
-                  {selectedAlbum && (albumPhotos[selectedAlbum.id] || []).length === 0 && (
+                  {/* Empty state - Add Photo Button (hidden for read-only) */}
+                  {selectedAlbum && !isSelectedAlbumReadOnly && (albumPhotos[selectedAlbum.id] || []).length === 0 && (
                     <Pressable
                       style={styles.emptyAddPhotoButton}
                       onPress={() => setShowMissionPhotosPicker(true)}
@@ -3097,21 +3095,8 @@ export default function MemoriesScreen() {
                       // Add photos in background (don't block animation)
                       if (albumId && photosToAdd.length > 0) {
                         if (isSyncInitialized && !isDemoMode) {
-                          // Sync mode: add photos asynchronously
-                          (async () => {
-                            try {
-                              for (const photo of photosToAdd) {
-                                await syncAddPhotoToAlbum(albumId, photo.id);
-                              }
-                            } catch (error) {
-                              console.error('Error syncing photo addition:', error);
-                              // Fallback to local on error
-                              setLocalAlbumPhotos(prev => ({
-                                ...prev,
-                                [albumId]: [...(prev[albumId] || []), ...photosToAdd]
-                              }));
-                            }
-                          })();
+                          // Sync mode: batch add all photos at once
+                          syncAddPhotosToAlbum(albumId, photosToAdd.map(p => p.id));
                         } else {
                           // Demo mode: add locally
                           setLocalAlbumPhotos(prev => ({
@@ -5889,7 +5874,7 @@ const styles = StyleSheet.create({
   },
   albumMenuDropdown: {
     position: 'absolute',
-    top: rs(100),
+    top: rs(106),
     right: rs(20),
     borderRadius: rs(12),
     paddingVertical: rs(6),
