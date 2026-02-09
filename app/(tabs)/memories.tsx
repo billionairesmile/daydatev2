@@ -3339,7 +3339,7 @@ function FlipCardItem({
                     <Text style={styles.flipCardMessageLabel} allowFontScaling={false}>
                       {user1Nickname}
                     </Text>
-                    <Text style={styles.flipCardMessageText} allowFontScaling={false}>
+                    <Text style={styles.flipCardMessageText} allowFontScaling={false} numberOfLines={5}>
                       {mission.user1Message}
                     </Text>
                   </View>
@@ -3349,7 +3349,7 @@ function FlipCardItem({
                     <Text style={styles.flipCardMessageLabel} allowFontScaling={false}>
                       {user2Nickname}
                     </Text>
-                    <Text style={styles.flipCardMessageText} allowFontScaling={false}>
+                    <Text style={styles.flipCardMessageText} allowFontScaling={false} numberOfLines={5}>
                       {mission.user2Message}
                     </Text>
                   </View>

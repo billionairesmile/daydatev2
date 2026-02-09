@@ -631,8 +631,8 @@ function buildContext(
   const mbtiA = input.userAPreferences?.mbti;
   const mbtiB = input.userBPreferences?.mbti;
   if (mbtiA || mbtiB) {
-    const mbtiContext = analyzeMBTICombination(mbtiA, mbtiB);
-    parts.push(`\n[MBTI] ${mbtiA || '?'} + ${mbtiB || '?'} -> ${mbtiContext}`);
+    const mbtiGuidance = getMBTIGuidance(mbtiA, mbtiB);
+    if (mbtiGuidance) parts.push(mbtiGuidance);
   }
 
   // === Priority 3: Date Worries ===
@@ -703,7 +703,14 @@ function buildContext(
   const todayMonth = now.getMonth() + 1;
   const todayDay = now.getDate();
   parts.push(`\n[DATE] ${todayMonth}/${todayDay} | ${weather.seasonLabel} | ${weather.condition} ${weather.temperature}C | Outdoor: ${weather.isOutdoorFriendly ? 'OK' : 'Not ideal'}`)
-  parts.push(`-> Only suggest holiday/event-themed missions if relevant to this date (e.g., Christmas only near Dec 20-25, Valentine's near Feb 14, Halloween near Oct 25-31)`);
+  parts.push(`-> STRICT HOLIDAY RULE: ONLY reference a holiday if today (${todayMonth}/${todayDay}) falls within its PREP~DAY period below. NEVER after the day itself.
+  * Christmas/크리스마스: Dec 15~25 (prep from Dec 15, ENDS Dec 25. Dec 26+ = FORBIDDEN)
+  * Valentine's Day/발렌타인: Feb 7~14 (prep from Feb 7, ENDS Feb 14. Feb 15+ = FORBIDDEN)
+  * Halloween/할로윈: Oct 24~31 (prep from Oct 24, ENDS Oct 31. Nov 1+ = FORBIDDEN)
+  * New Year/새해: Dec 28~Jan 1 (prep from Dec 28, ENDS Jan 1. Jan 2+ = FORBIDDEN)
+  * White Day/화이트데이: Mar 7~14 (prep from Mar 7, ENDS Mar 14. Mar 15+ = FORBIDDEN)
+  * Pepero Day/빼빼로데이: Nov 7~11 (prep from Nov 7, ENDS Nov 11. Nov 12+ = FORBIDDEN)
+  If today is BEFORE the prep period or AFTER the holiday, do NOT reference it at all. "Winter" ≠ "Christmas".`);
 
   // === Priority 6: Preferred Activities ===
   const allActivities = [
@@ -787,35 +794,32 @@ function buildContext(
   return parts.join('\n');
 }
 
-function analyzeMBTICombination(mbtiA?: string, mbtiB?: string): string {
+function getMBTIGuidance(mbtiA?: string, mbtiB?: string): string {
   if (!mbtiA && !mbtiB) return '';
+  const a = mbtiA || '?';
+  const b = mbtiB || '?';
 
-  const hints: string[] = [];
-  const a = mbtiA || '';
-  const b = mbtiB || '';
+  const tensions: string[] = [];
 
-  // E/I analysis
-  const eCount = (a.includes('E') ? 1 : 0) + (b.includes('E') ? 1 : 0);
-  if (eCount === 2) hints.push('Social activities OK');
-  else if (eCount === 0) hints.push('Quiet, private spaces preferred');
-  else hints.push('Mix of private time + some social');
+  if (a !== '?' && b !== '?') {
+    const hasEI = a.includes('E') !== b.includes('E');
+    if (hasEI) tensions.push('E/I: one needs stimulation, other needs recharge → activities with BOTH social AND quiet moments (e.g., cafe + board game, gallery + dinner)');
 
-  // N/S analysis
-  const nCount = (a.includes('N') ? 1 : 0) + (b.includes('N') ? 1 : 0);
-  if (nCount === 2) hints.push('Creative/artistic activities');
-  else if (nCount === 0) hints.push('Practical/food exploration');
+    const hasJP = a.includes('J') !== b.includes('J');
+    if (hasJP) tensions.push('J/P: one plans, other is spontaneous → semi-structured activities (reservation + flexible content)');
 
-  // F/T analysis
-  const fCount = (a.includes('F') ? 1 : 0) + (b.includes('F') ? 1 : 0);
-  if (fCount === 2) hints.push('Emotional/romantic');
-  else if (fCount === 0) hints.push('Games/puzzles/analytical');
+    const hasNS = a.includes('N') !== b.includes('N');
+    if (hasNS) tensions.push('N/S: one abstract, other practical → activities combining creativity WITH tangible results (cooking, crafts, photo projects)');
 
-  // J/P analysis
-  const jCount = (a.includes('J') ? 1 : 0) + (b.includes('J') ? 1 : 0);
-  if (jCount === 2) hints.push('Planned dates, reservations');
-  else if (jCount === 0) hints.push('Spontaneous/flexible');
+    const hasFT = a.includes('F') !== b.includes('F');
+    if (hasFT) tensions.push('F/T: one emotional, other analytical → friendly competition with emotional stakes (bet on games, challenge with prizes)');
+  }
 
-  return hints.join(', ');
+  if (tensions.length === 0) {
+    return `\n[MBTI] ${a} + ${b} -> Compatible types. Leverage shared strengths. Avoid stereotypical MBTI suggestions.`;
+  }
+
+  return `\n[MBTI] ${a} + ${b}\n-> Tensions to RESOLVE through activity choice (NOT stereotypical MBTI suggestions):\n  ${tensions.join('\n  ')}`;
 }
 
 // ============================================
@@ -933,7 +937,7 @@ const CULTURE_PROMPTS: Record<RegionCode, CulturePrompt> = {
       spring: '벚꽃/매화, 피크닉, 꽃구경',
       summer: '물놀이, 야외페스티벌, 빙수, 야경',
       fall: '단풍, 코스모스, 갈대밭, 억새',
-      winter: '일루미네이션, 온천, 눈 데이트, 크리스마스',
+      winter: '일루미네이션, 온천, 눈 데이트, 핫초코 카페',
     },
     coupleStyle: '100일 기념일 중요, 커플템, SNS 공유 활발, 스킨십 중간',
     anniversaryStyle: '100일, 200일, 300일... 일수 기념일 중요시',
@@ -983,7 +987,7 @@ const CULTURE_PROMPTS: Record<RegionCode, CulturePrompt> = {
       spring: 'Cherry blossoms, outdoor picnics, hiking',
       summer: 'Beach days, outdoor concerts, BBQ, road trips',
       fall: 'Fall foliage drives, pumpkin patches, apple picking',
-      winter: 'Holiday lights, ice skating, cozy cafes, ski trips',
+      winter: 'Ice skating, cozy cafes, ski trips, hot chocolate',
     },
     coupleStyle: 'Anniversary > day counts, dutch pay common, direct expressions, casual PDA',
     anniversaryStyle: 'Yearly anniversaries only, monthly not common',
@@ -1009,7 +1013,7 @@ const CULTURE_PROMPTS: Record<RegionCode, CulturePrompt> = {
       spring: 'Outdoor terraces, flower markets, canal walks',
       summer: 'Beach towns, festivals, rooftop bars, outdoor dining',
       fall: 'Wine harvest, cozy pubs, autumn walks, harvest festivals',
-      winter: 'Christmas markets, mulled wine, cozy cafes, winter walks',
+      winter: 'Mulled wine, cozy cafes, winter walks, indoor markets',
     },
     coupleStyle: 'Independence valued, less anniversary focus, natural progression, PDA normal',
     anniversaryStyle: 'Less emphasis on anniversaries, Valentine\'s seen as commercial',
@@ -1035,7 +1039,7 @@ const CULTURE_PROMPTS: Record<RegionCode, CulturePrompt> = {
       spring: 'Beach season starts, outdoor festivals, flower markets',
       summer: 'Beach life, night markets, outdoor dancing, carnival prep',
       fall: 'Dia de los Muertos, harvest festivals, wine tasting',
-      winter: 'Holiday celebrations, cozy cafes, indoor dancing, wine regions',
+      winter: 'Cozy cafes, indoor dancing, wine regions, warm drinks',
     },
     coupleStyle: 'Very expressive, family approval matters, traditional gender roles common, passionate PDA',
     anniversaryStyle: 'Monthly anniversaries (mesiversarios) common, romantic gestures important',
@@ -1124,13 +1128,29 @@ DIFFICULTY (MUST include at least 1 free mission):
 3 = PAID ($10+): ${canMeetToday ? 'restaurants, cafes, classes, entertainment' : 'online classes together, subscription services'}
 
 STYLE:
-${language === 'ko' ? `- title: 감성적이고 자연스러운 한국어 문구 (10~20자). 영어를 번역한 듯한 어색한 표현 절대 금지!
-  Good: "반짝이는 조명 아래, 우리의 겨울", "퍼즐 한 조각씩, 완성되는 우리", "땀 흘린 후의 달콤함", "새로운 레시피 도전기"
-  Bad: "카페 가기", "방탈출 하기", "속삭이는 별빛의 메아리" (번역체)
-  FORBIDDEN: "속삭임", "메아리", "그림자" 등 영어 직역 표현. 자연스러운 한국어 감성 표현 사용!` : `- title: Emotional, poetic phrase (not direct like "Go to cafe")
-  Good: "Under the Sparkling Lights, Our Winter Story", "A Canvas of Two Hearts", "Recipe for Us"
-  Bad: "Visit a cafe", "Do escape room"
-  FORBIDDEN patterns: Do NOT start titles with "Whispers", "Whispered", "Echoes", "Shadows" - these are overused`}
+${language === 'ko' ? `- TITLE: 인스타그램 캡션 스타일 (5~15자 내외).
+  - 핵심 규칙: '명사형 종결'을 주로 사용 (~하는 시간, ~한 기록, ~의 밤).
+  - 톤앤매너: 힙하고 미니멀한 잡지 제목이나 전시회 포스팅 느낌.
+  - 주의사항: 이모지는 절대 사용하지 말 것. 오직 텍스트로만 감성을 전달함.
+  - Good: "노을 맛집 카페, 우리", "취향 가득 채운 플레이리스트", "오늘의 메뉴: 직접 만든 파스타", "보드게임 한 판 승부"
+  - Bad: "카페에 방문하기", "소중한 추억을 만들어보세요", "즐거운 보드게임 시간"
+  - FORBIDDEN: "속삭임", "메아리", "여정", "오아시스", "찬란한", "영원한", "하모니"
+- DESCRIPTION: 친구에게 카톡으로 제안하듯 아주 담백하고 짧게.
+  - 핵심 규칙: '~해보세요' 대신 '~하기', '~하면 어때?', '~하기로 해' 같은 구어체 사용.
+  - 지침: AI 티가 나는 수식어(특별한, 소중한, 잊지 못할)를 전부 빼고 '구체적인 행동'만 남길 것.
+  - Good: "좋아하는 노래 크게 틀어놓고 같이 요리하기", "근처 코인노래방 가서 서로 최애곡 불러주기"
+  - Bad: "요리를 하며 서로의 유대감을 깊게 쌓아보세요", "노래방에서 즐거운 시간을 가져보시는 건 어떨까요?"
+  - FORBIDDEN: "탐험", "발견", "유대감", "추억을 쌓다", "시간을 보내다", "매력에 빠지다"` : `- TITLE: Instagram-ready caption (short, punchy, 2-5 words).
+  - Rule: Use noun-ending phrases or mood-focused snippets.
+  - Note: DO NOT use any emojis. Keep it clean and text-only.
+  - Good: "Golden Hour and Us", "Our Recipe Log", "Puzzle Masters", "Winter Night Walk"
+  - Bad: "Go to a cafe", "Making a wonderful memory", "A journey for love"
+  - FORBIDDEN: "Whispers", "Echoes", "Symphony", "Tapestry", "Embark", "Oasis"
+- DESCRIPTION: Casual DM style, like a close friend. Action-oriented.
+  - Rule: Avoid "Discover", "Explore", "Bond over". Just tell them what to do.
+  - Good: "Grab a coffee and hit the park for people-watching.", "Try a 500-piece puzzle with some lo-fi beats."
+  - Bad: "Embark on a puzzle journey to discover the joy of teamwork."
+  - FORBIDDEN: "Take time to", "Immerse yourselves", "Uncover the magic", "Special moments", "Strengthen your bond"`}
   Use VARIED opening words: verbs, nouns, adjectives, questions, metaphors
 - description: Specific action, MUST be 50-80 chars (not shorter, not longer)${canMeetToday ? '' : '\n- description: Must NOT imply physical meeting'}
 - Never mention prices
@@ -1141,6 +1161,7 @@ ${language === 'ko' ? `- title: 감성적이고 자연스러운 한국어 문구
   * Activities needing equipment in wrong setting (stargazing + activities needing light)
   * Weather-dependent activities without shelter backup
   * Activities requiring extensive prep for casual dates
+- FORBIDDEN THEMES: NEVER reference Christmas, Halloween, Valentine's, New Year, or any holiday UNLESS the user context [DATE] falls within that holiday's PREP~DAY window. Holiday missions are OK during prep period (for preparation/planning) and on the day itself, but ABSOLUTELY FORBIDDEN after the holiday has passed. "Winter" ≠ "Christmas".
 
 RELATIONSHIP STAGE GUIDE:
 - New couple (<6mo): First experiences together, playful/exciting dates, getting-to-know activities
@@ -1184,7 +1205,7 @@ const REGION_FEW_SHOTS: Record<RegionCode, string> = {
 ]`,
 
   EUROPE: `[
-  {"title":"Puzzle & Wine Evening","description":"Work on a puzzle while sharing a bottle of wine","category":"game","difficulty":2},
+  {"title":"Puzzle & Snack Evening","description":"Work on a puzzle while sharing your favorite snacks","category":"game","difficulty":2},
   {"title":"Recipe from Scratch","description":"Cook a traditional dish neither has made before","category":"cooking","difficulty":2},
   {"title":"Photo Journal","description":"Document your day in photos and create a mini album","category":"photo","difficulty":1}
 ]`,
@@ -1436,8 +1457,8 @@ export async function generateMissionsWithAI(input: MissionGenerationInput): Pro
       ],
       temperature: 0.8,
       max_tokens: maxTokens,
-      presence_penalty: 0.7,
-      frequency_penalty: 0.4,
+      presence_penalty: 1.0,
+      frequency_penalty: 0.5,
       response_format: { type: 'json_object' },
     });
 

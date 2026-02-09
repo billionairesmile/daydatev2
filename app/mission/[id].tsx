@@ -1169,15 +1169,56 @@ export default function MissionDetailScreen() {
   };
 
   const MAX_LINES = 5;
-  const handleMessageTextChange = (text: string) => {
+
+  // Estimate visual line count including auto-wrap
+  const getVisualLineCount = useCallback((text: string): number => {
     const lines = text.split('\n');
+    // TextInput text width = min(screenWidth - 48, 340) - modalPadding(40) - inputPadding(32) - border(2)
+    const inputTextWidth = Math.min(width - 48, 340) - 74;
+    // At fontSize 15: Korean (full-width) ≈ 15pt, ASCII (half-width) ≈ 7.5pt
+    const unitWidth = 7.5;
+    const maxUnitsPerLine = Math.floor(inputTextWidth / unitWidth);
+
+    let visualLines = 0;
+    for (const line of lines) {
+      if (line.length === 0) {
+        visualLines += 1;
+        continue;
+      }
+      let units = 0;
+      let wraps = 1;
+      for (const char of line) {
+        const code = char.charCodeAt(0);
+        // Korean Hangul syllables are roughly double width
+        const isWide = code >= 0xAC00 && code <= 0xD7AF;
+        const charUnits = isWide ? 2 : 1;
+        units += charUnits;
+        if (units > maxUnitsPerLine) {
+          wraps++;
+          units = charUnits;
+        }
+      }
+      visualLines += wraps;
+    }
+    return visualLines;
+  }, [width]);
+
+  const handleMessageTextChange = useCallback((text: string) => {
+    const lines = text.split('\n');
+
+    // Limit explicit newlines
     if (lines.length > MAX_LINES) {
-      // Keep only the first MAX_LINES lines
       setMessageText(lines.slice(0, MAX_LINES).join('\n'));
       return;
     }
+
+    // Block if auto-wrap would exceed MAX_LINES visual lines
+    if (getVisualLineCount(text) > MAX_LINES) {
+      return;
+    }
+
     setMessageText(text);
-  };
+  }, [getVisualLineCount]);
 
   const handleAddMessage = async () => {
     if (messageText.trim()) {
