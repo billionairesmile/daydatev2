@@ -1559,9 +1559,9 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     console.log('[CoupleSyncStore] checkAndResetSharedMissions - checking bookmarks:', sharedBookmarks.length);
 
     if (sharedBookmarks.length > 0) {
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      console.log('[CoupleSyncStore] Today start (local):', todayStart.toISOString());
+      // Use timezone-aware date comparison (same as mission date logic)
+      const todayStr = getTodayInTimezone(); // e.g. "2026-02-10"
+      console.log('[CoupleSyncStore] Today (timezone-aware):', todayStr);
 
       const activeBookmarks = sharedBookmarks.filter((b) => {
         // Keep non-completed bookmarks
@@ -1570,14 +1570,16 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
           return true;
         }
 
-        // Parse completed_at as Date and compare with today's start in user's timezone
-        const completedAt = new Date(b.completed_at);
-        const shouldKeep = completedAt >= todayStart;
+        // Compare completed date in user's timezone with today
+        const timezone = useTimezoneStore.getState().getEffectiveTimezone();
+        const completedDateStr = formatDateInTimezone(new Date(b.completed_at), timezone);
+        const shouldKeep = completedDateStr >= todayStr;
         console.log('[CoupleSyncStore] Bookmark completed_at:', b.completed_at,
-          '| completedAt:', completedAt.toISOString(),
+          '| completedDate (tz):', completedDateStr,
+          '| today:', todayStr,
           '| shouldKeep:', shouldKeep);
 
-        // Keep only if completed today (on or after midnight), remove if completed before today
+        // Keep only if completed today or later, remove if completed before today
         return shouldKeep;
       });
 
@@ -1645,9 +1647,11 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
     }
 
     // Check if bookmark limit reached (premium: unlimited, free: max 5)
+    // Use local state (sharedBookmarks) for limit check — it's updated immediately on deletion,
+    // whereas DB fetch may return stale data due to replication lag.
     const { canBookmarkMission } = useSubscriptionStore.getState();
-    if (!canBookmarkMission(bookmarkList.length)) {
-      console.log('[Bookmark] Limit reached:', bookmarkList.length);
+    if (!canBookmarkMission(sharedBookmarks.length)) {
+      console.log('[Bookmark] Limit reached:', sharedBookmarks.length);
       return false;
     }
 
@@ -1725,12 +1729,7 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
 
     set({ isLoadingBookmarks: true });
 
-    // First, cleanup any expired completed bookmarks
-    await db.coupleBookmarks.cleanupCompleted(coupleId).catch((err) => {
-      console.warn('[Bookmark] Failed to cleanup completed bookmarks:', err);
-    });
-
-    // Then load the remaining bookmarks
+    // Load bookmarks (cleanup is handled separately by checkAndResetSharedMissions)
     const { data, error } = await db.coupleBookmarks.getAll(coupleId);
     set({ isLoadingBookmarks: false });
 
@@ -1808,16 +1807,15 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
 
     if (!coupleId || isInTestMode()) {
       // Demo mode: cleanup locally - remove bookmarks completed before today
-      const now = new Date();
-      const todayMidnight = new Date(now);
-      todayMidnight.setHours(0, 0, 0, 0);
+      const todayStr = getTodayInTimezone();
+      const timezone = useTimezoneStore.getState().getEffectiveTimezone();
 
       set({
         sharedBookmarks: sharedBookmarks.filter((b) => {
           if (!b.completed_at) return true; // Keep non-completed bookmarks
-          const completedDate = new Date(b.completed_at);
+          const completedDateStr = formatDateInTimezone(new Date(b.completed_at), timezone);
           // Keep only if completed today or later
-          return completedDate >= todayMidnight;
+          return completedDateStr >= todayStr;
         }),
       });
       return;
@@ -1825,7 +1823,8 @@ export const useCoupleSyncStore = create<CoupleSyncState & CoupleSyncActions>()(
 
     console.log('[Bookmark] Cleaning up completed bookmarks...');
 
-    const { data, error } = await db.coupleBookmarks.cleanupCompleted(coupleId);
+    const timezone = useTimezoneStore.getState().getEffectiveTimezone();
+    const { data, error } = await db.coupleBookmarks.cleanupCompleted(coupleId, timezone);
 
     if (error) {
       console.warn('[Bookmark] DB cleanup failed:', error);

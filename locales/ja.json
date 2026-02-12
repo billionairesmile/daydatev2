@@ -186,6 +186,11 @@
   },
   "missionDetail": {
     "headerTitle": "ミッション詳細",
+    "linkButton": {
+      "reserve": "予約する",
+      "book": "チケットを予約",
+      "purchase": "購入する"
+    },
     "notFound": {
       "title": "ミッションが見つかりません",
       "description": "このミッションは利用できません。"

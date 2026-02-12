@@ -186,6 +186,11 @@
   },
   "missionDetail": {
     "headerTitle": "Mission Details",
+    "linkButton": {
+      "reserve": "Make a Reservation",
+      "book": "Book Now",
+      "purchase": "Purchase Now"
+    },
     "notFound": {
       "title": "Mission not found",
       "description": "This mission is no longer available."

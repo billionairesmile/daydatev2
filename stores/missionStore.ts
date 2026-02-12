@@ -598,6 +598,19 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
             }
           }
 
+          // Fetch bookmark summary for behavioral learning
+          let bookmarkSummary = null;
+          if (!isDemoMode && couple?.id) {
+            try {
+              bookmarkSummary = await db.coupleBookmarks.getBookmarkSummary(couple.id);
+              if (bookmarkSummary) {
+                console.log(`[MissionStore] Loaded bookmark summary: ${bookmarkSummary.total} bookmarks`);
+              }
+            } catch (bookmarkError) {
+              console.warn('[MissionStore] Failed to load bookmark summary:', bookmarkError);
+            }
+          }
+
           // Try to generate missions with AI
           const aiMissions = await generateMissionsWithAI({
             userAPreferences: onboardingData,
@@ -606,6 +619,7 @@ export const useMissionStore = create<ExtendedMissionState & MissionActions>()(
             missionHistory, // Pass history for deduplication
             excludedMissions, // Pass excluded missions for refresh (to avoid duplicates)
             customAnniversaries, // Pass custom anniversaries for anniversary-related missions
+            bookmarkSummary, // Pass bookmark data for behavioral learning
             location: currentLocation ? {
               latitude: currentLocation.latitude,
               longitude: currentLocation.longitude,

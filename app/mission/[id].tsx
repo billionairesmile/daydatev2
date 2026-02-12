@@ -23,6 +23,7 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { easeGradient } from 'react-native-easing-gradient';
+import Svg, { Path } from 'react-native-svg';
 import { Camera as VisionCamera, useCameraDevice, useCameraFormat, useCameraPermission, CameraRuntimeError } from 'react-native-vision-camera';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as Location from 'expo-location';
@@ -179,6 +180,9 @@ export default function MissionDetailScreen() {
   const secondContentOpacity = useRef(new Animated.Value(0)).current; // Second content (steps card)
   const buttonsOpacity = useRef(new Animated.Value(0)).current; // Action buttons
   const backgroundDarkOverlay = useRef(new Animated.Value(0)).current; // Scroll-based background darkening
+  const stickyHeaderOpacity = useRef(new Animated.Value(0)).current; // Sticky mission header
+  const showStickyRef = useRef(false);
+  const missionInfoScrollThreshold = useRef(0);
 
   // Handle scroll position change
   const handleScroll = useCallback((event: any) => {
@@ -224,7 +228,20 @@ export default function MissionDetailScreen() {
         useNativeDriver: true,
       }).start();
     }
-  }, [hasScrolled, isAtBottom, overlayOpacity, secondContentOpacity, buttonsOpacity]);
+
+    // Sticky mission header visibility
+    if (missionInfoScrollThreshold.current > 0) {
+      const shouldShowSticky = offsetY > missionInfoScrollThreshold.current;
+      if (shouldShowSticky !== showStickyRef.current) {
+        showStickyRef.current = shouldShowSticky;
+        Animated.timing(stickyHeaderOpacity, {
+          toValue: shouldShowSticky ? 1 : 0,
+          duration: 200,
+          useNativeDriver: true,
+        }).start();
+      }
+    }
+  }, [hasScrolled, isAtBottom, overlayOpacity, secondContentOpacity, buttonsOpacity, stickyHeaderOpacity]);
 
   // Vision Camera permission and device
   const { hasPermission, requestPermission } = useCameraPermission();
@@ -284,6 +301,7 @@ export default function MissionDetailScreen() {
   const [isLoadingFeaturedMission, setIsLoadingFeaturedMission] = useState(false);
   // Additional promotional content from featured mission (affiliate links, etc.)
   const [additionalContent, setAdditionalContent] = useState<string | null>(null);
+  const [linkButtonType, setLinkButtonType] = useState<'reserve' | 'book' | 'purchase' | null>(null);
 
   // Check if mission exists in local stores
   const localMission =
@@ -291,48 +309,78 @@ export default function MissionDetailScreen() {
     keptMissions.find((m) => m.id === id) ||
     bookmarkedMission;
 
-  // Load featured mission from DB if not found in local stores
-  // On Android, wait for interaction to complete before loading
+  // Load featured mission additional content from DB with current language
+  // This runs for both localMission (cached) and non-local paths to ensure correct language
   useEffect(() => {
-    const loadFeaturedMission = async () => {
-      if (localMission || !id || isDemoMode || !isReady) return;
+    const loadFeaturedContent = async () => {
+      if (!id || isDemoMode || !isReady) return;
 
-      setIsLoadingFeaturedMission(true);
+      // For non-featured local missions, use cached additionalContent directly
+      if (localMission && !localMission.isFeatured) {
+        if (localMission.additionalContent) {
+          setAdditionalContent(localMission.additionalContent);
+        }
+        if (localMission.linkButtonType) {
+          setLinkButtonType(localMission.linkButtonType);
+        }
+        return;
+      }
+
+      // For featured missions (both local and non-local), fetch from DB for current language
+      if (!localMission) {
+        setIsLoadingFeaturedMission(true);
+      }
+
       try {
         const { data, error } = await db.featuredMissions.getById(id);
         if (error || !data) {
-          setIsLoadingFeaturedMission(false);
+          // Fallback to localMission data if DB fetch fails
+          if (localMission?.additionalContent) {
+            setAdditionalContent(localMission.additionalContent);
+          }
+          if (localMission?.linkButtonType) {
+            setLinkButtonType(localMission.linkButtonType);
+          }
+          if (!localMission) {
+            setIsLoadingFeaturedMission(false);
+          }
           return;
         }
 
-        // Get current language
         const isEnglish = i18n.language === 'en';
 
-        // Convert to Mission format with language-aware fields
-        const converted: Mission = {
-          id: data.id,
-          title: (isEnglish && data.title_en) ? data.title_en : data.title,
-          description: (isEnglish && data.description_en) ? data.description_en : data.description,
-          category: data.category as Mission['category'],
-          tags: (isEnglish && data.tags_en?.length) ? data.tags_en : (data.tags || []),
-          imageUrl: data.image_url || '',
-          isPremium: false,
-        };
-        setFeaturedMission(converted);
+        // If no localMission, also set the featured mission object
+        if (!localMission) {
+          const converted: Mission = {
+            id: data.id,
+            title: (isEnglish && data.title_en) ? data.title_en : data.title,
+            description: (isEnglish && data.description_en) ? data.description_en : data.description,
+            category: data.category as Mission['category'],
+            tags: (isEnglish && data.tags_en?.length) ? data.tags_en : (data.tags || []),
+            imageUrl: data.image_url || '',
+            isPremium: false,
+          };
+          setFeaturedMission(converted);
+        }
 
-        // Set additional promotional content (language-aware)
+        // Set additional content with current language
         const content = (isEnglish && data.additional_content_en)
           ? data.additional_content_en
           : data.additional_content;
         setAdditionalContent(content || null);
+
+        // Set link button type
+        setLinkButtonType((data as any).link_button_type || null);
       } catch (error) {
         console.error('[MissionDetail] Error loading featured mission:', error);
       } finally {
-        setIsLoadingFeaturedMission(false);
+        if (!localMission) {
+          setIsLoadingFeaturedMission(false);
+        }
       }
     };
 
-    loadFeaturedMission();
+    loadFeaturedContent();
   }, [id, localMission, i18n.language, isReady]);
 
   const mission: Mission =
@@ -359,7 +407,7 @@ export default function MissionDetailScreen() {
     const parts = content.split(urlRegex);
 
     return (
-      <View>
+      <View style={{ width: '100%' }}>
         {parts.map((part, index) => {
           // Check if this part is a URL
           if (urlRegex.test(part)) {
@@ -384,7 +432,26 @@ export default function MissionDetailScreen() {
               );
             }
 
-            // It's a regular link
+            // Render as button if linkButtonType is set, otherwise as text link
+            if (linkButtonType) {
+              return (
+                <Pressable
+                  key={index}
+                  onPress={() => Linking.openURL(part)}
+                  style={styles.linkButton}
+                >
+                  <Text style={styles.linkButtonText}>
+                    {t(`missionDetail.linkButton.${linkButtonType}`)}
+                  </Text>
+                  <View style={styles.linkButtonIcon}>
+                    <Svg width={15} height={15} viewBox="0 0 24 24" fill="none">
+                      <Path d="M22 2L15 22L11 13L2 9L22 2Z" fill="#0066FF" stroke="#0066FF" strokeWidth={4} strokeLinejoin="round" strokeLinecap="round" />
+                    </Svg>
+                  </View>
+                </Pressable>
+              );
+            }
+
             return (
               <Pressable
                 key={index}
@@ -1675,6 +1742,8 @@ export default function MissionDetailScreen() {
               buttonsOpacity.setValue(0);
               secondContentOpacity.setValue(0);
               overlayOpacity.setValue(1);
+              stickyHeaderOpacity.setValue(0);
+              showStickyRef.current = false;
               // Reset scroll position to top
               scrollViewRef.current?.scrollTo({ y: 0, animated: false });
             }}
@@ -1809,7 +1878,14 @@ export default function MissionDetailScreen() {
         scrollEventThrottle={16}
       >
         {/* Black Area Container - Centers mission info vertically in the area below hero */}
-        <View style={styles.blackAreaContainer}>
+        <View
+          style={styles.blackAreaContainer}
+          onLayout={(e) => {
+            const { y, height } = e.nativeEvent.layout;
+            // Show sticky header when mission info center reaches upper 25% of screen
+            missionInfoScrollThreshold.current = y + height / 2 - SCREEN_HEIGHT * 0.25;
+          }}
+        >
           {/* Mission Info Section - Scrolls with content */}
           <View style={styles.scrollableMissionInfo}>
             {/* Title - Word-by-word wrapping to prevent breaking in middle of words */}
@@ -2010,6 +2086,24 @@ export default function MissionDetailScreen() {
           </View>
         </Animated.View>
       </ScrollView>
+
+      {/* Sticky Mission Info Header - appears when original mission info scrolls up */}
+      {mission && (
+        <Animated.View
+          style={[styles.stickyMissionHeader, { opacity: stickyHeaderOpacity }]}
+          pointerEvents="none"
+        >
+          <BlurView
+            experimentalBlurMethod="dimezisBlurView"
+            intensity={Platform.OS === 'ios' ? 80 : 100}
+            tint="dark"
+            style={styles.stickyMissionHeaderBlur}
+          >
+            <Text style={styles.stickyMissionTitle} numberOfLines={1}>{mission.title}</Text>
+            <Text style={styles.stickyMissionDescription} numberOfLines={2}>{mission.description}</Text>
+          </BlurView>
+        </Animated.View>
+      )}
 
       {/* Fixed Down Arrow - Hidden after scroll */}
       <Animated.View style={[styles.fixedDownArrow, { opacity: overlayOpacity, pointerEvents: hasScrolled ? 'none' : 'auto' }]}>
@@ -2309,6 +2403,31 @@ const styles = StyleSheet.create({
     paddingTop: HERO_HEIGHT - rs(60), // Start content near bottom of hero, allowing scroll over image
     paddingBottom: 140,
   },
+  stickyMissionHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 5,
+  },
+  stickyMissionHeaderBlur: {
+    paddingTop: Platform.OS === 'ios' ? rs(100) : rs(80),
+    paddingBottom: rs(12),
+    paddingHorizontal: SPACING.xl,
+    alignItems: 'center',
+  },
+  stickyMissionTitle: {
+    fontSize: fp(18),
+    color: COLORS.white,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  stickyMissionDescription: {
+    fontSize: fp(13),
+    color: 'rgba(255,255,255,0.7)',
+    textAlign: 'center',
+    marginTop: rs(4),
+  },
   header: {
     position: 'absolute',
     top: 0,
@@ -2396,11 +2515,13 @@ const styles = StyleSheet.create({
   additionalContentInner: {
     padding: SPACING.lg,
     backgroundColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
   },
   additionalContentText: {
     fontSize: 14,
     color: 'rgba(255,255,255,0.9)',
     lineHeight: 22,
+    textAlign: 'center',
   },
   additionalContentLink: {
     fontSize: 14,
@@ -2408,6 +2529,39 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     textDecorationLine: 'underline',
     marginVertical: 4,
+    textAlign: 'center',
+  },
+  linkButton: {
+    backgroundColor: '#0066FF',
+    borderRadius: 24,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    alignSelf: 'center' as const,
+    marginTop: 14,
+    paddingLeft: 20,
+    paddingRight: 5,
+    height: 46,
+    shadowColor: '#0066FF',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  linkButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600' as const,
+    marginRight: 12,
+  },
+  linkButtonIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    paddingRight: 2,
+    paddingTop: 1,
   },
   additionalContentImageContainer: {
     marginVertical: 8,

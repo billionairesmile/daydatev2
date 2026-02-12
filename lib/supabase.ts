@@ -1884,10 +1884,10 @@ export const db = {
     },
 
     // Cleanup completed bookmarks that have passed the noon threshold
-    async cleanupCompleted(coupleId: string) {
+    async cleanupCompleted(coupleId: string, timezone: string = 'UTC') {
       const client = getSupabase();
       const { data, error } = await client
-        .rpc('cleanup_couple_completed_bookmarks', { p_couple_id: coupleId });
+        .rpc('cleanup_couple_completed_bookmarks', { p_couple_id: coupleId, p_timezone: timezone });
       return { data, error };
     },
 
@@ -1931,6 +1931,31 @@ export const db = {
     unsubscribe(channel: ReturnType<SupabaseClient['channel']>) {
       const client = getSupabase();
       client.removeChannel(channel);
+    },
+
+    async getBookmarkSummary(coupleId: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('couple_bookmarks')
+        .select('mission_data')
+        .eq('couple_id', coupleId)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (error || !data || data.length === 0) return null;
+
+      const categories: Record<string, number> = {};
+      const titles: string[] = [];
+      for (const row of data) {
+        const mission = row.mission_data as any;
+        if (mission?.category) {
+          categories[mission.category] = (categories[mission.category] || 0) + 1;
+        }
+        if (mission?.title) {
+          titles.push(mission.title);
+        }
+      }
+      return { categories, titles, total: data.length };
     },
   },
 

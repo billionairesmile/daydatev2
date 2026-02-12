@@ -15,10 +15,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ChevronLeft, Bookmark, Trash2 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
-import { COLORS, SPACING, isFoldableDevice } from '@/constants/design';
+import { COLORS, SPACING, rs, isFoldableDevice } from '@/constants/design';
 import { useMissionStore } from '@/stores/missionStore';
 import { useCoupleSyncStore, type SyncedBookmark } from '@/stores/coupleSyncStore';
 import type { KeptMission, Mission } from '@/types';
+
+const MISSION_ICON_MAP: Record<string, { source: number; size: number }> = {
+  star: { source: require('@/assets/images/icon-star.png') as number, size: rs(34) },
+  flower: { source: require('@/assets/images/icon-flower.png') as number, size: rs(34) },
+};
 
 interface BookmarkedMissionsPageProps {
   onBack: () => void;
@@ -189,8 +194,14 @@ export function BookmarkedMissionsPage({ onBack }: BookmarkedMissionsPageProps) 
                 <BlurView experimentalBlurMethod="dimezisBlurView" intensity={60} tint={Platform.OS === 'android' ? 'dark' : 'default'} style={StyleSheet.absoluteFill} />
                 <View style={styles.cardDarkOverlay} />
 
-
                 <View style={styles.cardInner}>
+                  {mission.icon && MISSION_ICON_MAP[mission.icon] && (
+                    <Image
+                      source={MISSION_ICON_MAP[mission.icon].source}
+                      style={[styles.bookmarkIconBadge, { width: MISSION_ICON_MAP[mission.icon].size, height: MISSION_ICON_MAP[mission.icon].size }]}
+                      contentFit="contain"
+                    />
+                  )}
                   {/* Thumbnail */}
                   <View style={styles.thumbnailContainer}>
                     <Image
@@ -198,7 +209,7 @@ export function BookmarkedMissionsPage({ onBack }: BookmarkedMissionsPageProps) 
                       style={[styles.thumbnail, isCompleted && styles.thumbnailCompleted]}
                       contentFit="cover"
                       cachePolicy="memory-disk"
-                      transition={200}
+                      recyclingKey={mission.id}
                     />
                     <LinearGradient
                       colors={['transparent', 'rgba(0,0,0,0.5)']}
@@ -343,6 +354,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
     overflow: 'hidden',
+  },
+  bookmarkIconBadge: {
+    position: 'absolute',
+    top: rs(6),
+    left: rs(6),
+    zIndex: 10,
   },
   cardDarkOverlay: {
     ...StyleSheet.absoluteFillObject,

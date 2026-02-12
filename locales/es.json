@@ -184,6 +184,11 @@
   },
   "missionDetail": {
     "headerTitle": "Detalles de Misión",
+    "linkButton": {
+      "reserve": "Hacer una reserva",
+      "book": "Reservar entradas",
+      "purchase": "Comprar ahora"
+    },
     "notFound": {
       "title": "Misión no encontrada",
       "description": "Esta misión ya no está disponible."

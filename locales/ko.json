@@ -186,6 +186,11 @@
   },
   "missionDetail": {
     "headerTitle": "미션 상세",
+    "linkButton": {
+      "reserve": "예약하러 가기",
+      "book": "예매하러 가기",
+      "purchase": "구매하러 가기"
+    },
     "notFound": {
       "title": "미션을 찾을 수 없습니다",
       "description": "이 미션은 더 이상 사용할 수 없습니다."

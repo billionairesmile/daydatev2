@@ -34,6 +34,7 @@ export interface WeatherContext {
   isOutdoorFriendly: boolean;
   countryCode: CountryCode;
   regionCode: RegionCode;
+  city?: string;
 }
 
 // Mission history summary for deduplication (hybrid approach)
@@ -64,6 +65,11 @@ interface MissionGenerationInput {
   missionHistory?: MissionHistorySummary;  // For deduplication
   excludedMissions?: ExcludedMission[];  // Missions to exclude (for refresh - original missions)
   customAnniversaries?: CustomAnniversaryForMission[];  // User-created anniversaries
+  bookmarkSummary?: {
+    categories: Record<string, number>;
+    titles: string[];
+    total: number;
+  } | null;
 }
 
 interface GeneratedMissionData {
@@ -92,26 +98,29 @@ const getOpenAIClient = () => {
 // Weather API (OpenWeatherMap) + Country Detection
 // ============================================
 
-// Detect country from coordinates using OpenWeatherMap reverse geocoding
-async function detectCountryFromCoordinates(latitude: number, longitude: number): Promise<string> {
+// Detect country and city from coordinates using OpenWeatherMap reverse geocoding
+async function detectLocationFromCoordinates(latitude: number, longitude: number): Promise<{ country: string; city: string }> {
   const apiKey = process.env.EXPO_PUBLIC_OPENWEATHER_API_KEY;
-  if (!apiKey) return 'DEFAULT';
+  if (!apiKey) return { country: 'DEFAULT', city: '' };
 
   try {
     const response = await fetch(
       `https://api.openweathermap.org/geo/1.0/reverse?lat=${latitude}&lon=${longitude}&limit=1&appid=${apiKey}`
     );
 
-    if (!response.ok) return 'DEFAULT';
+    if (!response.ok) return { country: 'DEFAULT', city: '' };
 
     const data = await response.json();
     if (data && data.length > 0) {
-      return data[0].country || 'DEFAULT';
+      return {
+        country: data[0].country || 'DEFAULT',
+        city: data[0].name || '',
+      };
     }
-    return 'DEFAULT';
+    return { country: 'DEFAULT', city: '' };
   } catch (error) {
-    console.error('[Country Detection] Failed:', error);
-    return 'DEFAULT';
+    console.error('[Location Detection] Failed:', error);
+    return { country: 'DEFAULT', city: '' };
   }
 }
 
@@ -237,11 +246,12 @@ async function fetchWeather(latitude: number, longitude: number): Promise<Weathe
   }
 
   try {
-    // Fetch weather and country in parallel
-    const [weatherResponse, rawCountryCode] = await Promise.all([
+    // Fetch weather and location in parallel
+    const [weatherResponse, locationInfo] = await Promise.all([
       fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${apiKey}&units=metric`),
-      detectCountryFromCoordinates(latitude, longitude),
+      detectLocationFromCoordinates(latitude, longitude),
     ]);
+    const rawCountryCode = locationInfo.country;
 
     if (!weatherResponse.ok) {
       throw new Error(`Weather API error: ${weatherResponse.status}`);
@@ -271,7 +281,7 @@ async function fetchWeather(latitude: number, longitude: number): Promise<Weathe
     const countryCode = mapToCountryCode(rawCountryCode);
     useLanguageStore.getState().setDetectedCountry(countryCode);
 
-    return { temperature: temp, condition, season, seasonLabel, isOutdoorFriendly, countryCode, regionCode };
+    return { temperature: temp, condition, season, seasonLabel, isOutdoorFriendly, countryCode, regionCode, city: locationInfo.city };
   } catch (error) {
     console.error('[Weather] API fetch failed:', error);
     return getSeasonFallback();
@@ -579,7 +589,9 @@ function buildContext(
   const parts: string[] = [];
   const { canMeetToday, availableTime, todayMoods } = input.todayAnswers;
 
-  // === Priority 1: Constraints (MUST HAVE) ===
+  // =============================================
+  // Priority 1: Constraints + Worries (제약/고민)
+  // =============================================
   const allConstraints: string[] = [];
   if (input.userAPreferences?.constraints) {
     allConstraints.push(...input.userAPreferences.constraints);
@@ -603,39 +615,7 @@ function buildContext(
     parts.push(`### CONSTRAINTS (Violation = Invalid Mission)\n${constraintList}`);
   }
 
-  // === Priority 2: Relationship Status & Duration ===
-  const relationshipType = input.userAPreferences?.relationshipType;
-  const duration = getRelationshipDuration(input.userAPreferences?.anniversaryDate);
-  if (relationshipType || duration) {
-    const typeLabel = relationshipType === 'married' ? 'Married' : relationshipType === 'dating' ? 'Dating' : null;
-    const phaseGuide: Record<string, string> = {
-      honeymoon: 'New couple (<6mo) -> Exciting first experiences, discovery dates, playful activities',
-      building: 'Growing couple (6mo-2yr) -> Deeper bonding, shared hobbies, relationship-building activities',
-      established: 'Established couple (2-5yr) -> Fresh surprises, break routine, new challenges together',
-      mature: 'Mature couple (5-10yr) -> Meaningful experiences, revisit early memories, appreciation dates',
-      deep: 'Long-term couple (10yr+) -> Bucket list adventures, comfort activities, celebrating journey together',
-    };
-    let relationshipContext = '\n[RELATIONSHIP]';
-    if (typeLabel) relationshipContext += ` ${typeLabel}`;
-    if (duration) {
-      const durationStr = duration.years > 0
-        ? `${duration.years}yr ${duration.months}mo`
-        : `${duration.months}mo`;
-      relationshipContext += ` | Together: ${durationStr}`;
-      relationshipContext += `\n-> ${phaseGuide[duration.phase] || phaseGuide.established}`;
-    }
-    parts.push(relationshipContext);
-  }
-
-  // === Priority 3: MBTI Combination ===
-  const mbtiA = input.userAPreferences?.mbti;
-  const mbtiB = input.userBPreferences?.mbti;
-  if (mbtiA || mbtiB) {
-    const mbtiGuidance = getMBTIGuidance(mbtiA, mbtiB);
-    if (mbtiGuidance) parts.push(mbtiGuidance);
-  }
-
-  // === Priority 3: Date Worries ===
+  // Date Worries
   const worryDescriptions: Record<DateWorry, { short: string; detail: string }> = {
     'no_idea': { short: 'No ideas', detail: 'Mix of easy and special experiences' },
     'same_pattern': { short: 'Same routine', detail: 'Fresh, trendy, unique date ideas' },
@@ -645,7 +625,6 @@ function buildContext(
     'none': { short: 'Just fun', detail: 'FUN first! Active and exciting missions' },
   };
 
-  // Shared worries (both have same concern)
   if (combinedDateWorries.shared.length > 0) {
     const sharedList = combinedDateWorries.shared.map(w => worryDescriptions[w].short).join(', ');
     parts.push(`\n### SHARED CONCERNS (Top Priority)`);
@@ -655,7 +634,6 @@ function buildContext(
     });
   }
 
-  // One-side worries
   const oneSideWorries = [...combinedDateWorries.userAOnly, ...combinedDateWorries.userBOnly];
   if (oneSideWorries.length > 0) {
     const uniqueOneSide = [...new Set(oneSideWorries)];
@@ -663,12 +641,40 @@ function buildContext(
     parts.push(`\n[One-side concerns] ${oneSideList}`);
   }
 
-  // No worries = fun first
   if (combinedDateWorries.shared.length === 0 && oneSideWorries.length === 0) {
     parts.push(`\n[No specific concerns] -> FUN first! Active and exciting missions`);
   }
 
-  // === Priority 4: Today's Situation ===
+  // Worry-Constraint Cross-Reference
+  const hasBudgetWorry = combinedDateWorries.shared.includes('budget') ||
+    oneSideWorries.some(w => w === 'budget');
+  const hasTimeWorry = combinedDateWorries.shared.includes('time') ||
+    oneSideWorries.some(w => w === 'time');
+  const hasNoCar = uniqueConstraints.includes('no_car');
+  const hasLongDistance = uniqueConstraints.includes('long_distance') || uniqueConstraints.includes('far_distance');
+
+  const crossHints: string[] = [];
+  if (hasBudgetWorry && hasNoCar) {
+    crossHints.push('Budget + No car: Prioritize WALKABLE low-cost activities (neighborhood cafes, parks, local markets, home dates). Include both free AND affordable options.');
+  }
+  if (hasBudgetWorry && hasTimeWorry) {
+    crossHints.push('Budget + Time: QUICK & affordable missions (30min neighborhood walks, nearby cafe, home activities, convenience store snack date)');
+  }
+  if (hasTimeWorry && hasLongDistance) {
+    crossHints.push('Time + Long distance: SHORT ONLINE activities (15min video call game, quick photo exchange challenge)');
+  }
+  if (crossHints.length > 0) {
+    parts.push(`\n[SMART CONSTRAINTS] ${crossHints.join(' | ')}`);
+  }
+
+  // =============================================
+  // Priority 2: Meeting Status (만남 여부)
+  // =============================================
+  parts.push(`\n[MEETING] ${canMeetToday ? 'Yes - couple can meet today' : 'No - one person does mission alone (online/remote only)'}`);
+
+  // =============================================
+  // Priority 3: Date Category + Time (데이트 카테고리/시간)
+  // =============================================
   const moodMap: Record<string, string> = {
     cozy: 'Cozy/Home date', foodie: 'Food/Restaurant', active: 'Active',
     healing: 'Healing', culture: 'Culture', adventure: 'Adventure', romantic: 'Romantic',
@@ -676,7 +682,6 @@ function buildContext(
   const timeMap: Record<string, string> = {
     '30min': '30min', '1hour': '1hour', '2hour': '2hours+', 'allday': 'All day',
   };
-  // Distance limit based on available time
   const distanceMap: Record<string, string> = {
     '30min': '1km radius (home date OK)',
     '1hour': '5km radius',
@@ -684,21 +689,24 @@ function buildContext(
     'allday': 'No distance limit',
   };
   const moodStr = todayMoods.map(m => moodMap[m] || m).join(', ');
-  parts.push(`\n[TODAY]`);
-  parts.push(`- Meeting: ${canMeetToday ? 'Yes' : 'No (one person does mission alone)'}`);
-  parts.push(`- Time: ${timeMap[availableTime]}`);
-  parts.push(`- Distance: ${distanceMap[availableTime]} -> Suggest places within this range from user's location`);
-  parts.push(`- Mood: ${moodStr}`);
+  parts.push(`\n[DATE CATEGORY] ${moodStr}`);
+  parts.push(`[TIME] ${timeMap[availableTime]} | Distance: ${distanceMap[availableTime]} -> Suggest places within this range`);
 
-  // Add mood-specific constraints
+  // Category-specific constraints
   if (todayMoods.includes('cozy')) {
     parts.push(`-> COZY MOOD RULE: ALL missions MUST be home-based or indoor at home. NO outdoor activities, NO restaurants, NO parks, NO walks outside. Only: home cooking, movie at home, board games, puzzles, crafts at home, reading together, home spa, etc.`);
   }
   if (todayMoods.includes('foodie')) {
-    parts.push(`-> FOODIE MOOD RULE: ALL missions MUST involve food/dining. Restaurants, cafes, food markets, cooking classes, bakery tours, food truck visits, etc.`);
+    parts.push(`-> FOODIE MOOD RULE: ALL missions MUST involve food/dining.
+  - PRIORITY: Going OUT to eat > cooking at home. At least 2/3 of missions should be about visiting actual food spots.
+  - GO-OUT examples: hidden gem restaurants, trending cafes, street food alleys, food markets, bakery hopping, brunch spots, dessert cafes, local diners, food truck parks, night food streets
+  - COOKING examples (max 1 mission): recipe challenge, cooking class, making a specific cuisine
+  - VARIETY: Each mission must feature a DIFFERENT type of food experience. Never repeat similar concepts (e.g., don't have 2 cafe missions).`);
   }
 
-  // === Priority 5: Date + Weather/Season ===
+  // =============================================
+  // Priority 4: Weather + Location (날씨/위치)
+  // =============================================
   const now = new Date();
   const todayMonth = now.getMonth() + 1;
   const todayDay = now.getDate();
@@ -712,15 +720,174 @@ function buildContext(
   * Pepero Day/빼빼로데이: Nov 7~11 (prep from Nov 7, ENDS Nov 11. Nov 12+ = FORBIDDEN)
   If today is BEFORE the prep period or AFTER the holiday, do NOT reference it at all. "Winter" ≠ "Christmas".`);
 
-  // === Priority 6: Preferred Activities ===
-  const allActivities = [
+  // Weather-Creative Hints
+  if (weather.temperature !== undefined) {
+    const temp = weather.temperature;
+    let weatherCreative = '';
+    if (temp <= 0) {
+      weatherCreative = '-> COLD WEATHER IDEAS: Warm drink spot hopping, hot spring, heated outdoor terrace, winter sports, frost photography';
+    } else if (temp <= 10) {
+      weatherCreative = '-> COOL WEATHER IDEAS: Layered outfit coordination date, warm bakery crawl, bookstore browsing, autumn/winter scenic walks';
+    } else if (temp >= 30) {
+      weatherCreative = '-> HOT WEATHER IDEAS: Water activities, shaved ice tour, air-conditioned cultural spots, evening/night dates, rooftop with breeze';
+    } else if (temp >= 20) {
+      weatherCreative = '-> NICE WEATHER IDEAS: Outdoor terrace dining, cycling, park dates, sunset spots, open-air markets';
+    }
+    if (weatherCreative) parts.push(weatherCreative);
+
+    if (weather.condition?.includes('rain') || weather.condition?.includes('Rain') || weather.condition?.includes('비')) {
+      parts.push('-> RAIN SPECIAL: Indoor markets, rainy cafe window seats, umbrella sharing walk (short), indoor cooking, museum/gallery day');
+    }
+    if (weather.condition?.includes('snow') || weather.condition?.includes('Snow') || weather.condition?.includes('눈')) {
+      parts.push('-> SNOW SPECIAL: First snow walk, snowman building, snow cafe, warm noodle date, snow photography');
+    }
+  }
+
+  // City-Level Location Context
+  if (weather.city) {
+    parts.push(`[LOCATION] City: ${weather.city} -> Suggest activities and spots that are LOCALLY relevant to ${weather.city}. Reference local landmarks, neighborhoods, popular areas, or regional specialties when possible.`);
+  }
+
+  // =============================================
+  // Priority 5: Preferences (취향 분석 - Chemistry + MBTI)
+  // =============================================
+  const activitiesA = input.userAPreferences?.activityTypes || [];
+  const activitiesB = input.userBPreferences?.activityTypes || [];
+
+  if (activitiesA.length > 0 || activitiesB.length > 0) {
+    const setA = new Set(activitiesA);
+    const setB = new Set(activitiesB);
+    const shared = activitiesA.filter(a => setB.has(a));
+    const onlyA = activitiesA.filter(a => !setB.has(a));
+    const onlyB = activitiesB.filter(b => !setA.has(b));
+
+    let chemistryPrompt = '\n[COUPLE CHEMISTRY]';
+    if (shared.length > 0) {
+      chemistryPrompt += `\n- SHARED loves (both enjoy): ${shared.join(', ')} -> At least 1 mission from shared interests`;
+    }
+    if (onlyA.length > 0 && onlyB.length > 0) {
+      chemistryPrompt += `\n- Partner A uniquely likes: ${onlyA.join(', ')}`;
+      chemistryPrompt += `\n- Partner B uniquely likes: ${onlyB.join(', ')}`;
+      chemistryPrompt += `\n-> Include 1 mission that BRIDGES different interests (combine elements from both)`;
+    } else if (onlyA.length > 0 || onlyB.length > 0) {
+      const unique = onlyA.length > 0 ? onlyA : onlyB;
+      chemistryPrompt += `\n- One partner also likes: ${unique.join(', ')} -> Mix into missions as secondary element`;
+    }
+    if (shared.length === 0 && (onlyA.length > 0 && onlyB.length > 0)) {
+      chemistryPrompt += `\n-> No shared preferences! Create BRIDGE activities: combine A's and B's interests creatively`;
+    }
+    parts.push(chemistryPrompt);
+  }
+
+  // Mood-Preference Fusion (connects P3 date category with P5 preferences)
+  const allActivitiesForFusion = [
     ...(input.userAPreferences?.activityTypes || []),
     ...(input.userBPreferences?.activityTypes || []),
   ];
-  if (allActivities.length > 0) {
-    const uniqueActivities = [...new Set(allActivities)];
-    parts.push(`[Preferred activities] ${uniqueActivities.join(', ')}`);
+  if (todayMoods.length > 0 && allActivitiesForFusion.length > 0) {
+    const moodActivityMap: Record<string, string[]> = {
+      active: ['sports', 'fitness', 'outdoor', 'hiking', 'cycling'],
+      healing: ['wellness', 'nature', 'cafe', 'spa'],
+      culture: ['museum', 'gallery', 'concert', 'theater', 'exhibition'],
+      adventure: ['travel', 'new_places', 'extreme', 'exploration'],
+      romantic: ['dinner', 'sunset', 'wine', 'stargazing'],
+      foodie: ['restaurant', 'cooking', 'cafe', 'baking', 'food_tour'],
+      cozy: ['home', 'movie', 'game', 'reading', 'cooking'],
+    };
+
+    const fusionHints: string[] = [];
+    for (const mood of todayMoods) {
+      const relatedActivities = moodActivityMap[mood] || [];
+      const matchingPrefs = allActivitiesForFusion.filter(a =>
+        relatedActivities.some(r => a.toLowerCase().includes(r))
+      );
+      if (matchingPrefs.length > 0) {
+        fusionHints.push(`${mood} mood + ${matchingPrefs.join('/')} preference`);
+      }
+    }
+    if (fusionHints.length > 0) {
+      parts.push(`\n[MOOD-PREFERENCE MATCH] ${fusionHints.join(', ')} -> Prioritize activities at this intersection!`);
+    }
   }
+
+  // MBTI Combination
+  const mbtiA = input.userAPreferences?.mbti;
+  const mbtiB = input.userBPreferences?.mbti;
+  if (mbtiA || mbtiB) {
+    const mbtiGuidance = getMBTIGuidance(mbtiA, mbtiB);
+    if (mbtiGuidance) parts.push(mbtiGuidance);
+  }
+
+  // =============================================
+  // Priority 6: Relationship Stage (연애단계)
+  // =============================================
+  const relationshipType = input.userAPreferences?.relationshipType;
+  const duration = getRelationshipDuration(input.userAPreferences?.anniversaryDate);
+  if (relationshipType || duration) {
+    const typeLabel = relationshipType === 'married' ? 'Married' : relationshipType === 'dating' ? 'Dating' : null;
+    const phaseGuide: Record<string, string> = {
+      honeymoon: `New couple (<6mo):
+  - DO: First-time-together activities (first trip, first cooking, matching items)
+  - DO: Discovery dates (each other's favorite spots, childhood neighborhoods, playlist exchange)
+  - DO: Playful competition (arcade, sports, cooking battles)
+  - AVOID: Heavy commitment activities, routine-feeling dates`,
+      building: `Growing couple (6mo-2yr):
+  - DO: Skill-building together (classes, workshops, new hobby)
+  - DO: Day trips to new places, double dates, meeting each other's friends
+  - DO: Creating shared traditions (weekly date spot, monthly challenge)
+  - AVOID: Overly simple/basic dates that feel like early dating`,
+      established: `Established couple (2-5yr):
+  - DO: Surprise elements (blindfolded date, mystery destination, role reversal day)
+  - DO: Bucket list items, challenging activities, learning something neither knows
+  - DO: Revisiting first-date spot with a twist, recreating old photos
+  - AVOID: Same-old dinner-and-movie pattern`,
+      mature: `Mature couple (5-10yr):
+  - DO: Meaningful rituals (annual photo project, letters to future selves, memory book)
+  - DO: Appreciation dates (partner's choice day, gratitude walk, love map update)
+  - DO: New shared experiences to grow together (travel, volunteering, creating together)
+  - AVOID: Assuming preferences haven't changed`,
+      deep: `Long-term couple (10yr+):
+  - DO: Bucket list adventures (dream destinations, skydiving, concert of lifetime)
+  - DO: Legacy activities (planting a tree, charity together, teaching each other skills)
+  - DO: Comfort + surprise combo (favorite restaurant + unexpected dessert spot after)
+  - AVOID: Only comfortable/routine activities`,
+    };
+    let relationshipContext = '\n[RELATIONSHIP]';
+    if (typeLabel) relationshipContext += ` ${typeLabel}`;
+    if (duration) {
+      const durationStr = duration.years > 0
+        ? `${duration.years}yr ${duration.months}mo`
+        : `${duration.months}mo`;
+      relationshipContext += ` | Together: ${durationStr}`;
+      relationshipContext += `\n-> ${phaseGuide[duration.phase] || phaseGuide.established}`;
+    }
+    parts.push(relationshipContext);
+  }
+
+  // =============================================
+  // Priority 7: Bookmark Behavior (북마크)
+  // =============================================
+  if (input.bookmarkSummary && input.bookmarkSummary.total > 0) {
+    const bm = input.bookmarkSummary;
+    const topCategories = Object.entries(bm.categories)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([cat, count]) => `${cat}(${count})`);
+
+    let bookmarkPrompt = `\n[BOOKMARKED FAVORITES] User saved ${bm.total} missions`;
+    bookmarkPrompt += `\n- Most saved categories: ${topCategories.join(', ')}`;
+    bookmarkPrompt += `\n-> These categories = PROVEN interest. Include at least 1 mission from top saved category.`;
+
+    if (bm.titles.length > 0) {
+      bookmarkPrompt += `\n- Recent saved titles: ${bm.titles.slice(0, 5).join(' | ')}`;
+      bookmarkPrompt += `\n-> Generate missions with SIMILAR vibe but DIFFERENT specific activities.`;
+    }
+    parts.push(bookmarkPrompt);
+  }
+
+  // =============================================
+  // Special Events (Anniversary / Birthday / Minor)
+  // =============================================
 
   // === Anniversary ===
   const anniversaryInfo = getAnniversaryInfo(
@@ -744,15 +911,36 @@ function buildContext(
     : null;
 
   if (isAnyAnniversaryToday && todayLabels.length > 0) {
-    // Anniversary TODAY! All missions should be anniversary-themed
-    parts.push(`\n### TODAY IS ${todayLabels.join(', ')}!`);
-    // Add explicit anniversary type instruction for GPT
-    if (anniversaryTypeLabel) {
+    const annLanguage = useLanguageStore.getState().language;
+    // Anniversary/Event TODAY! ALL missions MUST be themed — this is the #1 priority
+    parts.push(`\n### 🎉 TODAY IS ${todayLabels.join(', ')}! — THIS OVERRIDES ALL OTHER RULES ###`);
+
+    // Case 1: Regular anniversary (dating/wedding) is today
+    if (anniversaryInfo.isToday && anniversaryTypeLabel) {
       parts.push(`### CRITICAL: This is a ${anniversaryTypeLabel}, NOT ${anniversaryInfo.anniversaryType === 'wedding' ? 'dating anniversary' : 'wedding anniversary'}!`);
       parts.push(`-> When mentioning anniversary in mission titles, use "${anniversaryInfo.anniversaryType === 'wedding' ? '결혼 기념일/Wedding Anniversary' : '연애 기념일/Dating Anniversary'}" terminology`);
     }
-    parts.push(`-> ALL missions must be anniversary/celebration themed!`);
-    parts.push(`-> Categories: romantic, anniversary, surprise, memory`);
+
+    // Case 2: Custom anniversary is today (e.g., child's birthday, special day)
+    if (customAnniversaryInfo.isToday && customAnniversaryInfo.todayLabel) {
+      const customLabel = customAnniversaryInfo.todayLabel;
+      parts.push(`### CUSTOM EVENT: "${customLabel}" — Use this EXACT name in mission titles and descriptions.`);
+      parts.push(`-> This is NOT a couple anniversary. This is "${customLabel}".`);
+      parts.push(`-> DO NOT use "연애 기념일", "결혼 기념일", or "dating/wedding anniversary" — those are WRONG for this event.`);
+      parts.push(`-> Missions must be themed around celebrating "${customLabel}" TOGETHER as a couple.`);
+      parts.push(`-> Example themes: party planning, gift preparation, special meal, celebration outing, photo session for "${customLabel}"`);
+    }
+
+    parts.push(`-> EVERY SINGLE mission (100%) MUST celebrate this event. Not just 1 or 2 — ALL of them.`);
+    parts.push(`-> Each mission must be a DIFFERENT way to celebrate.`);
+    parts.push(`-> Titles should feel festive and celebratory, referencing "${todayLabels.join(', ')}" naturally`);
+    parts.push(`-> Categories MUST be from: romantic, anniversary, surprise, memory`);
+    // Reinforce title style in override context
+    if (annLanguage === 'ko') {
+      parts.push(`-> TITLE STYLE: 명사형 종결만! "~하기" "~쓰기" "~촬영하기" 절대 금지. "~의 시간", "~한 기록", "~, 우리" 같은 감성 명사형으로.`);
+    } else {
+      parts.push(`-> TITLE STYLE: Noun-phrase endings ONLY! No "~ing" verb forms. Use evocative titles like "A Letter for Us", "Golden Hour Celebration".`);
+    }
   } else if (allUpcoming.length > 0) {
     // Upcoming anniversary - add type context
     let upcomingContext = `\n[Upcoming anniversary] ${allUpcoming.join(', ')}`;
@@ -770,11 +958,19 @@ function buildContext(
   );
 
   if (birthdayInfo.isToday && birthdayInfo.todayLabel) {
-    // Birthday TODAY! All missions should be birthday-themed
-    parts.push(`\n### TODAY IS BIRTHDAY!`);
-    parts.push(`-> ALL missions must be birthday/celebration themed!`);
-    parts.push(`-> Suggest birthday date ideas: surprise party planning, special dinner, gift hunting together, birthday cake making, photo spot visit`);
-    parts.push(`-> Categories: romantic, anniversary, surprise, memory`);
+    const bdLanguage = useLanguageStore.getState().language;
+    // Birthday TODAY! ALL missions MUST be birthday-themed
+    parts.push(`\n### 🎂 TODAY IS ${birthdayInfo.todayLabel}! — THIS OVERRIDES ALL OTHER RULES ###`);
+    parts.push(`-> EVERY SINGLE mission (100%) MUST be birthday-themed. Not just 1 or 2 — ALL of them.`);
+    parts.push(`-> Each mission must be a DIFFERENT birthday celebration: e.g., surprise party planning, special birthday dinner, gift hunting, birthday cake making/buying, photo shoot, birthday letter writing, wish list date, birthday dessert crawl`);
+    parts.push(`-> Titles should feel festive and celebratory, referencing the birthday naturally`);
+    parts.push(`-> Categories MUST be from: romantic, anniversary, surprise, memory`);
+    // Reinforce title style in birthday override context
+    if (bdLanguage === 'ko') {
+      parts.push(`-> TITLE STYLE: 명사형 종결만! "~하기" "~쓰기" "~만들기" 절대 금지. "~의 시간", "~한 기록", "~, 우리" 같은 감성 명사형으로.`);
+    } else {
+      parts.push(`-> TITLE STYLE: Noun-phrase endings ONLY! No "~ing" verb forms. Use evocative titles like "Birthday Cake and Us", "A Wish for You".`);
+    }
   } else if (birthdayInfo.upcoming.length > 0) {
     parts.push(`\n[Upcoming birthday] ${birthdayInfo.upcoming.join(', ')} -> Include at least 1 birthday-prep mission! (gift ideas, party planning, surprise preparation, reservation)`);
   }
@@ -815,11 +1011,29 @@ function getMBTIGuidance(mbtiA?: string, mbtiB?: string): string {
     if (hasFT) tensions.push('F/T: one emotional, other analytical → friendly competition with emotional stakes (bet on games, challenge with prizes)');
   }
 
-  if (tensions.length === 0) {
-    return `\n[MBTI] ${a} + ${b} -> Compatible types. Leverage shared strengths. Avoid stereotypical MBTI suggestions.`;
+  // Tone personalization based on MBTI dimensions
+  let toneGuide = '';
+  const types = [a, b].filter(t => t !== '?');
+  const hasF = types.some(t => t.includes('F'));
+  const hasT = types.some(t => t.includes('T'));
+  const hasN = types.some(t => t.includes('N'));
+  const hasS = types.some(t => t.includes('S'));
+
+  if (hasF && !hasT) {
+    toneGuide = '\n-> Description tone: Warm, emotionally engaging. Focus on feelings and connection.';
+  } else if (hasT && !hasF) {
+    toneGuide = '\n-> Description tone: Clear, action-oriented. Focus on what to do and why it\'s fun.';
+  } else if (hasN && !hasS) {
+    toneGuide = '\n-> Description tone: Creative, imaginative. Use metaphors and paint a vision.';
+  } else if (hasS && !hasN) {
+    toneGuide = '\n-> Description tone: Specific, practical. Include concrete details and steps.';
   }
 
-  return `\n[MBTI] ${a} + ${b}\n-> Tensions to RESOLVE through activity choice (NOT stereotypical MBTI suggestions):\n  ${tensions.join('\n  ')}`;
+  if (tensions.length === 0) {
+    return `\n[MBTI] ${a} + ${b} -> Compatible types. Leverage shared strengths. Avoid stereotypical MBTI suggestions.${toneGuide}`;
+  }
+
+  return `\n[MBTI] ${a} + ${b}\n-> Tensions to RESOLVE through activity choice (NOT stereotypical MBTI suggestions):\n  ${tensions.join('\n  ')}${toneGuide}`;
 }
 
 // ============================================
@@ -873,6 +1087,17 @@ function buildDeduplicationContext(history: MissionHistorySummary | undefined, _
     if (underusedCategories.length > 0) {
       parts.push(`PRIORITIZE (underused): ${underusedCategories.slice(0, 7).join(', ')}`);
     }
+  }
+
+  // 3. Activity pattern staleness detection
+  if (history.recentTitles.length >= 5) {
+    const recentFive = history.recentTitles.slice(0, 5);
+    parts.push(`\n-> STALENESS CHECK: Last 5 missions were: ${recentFive.join(' | ')}`);
+    parts.push(`-> If these feel repetitive, FORCE a completely different vibe:`);
+    parts.push(`   * If all were calm → suggest 1 HIGH-ENERGY mission`);
+    parts.push(`   * If all were outdoor → suggest 1 INDOOR/HOME mission`);
+    parts.push(`   * If all were food-related → suggest 1 NON-FOOD mission`);
+    parts.push(`   * If all were free → suggest 1 PAID experience`);
   }
 
   return parts.join('\n');
@@ -937,7 +1162,7 @@ const CULTURE_PROMPTS: Record<RegionCode, CulturePrompt> = {
       spring: '벚꽃/매화, 피크닉, 꽃구경',
       summer: '물놀이, 야외페스티벌, 빙수, 야경',
       fall: '단풍, 코스모스, 갈대밭, 억새',
-      winter: '일루미네이션, 온천, 눈 데이트, 핫초코 카페',
+      winter: '일루미네이션, 온천, 겨울 야경 산책, 따뜻한 국물 맛집, 붕어빵/호떡 길거리 간식, 겨울 바다 드라이브',
     },
     coupleStyle: '100일 기념일 중요, 커플템, SNS 공유 활발, 스킨십 중간',
     anniversaryStyle: '100일, 200일, 300일... 일수 기념일 중요시',
@@ -987,7 +1212,7 @@ const CULTURE_PROMPTS: Record<RegionCode, CulturePrompt> = {
       spring: 'Cherry blossoms, outdoor picnics, hiking',
       summer: 'Beach days, outdoor concerts, BBQ, road trips',
       fall: 'Fall foliage drives, pumpkin patches, apple picking',
-      winter: 'Ice skating, cozy cafes, ski trips, hot chocolate',
+      winter: 'Ice skating, winter hikes, ski trips, warm soup spots, holiday light walks',
     },
     coupleStyle: 'Anniversary > day counts, dutch pay common, direct expressions, casual PDA',
     anniversaryStyle: 'Yearly anniversaries only, monthly not common',
@@ -1013,7 +1238,7 @@ const CULTURE_PROMPTS: Record<RegionCode, CulturePrompt> = {
       spring: 'Outdoor terraces, flower markets, canal walks',
       summer: 'Beach towns, festivals, rooftop bars, outdoor dining',
       fall: 'Wine harvest, cozy pubs, autumn walks, harvest festivals',
-      winter: 'Mulled wine, cozy cafes, winter walks, indoor markets',
+      winter: 'Mulled wine, winter walks, outdoor markets, warm bakeries, canal strolls',
     },
     coupleStyle: 'Independence valued, less anniversary focus, natural progression, PDA normal',
     anniversaryStyle: 'Less emphasis on anniversaries, Valentine\'s seen as commercial',
@@ -1039,7 +1264,7 @@ const CULTURE_PROMPTS: Record<RegionCode, CulturePrompt> = {
       spring: 'Beach season starts, outdoor festivals, flower markets',
       summer: 'Beach life, night markets, outdoor dancing, carnival prep',
       fall: 'Dia de los Muertos, harvest festivals, wine tasting',
-      winter: 'Cozy cafes, indoor dancing, wine regions, warm drinks',
+      winter: 'Cozy cafes, live music venues, wine regions, local food markets',
     },
     coupleStyle: 'Very expressive, family approval matters, traditional gender roles common, passionate PDA',
     anniversaryStyle: 'Monthly anniversaries (mesiversarios) common, romantic gestures important',
@@ -1064,7 +1289,7 @@ const CULTURE_PROMPTS: Record<RegionCode, CulturePrompt> = {
     seasonal: {
       mild: 'Outdoor walks, picnics, sightseeing',
       hot: 'Indoor activities, evening outings, water-related activities',
-      cool: 'Cozy cafes, indoor activities, warm food dates',
+      cool: 'Cozy cafes, evening walks, warm food dates, outdoor markets',
     },
     coupleStyle: 'Balanced, respectful of local norms, flexible expression',
     anniversaryStyle: 'Yearly anniversaries',
@@ -1132,9 +1357,10 @@ ${language === 'ko' ? `- TITLE: 인스타그램 캡션 스타일 (5~15자 내외
   - 핵심 규칙: '명사형 종결'을 주로 사용 (~하는 시간, ~한 기록, ~의 밤).
   - 톤앤매너: 힙하고 미니멀한 잡지 제목이나 전시회 포스팅 느낌.
   - 주의사항: 이모지는 절대 사용하지 말 것. 오직 텍스트로만 감성을 전달함.
-  - Good: "노을 맛집 카페, 우리", "취향 가득 채운 플레이리스트", "오늘의 메뉴: 직접 만든 파스타", "보드게임 한 판 승부"
-  - Bad: "카페에 방문하기", "소중한 추억을 만들어보세요", "즐거운 보드게임 시간"
-  - FORBIDDEN: "속삭임", "메아리", "여정", "오아시스", "찬란한", "영원한", "하모니"
+  - Good: "노을 맛집 카페, 우리", "취향 가득 채운 플레이리스트", "오늘의 메뉴: 직접 만든 파스타", "보드게임 한 판 승부", "하온이를 위한 케이크 한 조각", "기념일, 우리만의 앨범"
+  - Bad: "카페에 방문하기", "소중한 추억을 만들어보세요", "즐거운 보드게임 시간", "편지 쓰기", "사진 촬영하기", "케이크 만들기"
+  - FORBIDDEN endings: "~하기", "~쓰기", "~촬영하기", "~만들기", "~보내기" (동사형 종결 절대 금지. 제목은 반드시 명사형으로 끝나야 함)
+  - FORBIDDEN words: "속삭임", "메아리", "여정", "오아시스", "찬란한", "영원한", "하모니"
 - DESCRIPTION: 친구에게 카톡으로 제안하듯 아주 담백하고 짧게.
   - 핵심 규칙: '~해보세요' 대신 '~하기', '~하면 어때?', '~하기로 해' 같은 구어체 사용.
   - 지침: AI 티가 나는 수식어(특별한, 소중한, 잊지 못할)를 전부 빼고 '구체적인 행동'만 남길 것.
@@ -1143,9 +1369,10 @@ ${language === 'ko' ? `- TITLE: 인스타그램 캡션 스타일 (5~15자 내외
   - FORBIDDEN: "탐험", "발견", "유대감", "추억을 쌓다", "시간을 보내다", "매력에 빠지다"` : `- TITLE: Instagram-ready caption (short, punchy, 2-5 words).
   - Rule: Use noun-ending phrases or mood-focused snippets.
   - Note: DO NOT use any emojis. Keep it clean and text-only.
-  - Good: "Golden Hour and Us", "Our Recipe Log", "Puzzle Masters", "Winter Night Walk"
-  - Bad: "Go to a cafe", "Making a wonderful memory", "A journey for love"
-  - FORBIDDEN: "Whispers", "Echoes", "Symphony", "Tapestry", "Embark", "Oasis"
+  - Good: "Golden Hour and Us", "Our Recipe Log", "Puzzle Masters", "Winter Night Walk", "A Cake for Haon", "Our Anniversary Album"
+  - Bad: "Go to a cafe", "Making a wonderful memory", "A journey for love", "Writing a letter", "Taking photos", "Making a cake"
+  - FORBIDDEN endings: Verb-form titles like "Writing ~", "Making ~", "Taking ~", "Going to ~" (titles must end with nouns/phrases)
+  - FORBIDDEN words: "Whispers", "Echoes", "Symphony", "Tapestry", "Embark", "Oasis"
 - DESCRIPTION: Casual DM style, like a close friend. Action-oriented.
   - Rule: Avoid "Discover", "Explore", "Bond over". Just tell them what to do.
   - Good: "Grab a coffee and hit the park for people-watching.", "Try a 500-piece puzzle with some lo-fi beats."
@@ -1161,6 +1388,7 @@ ${language === 'ko' ? `- TITLE: 인스타그램 캡션 스타일 (5~15자 내외
   * Activities needing equipment in wrong setting (stargazing + activities needing light)
   * Weather-dependent activities without shelter backup
   * Activities requiring extensive prep for casual dates
+- ITEM DIVERSITY: NEVER repeat the same specific food, drink, or activity item across multiple missions. If one mission mentions a specific drink (e.g., hot chocolate), NO other mission can reference it. Each mission must feel completely distinct.
 - FORBIDDEN THEMES: NEVER reference Christmas, Halloween, Valentine's, New Year, or any holiday UNLESS the user context [DATE] falls within that holiday's PREP~DAY window. Holiday missions are OK during prep period (for preparation/planning) and on the day itself, but ABSOLUTELY FORBIDDEN after the holiday has passed. "Winter" ≠ "Christmas".
 
 RELATIONSHIP STAGE GUIDE:

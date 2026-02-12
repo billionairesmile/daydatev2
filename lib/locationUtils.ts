@@ -270,16 +270,18 @@ export interface UserTargetingContext {
   latitude?: number;
   longitude?: number;
   countryCode?: string; // ISO 3166-1 alpha-2 (e.g., 'KR', 'US', 'JP')
+  coupleId?: string; // For couple-specific featured missions
 }
 
 /**
  * Target audience structure from featured_missions
  */
 interface TargetAudience {
-  type: 'all' | 'country' | 'location' | 'custom';
+  type: 'all' | 'country' | 'location' | 'couple' | 'custom';
   country?: string;
   center?: { lat: number; lng: number };
   radius_km?: number;
+  couple_ids?: string[];
   [key: string]: unknown;
 }
 
@@ -355,6 +357,18 @@ export const matchesMissionTargeting = (
     );
 
     return distance <= radiusKm;
+  }
+
+  // Type 'couple' - check if user's couple matches
+  if (targetAudience.type === 'couple') {
+    const coupleIds = targetAudience.couple_ids;
+    if (!coupleIds || coupleIds.length === 0) {
+      return true; // No couple IDs specified, show to all
+    }
+    if (!userContext.coupleId) {
+      return false; // User has no couple ID, skip couple-specific missions
+    }
+    return coupleIds.includes(userContext.coupleId);
   }
 
   // Type 'custom' or unknown - show to all (future extensibility)

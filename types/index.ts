@@ -61,6 +61,10 @@ export interface Mission {
   imageUrl: string;
   isPremium: boolean;
   moodTags?: ('cozy' | 'foodie' | 'romantic' | 'healing' | 'adventure' | 'active' | 'culture')[];
+  isFeatured?: boolean;
+  icon?: string;
+  additionalContent?: string;
+  linkButtonType?: 'reserve' | 'book' | 'purchase';
 }
 
 export type MissionCategory =

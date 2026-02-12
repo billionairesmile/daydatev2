@@ -36,6 +36,7 @@ import { Bookmark, Sparkles, X } from 'lucide-react-native';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useUIStore } from '@/stores/uiStore';
 import * as Location from 'expo-location';
+import * as Haptics from 'expo-haptics';
 
 import { COLORS, SPACING, rs, fp, isFoldableDevice } from '@/constants/design';
 import { useMissionStore, MOOD_OPTIONS, TIME_OPTIONS, type TodayMood, type AvailableTime, type MissionGenerationAnswers } from '@/stores/missionStore';
@@ -75,6 +76,12 @@ const getCardHeight = () => {
 };
 const CARD_HEIGHT = getCardHeight();
 const CARD_MARGIN = rs(10);
+
+// Icon map for featured mission badges (Supabase featured_missions.icon column)
+const MISSION_ICON_MAP: Record<string, { source: number; size: number }> = {
+  star: { source: require('@/assets/images/icon-star.png') as number, size: rs(48) },
+  flower: { source: require('@/assets/images/icon-flower.png') as number, size: rs(48) },
+};
 
 // Easing gradient for smooth blur transition
 const { colors: blurGradientColors, locations: blurGradientLocations } = easeGradient({
@@ -303,7 +310,7 @@ export default function MissionScreen() {
   const handleKeepMission = useCallback(async (mission: Mission): Promise<boolean> => {
     // Prefetch bookmark thumbnail image for faster loading in bookmark page
     if (mission.imageUrl) {
-      ExpoImage.prefetch(`${mission.imageUrl}?w=300&h=400&fit=crop`).catch(() => {});
+      ExpoImage.prefetch(`${mission.imageUrl}?w=300&h=400&fit=crop`).catch(() => { });
     }
 
     if (isSyncInitialized) {
@@ -475,6 +482,11 @@ export default function MissionScreen() {
         setTotalImagesToLoad(0);
         firstImageLoadedRef.current = false;  // Reset for next generation
 
+        // Haptic feedback on iOS when mission cards become visible
+        if (Platform.OS === 'ios') {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+
         // Initialize scroll after images are loaded
         setCurrentIndex(0);
         scrollX.setValue(0);
@@ -507,6 +519,11 @@ export default function MissionScreen() {
           setLoadedImagesCount(0);
           setTotalImagesToLoad(0);
           firstImageLoadedRef.current = false;
+
+          // Haptic feedback on iOS when mission cards become visible (fallback)
+          if (Platform.OS === 'ios') {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          }
 
           // Reset carousel state
           setCurrentIndex(0);
@@ -555,12 +572,17 @@ export default function MissionScreen() {
     setIsLoadingFeatured(true);
     try {
       // Build user targeting context from user profile and device locale
-      const userTargetingContext: { latitude?: number; longitude?: number; countryCode?: string } = {};
+      const userTargetingContext: { latitude?: number; longitude?: number; countryCode?: string; coupleId?: string } = {};
 
       // Get user location if available
       if (user?.locationLatitude && user?.locationLongitude) {
         userTargetingContext.latitude = user.locationLatitude;
         userTargetingContext.longitude = user.locationLongitude;
+      }
+
+      // Get couple ID for couple-specific targeting
+      if (coupleId) {
+        userTargetingContext.coupleId = coupleId;
       }
 
       // Get country code from device locale (e.g., 'ko-KR' -> 'KR')
@@ -606,6 +628,12 @@ export default function MissionScreen() {
             tags: isEnglish && fm.tags_en?.length ? fm.tags_en : (fm.tags || []),
             imageUrl: fm.image_url,
             isPremium: false, // Featured missions are free
+            isFeatured: true,
+            icon: (fm as any).icon || undefined,
+            additionalContent: isEnglish && (fm as any).additional_content_en
+              ? (fm as any).additional_content_en
+              : (fm as any).additional_content || undefined,
+            linkButtonType: (fm as any).link_button_type || undefined,
           }));
 
         setFeaturedMissions(convertedMissions);
@@ -1239,14 +1267,36 @@ export default function MissionScreen() {
             console.log('Image prefetch error:', error);
           }
 
-          // Wait for first card image to actually render before hiding loading
-          if (newMissions[0]?.imageUrl) {
-            initializeImageWait();
-            // isGenerating stays true, useEffect will hide it when first image onLoad fires
-          } else {
-            // No image URL, hide loading immediately
-            setIsGenerating(false);
+          // Images are already prefetched/cached - show cards immediately
+          await setMissionsReady();
+
+          // Haptic feedback on iOS when mission cards become visible
+          if (Platform.OS === 'ios') {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           }
+
+          // Hide loading with minimal delay for smooth transition
+          setTimeout(() => {
+            setIsGenerating(false);
+            setIsWaitingForImages(false);
+            isWaitingForImagesRef.current = false;
+
+            // Reset carousel state
+            setCurrentIndex(0);
+            scrollX.setValue(0);
+            setIsScrollInitialized(false);
+            hasInitializedCarousel.current = false;
+
+            setTimeout(() => {
+              if (scrollViewRef.current) {
+                scrollViewRef.current.scrollToOffset({ offset: 1, animated: false });
+                setTimeout(() => {
+                  scrollViewRef.current?.scrollToOffset({ offset: 0, animated: false });
+                  setIsScrollInitialized(true);
+                }, 50);
+              }
+            }, 100);
+          }, 100);
         } else {
           setIsGenerating(false);
         }
@@ -1391,6 +1441,11 @@ export default function MissionScreen() {
                 // No need to wait for onLoad events which may not fire for cached images
                 console.log('[Mission Refresh] Signaling missions ready after prefetch');
                 await setMissionsReady();
+
+                // Haptic feedback on iOS when mission cards become visible
+                if (Platform.OS === 'ios') {
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                }
 
                 // Hide loading with minimal delay for smooth transition
                 setTimeout(() => {
@@ -1572,14 +1627,36 @@ export default function MissionScreen() {
         // Continue even if prefetch fails
       }
 
-      // Wait for first card image to actually render before hiding loading
-      if (newMissions[0]?.imageUrl) {
-        initializeImageWait();
-        // isGenerating stays true, useEffect will hide it when first image onLoad fires
-      } else {
-        // No image URL, hide loading immediately
-        setIsGenerating(false);
+      // Images are already prefetched/cached - show cards immediately
+      await setMissionsReady();
+
+      // Haptic feedback on iOS when mission cards become visible
+      if (Platform.OS === 'ios') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
+
+      // Hide loading with minimal delay for smooth transition
+      setTimeout(() => {
+        setIsGenerating(false);
+        setIsWaitingForImages(false);
+        isWaitingForImagesRef.current = false;
+
+        // Reset carousel state
+        setCurrentIndex(0);
+        scrollX.setValue(0);
+        setIsScrollInitialized(false);
+        hasInitializedCarousel.current = false;
+
+        setTimeout(() => {
+          if (scrollViewRef.current) {
+            scrollViewRef.current.scrollToOffset({ offset: 1, animated: false });
+            setTimeout(() => {
+              scrollViewRef.current?.scrollToOffset({ offset: 0, animated: false });
+              setIsScrollInitialized(true);
+            }, 50);
+          }
+        }, 100);
+      }, 100);
     } else {
       // No missions generated, hide loading immediately
       setIsGenerating(false);
@@ -2234,6 +2311,16 @@ function MissionCardContent({ mission, onStartPress, onKeepPress, isKept, canSta
 
   return (
     <View style={styles.cardContentWrapper}>
+      {/* Featured Icon Badge */}
+      {mission.isFeatured && (
+        <View style={styles.featuredStarBadge}>
+          <ExpoImage
+            source={(MISSION_ICON_MAP[mission.icon || 'star'] || MISSION_ICON_MAP.star).source}
+            style={{ width: (MISSION_ICON_MAP[mission.icon || 'star'] || MISSION_ICON_MAP.star).size, height: (MISSION_ICON_MAP[mission.icon || 'star'] || MISSION_ICON_MAP.star).size }}
+            contentFit="contain"
+          />
+        </View>
+      )}
       {/* Background Image with fallback */}
       {imageUrl && !imageError ? (
         <ExpoImage
@@ -2495,6 +2582,16 @@ const styles = StyleSheet.create({
   },
   cardContentWrapper: {
     flex: 1,
+  },
+  featuredStarBadge: {
+    position: 'absolute',
+    top: rs(12),
+    right: rs(12),
+    zIndex: 10,
+  },
+  featuredStarImage: {
+    width: rs(48),
+    height: rs(48),
   },
   cardImage: {
     position: 'absolute',

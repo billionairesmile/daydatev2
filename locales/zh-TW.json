@@ -184,6 +184,11 @@
   },
   "missionDetail": {
     "headerTitle": "任務詳情",
+    "linkButton": {
+      "reserve": "前往預約",
+      "book": "前往訂票",
+      "purchase": "前往購買"
+    },
     "notFound": {
       "title": "找不到任務",
       "description": "此任務已無法使用。"
