@@ -76,15 +76,10 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
       }
 
       // Default navigation based on data.screen
-      if (data.screen === 'mission') {
-        if (data.missionId && typeof data.missionId === 'string' && data.missionId.length > 0) {
-          // Navigate directly to mission detail page
-          router.push(`/mission/${data.missionId}`);
-        } else {
-          router.push('/(tabs)');
-        }
-      } else if (data.screen === 'memories') {
+      if (data.screen === 'memories') {
         router.push('/(tabs)/memories');
+      } else {
+        router.push('/(tabs)');
       }
     },
     [router, user?.id, options.onNotificationResponse]

@@ -679,85 +679,7 @@ export default function CalendarScreen() {
     return days;
   };
 
-  // Create stable cache of missions by date - only depends on memories data, NOT year/month
-  // year/month are not used in the computation, so removing them prevents
-  // unnecessary cache rebuilds when navigating between months
-  const missionsByDate = React.useMemo(() => {
-    const cache: Record<string, { imageUrl: string; title: string }> = {};
-    const timezone = getEffectiveTimezone();
 
-    // Process real memories
-    memories.forEach((memory) => {
-      const dateStr = formatDateInTimezone(new Date(memory.completedAt), timezone);
-      // Only store if we don't have a mission for this date yet and photo URL is valid
-      if (!cache[dateStr] && memory.photoUrl?.trim()) {
-        cache[dateStr] = {
-          imageUrl: memory.photoUrl,
-          title: memory.mission?.title || '미션 완료',
-        };
-      }
-    });
-
-    // Add sample memories for development (if no real memory exists for that date)
-    SAMPLE_MEMORIES.forEach((memory) => {
-      const dateStr = formatDateInTimezone(new Date(memory.completedAt), timezone);
-      if (!cache[dateStr] && memory.photoUrl?.trim()) {
-        cache[dateStr] = {
-          imageUrl: memory.photoUrl,
-          title: memory.mission?.title || '미션 완료',
-        };
-      }
-    });
-
-    return cache;
-  }, [memories]);
-
-  const getMissionForDate = useCallback((day: number) => {
-    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    return missionsByDate[dateStr];
-  }, [missionsByDate, year, month]);
-
-  // Prefetch all mission images into MEMORY+DISK cache to prevent Android flickering
-  // Default prefetch only caches to disk; on Android disk reads are async causing placeholder flash
-  // 'memory-disk' ensures images are instantly available from memory on component mount
-  useEffect(() => {
-    const imagesToPrefetch = Object.values(missionsByDate)
-      .map(mission => mission.imageUrl)
-      .filter(Boolean);
-
-    if (imagesToPrefetch.length > 0) {
-      ExpoImage.prefetch(imagesToPrefetch, 'memory-disk')
-        .catch(error => console.log('[Calendar] Image prefetch error:', error));
-    }
-  }, [missionsByDate]);
-
-  // Prefetch images for current month + adjacent months on month change
-  // This prevents flickering when swiping to a new month for the first time
-  useEffect(() => {
-    const imagesToPrefetch: string[] = [];
-
-    // Current month, previous month, next month (-1, 0, +1)
-    [-1, 0, 1].forEach(offset => {
-      const targetDate = new Date(year, month + offset, 1);
-      const targetYear = targetDate.getFullYear();
-      const targetMonth = targetDate.getMonth();
-      const daysInMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
-
-      for (let day = 1; day <= daysInMonth; day++) {
-        const dateStr = `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        const mission = missionsByDate[dateStr];
-        if (mission?.imageUrl) {
-          imagesToPrefetch.push(mission.imageUrl);
-        }
-      }
-    });
-
-    if (imagesToPrefetch.length > 0) {
-      const uniqueUrls = [...new Set(imagesToPrefetch)];
-      ExpoImage.prefetch(uniqueUrls, 'memory-disk')
-        .catch(() => {}); // Silently ignore prefetch errors
-    }
-  }, [year, month, missionsByDate]);
 
   const getHolidayForDate = (day: number) => {
     const dateKey = `${year}-${month + 1}-${day}`;
@@ -1184,7 +1106,6 @@ export default function CalendarScreen() {
               return <View key={`empty-${index}`} style={styles.dayCell} />;
             }
 
-            const mission = getMissionForDate(day);
             const isRedDay = isHolidayOrWeekend(day);
             const isTodayDay = isToday(day);
             const isSelectedDay = selectedDate &&
@@ -1193,51 +1114,13 @@ export default function CalendarScreen() {
               selectedDate.day === day;
             const hasTodos = getTodosForDate(day).length > 0;
 
-            const showPeriod = !mission && isPeriodDay(day);
-            const showOvulation = !mission && isOvulationDay(day);
-            const showFertile = !mission && !showOvulation && isFertileWindow(day);
+            const showPeriod = isPeriodDay(day);
+            const showOvulation = isOvulationDay(day);
+            const showFertile = !showOvulation && isFertileWindow(day);
 
             return (
               <View key={day} style={styles.dayCell}>
-                {mission ? (
-                  <Pressable
-                    onPress={() => handleDateClick(day)}
-                    style={[
-                      styles.dayCellInner,
-                      styles.missionCell,
-                    ]}
-                  >
-                    <ExpoImage
-                      source={mission.imageUrl}
-                      style={styles.missionImage}
-                      contentFit="cover"
-                      cachePolicy="memory-disk"
-                      transition={0}
-                      recyclingKey={mission.imageUrl}
-                      priority="high"
-                      placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}
-                    />
-                    <View style={styles.missionOverlay}>
-                      <Text
-                        style={[
-                          styles.missionDayText,
-                          isRedDay && styles.redDayText,
-                        ]}
-                      >
-                        {day}
-                      </Text>
-                    </View>
-                    {/* Selection/Today indicator overlay - doesn't affect image size */}
-                    {(isTodayDay || isSelectedDay) && (
-                      <View
-                        style={[
-                          styles.missionSelectionOverlay,
-                          isTodayDay ? styles.missionTodayIndicator : styles.missionSelectedIndicator,
-                        ]}
-                      />
-                    )}
-                  </Pressable>
-                ) : isTodayDay ? (
+                {isTodayDay ? (
                   <Pressable
                     onPress={() => handleDateClick(day)}
                     style={[styles.dayCellInner, styles.todayCell]}
@@ -1992,45 +1875,7 @@ const styles = StyleSheet.create({
     borderRadius: rs(RADIUS.full),
     position: 'relative',
   },
-  missionCell: {
-    overflow: 'hidden',
-  },
-  missionImage: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-  },
-  missionOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: COLORS.glass.black30,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  // Selection overlay for mission cells - positioned on top without affecting image size
-  missionSelectionOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: rs(RADIUS.full),
-    borderWidth: rs(2),
-  },
-  missionTodayIndicator: {
-    borderColor: COLORS.primary,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: rs(8),
-  },
-  missionSelectedIndicator: {
-    borderColor: '#E8DCC4',
-    shadowColor: '#E8DCC4',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: rs(8),
-  },
-  missionDayText: {
-    fontSize: fp(14),
-    fontWeight: '600',
-    color: COLORS.white,
-  },
+
   todayBorder: {
     borderWidth: rs(2),
     borderColor: COLORS.primary,

@@ -49,7 +49,8 @@
     "mission": "미션",
     "calendar": "캘린더",
     "memories": "추억",
-    "more": "더보기"
+    "more": "더보기",
+    "feed": "피드"
   },
   "home": {
     "dDay": {
@@ -983,6 +984,25 @@
     "message": "새로운 버전이 출시되었습니다.\n더 나은 경험을 위해 업데이트해주세요.",
     "confirm": "업데이트",
     "cancel": "나중에"
+  },
+  "feed": {
+    "category": {
+      "all": "전체",
+      "festival": "축제",
+      "performance": "공연",
+      "restaurant": "맛집",
+      "activity": "액티비티",
+      "spot": "스팟"
+    },
+    "save": "저장",
+    "saved": "저장됨",
+    "viewDetail": "자세히 보기",
+    "empty": "아직 등록된 데이트 아이디어가 없어요",
+    "price": {
+      "free": "무료"
+    },
+    "eventPeriod": "기간",
+    "loading": "로딩 중..."
   },
   "errors": {
     "networkError": "네트워크 오류가 발생했습니다",

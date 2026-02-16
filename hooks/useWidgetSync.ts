@@ -1,7 +1,7 @@
 /**
  * useWidgetSync Hook
  *
- * Automatically syncs completed mission data with the iOS widget.
+ * Automatically syncs memory data with the iOS widget.
  * Should be used in the main app component to ensure widget stays updated.
  */
 
@@ -45,14 +45,14 @@ export function useWidgetSync() {
 
     try {
       // Transform memories to widget format
-      const widgetMissions = memories.map((memory) => ({
+      const widgetEntries = memories.map((memory) => ({
         date: formatDateToString(memory.completedAt),
-        photoUrl: memory.photoUrl || memory.mission?.imageUrl || null,
+        photoUrl: memory.photoUrl || null,
       }));
 
-      console.log('[useWidgetSync] Transformed missions:', JSON.stringify(widgetMissions.slice(0, 3)));
+      console.log('[useWidgetSync] Transformed entries:', JSON.stringify(widgetEntries.slice(0, 3)));
 
-      const result = await updateWidgetData(widgetMissions, isLoggedIn);
+      const result = await updateWidgetData(widgetEntries, isLoggedIn);
       console.log('[useWidgetSync] updateWidgetData result:', result);
     } catch (error) {
       console.error('[useWidgetSync] Failed to sync widget data:', error);
@@ -75,7 +75,6 @@ export async function syncWidgetWithMemories(
   memories: Array<{
     id: string;
     photoUrl?: string | null;
-    mission?: { imageUrl?: string } | null;
     completedAt: Date | string;
   }>,
   isLoggedIn: boolean
@@ -85,12 +84,12 @@ export async function syncWidgetWithMemories(
   }
 
   try {
-    const widgetMissions = memories.map((memory) => ({
+    const widgetEntries = memories.map((memory) => ({
       date: formatDateToString(memory.completedAt),
-      photoUrl: memory.photoUrl || memory.mission?.imageUrl || null,
+      photoUrl: memory.photoUrl || null,
     }));
 
-    return await updateWidgetData(widgetMissions, isLoggedIn);
+    return await updateWidgetData(widgetEntries, isLoggedIn);
   } catch (error) {
     console.error('[syncWidgetWithMemories] Failed to sync:', error);
     return false;

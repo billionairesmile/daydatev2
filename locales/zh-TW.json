@@ -49,7 +49,8 @@
     "mission": "任務",
     "calendar": "日曆",
     "memories": "回憶",
-    "more": "更多"
+    "more": "更多",
+    "feed": "動態"
   },
   "home": {
     "dDay": {
@@ -975,6 +976,25 @@
     "message": "新版本已發布。\n請更新以獲得更好的體驗。",
     "confirm": "更新",
     "cancel": "稍後"
+  },
+  "feed": {
+    "category": {
+      "all": "全部",
+      "festival": "節慶",
+      "performance": "演出",
+      "restaurant": "美食",
+      "activity": "活動",
+      "spot": "景點"
+    },
+    "save": "收藏",
+    "saved": "已收藏",
+    "viewDetail": "查看詳情",
+    "empty": "還沒有約會點子",
+    "price": {
+      "free": "免費"
+    },
+    "eventPeriod": "期間",
+    "loading": "載入中..."
   },
   "errors": {
     "networkError": "發生網路錯誤",

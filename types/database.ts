@@ -40,45 +40,6 @@ export interface Couple {
   updated_at?: string;
 }
 
-export interface Mission {
-  id: string;
-  title: string;
-  description: string;
-  category: string;
-  difficulty: number;
-  duration: string;
-  location_type: 'indoor' | 'outdoor';
-  tags: string[];
-  icon: string;
-  image_url?: string;
-  is_premium: boolean;
-  estimated_time: number;
-  created_at?: string;
-}
-
-export interface DailyMission {
-  id: string;
-  couple_id: string;
-  mission_id: string;
-  ai_reason: string;
-  assigned_date: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'skipped';
-  created_at?: string;
-  updated_at?: string;
-}
-
-export interface CompletedMission {
-  id: string;
-  couple_id: string;
-  mission_id: string;
-  photo_url: string;
-  user1_message: string;
-  user2_message: string;
-  location: string;
-  completed_at: string;
-  created_at?: string;
-}
-
 export interface OnboardingAnswers {
   id: string;
   user_id: string;
@@ -109,53 +70,6 @@ export interface Todo {
   created_at?: string;
 }
 
-export interface MissionCompletion {
-  id: string;
-  daily_mission_id: string;
-  user_id: string;
-  photo_url?: string;
-  message?: string;
-  created_at?: string;
-}
-
-// Target audience JSONB structure
-export interface TargetAudience {
-  type: 'all' | 'country' | 'location' | 'custom';
-  country?: string;
-  center?: { lat: number; lng: number };
-  radius_km?: number;
-  [key: string]: unknown;
-}
-
-export interface FeaturedMission {
-  id: string;
-  mission_id?: string;
-  title: string;
-  description: string;
-  // i18n fields for English (optional, falls back to Korean title/description if null)
-  title_en?: string;
-  description_en?: string;
-  category: string;
-  tags: string[];
-  tags_en?: string[]; // English tags for i18n
-  image_url: string;
-  start_date?: string;
-  end_date?: string;
-  is_active: boolean;
-  priority: number;
-  // Targeting fields
-  target_audience: TargetAudience;
-  target_country?: string;
-  target_center_lat?: number;
-  target_center_lng?: number;
-  target_radius_km?: number;
-  // Additional promotional content (affiliate links, 1-2 sentences)
-  additional_content?: string;
-  additional_content_en?: string;
-  created_at?: string;
-  updated_at?: string;
-}
-
 // Database response types
 export type Database = {
   public: {
@@ -169,21 +83,6 @@ export type Database = {
         Row: Couple;
         Insert: Omit<Couple, 'id' | 'created_at' | 'updated_at'>;
         Update: Partial<Omit<Couple, 'id' | 'created_at' | 'updated_at'>>;
-      };
-      missions: {
-        Row: Mission;
-        Insert: Omit<Mission, 'id' | 'created_at'>;
-        Update: Partial<Omit<Mission, 'id' | 'created_at'>>;
-      };
-      daily_missions: {
-        Row: DailyMission;
-        Insert: Omit<DailyMission, 'id' | 'created_at' | 'updated_at'>;
-        Update: Partial<Omit<DailyMission, 'id' | 'created_at' | 'updated_at'>>;
-      };
-      completed_missions: {
-        Row: CompletedMission;
-        Insert: Omit<CompletedMission, 'id' | 'created_at'>;
-        Update: Partial<Omit<CompletedMission, 'id' | 'created_at'>>;
       };
       onboarding_answers: {
         Row: OnboardingAnswers;
@@ -200,16 +99,49 @@ export type Database = {
         Insert: Omit<Todo, 'id' | 'created_at'>;
         Update: Partial<Omit<Todo, 'id' | 'created_at'>>;
       };
-      mission_completions: {
-        Row: MissionCompletion;
-        Insert: Omit<MissionCompletion, 'id' | 'created_at'>;
-        Update: Partial<Omit<MissionCompletion, 'id' | 'created_at'>>;
+      feed_posts: {
+        Row: FeedPostRow;
+        Insert: Omit<FeedPostRow, 'id' | 'created_at' | 'updated_at' | 'save_count'>;
+        Update: Partial<Omit<FeedPostRow, 'id' | 'created_at'>>;
       };
-      featured_missions: {
-        Row: FeaturedMission;
-        Insert: Omit<FeaturedMission, 'id' | 'created_at' | 'updated_at'>;
-        Update: Partial<Omit<FeaturedMission, 'id' | 'created_at' | 'updated_at'>>;
+      feed_saves: {
+        Row: FeedSaveRow;
+        Insert: Omit<FeedSaveRow, 'id' | 'created_at'>;
+        Update: never;
       };
     };
   };
 };
+
+// Feed Posts (DB row format)
+export interface FeedPostRow {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  title: string;
+  caption: string;
+  source_type: string;
+  images: string[];
+  location_name: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  price: string | null;
+  event_start_date: string | null;
+  event_end_date: string | null;
+  external_link: string | null;
+  affiliate_link: string | null;
+  category: string;
+  tags: string[];
+  is_published: boolean;
+  publish_date: string | null;
+  priority: number;
+  save_count: number;
+}
+
+// Feed Saves (DB row format)
+export interface FeedSaveRow {
+  id: string;
+  user_id: string;
+  feed_post_id: string;
+  created_at: string;
+}

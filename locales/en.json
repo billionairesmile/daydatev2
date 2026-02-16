@@ -49,7 +49,8 @@
     "mission": "Mission",
     "calendar": "Calendar",
     "memories": "Memories",
-    "more": "More"
+    "more": "More",
+    "feed": "Feed"
   },
   "home": {
     "dDay": {
@@ -978,6 +979,25 @@
     "message": "A new version is available.\nPlease update for a better experience.",
     "confirm": "Update",
     "cancel": "Later"
+  },
+  "feed": {
+    "category": {
+      "all": "All",
+      "festival": "Festival",
+      "performance": "Show",
+      "restaurant": "Food",
+      "activity": "Activity",
+      "spot": "Spot"
+    },
+    "save": "Save",
+    "saved": "Saved",
+    "viewDetail": "View Detail",
+    "empty": "No date ideas yet",
+    "price": {
+      "free": "Free"
+    },
+    "eventPeriod": "Period",
+    "loading": "Loading..."
   },
   "errors": {
     "networkError": "Network error occurred",

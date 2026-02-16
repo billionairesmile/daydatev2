@@ -3,9 +3,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { File as ExpoFile } from 'expo-file-system';
 import { decode } from 'base64-arraybuffer';
-import { formatDateToLocal, formatDateInTimezone } from './dateUtils';
+import { formatDateToLocal } from './dateUtils';
 import * as ImageManipulator from 'expo-image-manipulator';
-import { filterMissionsByTargeting, UserTargetingContext } from './locationUtils';
+
 
 // Note: useTimezoneStore is imported dynamically to avoid require cycle
 // supabase.ts <-> timezoneStore.ts
@@ -82,6 +82,17 @@ async function deleteFromStorage(path: string | null): Promise<void> {
 
 // Database helper functions
 export const db = {
+  // Server Time (general utility)
+  async getServerTime(): Promise<Date> {
+    const client = getSupabase();
+    const { data, error } = await client.rpc('get_server_time');
+    if (error || !data) {
+      console.warn('[Supabase] Failed to get server time, using client time:', error?.message);
+      return new Date();
+    }
+    return new Date(data);
+  },
+
   // Pairing Codes
   pairingCodes: {
     // Create a new pairing code
@@ -737,295 +748,6 @@ export const db = {
     },
   },
 
-  // Missions
-  missions: {
-    async getAll() {
-      const client = getSupabase();
-      const { data, error } = await client
-        .from('missions')
-        .select('*')
-        .order('created_at', { ascending: false });
-      return { data, error };
-    },
-
-    async getByCategory(category: string) {
-      const client = getSupabase();
-      const { data, error } = await client
-        .from('missions')
-        .select('*')
-        .eq('category', category);
-      return { data, error };
-    },
-
-    async getRandom(limit = 5) {
-      const client = getSupabase();
-      const { data, error } = await client
-        .from('missions')
-        .select('*')
-        .limit(limit);
-      return { data, error };
-    },
-  },
-
-  // Daily Missions
-  dailyMissions: {
-    async getToday(coupleId: string) {
-      const client = getSupabase();
-      const today = formatDateToLocal(new Date());
-      const { data, error } = await client
-        .from('daily_missions')
-        .select('*, mission:missions(*)')
-        .eq('couple_id', coupleId)
-        .eq('assigned_date', today)
-        .single();
-      return { data, error };
-    },
-
-    async create(dailyMission: {
-      couple_id: string;
-      mission_id: string;
-      ai_reason: string;
-      assigned_date: string;
-    }) {
-      const client = getSupabase();
-      const { data, error } = await client
-        .from('daily_missions')
-        .insert(dailyMission)
-        .select('*, mission:missions(*)')
-        .single();
-      return { data, error };
-    },
-
-    async updateStatus(id: string, status: string) {
-      const client = getSupabase();
-      const { data, error } = await client
-        .from('daily_missions')
-        .update({ status })
-        .eq('id', id)
-        .select()
-        .single();
-      return { data, error };
-    },
-
-    async getHistory(coupleId: string, limit = 30) {
-      const client = getSupabase();
-      const { data, error } = await client
-        .from('daily_missions')
-        .select('*, mission:missions(*)')
-        .eq('couple_id', coupleId)
-        .order('assigned_date', { ascending: false })
-        .limit(limit);
-      return { data, error };
-    },
-  },
-
-  // Completed Missions (Memories)
-  completedMissions: {
-    async getAll(coupleId: string) {
-      const client = getSupabase();
-      const { data, error } = await client
-        .from('completed_missions')
-        .select('*')
-        .eq('couple_id', coupleId)
-        .order('completed_at', { ascending: false });
-      return { data, error };
-    },
-
-    async getByMonth(coupleId: string, year: number, month: number) {
-      const client = getSupabase();
-      const startDate = new Date(year, month, 1).toISOString();
-      const endDate = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
-
-      const { data, error } = await client
-        .from('completed_missions')
-        .select('*')
-        .eq('couple_id', coupleId)
-        .gte('completed_at', startDate)
-        .lte('completed_at', endDate)
-        .order('completed_at', { ascending: false });
-      return { data, error };
-    },
-
-    // Create memory for AI-generated missions (no mission_id FK)
-    async create(memory: {
-      couple_id: string;
-      photo_url: string;
-      user1_message: string;
-      user2_message?: string;
-      location?: string;
-      mission_data: {
-        id: string;
-        title: string;
-        description: string;
-        category: string;
-        icon?: string;
-        imageUrl?: string;
-        difficulty?: number;
-        tags?: string[];
-      };
-    }) {
-      const client = getSupabase();
-      const { data, error } = await client
-        .from('completed_missions')
-        .insert({
-          couple_id: memory.couple_id,
-          photo_url: memory.photo_url,
-          user1_message: memory.user1_message,
-          user2_message: memory.user2_message || '',
-          location: memory.location || '',
-          mission_data: memory.mission_data,
-          // mission_id is null for AI-generated missions
-        })
-        .select()
-        .single();
-      return { data, error };
-    },
-
-    // Get single memory by ID
-    async getById(id: string) {
-      const client = getSupabase();
-      const { data, error } = await client
-        .from('completed_missions')
-        .select('*')
-        .eq('id', id)
-        .single();
-      return { data, error };
-    },
-
-    // Update memory (e.g., add partner's message)
-    async update(id: string, updates: Record<string, unknown>) {
-      const client = getSupabase();
-      const { data, error } = await client
-        .from('completed_missions')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
-      return { data, error };
-    },
-
-    // Delete memory
-    async delete(id: string) {
-      const client = getSupabase();
-      const { error } = await client
-        .from('completed_missions')
-        .delete()
-        .eq('id', id);
-      return { error };
-    },
-
-    // Get mission history summary for deduplication (hybrid approach)
-    // Returns recent titles and category counts - optimized for token efficiency
-    async getMissionHistorySummary(coupleId: string, limit: number = 30): Promise<{
-      recentTitles: string[];
-      categoryStats: Record<string, number>;
-      totalCompleted: number;
-    }> {
-      const client = getSupabase();
-
-      // Get recent missions (last N missions)
-      const { data, error } = await client
-        .from('completed_missions')
-        .select('mission_data, completed_at')
-        .eq('couple_id', coupleId)
-        .order('completed_at', { ascending: false })
-        .limit(limit);
-
-      if (error || !data) {
-        console.error('[getMissionHistorySummary] Error:', error);
-        return { recentTitles: [], categoryStats: {}, totalCompleted: 0 };
-      }
-
-      // Extract titles and count categories
-      const recentTitles: string[] = [];
-      const categoryStats: Record<string, number> = {};
-
-      for (const mission of data) {
-        const missionData = mission.mission_data as { title?: string; category?: string } | null;
-        if (missionData) {
-          // Add title (if exists)
-          if (missionData.title) {
-            recentTitles.push(missionData.title);
-          }
-          // Count category
-          if (missionData.category) {
-            categoryStats[missionData.category] = (categoryStats[missionData.category] || 0) + 1;
-          }
-        }
-      }
-
-      return {
-        recentTitles,
-        categoryStats,
-        totalCompleted: data.length,
-      };
-    },
-
-    // Get all completed mission IDs (for filtering out already completed missions)
-    async getCompletedMissionIds(coupleId: string): Promise<{ data: string[] | null; error: Error | null }> {
-      const client = getSupabase();
-      try {
-        const { data, error } = await client
-          .from('completed_missions')
-          .select('mission_data')
-          .eq('couple_id', coupleId);
-
-        if (error) {
-          return { data: null, error };
-        }
-
-        // Extract mission IDs from mission_data
-        const missionIds: string[] = [];
-        for (const row of data || []) {
-          const missionData = row.mission_data as { id?: string } | null;
-          if (missionData?.id) {
-            missionIds.push(missionData.id);
-          }
-        }
-
-        return { data: missionIds, error: null };
-      } catch (err) {
-        return { data: null, error: err as Error };
-      }
-    },
-
-    // Subscribe to completed missions changes for real-time sync
-    subscribeToCompletedMissions(
-      coupleId: string,
-      callback: (payload: { eventType: string; memory: unknown }) => void
-    ) {
-      const client = getSupabase();
-      console.log('[Supabase] Creating completed_missions subscription for couple:', coupleId);
-      const channel = client
-        .channel(`completed_missions:${coupleId}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'completed_missions',
-            filter: `couple_id=eq.${coupleId}`,
-          },
-          (payload) => {
-            console.log('[Supabase] completed_missions event received:', payload.eventType, 'id:', (payload.new as Record<string, unknown>)?.id || (payload.old as Record<string, unknown>)?.id);
-            callback({
-              eventType: payload.eventType,
-              memory: payload.eventType === 'DELETE' ? payload.old : payload.new,
-            });
-          }
-        )
-        .subscribe((status) => {
-          console.log('[Supabase] completed_missions subscription status:', status);
-        });
-      return channel;
-    },
-
-    unsubscribeFromCompletedMissions(channel: ReturnType<SupabaseClient['channel']>) {
-      const client = getSupabase();
-      client.removeChannel(channel);
-    },
-  },
-
   // Onboarding Answers
   onboardingAnswers: {
     async get(userId: string) {
@@ -1217,149 +939,132 @@ export const db = {
     },
   },
 
-  // Mission Completions (per-user)
-  missionCompletions: {
-    async getByMission(dailyMissionId: string) {
+  // ============================================
+  // FEED (Date idea content)
+  // ============================================
+
+  feedPosts: {
+    async getPublished(options?: { category?: string; limit?: number; offset?: number }) {
       const client = getSupabase();
-      const { data, error } = await client
-        .from('mission_completions')
+      let query = client
+        .from('feed_posts')
         .select('*')
-        .eq('daily_mission_id', dailyMissionId);
-      return { data, error };
-    },
+        .eq('is_published', true)
+        .order('priority', { ascending: false })
+        .order('publish_date', { ascending: false });
 
-    async create(completion: {
-      daily_mission_id: string;
-      user_id: string;
-      photo_url?: string;
-      message?: string;
-    }) {
-      const client = getSupabase();
-      const { data, error } = await client
-        .from('mission_completions')
-        .insert(completion)
-        .select()
-        .single();
-      return { data, error };
-    },
-
-    async update(id: string, updates: Record<string, unknown>) {
-      const client = getSupabase();
-      const { data, error } = await client
-        .from('mission_completions')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
-      return { data, error };
-    },
-  },
-
-  // Featured Missions (Admin-created special missions)
-  featuredMissions: {
-    /**
-     * Get active featured missions for today, optionally filtered by user targeting
-     * @param userContext - Optional user location/country for targeting filter
-     */
-    async getActiveForToday(userContext?: UserTargetingContext) {
-      const client = getSupabase();
-      // Use effective timezone for date comparison
-      // Dynamic import to avoid require cycle (supabase.ts <-> timezoneStore.ts)
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { useTimezoneStore } = require('@/stores/timezoneStore');
-      const effectiveTimezone = useTimezoneStore.getState().getEffectiveTimezone();
-      const today = formatDateInTimezone(new Date(), effectiveTimezone);
-
-      // Fetch all active featured missions first, then filter by date in JS
-      // This avoids issues with chaining multiple .or() calls in Supabase
-      const { data: allData, error } = await client
-        .from('featured_missions')
-        .select('*')
-        .eq('is_active', true)
-        .order('priority', { ascending: false });
-
-      if (error || !allData) {
-        return { data: null, error };
+      if (options?.category && options.category !== 'all') {
+        query = query.eq('category', options.category);
+      }
+      if (options?.limit) {
+        query = query.limit(options.limit);
+      }
+      if (options?.offset) {
+        query = query.range(options.offset, options.offset + (options?.limit || 20) - 1);
       }
 
-      // Filter by date range in JavaScript for reliable NULL handling
-      let filteredData = allData.filter(mission => {
-        const startOk = !mission.start_date || mission.start_date <= today;
-        const endOk = !mission.end_date || mission.end_date >= today;
-        return startOk && endOk;
-      });
-
-      // Apply targeting filter if user context is provided
-      if (userContext) {
-        filteredData = filterMissionsByTargeting(filteredData, userContext);
-      }
-
-      return { data: filteredData, error: null };
-    },
-
-    async getAll() {
-      const client = getSupabase();
-      const { data, error } = await client
-        .from('featured_missions')
-        .select('*')
-        .order('priority', { ascending: false });
+      const { data, error } = await query;
       return { data, error };
     },
 
     async getById(id: string) {
       const client = getSupabase();
       const { data, error } = await client
-        .from('featured_missions')
+        .from('feed_posts')
         .select('*')
         .eq('id', id)
         .single();
       return { data, error };
     },
 
-    async create(mission: {
-      mission_id?: string;
-      title: string;
-      description: string;
-      category: string;
-      difficulty: number;
-      duration: string;
-      location_type: string;
-      tags: string[];
-      icon: string;
-      image_url: string;
-      estimated_time: number;
-      start_date?: string;
-      end_date?: string;
-      priority?: number;
-      target_audience?: string;
-    }) {
+    async search(searchTerm: string) {
       const client = getSupabase();
       const { data, error } = await client
-        .from('featured_missions')
-        .insert(mission)
-        .select()
-        .single();
+        .from('feed_posts')
+        .select('*')
+        .eq('is_published', true)
+        .or(`title.ilike.%${searchTerm}%,caption.ilike.%${searchTerm}%`)
+        .order('priority', { ascending: false })
+        .limit(20);
+      return { data, error };
+    },
+  },
+
+  feedSaves: {
+    async getByUser(userId: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('feed_saves')
+        .select('*, feed_posts(*)')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
       return { data, error };
     },
 
-    async update(id: string, updates: Record<string, unknown>) {
+    async toggle(userId: string, feedPostId: string) {
       const client = getSupabase();
-      const { data, error } = await client
-        .from('featured_missions')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
-      return { data, error };
+      // Check if already saved
+      const { data: existing } = await client
+        .from('feed_saves')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('feed_post_id', feedPostId)
+        .maybeSingle();
+
+      if (existing) {
+        // Unsave
+        const { error } = await client
+          .from('feed_saves')
+          .delete()
+          .eq('id', existing.id);
+        return { saved: false, error };
+      } else {
+        // Save
+        const { error } = await client
+          .from('feed_saves')
+          .insert({ user_id: userId, feed_post_id: feedPostId });
+        return { saved: true, error };
+      }
     },
 
-    async delete(id: string) {
+    async isSaved(userId: string, feedPostId: string) {
       const client = getSupabase();
-      const { error } = await client
-        .from('featured_missions')
+      const { data, error } = await client
+        .from('feed_saves')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('feed_post_id', feedPostId)
+        .maybeSingle();
+      return { isSaved: !!data, error };
+    },
+
+    async getSavedPostIds(userId: string) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('feed_saves')
+        .select('feed_post_id')
+        .eq('user_id', userId);
+      return { data: data?.map(d => d.feed_post_id) || [], error };
+    },
+  },
+
+  // Legacy: completed_missions (read-only for memories tab, Phase 2 will migrate to albums)
+  completedMissions: {
+    async getAll(coupleId: string) {
+      const client = getSupabase();
+      return client
+        .from('completed_missions')
+        .select('*')
+        .eq('couple_id', coupleId)
+        .order('completed_at', { ascending: false });
+    },
+
+    async delete(memoryId: string) {
+      const client = getSupabase();
+      return client
+        .from('completed_missions')
         .delete()
-        .eq('id', id);
-      return { error };
+        .eq('id', memoryId);
     },
   },
 
@@ -1442,522 +1147,9 @@ export const db = {
     },
   },
 
-  // Mission Categories
-  missionCategories: {
-    async getAll() {
-      const client = getSupabase();
-      const { data, error } = await client
-        .from('mission_categories')
-        .select('*')
-        .eq('is_active', true)
-        .order('display_order', { ascending: true });
-      return { data, error };
-    },
-
-    async getByCategory(category: string) {
-      const client = getSupabase();
-      const { data, error } = await client
-        .from('mission_categories')
-        .select('*')
-        .eq('category', category)
-        .eq('is_active', true)
-        .single();
-      return { data, error };
-    },
-
-    async getByGroup(groupName: string) {
-      const client = getSupabase();
-      const { data, error } = await client
-        .from('mission_categories')
-        .select('*')
-        .eq('group_name', groupName)
-        .eq('is_active', true)
-        .order('display_order', { ascending: true });
-      return { data, error };
-    },
-  },
-
   // ============================================
   // COUPLE SYNC HELPERS (Real-time sync between paired users)
   // ============================================
-
-  // Couple Missions (shared generated missions)
-  coupleMissions: {
-    // Get server time to prevent client time manipulation
-    async getServerTime(): Promise<Date> {
-      const client = getSupabase();
-      const { data, error } = await client.rpc('get_server_time');
-      if (error || !data) {
-        // Fallback to client time if RPC fails (function may not exist yet)
-        console.warn('[Supabase] Failed to get server time, using client time:', error?.message);
-        return new Date();
-      }
-      return new Date(data);
-    },
-
-    async getToday(coupleId: string) {
-      const client = getSupabase();
-      // Use server time to prevent client time manipulation
-      const serverTime = await this.getServerTime();
-      serverTime.setHours(0, 0, 0, 0);
-
-      // Use .gt() (greater than) instead of .gte() to correctly exclude
-      // missions that expire at exactly midnight today
-      // e.g., mission created Dec 24 expires at Dec 25 00:00:00
-      // On Dec 25, this mission should NOT be returned
-      const { data, error } = await client
-        .from('couple_missions')
-        .select('*')
-        .eq('couple_id', coupleId)
-        .eq('status', 'active')
-        .gt('expires_at', serverTime.toISOString())
-        .order('generated_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      return { data, error };
-    },
-
-    async create(
-      coupleId: string,
-      missions: unknown[],
-      answers: unknown,
-      userId: string,
-      expiresAtISO?: string // Optional: timezone-aware expiration time in ISO format
-    ) {
-      const client = getSupabase();
-
-      // Use provided expiration time or fallback to device local time
-      let expiresAtString: string;
-      if (expiresAtISO) {
-        expiresAtString = expiresAtISO;
-      } else {
-        // Fallback: Set expiration to next midnight in device local time
-        const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + 1);
-        expiresAt.setHours(0, 0, 0, 0);
-        expiresAtString = expiresAt.toISOString();
-      }
-
-      const { data, error } = await client
-        .from('couple_missions')
-        .insert({
-          couple_id: coupleId,
-          missions,
-          generation_answers: answers,
-          generated_by: userId,
-          expires_at: expiresAtString,
-          status: 'active',
-          missions_ready: false, // A will set to true after loading images
-        })
-        .select()
-        .single();
-      return { data, error };
-    },
-
-    async expireOld(coupleId: string) {
-      const client = getSupabase();
-      // Use server time to prevent client time manipulation
-      const serverTime = await this.getServerTime();
-      const { error } = await client
-        .from('couple_missions')
-        .update({ status: 'expired' })
-        .eq('couple_id', coupleId)
-        .eq('status', 'active')
-        .lt('expires_at', serverTime.toISOString());
-      return { error };
-    },
-
-    // Delete all active missions for a couple (for reset)
-    async deleteActive(coupleId: string) {
-      const client = getSupabase();
-      const { error } = await client
-        .from('couple_missions')
-        .delete()
-        .eq('couple_id', coupleId)
-        .eq('status', 'active');
-      return { error };
-    },
-
-    // Delete all expired missions for a couple (cleanup old data)
-    // This prevents data bloat - expired missions are no longer needed
-    // Note: couple_bookmarks is independent and won't be affected
-    async deleteExpired(coupleId: string) {
-      const client = getSupabase();
-      const { error } = await client
-        .from('couple_missions')
-        .delete()
-        .eq('couple_id', coupleId)
-        .eq('status', 'expired');
-      return { error };
-    },
-
-    // Mark missions as refreshed (syncs refresh status between users)
-    async setRefreshed(coupleId: string) {
-      const client = getSupabase();
-      const { error } = await client
-        .from('couple_missions')
-        .update({ refreshed_at: new Date().toISOString() })
-        .eq('couple_id', coupleId)
-        .eq('status', 'active');
-      return { error };
-    },
-
-    subscribeToMissions(
-      coupleId: string,
-      callback: (payload: { missions: unknown[]; generated_by: string; generated_at: string; eventType: 'INSERT' | 'DELETE' | 'UPDATE'; refreshed_at?: string | null; missions_ready?: boolean }) => void
-    ) {
-      const client = getSupabase();
-      const channel = client
-        .channel(`couple_missions:${coupleId}`)
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'couple_missions',
-            filter: `couple_id=eq.${coupleId}`,
-          },
-          (payload) => {
-            const record = payload.new as { missions: unknown[]; generated_by: string; generated_at: string; refreshed_at?: string | null; missions_ready?: boolean };
-            callback({ missions: record.missions, generated_by: record.generated_by, generated_at: record.generated_at, eventType: 'INSERT', refreshed_at: record.refreshed_at, missions_ready: record.missions_ready });
-          }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'couple_missions',
-            filter: `couple_id=eq.${coupleId}`,
-          },
-          (payload) => {
-            // When missions are updated (e.g., refreshed_at or missions_ready is set), sync the state
-            const record = payload.new as { missions: unknown[]; generated_by: string; generated_at: string; refreshed_at?: string | null; missions_ready?: boolean };
-            console.log('[Supabase] couple_missions UPDATE event received, refreshed_at:', record.refreshed_at, 'missions_ready:', record.missions_ready);
-            callback({ missions: record.missions, generated_by: record.generated_by, generated_at: record.generated_at, eventType: 'UPDATE', refreshed_at: record.refreshed_at, missions_ready: record.missions_ready });
-          }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: 'DELETE',
-            schema: 'public',
-            table: 'couple_missions',
-            filter: `couple_id=eq.${coupleId}`,
-          },
-          (payload) => {
-            // When missions are deleted, notify with empty array
-            console.log('[Supabase] couple_missions DELETE event received');
-            callback({ missions: [], generated_by: '', generated_at: '', eventType: 'DELETE' });
-          }
-        )
-        .subscribe();
-      return channel;
-    },
-
-    unsubscribe(channel: ReturnType<SupabaseClient['channel']>) {
-      const client = getSupabase();
-      client.removeChannel(channel);
-    },
-  },
-
-  // Mission Generation Lock (prevents simultaneous generation)
-  missionLock: {
-    async getStatus(coupleId: string) {
-      const client = getSupabase();
-      const { data, error } = await client
-        .from('mission_generation_lock')
-        .select('*')
-        .eq('couple_id', coupleId)
-        .maybeSingle();
-      return { data, error };
-    },
-
-    async acquire(coupleId: string, userId: string): Promise<boolean> {
-      const client = getSupabase();
-
-      // First check if lock exists
-      const { data: existing } = await client
-        .from('mission_generation_lock')
-        .select('*')
-        .eq('couple_id', coupleId)
-        .maybeSingle();
-
-      if (existing) {
-        // If already generating or watching ad by someone else, fail
-        if (
-          (existing.status === 'generating' || existing.status === 'ad_watching') &&
-          existing.locked_by !== userId
-        ) {
-          // Check if lock is stale (older than 2 minutes)
-          const lockTime = new Date(existing.locked_at).getTime();
-          const now = Date.now();
-          if (now - lockTime < 120000) {
-            // Lock is fresh, cannot acquire
-            return false;
-          }
-          // Lock is stale, proceed to update
-        }
-
-        // Update existing lock
-        const { error } = await client
-          .from('mission_generation_lock')
-          .update({
-            locked_by: userId,
-            locked_at: new Date().toISOString(),
-            status: 'generating',
-          })
-          .eq('couple_id', coupleId);
-
-        return !error;
-      } else {
-        // Create new lock
-        const { error } = await client
-          .from('mission_generation_lock')
-          .insert({
-            couple_id: coupleId,
-            locked_by: userId,
-            locked_at: new Date().toISOString(),
-            status: 'generating',
-          });
-
-        return !error;
-      }
-    },
-
-    async release(coupleId: string, status: 'completed' | 'idle' = 'completed') {
-      const client = getSupabase();
-      const { error } = await client
-        .from('mission_generation_lock')
-        .update({
-          status,
-          locked_by: null,
-          locked_at: null,
-          pending_missions: null,
-          pending_answers: null,
-        })
-        .eq('couple_id', coupleId);
-      return { error };
-    },
-
-    // Update lock with pending missions during ad viewing
-    // Uses UPSERT to create record if it doesn't exist
-    async updatePending(
-      coupleId: string,
-      missions: unknown[],
-      answers: unknown,
-      userId: string
-    ) {
-      const client = getSupabase();
-      const { error } = await client
-        .from('mission_generation_lock')
-        .upsert({
-          couple_id: coupleId,
-          status: 'ad_watching',
-          pending_missions: missions,
-          pending_answers: answers,
-          locked_by: userId,
-          locked_at: new Date().toISOString(),
-        }, {
-          onConflict: 'couple_id',
-        });
-      return { error };
-    },
-
-    // Clear pending data (on commit or rollback)
-    async clearPending(coupleId: string) {
-      const client = getSupabase();
-      const { error } = await client
-        .from('mission_generation_lock')
-        .update({
-          pending_missions: null,
-          pending_answers: null,
-        })
-        .eq('couple_id', coupleId);
-      return { error };
-    },
-
-    // Update lock status only (for ad_watching state - no pending missions)
-    // Uses UPSERT to create record if it doesn't exist
-    async updateStatus(
-      coupleId: string,
-      status: string,
-      userId: string
-    ) {
-      const client = getSupabase();
-      const { error } = await client
-        .from('mission_generation_lock')
-        .upsert({
-          couple_id: coupleId,
-          status,
-          locked_by: userId,
-          locked_at: new Date().toISOString(),
-        }, {
-          onConflict: 'couple_id',
-        });
-      return { error };
-    },
-
-    subscribeToLock(
-      coupleId: string,
-      callback: (payload: { status: string; locked_by: string | null }) => void
-    ) {
-      const client = getSupabase();
-      const channel = client
-        .channel(`mission_lock:${coupleId}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'mission_generation_lock',
-            filter: `couple_id=eq.${coupleId}`,
-          },
-          (payload) => {
-            const record = payload.new as { status: string; locked_by: string | null };
-            callback({ status: record.status, locked_by: record.locked_by });
-          }
-        )
-        .subscribe();
-      return channel;
-    },
-
-    unsubscribe(channel: ReturnType<SupabaseClient['channel']>) {
-      const client = getSupabase();
-      client.removeChannel(channel);
-    },
-  },
-
-  // Couple Bookmarks (shared bookmarked missions)
-  coupleBookmarks: {
-    async getAll(coupleId: string) {
-      const client = getSupabase();
-      const { data, error } = await client
-        .from('couple_bookmarks')
-        .select('*')
-        .eq('couple_id', coupleId)
-        .order('created_at', { ascending: false });
-      return { data, error };
-    },
-
-    async add(coupleId: string, missionId: string, missionData: unknown, userId: string) {
-      const client = getSupabase();
-      const { data, error } = await client
-        .from('couple_bookmarks')
-        .insert({
-          couple_id: coupleId,
-          mission_id: missionId,
-          mission_data: missionData,
-          bookmarked_by: userId,
-        })
-        .select()
-        .single();
-      return { data, error };
-    },
-
-    async remove(coupleId: string, missionId: string) {
-      const client = getSupabase();
-      const { error } = await client
-        .from('couple_bookmarks')
-        .delete()
-        .eq('couple_id', coupleId)
-        .eq('mission_id', missionId);
-      return { error };
-    },
-
-    // Mark a bookmark as completed (instead of removing immediately)
-    async markCompleted(coupleId: string, missionId: string) {
-      const client = getSupabase();
-      const { data, error } = await client
-        .from('couple_bookmarks')
-        .update({ completed_at: new Date().toISOString() })
-        .eq('couple_id', coupleId)
-        .eq('mission_id', missionId)
-        .select();
-
-      // Log if no rows were updated (bookmark might not exist)
-      if (!error && (!data || data.length === 0)) {
-        console.log('[Bookmark] No bookmark found to mark as completed:', missionId);
-      }
-
-      return { data, error };
-    },
-
-    // Cleanup completed bookmarks that have passed the noon threshold
-    async cleanupCompleted(coupleId: string, timezone: string = 'UTC') {
-      const client = getSupabase();
-      const { data, error } = await client
-        .rpc('cleanup_couple_completed_bookmarks', { p_couple_id: coupleId, p_timezone: timezone });
-      return { data, error };
-    },
-
-    async exists(coupleId: string, missionId: string) {
-      const client = getSupabase();
-      const { data, error } = await client
-        .from('couple_bookmarks')
-        .select('id')
-        .eq('couple_id', coupleId)
-        .eq('mission_id', missionId)
-        .maybeSingle();
-      return { exists: !!data, error };
-    },
-
-    subscribeToBookmarks(
-      coupleId: string,
-      callback: (payload: { eventType: string; bookmark: unknown }) => void
-    ) {
-      const client = getSupabase();
-      const channel = client
-        .channel(`couple_bookmarks:${coupleId}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'couple_bookmarks',
-            filter: `couple_id=eq.${coupleId}`,
-          },
-          (payload) => {
-            callback({
-              eventType: payload.eventType,
-              bookmark: payload.eventType === 'DELETE' ? payload.old : payload.new,
-            });
-          }
-        )
-        .subscribe();
-      return channel;
-    },
-
-    unsubscribe(channel: ReturnType<SupabaseClient['channel']>) {
-      const client = getSupabase();
-      client.removeChannel(channel);
-    },
-
-    async getBookmarkSummary(coupleId: string) {
-      const client = getSupabase();
-      const { data, error } = await client
-        .from('couple_bookmarks')
-        .select('mission_data')
-        .eq('couple_id', coupleId)
-        .order('created_at', { ascending: false })
-        .limit(20);
-
-      if (error || !data || data.length === 0) return null;
-
-      const categories: Record<string, number> = {};
-      const titles: string[] = [];
-      for (const row of data) {
-        const mission = row.mission_data as any;
-        if (mission?.category) {
-          categories[mission.category] = (categories[mission.category] || 0) + 1;
-        }
-        if (mission?.title) {
-          titles.push(mission.title);
-        }
-      }
-      return { categories, titles, total: data.length };
-    },
-  },
 
   // Couple Todos (shared todo list - different from the existing todos table)
   coupleTodos: {

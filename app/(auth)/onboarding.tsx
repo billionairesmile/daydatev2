@@ -66,7 +66,7 @@ import {
   type OnboardingData,
 } from '@/stores/onboardingStore';
 import { useBackground } from '@/contexts';
-import { useMissionStore } from '@/stores/missionStore';
+
 import { db, isDemoMode, isInTestMode, supabase } from '@/lib/supabase';
 import {
   createTestPairingCode,
@@ -3011,7 +3011,6 @@ function PairingStep({
               // This ensures both users start completely fresh with the new couple
               if (!isReconnection) {
                 console.log('[PairingStep] Creator (realtime): New pairing - resetting all local mission data');
-                useMissionStore.getState().resetAllTodayMissions();
               }
 
               if (isReconnection && actualCoupleData) {
@@ -3202,10 +3201,6 @@ function PairingStep({
 
               setIsPairingConnected(true);
 
-              // Reset ALL local mission data for NEW pairings (test mode - always fresh)
-              console.log('[PairingStep] Creator (test mode): New pairing - resetting all local mission data');
-              useMissionStore.getState().resetAllTodayMissions();
-
               // Clear polling interval before navigating
               if (pollingRef.current) {
                 clearInterval(pollingRef.current);
@@ -3316,7 +3311,6 @@ function PairingStep({
                 // Reset ALL local mission data for NEW pairings
                 // This ensures both users start completely fresh with the new couple
                 console.log('[PairingStep] Creator (polling): New pairing - resetting all local mission data');
-                useMissionStore.getState().resetAllTodayMissions();
 
                 console.log('[PairingStep] Polling: Partner connected, navigating to next screen');
                 onNext();
@@ -3444,10 +3438,6 @@ function PairingStep({
         console.log('[TestMode] Creator:', pairingData.creatorId, '+ Joiner:', joinerId);
 
         setIsPairingConnected(true);
-
-        // Reset ALL local mission data for NEW pairings (test mode - always fresh)
-        console.log('[PairingStep] Joiner (test mode): New pairing - resetting all local mission data');
-        useMissionStore.getState().resetAllTodayMissions();
 
         setIsLoading(false);
         // Navigation will be handled by handleConnect or validation check
@@ -3850,13 +3840,6 @@ function PairingStep({
 
       // Reset ALL local mission data for NEW pairings (not reconnections)
       // This ensures both users start completely fresh with the new couple:
-      // - Generated missions are cleared
-      // - Today's completed mission limit is reset (can complete 1 mission with new partner)
-      // - In-progress missions are cleared
-      if (!isReconnection) {
-        console.log('[PairingStep] New pairing - resetting all local mission data');
-        useMissionStore.getState().resetAllTodayMissions();
-      }
       console.log('[PairingStep] Reconnection check:', { disconnect_reason: updatedCouple?.disconnect_reason, isReconnection });
 
       if (isReconnection && isExistingUser) {

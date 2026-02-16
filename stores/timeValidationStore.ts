@@ -33,7 +33,7 @@ export const useTimeValidationStore = create<TimeValidationState>((set, get) => 
 
     try {
       // Get server time
-      const serverTime = await db.coupleMissions.getServerTime();
+      const serverTime = await db.getServerTime();
       const deviceTime = new Date();
 
       // Calculate absolute time difference
@@ -83,9 +83,9 @@ export function getTimeDifferenceText(timeDifferenceMs: number | null): string {
 
   const minutes = Math.round(timeDifferenceMs / 1000 / 60);
   if (minutes < 60) {
-    return i18n.t('mission.timeError.minutes', { count: minutes });
+    return i18n.t('timeError.minutes', { count: minutes });
   }
 
   const hours = Math.round(minutes / 60);
-  return i18n.t('mission.timeError.hours', { count: hours });
+  return i18n.t('timeError.hours', { count: hours });
 }

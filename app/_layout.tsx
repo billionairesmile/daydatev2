@@ -26,7 +26,6 @@ import { useTranslation } from 'react-i18next';
 
 import { useAuthStore, useOnboardingStore, useTimezoneStore, useSubscriptionStore, useLanguageStore } from '@/stores';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
-import { useMissionStore } from '@/stores/missionStore';
 import { BackgroundProvider, useBackground } from '@/contexts';
 import { preloadCharacterAssets } from '@/utils';
 import { CharacterPreloader } from '@/components/ransom';
@@ -222,8 +221,7 @@ function RootLayoutNav() {
   const segments = useSegments();
   const { t } = useTranslation();
   const { isAuthenticated, isOnboardingComplete, setIsOnboardingComplete, couple, user, setCouple, setPartner, partner, _hasHydrated: authHydrated } = useAuthStore();
-  const { initializeSync, cleanup: cleanupSync, processPendingOperations, loadMissionProgress, loadSharedMissions, loadAlbums, loadTodos, loadMenstrualSettings } = useCoupleSyncStore();
-  const { checkAndResetMissions } = useMissionStore();
+  const { initializeSync, cleanup: cleanupSync, processPendingOperations, loadAlbums, loadTodos, loadMenstrualSettings } = useCoupleSyncStore();
   const { setStep: setOnboardingStep, updateData: updateOnboardingData } = useOnboardingStore();
   const { syncFromCouple } = useTimezoneStore();
   const { initializeRevenueCat, loadFromDatabase, checkCouplePremium, setPartnerIsPremium, _hasHydrated: subscriptionHydrated } = useSubscriptionStore();
@@ -238,7 +236,7 @@ function RootLayoutNav() {
   // Initialize push notifications
   usePushNotifications();
 
-  // Sync widget data with completed missions (iOS only)
+  // Sync widget data (iOS only)
   useWidgetSync();
 
   // Get signOut function from authStore
@@ -796,7 +794,7 @@ function RootLayoutNav() {
     }
   }, [authSignOut, cleanupSync, setIsOnboardingComplete]);
 
-  // Refresh partner data, location, mission progress, albums, and subscription when app comes to foreground
+  // Refresh partner data, location, albums, and subscription when app comes to foreground
   useEffect(() => {
     const subscription = AppState.addEventListener('change', async (nextAppState: AppStateStatus) => {
       if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
@@ -804,16 +802,8 @@ function RootLayoutNav() {
         await verifySessionAndRefresh();
 
         // Then refresh all synced data
-        // CRITICAL: Must await fetchCoupleAndPartnerData to ensure timezone is synced
-        // before checking mission dates
         await fetchCoupleAndPartnerData();
         updateUserLocation();
-        // First load fresh mission data from DB to ensure proper date comparison
-        await loadSharedMissions();
-        // Then check and reset missions based on fresh data
-        checkAndResetMissions();
-        // Refresh mission progress
-        loadMissionProgress();
         // Refresh albums to sync any changes from partner
         loadAlbums();
         // Refresh calendar data (todos and menstrual settings) to sync any changes from partner
@@ -828,66 +818,7 @@ function RootLayoutNav() {
     return () => {
       subscription.remove();
     };
-  }, [fetchCoupleAndPartnerData, updateUserLocation, checkAndResetMissions, loadMissionProgress, loadSharedMissions, loadAlbums, loadTodos, loadMenstrualSettings, loadFromDatabase, verifySessionAndRefresh]);
-
-  // Midnight timer - automatically reset missions when date changes (12:00 AM in user's timezone)
-  useEffect(() => {
-    if (!isOnboardingComplete) return;
-
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-
-    const scheduleMidnightReset = () => {
-      // Get next midnight in user's effective timezone
-      const { getEffectiveTimezone } = useTimezoneStore.getState();
-      const timezone = getEffectiveTimezone();
-
-      // Calculate midnight in the user's timezone
-      const now = new Date();
-      const formatter = new Intl.DateTimeFormat('en-CA', {
-        timeZone: timezone,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false,
-      });
-
-      // Get current time in timezone
-      const parts = formatter.formatToParts(now);
-      const hour = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10);
-      const minute = parseInt(parts.find(p => p.type === 'minute')?.value || '0', 10);
-      const second = parseInt(parts.find(p => p.type === 'second')?.value || '0', 10);
-
-      // Calculate milliseconds until midnight in that timezone
-      const msUntilMidnight = ((24 - hour - 1) * 60 * 60 * 1000) +
-        ((60 - minute - 1) * 60 * 1000) +
-        ((60 - second) * 1000);
-
-      console.log('[Layout] Scheduling midnight reset in', Math.round(msUntilMidnight / 1000 / 60), 'minutes (timezone:', timezone, ')');
-
-      timeoutId = setTimeout(async () => {
-        console.log('[Layout] Midnight reached - resetting missions');
-        // CRITICAL: First load fresh mission data from DB to get correct date
-        await loadSharedMissions();
-        // Then check and reset missions based on fresh data
-        checkAndResetMissions();
-        // Reload mission progress
-        loadMissionProgress();
-        // Schedule next midnight reset (add small delay to ensure we're past midnight)
-        setTimeout(() => scheduleMidnightReset(), 1000);
-      }, msUntilMidnight);
-    };
-
-    scheduleMidnightReset();
-
-    return () => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-    };
-  }, [isOnboardingComplete, checkAndResetMissions, loadMissionProgress, loadSharedMissions]);
+  }, [fetchCoupleAndPartnerData, updateUserLocation, loadAlbums, loadTodos, loadMenstrualSettings, loadFromDatabase, verifySessionAndRefresh]);
 
   // Also refresh if partner data is incomplete (partner might have completed onboarding)
   useEffect(() => {
@@ -1215,7 +1146,7 @@ function RootLayoutNav() {
   // Check if we're in the wrong place and need navigation
   const needsNavigationToTabs = shouldBeInTabs && inAuthGroup;
   // Need to redirect to auth if onboarding incomplete AND user is NOT already in auth group
-  // This covers tabs, more, mission, and any other top-level routes
+  // This covers tabs, more, and any other top-level routes
   const needsNavigationToAuth = shouldBeInAuth && !inAuthGroup;
 
   // Trigger navigation only AFTER navigator is mounted
@@ -1281,14 +1212,6 @@ function RootLayoutNav() {
           options={{
             headerShown: false,
             animation: 'none',
-          }}
-        />
-        <Stack.Screen
-          name="mission/[id]"
-          options={{
-            presentation: 'card',
-            animation: Platform.OS === 'android' ? 'none' : 'fade',
-            animationDuration: Platform.OS === 'android' ? 0 : 150,
           }}
         />
         <Stack.Screen

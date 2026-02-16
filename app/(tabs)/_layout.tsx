@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { LiquidGlassView, isLiquidGlassSupported } from '@callstack/liquid-glass';
-import { Flame, BookHeart, Home, Calendar, Menu } from 'lucide-react-native';
+import { Compass, BookHeart, Home, Calendar, Menu } from 'lucide-react-native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useTranslation } from 'react-i18next';
 
@@ -74,7 +74,7 @@ const IOS26_INACTIVE_COLOR_DARK = '#FFFFFF90';
 // Tab Configuration
 // ============================================
 const TAB_KEYS: Record<string, string> = {
-  mission: 'tabs.mission',
+  feed: 'tabs.feed',
   memories: 'tabs.memories',
   index: 'tabs.home',
   calendar: 'tabs.calendar',
@@ -82,7 +82,7 @@ const TAB_KEYS: Record<string, string> = {
 };
 
 const TAB_ICONS: Record<string, React.ComponentType<{ color: string; size: number; strokeWidth: number }>> = {
-  mission: Flame,
+  feed: Compass,
   memories: BookHeart,
   index: Home,
   calendar: Calendar,
@@ -91,7 +91,7 @@ const TAB_ICONS: Record<string, React.ComponentType<{ color: string; size: numbe
 
 // Android icon sizes
 const ANDROID_ICON_SIZES: Record<string, number> = {
-  mission: 25,
+  feed: 25,
   memories: 25,
   index: 25,      // Home
   calendar: 24,
@@ -100,7 +100,7 @@ const ANDROID_ICON_SIZES: Record<string, number> = {
 
 // Android icon vertical offset adjustments
 const ANDROID_ICON_OFFSETS: Record<string, number> = {
-  mission: 0,
+  feed: 0,
   memories: 0,
   index: 1,       // Home - slightly lower
   calendar: 0,
@@ -109,7 +109,7 @@ const ANDROID_ICON_OFFSETS: Record<string, number> = {
 
 // SF Symbol names for iOS native icons
 const TAB_SF_SYMBOLS: Record<string, string> = {
-  mission: 'flame.fill',
+  feed: 'safari',
   memories: 'heart.text.square',
   index: 'house',
   calendar: 'calendar',
@@ -152,9 +152,9 @@ function NativeTabLayout() {
       indicatorColor={IOS26_TINT_COLOR + '25'}
       disableTransparentOnScrollEdge={true}
     >
-      <NativeTabs.Trigger name="mission">
-        <Icon sf={TAB_SF_SYMBOLS.mission} />
-        <Label>{t(TAB_KEYS.mission)}</Label>
+      <NativeTabs.Trigger name="feed">
+        <Icon sf={TAB_SF_SYMBOLS.feed} />
+        <Label>{t(TAB_KEYS.feed)}</Label>
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="memories">
@@ -462,7 +462,7 @@ function ClassicTabLayout() {
         }}
         initialRouteName="index"
       >
-        <Tabs.Screen name="mission" options={{ title: '미션' }} />
+        <Tabs.Screen name="feed" options={{ title: '피드' }} />
         <Tabs.Screen name="memories" options={{ title: '추억' }} />
         <Tabs.Screen name="index" options={{ title: '홈' }} />
         <Tabs.Screen name="calendar" options={{ title: '캘린더' }} />

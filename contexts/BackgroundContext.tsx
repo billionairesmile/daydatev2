@@ -30,8 +30,6 @@ export function BackgroundProvider({ children }: { children: ReactNode }) {
     backgroundImageUrl: syncedBackgroundUrl,
     updateBackgroundImage: syncBackgroundImage,
     coupleAlbums,
-    sharedMissions,
-    allMissionProgress,
   } = useCoupleSyncStore();
 
   // Get memories for prefetching
@@ -101,26 +99,7 @@ export function BackgroundProvider({ children }: { children: ReactNode }) {
         });
       }
 
-      // 2. Mission background images (for mission cards)
-      if (sharedMissions && sharedMissions.length > 0) {
-        sharedMissions.forEach(mission => {
-          if (mission.imageUrl && isValidRemoteUrl(mission.imageUrl)) {
-            // Add optimized version for card display
-            imagesToPrefetch.push(`${mission.imageUrl}?w=800&h=1000&fit=crop`);
-          }
-        });
-      }
-
-      // 3. Mission progress photos (for calendar tab - completed mission photos)
-      if (allMissionProgress && allMissionProgress.length > 0) {
-        allMissionProgress.forEach(progress => {
-          if (progress.photo_url && isValidRemoteUrl(progress.photo_url)) {
-            imagesToPrefetch.push(progress.photo_url);
-          }
-        });
-      }
-
-      // 4. Memory photos (for memories tab - monthly albums)
+      // 2. Memory photos (for memories tab - monthly albums)
       const allMemories = [...memories, ...SAMPLE_MEMORIES];
       allMemories.forEach(memory => {
         if (memory.photoUrl && isValidRemoteUrl(memory.photoUrl)) {
@@ -150,7 +129,7 @@ export function BackgroundProvider({ children }: { children: ReactNode }) {
     // Delay prefetching slightly to not block main thread during splash
     const timer = setTimeout(prefetchAppImages, 500);
     return () => clearTimeout(timer);
-  }, [isLoaded, coupleAlbums, sharedMissions, allMissionProgress, memories]);
+  }, [isLoaded, coupleAlbums, memories]);
 
   // Listen for synced background updates from partner
   useEffect(() => {

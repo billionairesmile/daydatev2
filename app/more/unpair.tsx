@@ -28,8 +28,7 @@ import { useTranslation } from 'react-i18next';
 import { COLORS, SPACING, RADIUS } from '@/constants/design';
 import { useAuthStore, useMemoryStore, useOnboardingStore } from '@/stores';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
-import { cancelHourlyReminders, cancelMissionReminderNotification } from '@/lib/pushNotifications';
-import { useMissionStore } from '@/stores/missionStore';
+import { cancelHourlyReminders } from '@/lib/pushNotifications';
 import { db, isDemoMode } from '@/lib/supabase';
 import { notifyPartnerUnpaired } from '@/lib/pushNotifications';
 
@@ -166,19 +165,15 @@ export default function UnpairScreen() {
         await db.pairingCodes.deleteByCreatorId(user.id);
       }
 
-      // Cancel any scheduled mission notifications (hourly reminders, daily reminder)
-      // These are local scheduled notifications that should stop when unpaired
+      // Cancel any scheduled notifications
       await cancelHourlyReminders();
-      await cancelMissionReminderNotification();
       console.log('[Unpair] Cancelled scheduled notifications');
 
       // Cleanup realtime subscriptions
       cleanupSync();
 
       // Reset couple-specific stores to prevent old data from showing after re-pairing
-      const { reset: resetMission } = useMissionStore.getState();
       const { reset: resetMemory } = useMemoryStore.getState();
-      resetMission();
       resetMemory();
 
       // Clear couple and partner from local state (but keep user logged in)

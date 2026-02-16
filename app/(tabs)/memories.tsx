@@ -3894,15 +3894,6 @@ function PhotoDetailView({
         </Pressable>
       )}
 
-      {/* Instruction Text - No animation */}
-      <View style={styles.flipInstructionContainer}>
-        <View style={styles.flipInstructionBadge}>
-          <Text style={styles.flipInstructionText}>
-            {isFlipped ? t('memories.photo.tapToView') : t('memories.photo.tapToFlip')}
-          </Text>
-        </View>
-      </View>
-
       {/* Carousel with smooth entrance animation (fade + scale + slide) */}
       <ReanimatedModule.View style={[{ flex: 1 }, contentAnimStyle]}>
         {Platform.OS === 'android' ? (
@@ -4454,7 +4445,7 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   photoDetailCard: {
-    width: IS_LARGE_DEVICE ? '60%' : '90%',
+    width: IS_LARGE_DEVICE ? '65%' : '95%',
     aspectRatio: 3 / 4,
     borderRadius: rs(16),
     overflow: 'hidden',
@@ -4469,7 +4460,7 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   photoInfoCard: {
-    width: IS_LARGE_DEVICE ? '60%' : '90%',
+    width: IS_LARGE_DEVICE ? '65%' : '95%',
     marginTop: rs(SPACING.lg),
     padding: rs(SPACING.lg),
     borderRadius: rs(16),
@@ -4547,10 +4538,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: width * 0.05,
+    paddingHorizontal: width * 0.025,
   },
   flipCardContainer: {
-    width: IS_LARGE_DEVICE ? '60%' : '90%',
+    width: IS_LARGE_DEVICE ? '65%' : '95%',
     aspectRatio: 3 / 4,
   },
   flipCardPressable: {
