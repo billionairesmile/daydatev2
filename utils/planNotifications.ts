@@ -142,17 +142,6 @@ export async function schedulePlanNotifications(plan: Plan): Promise<void> {
     });
   }
 
-  if (daysUntilEvent >= 3) {
-    notifications.push({
-      plan_id: plan.id,
-      type: 'd_3',
-      scheduled_at: toNineAMInTimezone(subDays(eventDate, 3), timezone),
-      include_affiliate_link: true,
-      message_title: '📅 3일 남았어요!',
-      message_body: `${plan.title}까지 D-3!`,
-    });
-  }
-
   if (daysUntilEvent >= 1) {
     notifications.push({
       plan_id: plan.id,
