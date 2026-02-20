@@ -276,10 +276,10 @@ Deno.serve(async (req: Request) => {
       // Use couple's timezone, default to Asia/Seoul
       const coupleTimezone = couple.timezone || "Asia/Seoul";
 
-      // Only send notifications at 9 AM in the couple's timezone
-      // This function runs hourly via cron — each timezone hits 9 AM once per day
+      // Only send notifications at midnight (0 AM) in the couple's timezone
+      // This function runs hourly via cron — each timezone hits midnight once per day
       const currentHour = getCurrentHourInTimezone(coupleTimezone);
-      if (currentHour !== 9) {
+      if (currentHour !== 0) {
         results.skippedNotNineAM++;
         continue;
       }
