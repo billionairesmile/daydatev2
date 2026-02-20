@@ -20,6 +20,7 @@ interface Couple {
   user1_id: string;
   user2_id: string;
   status: string;
+  timezone: string | null;
 }
 
 interface Profile {
@@ -95,39 +96,62 @@ function getLanguage(lang: string | null): SupportedLanguage {
   return "ko";
 }
 
-// Calculate days until anniversary (handles recurring)
-function getDaysUntilAnniversary(dateStr: string, isRecurring: boolean): number {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+// ---------------------------------------------------------------------------
+// Timezone-aware helpers
+// ---------------------------------------------------------------------------
 
-  const anniversaryDate = new Date(dateStr);
+/** Get current hour (0-23) in the given IANA timezone */
+function getCurrentHourInTimezone(timezone: string): number {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    hour: "2-digit",
+    hour12: false,
+  }).formatToParts(now);
+  return parseInt(parts.find((p) => p.type === "hour")!.value, 10);
+}
+
+/** Get today's date components in the given IANA timezone */
+function getTodayInTimezone(timezone: string): { year: number; month: number; day: number } {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  return {
+    year: parseInt(parts.find((p) => p.type === "year")!.value, 10),
+    month: parseInt(parts.find((p) => p.type === "month")!.value, 10),
+    day: parseInt(parts.find((p) => p.type === "day")!.value, 10),
+  };
+}
+
+/**
+ * Calculate days until anniversary using the couple's timezone.
+ * "today" is determined by the couple's local date, not UTC.
+ */
+function getDaysUntilAnniversary(
+  dateStr: string,
+  isRecurring: boolean,
+  timezone: string
+): number {
+  const { year: todayYear, month: todayMonth, day: todayDay } = getTodayInTimezone(timezone);
+  const todayMs = Date.UTC(todayYear, todayMonth - 1, todayDay);
+
+  // Parse anniversary date (stored as YYYY-MM-DD in DB)
+  const [annYear, annMonth, annDay] = dateStr.split("-").map(Number);
 
   if (isRecurring) {
-    // For recurring, check this year's occurrence
-    const thisYear = today.getFullYear();
-    const thisYearAnniversary = new Date(
-      thisYear,
-      anniversaryDate.getMonth(),
-      anniversaryDate.getDate()
-    );
-    thisYearAnniversary.setHours(0, 0, 0, 0);
-
-    // If this year's date has passed, check next year
-    if (thisYearAnniversary < today) {
-      const nextYearAnniversary = new Date(
-        thisYear + 1,
-        anniversaryDate.getMonth(),
-        anniversaryDate.getDate()
-      );
-      nextYearAnniversary.setHours(0, 0, 0, 0);
-      return Math.floor((nextYearAnniversary.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    const thisYearMs = Date.UTC(todayYear, annMonth - 1, annDay);
+    if (thisYearMs < todayMs) {
+      const nextYearMs = Date.UTC(todayYear + 1, annMonth - 1, annDay);
+      return Math.floor((nextYearMs - todayMs) / (1000 * 60 * 60 * 24));
     }
-
-    return Math.floor((thisYearAnniversary.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    return Math.floor((thisYearMs - todayMs) / (1000 * 60 * 60 * 24));
   } else {
-    // Non-recurring: exact date match
-    anniversaryDate.setHours(0, 0, 0, 0);
-    return Math.floor((anniversaryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    const anniversaryMs = Date.UTC(annYear, annMonth - 1, annDay);
+    return Math.floor((anniversaryMs - todayMs) / (1000 * 60 * 60 * 24));
   }
 }
 
@@ -213,19 +237,59 @@ Deno.serve(async (req: Request) => {
 
     console.log(`[Anniversary] Found ${anniversaries.length} anniversaries to check`);
 
+    // Cache couple data to avoid repeated queries for couples with multiple anniversaries
+    const coupleCache = new Map<string, Couple | null>();
+
     const results = {
       processed: 0,
       weekBefore: 0,
       today: 0,
       skipped: 0,
+      skippedNotNineAM: 0,
       errors: 0,
     };
 
     for (const anniversary of anniversaries) {
       results.processed++;
-
-      const daysUntil = getDaysUntilAnniversary(anniversary.date, anniversary.is_recurring);
       const icon = anniversary.icon || "🎉";
+
+      // Get couple info (with timezone)
+      let couple = coupleCache.get(anniversary.couple_id);
+      if (couple === undefined) {
+        const { data, error: coupleError } = await supabase
+          .from("couples")
+          .select("id, user1_id, user2_id, status, timezone")
+          .eq("id", anniversary.couple_id)
+          .eq("status", "connected")
+          .single();
+
+        couple = coupleError || !data ? null : (data as Couple);
+        coupleCache.set(anniversary.couple_id, couple);
+      }
+
+      if (!couple) {
+        console.log(`[Anniversary] Couple not found or not connected: ${anniversary.couple_id}`);
+        results.skipped++;
+        continue;
+      }
+
+      // Use couple's timezone, default to Asia/Seoul
+      const coupleTimezone = couple.timezone || "Asia/Seoul";
+
+      // Only send notifications at 9 AM in the couple's timezone
+      // This function runs hourly via cron — each timezone hits 9 AM once per day
+      const currentHour = getCurrentHourInTimezone(coupleTimezone);
+      if (currentHour !== 9) {
+        results.skippedNotNineAM++;
+        continue;
+      }
+
+      // Calculate days until anniversary using the couple's timezone
+      const daysUntil = getDaysUntilAnniversary(
+        anniversary.date,
+        anniversary.is_recurring,
+        coupleTimezone
+      );
 
       // Check if notification should be sent (7 days before or today)
       let notificationType: "weekBefore" | "today" | null = null;
@@ -241,21 +305,9 @@ Deno.serve(async (req: Request) => {
         continue;
       }
 
-      console.log(`[Anniversary] ${anniversary.title}: ${daysUntil} days until, type: ${notificationType}`);
-
-      // Get couple info
-      const { data: couple, error: coupleError } = await supabase
-        .from("couples")
-        .select("id, user1_id, user2_id, status")
-        .eq("id", anniversary.couple_id)
-        .eq("status", "connected")
-        .single();
-
-      if (coupleError || !couple) {
-        console.log(`[Anniversary] Couple not found or not connected: ${anniversary.couple_id}`);
-        results.skipped++;
-        continue;
-      }
+      console.log(
+        `[Anniversary] ${anniversary.title}: ${daysUntil} days until, type: ${notificationType}, timezone: ${coupleTimezone}`
+      );
 
       // Get both users' profiles
       const userIds = [couple.user1_id, couple.user2_id];
