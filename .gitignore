@@ -35,8 +35,7 @@ yarn-error.*
 .env.*
 .env*.local
 
-# Firebase config (contains API keys)
-google-services.json
+# Firebase config (iOS only — Android google-services.json must be tracked for EAS Build)
 GoogleService-Info.plist
 
 # typescript
