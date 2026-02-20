@@ -12,6 +12,7 @@ import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, In
 import { Anton_400Regular } from '@expo-google-fonts/anton';
 import { Lora_400Regular, Lora_500Medium, Lora_600SemiBold, Lora_700Bold } from '@expo-google-fonts/lora';
 import { InstrumentSerif_400Regular, InstrumentSerif_400Regular_Italic } from '@expo-google-fonts/instrument-serif';
+import { DoHyeon_400Regular } from '@expo-google-fonts/do-hyeon';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Location from 'expo-location';
@@ -26,9 +27,8 @@ import { useTranslation } from 'react-i18next';
 
 import { useAuthStore, useOnboardingStore, useTimezoneStore, useSubscriptionStore, useLanguageStore } from '@/stores';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
+import { usePlanStore } from '@/stores/planStore';
 import { BackgroundProvider, useBackground } from '@/contexts';
-import { preloadCharacterAssets } from '@/utils';
-import { CharacterPreloader } from '@/components/ransom';
 import { db, isDemoMode, supabase } from '@/lib/supabase';
 import { onAuthStateChange, signOut as supabaseSignOut } from '@/lib/socialAuth';
 import { updateUserLocationInDB, checkLocationPermission } from '@/lib/locationUtils';
@@ -36,7 +36,6 @@ import { initializeNetworkMonitoring, subscribeToNetwork } from '@/lib/useNetwor
 import { offlineQueue } from '@/lib/offlineQueue';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useWidgetSync } from '@/hooks/useWidgetSync';
-import BannerAdView from '@/components/ads/BannerAdView';
 import { checkForUpdates } from '@/lib/versionCheck';
 
 // Type for couple data from DB (includes timezone column)
@@ -105,7 +104,6 @@ const safeSplashScreen = {
 safeSplashScreen.preventAutoHide();
 
 export default function RootLayout() {
-  const [assetsLoaded, setAssetsLoaded] = useState(false);
   const [backgroundLoaded, setBackgroundLoaded] = useState(false);
   const authHydrated = useAuthStore((state) => state._hasHydrated);
   const [fontsLoaded, fontError] = useFonts({
@@ -129,14 +127,8 @@ export default function RootLayout() {
     LoraBold: Lora_700Bold,
     InstrumentSerif: InstrumentSerif_400Regular,
     InstrumentSerifItalic: InstrumentSerif_400Regular_Italic,
+    DoHyeon: DoHyeon_400Regular,
   });
-
-  // Preload character assets for ransom text
-  useEffect(() => {
-    preloadCharacterAssets().then(() => {
-      setAssetsLoaded(true);
-    });
-  }, []);
 
   useEffect(() => {
     if (fontError) throw fontError;
@@ -178,23 +170,21 @@ export default function RootLayout() {
 
   useEffect(() => {
     // Include authHydrated to prevent flash of home screen before auth state is known
-    if (fontsLoaded && assetsLoaded && backgroundLoaded && authHydrated) {
+    if (fontsLoaded && backgroundLoaded && authHydrated) {
       // Add minimum display time for splash screen (1.5 seconds)
       const timer = setTimeout(() => {
         safeSplashScreen.hide();
       }, 1500);
       return () => clearTimeout(timer);
     }
-  }, [fontsLoaded, assetsLoaded, backgroundLoaded, authHydrated]);
+  }, [fontsLoaded, backgroundLoaded, authHydrated]);
 
-  if (!fontsLoaded || !assetsLoaded) {
+  if (!fontsLoaded) {
     return null;
   }
 
   return (
     <GestureHandlerRootView style={styles.container}>
-      {/* Preload all ransom character images at app startup */}
-      <CharacterPreloader />
       <BackgroundProvider>
         <BackgroundLoadedHandler setBackgroundLoaded={setBackgroundLoaded} />
         <RootLayoutNav />
@@ -222,6 +212,7 @@ function RootLayoutNav() {
   const { t } = useTranslation();
   const { isAuthenticated, isOnboardingComplete, setIsOnboardingComplete, couple, user, setCouple, setPartner, partner, _hasHydrated: authHydrated } = useAuthStore();
   const { initializeSync, cleanup: cleanupSync, processPendingOperations, loadAlbums, loadTodos, loadMenstrualSettings } = useCoupleSyncStore();
+  const { initializePlanSync, cleanup: cleanupPlanSync } = usePlanStore();
   const { setStep: setOnboardingStep, updateData: updateOnboardingData } = useOnboardingStore();
   const { syncFromCouple } = useTimezoneStore();
   const { initializeRevenueCat, loadFromDatabase, checkCouplePremium, setPartnerIsPremium, _hasHydrated: subscriptionHydrated } = useSubscriptionStore();
@@ -846,12 +837,14 @@ function RootLayoutNav() {
   useEffect(() => {
     if (couple?.id && user?.id) {
       initializeSync(couple.id, user.id);
+      initializePlanSync(couple.id, user.id);
     }
 
     return () => {
       cleanupSync();
+      cleanupPlanSync();
     };
-  }, [couple?.id, user?.id, initializeSync, cleanupSync]);
+  }, [couple?.id, user?.id, initializeSync, cleanupSync, initializePlanSync, cleanupPlanSync]);
 
   // Check premium status when couple is formed or changed (e.g., after pairing)
   useEffect(() => {

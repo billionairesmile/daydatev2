@@ -11,13 +11,13 @@ import UIKit
 
 // MARK: - Data Models
 
-struct StoredMission: Codable {
+struct StoredDateEntry: Codable {
     let date: String // "YYYY-MM-DD" format
     let localImagePath: String?
 }
 
 struct WidgetData: Codable {
-    let completedMissions: [StoredMission]
+    let dateRecords: [StoredDateEntry]
     let isLoggedIn: Bool
 }
 
@@ -25,7 +25,7 @@ struct WidgetData: Codable {
 
 struct DaydateEntry: TimelineEntry {
     let date: Date
-    let completedMissions: [String: String] // date -> local image path
+    let dateRecords: [String: String] // date -> local image path
     let isLoggedIn: Bool
 }
 
@@ -35,12 +35,12 @@ struct DaydateProvider: TimelineProvider {
     private let appGroupIdentifier = "group.com.daydate.app"
 
     func placeholder(in context: Context) -> DaydateEntry {
-        DaydateEntry(date: Date(), completedMissions: [:], isLoggedIn: false)
+        DaydateEntry(date: Date(), dateRecords: [:], isLoggedIn: false)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (DaydateEntry) -> ()) {
         let (missions, isLoggedIn) = loadWidgetData()
-        let entry = DaydateEntry(date: Date(), completedMissions: missions, isLoggedIn: isLoggedIn)
+        let entry = DaydateEntry(date: Date(), dateRecords: missions, isLoggedIn: isLoggedIn)
         completion(entry)
     }
 
@@ -48,7 +48,7 @@ struct DaydateProvider: TimelineProvider {
         let currentDate = Date()
         let (missions, isLoggedIn) = loadWidgetData()
 
-        let entry = DaydateEntry(date: currentDate, completedMissions: missions, isLoggedIn: isLoggedIn)
+        let entry = DaydateEntry(date: currentDate, dateRecords: missions, isLoggedIn: isLoggedIn)
 
         let calendar = Calendar.current
         let tomorrow = calendar.startOfDay(for: calendar.date(byAdding: .day, value: 1, to: currentDate)!)
@@ -68,18 +68,18 @@ struct DaydateProvider: TimelineProvider {
         let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupIdentifier)
 
         var result: [String: String] = [:]
-        for mission in widgetData.completedMissions {
-            if let localPath = mission.localImagePath, !localPath.isEmpty {
+        for entry in widgetData.dateRecords {
+            if let localPath = entry.localImagePath, !localPath.isEmpty {
                 // The path from native module is an absolute path to the App Group container
                 // Check if file exists at the stored path
                 if FileManager.default.fileExists(atPath: localPath) {
-                    result[mission.date] = localPath
+                    result[entry.date] = localPath
                 } else if let containerURL = containerURL {
                     // Fallback: try to find in WidgetImages directory with just the filename
                     let filename = (localPath as NSString).lastPathComponent
                     let fallbackPath = containerURL.appendingPathComponent("WidgetImages").appendingPathComponent(filename).path
                     if FileManager.default.fileExists(atPath: fallbackPath) {
-                        result[mission.date] = fallbackPath
+                        result[entry.date] = fallbackPath
                     }
                 }
             }
@@ -235,7 +235,7 @@ struct SmallWidgetView: View {
                                     isToday: isToday(date),
                                     isSunday: isSunday(date),
                                     isSaturday: isSaturday(date),
-                                    localImagePath: entry.completedMissions[dateString(from: date)],
+                                    localImagePath: entry.dateRecords[dateString(from: date)],
                                     cellSize: cellSize,
                                     textColor: textColor,
                                     accentColor: accentColor,
@@ -303,7 +303,7 @@ struct CalendarDayCell: View {
 
     var body: some View {
         ZStack {
-            // Background with mission photo from local cache
+            // Background with date record photo from local cache
             if let uiImage = localImage {
                 Image(uiImage: uiImage)
                     .resizable()
@@ -350,7 +350,7 @@ struct DaydateWidget: Widget {
             }
         }
         .configurationDisplayName("Daydate")
-        .description("데이트 미션 캘린더")
+        .description("데이트 캘린더")
         .supportedFamilies([.systemSmall])
         .contentMarginsDisabled()
     }
@@ -363,5 +363,5 @@ struct DaydateWidget: Widget {
     DaydateWidget()
 } timeline: {
     // Preview with no cached images (local paths would be set by the app)
-    DaydateEntry(date: .now, completedMissions: [:], isLoggedIn: true)
+    DaydateEntry(date: .now, dateRecords: [:], isLoggedIn: true)
 }

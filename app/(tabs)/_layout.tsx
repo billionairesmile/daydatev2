@@ -58,10 +58,7 @@ const ANDROID_SCALE = Platform.OS === 'android'
 const androidScale = (size: number) => Platform.OS === 'android' ? Math.round(size * ANDROID_SCALE) : size;
 
 // Android Tab Bar Layout:
-// - Banner ad positioned at: insets.bottom (directly above nav bar)
-// - Tab bar positioned at: insets.bottom + bannerHeight (above banner ad)
-// - With nav bar: banner → nav bar, tab bar → banner
-// - Without nav bar: banner → screen bottom, tab bar → banner
+// - Tab bar positioned at: insets.bottom (directly above nav bar)
 
 // ============================================
 // iOS 26 Theme Colors
@@ -196,9 +193,6 @@ function ClassicTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   // iOS legacy tab bar position
   const tabBarBottom = useTabBarBottom();
 
-  // Android: Get banner ad height for tab bar positioning (tab bar sits above banner)
-  const bannerAdHeight = useUIStore((s) => s.bannerAdHeight);
-
   // Android: Native style (icons only, full width)
   // iOS: Legacy floating pill style
   const ICON_SIZE = isAndroid
@@ -246,14 +240,10 @@ function ClassicTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   };
 
   // Android: Full-width native style tab bar
-  // Tab bar sits above banner ad (banner ad is directly above nav bar)
-  // Responsive to navigation bar presence and banner ad height
+  // Positioned directly above navigation bar
   if (isAndroid) {
-    // Default banner height if not yet loaded (standard AdMob banner is ~50dp)
-    const bannerHeight = bannerAdHeight > 0 ? bannerAdHeight : 50;
-
     return (
-      <View style={[androidStyles.container, { bottom: insets.bottom + bannerHeight }]}>
+      <View style={[androidStyles.container, { bottom: insets.bottom }]}>
         <BlurView
           experimentalBlurMethod="dimezisBlurView"
           intensity={50}

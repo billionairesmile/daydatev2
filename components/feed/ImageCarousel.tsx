@@ -14,12 +14,14 @@ import { COLORS, SP, RD, SCREEN_WIDTH } from '@/constants/design';
 interface ImageCarouselProps {
   images: string[];
   onPress?: () => void;
+  height?: number;
 }
 
-const IMAGE_WIDTH = SCREEN_WIDTH - SP.lg * 2;
-const IMAGE_HEIGHT = IMAGE_WIDTH * (3 / 4);
+const IMAGE_WIDTH = SCREEN_WIDTH;
+const DEFAULT_HEIGHT = IMAGE_WIDTH * (3 / 4);
 
-export function ImageCarousel({ images, onPress }: ImageCarouselProps) {
+export function ImageCarousel({ images, onPress, height }: ImageCarouselProps) {
+  const imageHeight = height ?? DEFAULT_HEIGHT;
   const [activeIndex, setActiveIndex] = useState(0);
   const flatListRef = useRef<FlatList<string>>(null);
 
@@ -38,24 +40,28 @@ export function ImageCarousel({ images, onPress }: ImageCarouselProps) {
 
   const renderItem = useCallback(
     ({ item }: { item: string }) => (
-      <Pressable onPress={onPress} disabled={!onPress} style={styles.imageWrapper}>
+      <Pressable
+        onPress={onPress}
+        disabled={!onPress}
+        style={[styles.imageWrapper, { height: imageHeight }]}
+      >
         <Image
           source={{ uri: item }}
           style={styles.image}
-          contentFit="cover"
+          contentFit="contain"
           transition={200}
           recyclingKey={item}
         />
       </Pressable>
     ),
-    [onPress],
+    [onPress, imageHeight],
   );
 
   const keyExtractor = useCallback((_: string, index: number) => `carousel-${index}`, []);
 
   if (images.length === 0) {
     return (
-      <View style={[styles.imageWrapper, styles.placeholder]}>
+      <View style={[styles.imageWrapper, { height: imageHeight }, styles.placeholder]}>
         <View style={styles.placeholderInner} />
       </View>
     );
@@ -104,10 +110,8 @@ const styles = StyleSheet.create({
   },
   imageWrapper: {
     width: IMAGE_WIDTH,
-    height: IMAGE_HEIGHT,
+    height: DEFAULT_HEIGHT,
     overflow: 'hidden',
-    borderTopLeftRadius: RD.sm,
-    borderTopRightRadius: RD.sm,
   },
   image: {
     width: '100%',

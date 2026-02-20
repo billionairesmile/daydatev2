@@ -22,7 +22,8 @@
     "partner": "파트너",
     "me": "나",
     "days": "일",
-    "daysCount": "일째"
+    "daysCount": "일째",
+    "comingSoon": "준비중입니다"
   },
   "auth": {
     "email": {
@@ -46,7 +47,6 @@
   },
   "tabs": {
     "home": "홈",
-    "mission": "미션",
     "calendar": "캘린더",
     "memories": "추억",
     "more": "더보기",
@@ -96,165 +96,6 @@
     },
     "shareError": "공유 중 오류가 발생했습니다."
   },
-  "mission": {
-    "title": "오늘의 미션",
-    "subtitle": "오늘은 어떤 순간을 함께할까요?",
-    "emptyState": {
-      "line1": "오늘의 미션을",
-      "line2": "시작해보세요",
-      "button": "시작하기"
-    },
-    "generate": "오늘의 미션 받기",
-    "generating": "생성 중...",
-    "generatingMessage": "미션을 생성하고 있어요",
-    "pleaseWait": "잠시만 기다려주세요",
-    "start": "시작하기",
-    "completed": "완료",
-    "view": "보기",
-    "kept": "보관됨",
-    "keep": "Keep",
-    "anotherInProgress": "다른 미션 진행 중",
-    "questions": {
-      "canMeetToday": "오늘 만날 수 있나요?",
-      "yesMeet": "네, 만나요",
-      "noMeet": "아니요",
-      "availableTime": "오늘 함께할 시간이 얼마나 되나요?",
-      "todayMood": "오늘 원하는 분위기는? (모두 선택)"
-    },
-    "timeOptions": {
-      "30min": "30분",
-      "1hour": "1시간",
-      "2hour": "2시간 +",
-      "allday": "하루종일"
-    },
-    "moodOptions": {
-      "cozy": "집콕·홈데이트",
-      "foodie": "맛집·미식",
-      "active": "활동·에너지",
-      "healing": "휴식·힐링",
-      "culture": "문화·감성",
-      "adventure": "새로운 도전",
-      "romantic": "로맨틱"
-    },
-    "alerts": {
-      "locationRequired": "위치 권한 필요",
-      "locationRequiredMessage": "미션을 생성하려면 위치 정보 권한이 필요해요.\n위치 권한을 허용해주세요.",
-      "allowPermission": "권한 허용",
-      "locationDenied": "위치 권한 거부됨",
-      "locationDeniedMessage": "위치 권한이 거부되었어요. 설정에서 위치 권한을 허용해주세요.",
-      "goToSettings": "설정으로 이동",
-      "partnerLocationRequired": "파트너 위치 정보 필요",
-      "partnerLocationRequiredMessage": "미션을 생성하려면 파트너도 위치 정보를 허용해야 해요.\n파트너에게 위치 권한을 허용해달라고 요청해주세요.",
-      "cannotKeep": "보관 불가",
-      "alreadyCompletedKeep": "이미 완료한 미션은 보관할 수 없어요.",
-      "keepMission": "미션 보관",
-      "keepMissionConfirm": "'{{title}}' 미션을 보관함에 저장할까요?",
-      "keepLimit": "보관 제한",
-      "keepLimitMessage": "미션은 최대 5개까지만 보관할 수 있어요.\n보관된 미션을 삭제한 후 다시 시도해주세요.",
-      "cannotStart": "미션 시작 불가",
-      "anotherInProgressMessage": "이미 다른 미션이 진행 중이에요.\n진행 중인 미션을 완료해주세요!",
-      "dailyLimitMessage": "오늘 가능한 미션을 모두 완료했어요.\n내일 다시 도전해보세요!",
-      "offlineTitle": "인터넷 연결 필요",
-      "offlineMessage": "미션을 생성하려면 인터넷 연결이 필요합니다.\n네트워크 연결을 확인하고 다시 시도해주세요."
-    },
-    "refresh": {
-      "questionLine1": "마음에 드는",
-      "questionLine2": "미션이 없나요?",
-      "button": "새로운 미션 받기",
-      "hint": "광고 시청 후\n새 미션을 받을 수 있어요",
-      "modalTitle": "새로운 미션",
-      "modalButton": "새로운 미션 받기",
-      "partnerGenerating": "잠시만 기다려주세요",
-      "partnerGeneratingMessage": "파트너가 새로운 미션을 생성하고 있습니다. 잠시 후 다시 시도해주세요.",
-      "adLoadingFailed": "광고 로딩 실패",
-      "adLoadingFailedMessage": "광고를 불러오는데 실패했어요.\n잠시 후 다시 시도해주세요.",
-      "devModeTitle": "개발 모드",
-      "devModeMessage": "광고는 프로덕션 빌드에서만 표시됩니다. 미션 새로고침은 광고 시청 후 사용 가능합니다.",
-      "generating": "새로운 미션 생성 중...",
-      "loadingAd": "광고 준비 중...",
-      "adNotCompleted": "광고 시청 미완료",
-      "adNotCompletedMessage": "미션을 새로고침하려면 광고를 끝까지 시청해주세요."
-    },
-    "partnerWatchingAd": "파트너가 광고를 시청 중입니다...",
-    "partnerWatchingAdWithName": "{{name}}님이\n광고를 시청하고 있습니다",
-    "timeError": {
-      "title": "시간 설정 오류",
-      "message": "기기 시간이 서버 시간과 차이가 납니다.\n\n정확한 미션 서비스 이용을 위해 기기의 '자동 날짜 및 시간' 설정을 활성화해 주세요.",
-      "confirm": "확인",
-      "minutes": "{{count}}분",
-      "hours": "{{count}}시간"
-    }
-  },
-  "missionDetail": {
-    "headerTitle": "미션 상세",
-    "linkButton": {
-      "reserve": "예약하러 가기",
-      "book": "예매하러 가기",
-      "purchase": "구매하러 가기"
-    },
-    "notFound": {
-      "title": "미션을 찾을 수 없습니다",
-      "description": "이 미션은 더 이상 사용할 수 없습니다."
-    },
-    "camera": {
-      "title": "사진 촬영",
-      "confirmTitle": "사진 확인",
-      "permissionRequired": "카메라 권한 필요",
-      "permissionMessage": "사진을 촬영하려면 카메라 권한이 필요합니다.",
-      "photoError": "사진 촬영에 실패했습니다. 다시 시도해주세요.",
-      "usePhoto": "사용하기",
-      "retake": "다시 찍기",
-      "pinchToZoom": "핀치하여 확대/축소",
-      "error": "카메라를 시작할 수 없습니다"
-    },
-    "location": {
-      "noInfo": "위치 정보 없음"
-    },
-    "steps": {
-      "photo": {
-        "title": "사진 촬영하기",
-        "description": "두 분의 특별한 순간을 사진으로 담아주세요.",
-        "hint": "지금 이 순간의 설렘과 행복을 사진에 담아\n추억으로 만들어보세요."
-      },
-      "message": {
-        "title": "서로에게 한마디 작성하기",
-        "description": "이 순간 상대방에게 전하고 싶은 마음을 글로 남겨보세요. 진심이 담긴 메시지가 더 특별한 추억을\n만듭니다.",
-        "written": "작성 완료",
-        "notWritten": "미작성"
-      },
-      "complete": "완료"
-    },
-    "status": {
-      "anotherInProgress": "다른 미션 진행 중",
-      "waitingPartner": "상대방 대기 중...",
-      "waitingPhoto": "사진 대기 중...",
-      "writeMessage": "서로에게 한마디 작성",
-      "takePhoto": "사진 촬영"
-    },
-    "modal": {
-      "title": "서로에게 한마디",
-      "placeholder": "상대방에게 전하고 싶은 말을 적어주세요"
-    },
-    "defaultPartnerMessage": "너와 함께여서 행복해 💕",
-    "completed": "완료됨",
-    "completeButton": "미션 완료! 🎉",
-    "writeMessage": "메시지 작성",
-    "messagePlaceholder": "오늘의 미션을 함께 기록해요",
-    "submitMission": "미션 완료하기",
-    "partnerMessage": "상대방 메시지",
-    "myMessage": "내 메시지",
-    "waitingPartner": "상대방의 메시지를 기다리고 있어요",
-    "viewMemory": "추억 보기"
-  },
-  "bookmark": {
-    "title": "보관함",
-    "empty": "보관한 미션이 없어요",
-    "emptyHint": "마음에 드는 미션을 Keep 해보세요",
-    "deleteMission": "미션 삭제",
-    "deleteConfirm": "'{{title}}' 미션을 삭제하시겠어요?",
-    "cannotDelete": "삭제할 수 없어요",
-    "missionInProgressMessage": "진행 중인 미션은 삭제할 수 없어요. 미션을 완료하거나 취소한 후 삭제해주세요."
-  },
   "calendar": {
     "title": "캘린더",
     "subtitle": "우리의 시간을 기록해요",
@@ -284,7 +125,16 @@
       "deleteConfirmTitle": "할 일 삭제",
       "deleteConfirmMessage": "이 할 일을 삭제할까요?",
       "deleteConfirmCancel": "취소",
-      "deleteConfirmOk": "삭제"
+      "deleteConfirmOk": "삭제",
+      "calendar": "투두리스트",
+      "calendarDesc": "날짜별로 할 일을 관리할 수 있어요"
+    },
+    "photos": {
+      "title": "사진",
+      "countUnit": "장"
+    },
+    "plans": {
+      "title": "스케줄"
     },
     "period": {
       "title": "월경 정보",
@@ -328,11 +178,13 @@
   "memories": {
     "title": "추억",
     "subtitle": "우리가 함께한 순간들",
-    "empty": "완료된 미션이 없습니다",
-    "emptyHint": "미션을 완료해 주세요!",
+    "empty": "탭하여 사진을 추가해주세요",
+    "emptyHint": "",
     "viewAll": "전체 보기",
     "togetherMoment": "함께한 순간",
     "itemCount": "{{count}}개의 항목",
+    "dateCount": "{{count}}번의 데이트",
+    "totalSpending": "총 지출 : {{amount}}",
     "monthNames": [
       "1월",
       "2월",
@@ -363,11 +215,8 @@
       "fontStyleDesc": "앨범 제목에 사용할 폰트 스타일을 선택하세요",
       "basicFont": "폰트",
       "basicFontDesc": "깔끔한 스타일",
-      "ransomStyle": "랜섬노트 스타일",
       "basicFontHint": "깔끔한 폰트가 적용됩니다",
-      "ransomFontHint": "입력하는 글자마다 특별한 스타일이 적용됩니다",
       "namePlaceholder": "앨범 이름 입력...",
-      "ransomPlaceholder": "영어만 입력 가능 (A-Z, 0-9)",
       "selectPhoto": "사진 선택",
       "dragHint": "문구를 드래그하여 위치를 조정하세요",
       "coverEditHint": "사진을 선택하고 문구 위치를 드래그해서 조정하세요",
@@ -380,7 +229,7 @@
       "deleteAlbumConfirm": "이 앨범을 삭제하시겠습니까?",
       "readOnly": "읽기 전용",
       "limitReached": "앨범 생성 제한",
-      "limitReachedMessage": "무료 플랜에서는 앨범을 최대 5개까지 만들 수 있습니다. 프리미엄으로 업그레이드하면 무제한으로 앨범을 만들 수 있습니다."
+      "limitReachedMessage": "무료 버전에서는 앨범을 최대 5개까지 만들 수 있습니다. 프리미엄으로 업그레이드하면 무제한으로 앨범을 만들 수 있습니다."
     },
     "photo": {
       "select": "선택",
@@ -390,7 +239,23 @@
       "deleteSingleConfirm": "이 사진을 삭제하시겠습니까?",
       "save": "사진 저장",
       "tapToFlip": "탭하여 뒷면 확인",
-      "tapToView": "탭하여 사진 보기"
+      "tapToView": "탭하여 사진 보기",
+      "uploading": "업로드 중 ({{current}}/{{total}})",
+      "permissionDenied": "사진첩 접근 권한이 필요합니다.",
+      "uploadError": "사진 업로드 중 오류가 발생했습니다.",
+      "tapToEdit": "탭하여 수정",
+      "addMessage": "메시지 남기기",
+      "editMessage": "메시지 편집",
+      "messagePlaceholder": "이 순간에 대한 메시지를 남겨보세요...",
+      "addRecord": "데이트를 기록해주세요",
+      "editRecord": "기록하기",
+      "recordTitle": "제목",
+      "recordTitlePlaceholder": "데이트 제목을 입력해주세요",
+      "recordLocation": "위치",
+      "recordLocationPlaceholder": "장소를 입력해주세요",
+      "recordMessage": "메시지",
+      "spending": "지출",
+      "spendingPlaceholder": "금액을 입력하세요"
     },
     "permission": {
       "required": "권한 필요",
@@ -411,15 +276,16 @@
       "developer": "개발자"
     },
     "menu": {
+      "profile": "프로필",
       "myProfile": "내 프로필",
       "coupleProfile": "커플 프로필",
       "settings": "설정",
       "announcements": "공지사항",
       "customerService": "고객센터",
       "onboardingReset": "온보딩 리셋",
-      "missionReset": "미션 리셋",
       "fullReset": "완전 리셋",
-      "logout": "로그아웃"
+      "logout": "로그아웃",
+      "ourPlans": "우리 스케줄"
     },
     "announcements": {
       "title": "공지사항",
@@ -445,10 +311,6 @@
     "alerts": {
       "devReset": "개발자 리셋",
       "devResetMessage": "온보딩 상태를 초기화하고 처음부터 다시 시작하시겠습니까?",
-      "missionReset": "미션 리셋",
-      "missionResetMessage": "오늘의 미션과 완료 상태를 모두 초기화하시겠습니까?",
-      "missionResetComplete": "리셋 완료",
-      "missionResetCompleteMessage": "미션이 초기화되었습니다. 미션 탭으로 이동하여 새로운 미션을 생성하세요.",
       "fullReset": "⚠️ 완전 리셋",
       "fullResetMessage": "모든 데이터를 초기화합니다.\n\n• 온보딩 데이터\n• 페어링 정보\n• 커플 동기화 데이터\n• 미션 데이터\n• 모든 로컬 저장소\n\n정말 초기화하시겠습니까?",
       "fullResetComplete": "초기화 완료",
@@ -501,7 +363,7 @@
     "couple": {
       "title": "커플 프로필",
       "anniversary": "기념일",
-      "accountInfo": "계정 정보",
+      "accountInfo": "페어링 계정 정보",
       "myAccountInfo": "{{nickname}} 계정 정보",
       "myAccount": "내 계정",
       "partnerAccountInfo": "{{nickname}} 계정 정보",
@@ -543,8 +405,6 @@
     "notifications": {
       "push": "푸시 알림",
       "pushDesc": "모든 알림 받기",
-      "mission": "미션 알림",
-      "missionDesc": "새로운 미션을 생성하면 알림",
       "message": "서로에게 한마디 미작성 알림",
       "messageDesc": "한마디를 작성하지 않으면 알림"
     },
@@ -592,13 +452,13 @@
       "checkTitle": "연결 끊기 전 확인해주세요",
       "daysTogether": "함께한 기간",
       "daysUnit": "일",
-      "completedMissions": "함께 완료한 미션",
-      "missionsUnit": "개",
+      "dateRecords": "함께 기록한 데이트",
+      "recordsUnit": "개",
       "recoveryPeriod": "복구 가능한 기간",
       "recoveryHint": "최대 30일 동안 복구할 수 있어요",
       "warningsTitle": "주의사항",
       "warning1": "상대방에게 페어링 해제 알림이 전송됩니다",
-      "warning2": "미션 히스토리는 개별 계정에 보관됩니다",
+      "warning2": "데이트 기록은 개별 계정에 보관됩니다",
       "warning3": "30일 이내 같은 파트너와 재연결 가능합니다",
       "confirmPrompt": "계속하려면 아래에 '페어링끊기'를\n정확히 입력해주세요",
       "confirmText": "페어링끊기",
@@ -622,7 +482,7 @@
       "warningText": "계정을 탈퇴하면 모든 데이터가\n",
       "permanentDelete": "영구적으로 삭제",
       "warningEnd": "됩니다.",
-      "dataList": "삭제되는 데이터 : 프로필 정보, 커플 연결 정보, 완료한 미션 기록, 앨범 및 사진, 모든 설정",
+      "dataList": "삭제되는 데이터 : 프로필 정보, 커플 연결 정보, 앨범 및 사진, 모든 설정",
       "confirmPrompt": "계속하려면 아래에 '계정탈퇴'를 입력해주세요",
       "confirmText": "계정탈퇴",
       "button": "계정 탈퇴",
@@ -644,7 +504,7 @@
     "licenses": "오픈소스 라이선스"
   },
   "onboarding": {
-    "tagline": "매일,\n새로운\n데이트 미션.",
+    "tagline": "우리의\n데이트가\n쌓이는 곳,\n\nDaydate.",
     "welcome": "환영합니다",
     "welcomeTitle": "Daydate에\n오신 것을 환영해요",
     "welcomeSubtitle": "두 사람의 특별한 순간들을\n함께 기록하고 공유해보세요",
@@ -959,9 +819,6 @@
       "manage": "프리미엄 플랜 관리"
     },
     "limits": {
-      "generationReached": "오늘의 미션 생성 횟수를 모두 사용했어요",
-      "completionReached": "오늘의 미션 완료 횟수를 모두 사용했어요",
-      "bookmarkReached": "미션 보관함이 가득 찼어요 (최대 5개)",
       "albumReached": "앨범을 더 만들 수 없어요 (최대 5개)",
       "albumReadOnly": "이 앨범은 읽기 전용이에요",
       "upgradeToPremium": "프리미엄으로 업그레이드하면 제한 없이 이용할 수 있어요",
@@ -969,7 +826,6 @@
     },
     "limitReached": {
       "title": "일일 한도 도달",
-      "completion": "오늘의 미션 완료 한도에 도달했습니다. 프리미엄으로 업그레이드하여 더 많은 미션을 완료하세요!",
       "photoStorage": "사진 저장 한도(100장)에 도달했습니다. 프리미엄으로 업그레이드하여 무제한 저장하세요!"
     },
     "deleteWarning": {
@@ -986,13 +842,16 @@
     "cancel": "나중에"
   },
   "feed": {
+    "title": "피드",
+    "subtitle": "둘만의 특별한 데이트를 발견하세요",
     "category": {
       "all": "전체",
       "festival": "축제",
-      "performance": "공연",
+      "show": "공연",
       "restaurant": "맛집",
       "activity": "액티비티",
-      "spot": "스팟"
+      "spot": "스팟",
+      "pet": "펫"
     },
     "save": "저장",
     "saved": "저장됨",
@@ -1002,7 +861,21 @@
       "free": "무료"
     },
     "eventPeriod": "기간",
-    "loading": "로딩 중..."
+    "loading": "로딩 중...",
+    "viewMore": "예매처 바로가기",
+    "openLink": "예매 링크 열기",
+    "photoBy": "Photo by {{name}} on Unsplash",
+    "detail": {
+      "date": "일정",
+      "location": "위치"
+    },
+    "anniversaryToday": "바로 오늘이에요!",
+    "anniversaryHint": "연인에게 이런 선물은 어떠신가요?",
+    "locationRequired": "위치 권한 필요",
+    "locationRequiredDesc": "주변 데이트 스팟을 보려면 위치 권한을 허용해주세요.",
+    "enableLocation": "위치 권한 허용하기",
+    "goToSettings": "설정으로 이동",
+    "getDirections": "길찾기"
   },
   "errors": {
     "networkError": "네트워크 오류가 발생했습니다",
@@ -1010,5 +883,56 @@
     "somethingWrong": "문제가 발생했습니다",
     "sessionExpired": "세션이 만료되었습니다",
     "unauthorized": "권한이 없습니다"
+  },
+  "plans": {
+    "title": "우리 스케줄",
+    "tabs": {
+      "interested": "관심 목록",
+      "booked": "예매 완료"
+    },
+    "bookNow": "예매하기",
+    "emptyInterested": "아직 추가된 스케줄이 없어요\n피드에서 마음에 드는 이벤트를 추가해보세요!",
+    "emptyBooked": "아직 예매 완료된 스케줄이 없어요",
+    "expiredSection": "지난 스케줄",
+    "monthlyLimit": "이번 달 {{current}}/{{max}}개 사용",
+    "premiumRequired": "프리미엄 필요",
+    "adding": "추가 중...",
+    "upgradeToPremium": "프리미엄으로 업그레이드",
+    "addToPlan": "스케줄에 추가하기 ✓"
+  },
+  "planDetail": {
+    "title": "스케줄 상세",
+    "notFound": "스케줄을 찾을 수 없어요",
+    "status": {
+      "interested": "관심",
+      "booked": "예매",
+      "completed": "완료"
+    },
+    "memo": "메모",
+    "memoPlaceholder": "메모를 입력하세요",
+    "cancelled": "취소된 스케줄",
+    "bookingCta": "예매하러 가기",
+    "navigateCta": "장소 길찾기",
+    "editMemo": "메모 수정",
+    "cancelBooking": "예매 취소",
+    "moveToWishlist": "위시리스트로 되돌리기",
+    "deletePlan": "삭제",
+    "deleteConfirm": {
+      "title": "스케줄 삭제",
+      "message": "이 스케줄을 삭제할까요?"
+    },
+    "getDetails": "상세 보기",
+    "bookingConfirm": {
+      "title": "예매 완료했나요?",
+      "desc": "예매를 완료했다면 스케줄 상태를 업데이트할게요",
+      "yes": "네, 예매했어요",
+      "notYet": "아직이요"
+    },
+    "cancelSheet": {
+      "title": "어떻게 할까요?",
+      "reasonPlaceholder": "사유 (선택)",
+      "revertToInterested": "관심으로 되돌리기",
+      "fullCancel": "스케줄 완전 삭제"
+    }
   }
 }

@@ -2,8 +2,6 @@ import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { isLiquidGlassSupported } from '@callstack/liquid-glass';
 import { scale } from '@/constants/design';
-import { useSubscriptionStore } from '@/stores/subscriptionStore';
-import { useUIStore } from '@/stores/uiStore';
 
 // iOS 26 Liquid Glass 탭바 사용 여부 (테스트를 위해 임시로 비활성화 가능)
 // _layout.tsx의 TabLayout과 동일하게 설정해야 함
@@ -64,78 +62,10 @@ export function useConsistentBottomPadding(): number {
   return bottom;
 }
 
-/**
- * Android 배너 광고 위치 계산 훅
- *
- * 레이아웃 순서 (위에서 아래로):
- * 1. 탭바 아이콘 (풀와이드 배경) - bottom: insets.bottom + 배너광고높이
- * 2. 배너 광고 - bottom: insets.bottom (네비바 바로 위)
- * 3. 시스템 네비바 (있으면 insets.bottom > 0, 없으면 insets.bottom ≈ 0)
- *
- * 반응형 동작:
- * - 네비바 있음: 배너가 네비바 위, 탭바가 배너 위
- * - 네비바 없음: 배너가 화면 최하단, 탭바가 배너 위
- */
-
-// 배너와 탭바 사이 간격
-const BANNER_TAB_GAP = 0;
-
-export function useBannerAdBottom(): number {
-  const insets = useSafeAreaInsets();
-  // 실제 로드된 배너 광고 높이를 사용하여 반응형 포지셔닝
-  const bannerAdHeight = useUIStore((state) => state.bannerAdHeight);
-
-  if (Platform.OS === 'android') {
-    // 배너 광고는 네비바 바로 위에 위치 (탭바 아래)
-    return insets.bottom;
-  }
-
-  // 배너 광고 높이에 따라 반응형 조정
-  const SMALL_BANNER_THRESHOLD = 50;
-  const heightAdjustment = bannerAdHeight > 0 && bannerAdHeight <= SMALL_BANNER_THRESHOLD ? -4 : 0;
-
-  if (isUsingIOS26TabBar) {
-    // iOS 26 Liquid Glass 네이티브 탭바: 화면 하단에 고정, safe area 포함
-    // 탭바 높이 (콘텐츠 영역만): 44pt
-    const IOS_26_TAB_BAR_CONTENT_HEIGHT = 44;
-    return insets.bottom + IOS_26_TAB_BAR_CONTENT_HEIGHT + heightAdjustment;
-  }
-
-  // 레거시 플로팅 필 탭바: 화면에서 떠있는 형태
-  // 탭바 위치: scale(24) from bottom
-  // 탭바 높이: inner padding(6) + tab padding(12) + icon(24) + label(13) ≈ 55pt
-  const LEGACY_TAB_BAR_BOTTOM_POSITION = scale(24);
-  const LEGACY_TAB_BAR_HEIGHT = 55;
-  return LEGACY_TAB_BAR_BOTTOM_POSITION + LEGACY_TAB_BAR_HEIGHT + heightAdjustment;
-}
-
 export function useTabBarBottom(): number {
   // iOS 전용: 레거시 플로팅 필 탭바 위치
-  // Android는 _layout.tsx에서 배너를 탭바 내부에 직접 렌더링하므로 이 훅 사용 안함
+  // Android는 _layout.tsx에서 직접 렌더링하므로 이 훅 사용 안함
   return scale(24);
-}
-
-/**
- * 프리미엄 사용자를 위한 컨텐츠 하단 패딩 훅
- *
- * - 무료 사용자: 0 반환 (배너 광고가 이미 공간을 차지함)
- * - 프리미엄 사용자: 배너 광고 높이 반환 (배너가 없으므로 동일한 공간 확보)
- *
- * 이 훅을 사용하면 프리미엄/무료 사용자 모두 컨텐츠 위치가 일관되게 유지됨
- */
-export function usePremiumContentPadding(): number {
-  const isPremium = useSubscriptionStore((state) => state.isPremium);
-  const partnerIsPremium = useSubscriptionStore((state) => state.partnerIsPremium);
-  const showAds = !isPremium && !partnerIsPremium;
-  const bannerAdHeight = useUIStore((state) => state.bannerAdHeight);
-
-  if (showAds) {
-    // 무료 사용자: 배너 광고가 보이므로 추가 패딩 불필요
-    return 0;
-  }
-
-  // 프리미엄 사용자: 배너 광고 높이만큼 추가 패딩 (컨텐츠 위치 일관성 유지)
-  return bannerAdHeight;
 }
 
 export default useConsistentBottomInset;

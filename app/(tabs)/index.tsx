@@ -15,33 +15,30 @@ import {
   StatusBar,
   InteractionManager,
   ActivityIndicator,
-  PixelRatio,
-  Share,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { BlurView } from 'expo-blur';
 import Svg, { Rect, Circle, Defs, Mask } from 'react-native-svg';
-import { X, Edit2, Trash2, ChevronLeft, ChevronRight, Users, Heart, Send, Image as ImageIcon, Calendar } from 'lucide-react-native';
+import { X, Edit2, Trash2, ChevronLeft, ChevronRight, Users, Heart, Image as ImageIcon, Calendar } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { Swipeable } from 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Asset } from 'expo-asset';
 import { useTranslation } from 'react-i18next';
-import { captureScreen, captureRef } from 'react-native-view-shot';
-import * as ImageManipulator from 'expo-image-manipulator';
-import * as MediaLibrary from 'expo-media-library';
+import { useRouter } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import NetInfo from '@react-native-community/netinfo';
 import KoreanLunarCalendar from 'korean-lunar-calendar';
 
 import { COLORS, SPACING, RADIUS, rs, fp, SCREEN_WIDTH, SCREEN_HEIGHT, rw, rh, isCompactHeight } from '@/constants/design';
 import { useBackground } from '@/contexts';
 import { useOnboardingStore, useAuthStore, useTimezoneStore } from '@/stores';
-import { BannerAdView } from '@/components/ads';
-import { useBannerAdBottom, usePremiumContentPadding } from '@/hooks/useConsistentBottomInset';
 import { useCoupleSyncStore } from '@/stores/coupleSyncStore';
 import { db } from '@/lib/supabase';
 import { anniversaryService } from '@/services/anniversaryService';
+import { getUserCountryCode } from '@/lib/locationUtils';
+import { getLocales } from 'expo-localization';
 
 // Pre-load static images (outside component to avoid re-creation)
 const LOGO_IMAGE = require('@/assets/images/daydate-logo.png');
@@ -387,13 +384,12 @@ const swipeStyles = StyleSheet.create({
 
 export default function HomeScreen() {
   const { t, i18n } = useTranslation();
+  const router = useRouter();
   const { backgroundImage, setBackgroundImage, resetToDefault } = useBackground();
   const { data: onboardingData } = useOnboardingStore();
   const { user, partner, couple, setPartner, setCouple } = useAuthStore();
   const { getEffectiveTimezone } = useTimezoneStore();
   const { coupleId, heartLikedBy, updateHeartLiked } = useCoupleSyncStore();
-  const bannerAdBottom = useBannerAdBottom();
-  const premiumContentPadding = usePremiumContentPadding();
 
   // Determine nicknames - always show "나 ❤️ 파트너" from current user's perspective
   const isCurrentUserCoupleUser1 = user?.id === couple?.user1Id;
@@ -408,11 +404,11 @@ export default function HomeScreen() {
   const [anniversaryModalStep, setAnniversaryModalStep] = useState<'list' | 'add' | 'addDatePicker' | 'edit' | 'editDatePicker'>('list');
   const [showImagePickerModal, setShowImagePickerModal] = useState(false);
   const [isUploadingBackground, setIsUploadingBackground] = useState(false);
-  const [isSavingShare, setIsSavingShare] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [newAnniversaryIcon, setNewAnniversaryIcon] = useState('💝');
   const [newAnniversaryName, setNewAnniversaryName] = useState('');
   const [newAnniversaryDate, setNewAnniversaryDate] = useState(new Date());
+  const [isKoreaUser, setIsKoreaUser] = useState(false);
 
   // Custom anniversaries added by user (yearly repeating) - loaded from DB/local storage
   const [customAnniversaries, setCustomAnniversaries] = useState<Anniversary[]>([]);
@@ -448,149 +444,20 @@ export default function HomeScreen() {
     ]).start();
   }, [heartScale, isHeartLiked, updateHeartLiked]);
 
-  // Handle share button press - capture from top line to bottom line with Daydate branding
-  const handleSharePress = useCallback(async () => {
-    // Prevent double execution
-    if (isSavingShare) return;
-    setIsSavingShare(true);
-
-    try {
-      // Measure top line and bottom line positions
-      if (!topLineRef.current || !bottomLineRef.current) {
-        setIsSavingShare(false);
-        return;
-      }
-
-      const topMeasurement = await new Promise<{ x: number; y: number; width: number; height: number }>((resolve) => {
-        topLineRef.current?.measureInWindow((x: number, y: number, width: number, height: number) => {
-          resolve({ x, y, width, height });
-        });
-      });
-
-      const bottomMeasurement = await new Promise<{ x: number; y: number; width: number; height: number }>((resolve) => {
-        bottomLineRef.current?.measureInWindow((x: number, y: number, width: number, height: number) => {
-          resolve({ x, y, width, height });
-        });
-      });
-
-      // Calculate responsive padding based on content height, not screen height
-      // This ensures consistent visual appearance across all device sizes
-      const contentHeight = (bottomMeasurement.y + bottomMeasurement.height) - topMeasurement.y;
-
-      // Padding = 10% of content height, with min 30px and max 50px
-      const basePadding = Math.round(contentHeight * 0.10);
-      const topPadding = Math.min(50, Math.max(30, basePadding));
-
-      // Bottom padding should be limited to avoid capturing ad area
-      // Safe zone: at least 120px from bottom of screen (tab bar + ad height)
-      const safeBottomY = SCREEN_HEIGHT - 120;
-      const bottomLineY = bottomMeasurement.y + bottomMeasurement.height;
-      const maxBottomPadding = Math.max(20, safeBottomY - bottomLineY - 10);
-      const bottomPadding = Math.min(topPadding, maxBottomPadding);
-
-      const pixelScale = PixelRatio.get();
-
-      // Capture the full screen
-      const fullScreenUri = await captureScreen({
-        format: 'png',
-        quality: 1,
-        result: 'tmpfile',
-      });
-
-      // Calculate crop area from top line to bottom line (full screen width, convert points to pixels)
-      // Add offset to move capture area down slightly (matching content position adjustment)
-      // Android needs more offset to move capture area further down
-      const captureOffsetY = Platform.OS === 'android' ? rh(50) : rh(15); // Responsive offset to shift capture down
-      const cropX = 0;
-      const cropY = Math.max(0, Math.round((topMeasurement.y - topPadding + captureOffsetY) * pixelScale));
-      const cropWidth = Math.round(SCREEN_WIDTH * pixelScale);
-      const cropHeight = Math.round((contentHeight + topPadding + bottomPadding) * pixelScale);
-
-      const croppedImage = await ImageManipulator.manipulateAsync(
-        fullScreenUri,
-        [{ crop: { originX: cropX, originY: cropY, width: cropWidth, height: cropHeight } }],
-        { format: ImageManipulator.SaveFormat.PNG, compress: 1 }
-      );
-
-      // Step 2: Set the captured content to state to render the branded container
-      const contentWidth = cropWidth / pixelScale;
-      const contentHeightPts = cropHeight / pixelScale;
-
-      // Create a promise that resolves when the branded image loads
-      const imageLoadPromise = new Promise<void>((resolve) => {
-        brandedImageLoadedRef.current = resolve;
-      });
-
-      setCapturedContentUri(croppedImage.uri);
-      setCapturedContentSize({ width: contentWidth, height: contentHeightPts });
-
-      // Wait for the branded container image to load (with 3 second timeout)
-      await Promise.race([
-        imageLoadPromise,
-        new Promise<void>(resolve => setTimeout(resolve, 3000)),
-      ]);
-
-      // Additional small delay to ensure render is complete
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      // Step 3: Capture the branded container
-      if (!brandedContainerRef.current) {
-        // Fallback to original image if branding container not available
-        throw new Error('Branded container not ready');
-      }
-
-      const brandedImage = await captureRef(brandedContainerRef, {
-        format: 'png',
-        quality: 1,
-        result: 'tmpfile',
-      });
-
-      // Clear the state after capture
-      setCapturedContentUri(null);
-      setCapturedContentSize(null);
-
-      if (Platform.OS === 'ios') {
-        // iOS: Share directly using file URI
-        await Share.share({
-          url: brandedImage,
-        });
+  // Check if user is in Korea (for gift link visibility)
+  // Check if user is in Korea (for gift link visibility)
+  // Primary: GPS location, Fallback: device region setting
+  useEffect(() => {
+    (async () => {
+      const code = await getUserCountryCode();
+      if (code) {
+        setIsKoreaUser(code === 'KR');
       } else {
-        // Android: Use expo-sharing to show native share sheet (dynamic import to avoid iOS crash)
-        try {
-          const Sharing = await import('expo-sharing');
-          const isAvailable = await Sharing.isAvailableAsync();
-          if (isAvailable) {
-            await Sharing.shareAsync(brandedImage, {
-              mimeType: 'image/png',
-              dialogTitle: t('home.share.dialogTitle'),
-            });
-          } else {
-            throw new Error('Sharing not available');
-          }
-        } catch {
-          // Fallback: Save to gallery if sharing is not available
-          const { status } = await MediaLibrary.requestPermissionsAsync();
-          if (status !== 'granted') {
-            Alert.alert(t('common.error'), t('home.share.permissionDenied'));
-            return;
-          }
-          await MediaLibrary.createAssetAsync(brandedImage);
-          Alert.alert(
-            t('home.share.savedTitle'),
-            t('home.share.savedAndShareFromGallery')
-          );
-        }
+        const regionCode = getLocales()[0]?.regionCode;
+        setIsKoreaUser(regionCode === 'KR');
       }
-    } catch (error) {
-      console.error('Error sharing:', error);
-      // Clear state on error
-      setCapturedContentUri(null);
-      setCapturedContentSize(null);
-      Alert.alert(t('common.error'), t('home.shareError'));
-    } finally {
-      setIsSavingShare(false);
-    }
-  }, [t, isSavingShare]);
+    })();
+  }, []);
 
   // Track if navigation/interaction is complete for deferred rendering
   const [isInteractionComplete, setIsInteractionComplete] = useState(false);
@@ -703,7 +570,7 @@ export default function HomeScreen() {
           isCustom: true,
         }));
         setCustomAnniversaries(converted);
-      })
+      }, 'home')
       : null;
 
     return () => {
@@ -745,15 +612,6 @@ export default function HomeScreen() {
   const [showTutorial, setShowTutorial] = useState(false);
   const [buttonPosition, setButtonPosition] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const imageButtonRef = useRef<View>(null);
-  const topLineRef = useRef<View>(null);
-  const bottomLineRef = useRef<View>(null);
-
-  // Branding container for share capture (hidden off-screen)
-  const brandedContainerRef = useRef<View>(null);
-  const [capturedContentUri, setCapturedContentUri] = useState<string | null>(null);
-  const [capturedContentSize, setCapturedContentSize] = useState<{ width: number; height: number } | null>(null);
-  const brandedImageLoadedRef = useRef<(() => void) | null>(null);
-
   // TextInput refs for emoji picker behavior
   const nameInputRef = useRef<TextInput>(null);
   const editNameInputRef = useRef<TextInput>(null);
@@ -840,6 +698,34 @@ export default function HomeScreen() {
     } catch {
       // Ignore storage errors
     }
+  };
+
+  // Gift emoji shake animation (intermittent: shake → pause → shake)
+  const giftShakeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const shake = Animated.sequence([
+      // Shake: rotate left-right quickly
+      Animated.timing(giftShakeAnim, { toValue: 1, duration: 80, useNativeDriver: true }),
+      Animated.timing(giftShakeAnim, { toValue: -1, duration: 80, useNativeDriver: true }),
+      Animated.timing(giftShakeAnim, { toValue: 1, duration: 80, useNativeDriver: true }),
+      Animated.timing(giftShakeAnim, { toValue: -1, duration: 80, useNativeDriver: true }),
+      Animated.timing(giftShakeAnim, { toValue: 0, duration: 60, useNativeDriver: true }),
+      // Pause
+      Animated.delay(2500),
+    ]);
+    const loop = Animated.loop(shake);
+    loop.start();
+    return () => loop.stop();
+  }, [giftShakeAnim]);
+
+  const giftShakeStyle = {
+    transform: [{
+      rotate: giftShakeAnim.interpolate({
+        inputRange: [-1, 0, 1],
+        outputRange: ['-15deg', '0deg', '15deg'],
+      }),
+    }],
   };
 
   // Anniversary modal animation (scale + opacity like album modal, iOS only)
@@ -1912,14 +1798,13 @@ export default function HomeScreen() {
       />
       <View style={[styles.overlay, { backgroundColor: Platform.OS === 'ios' ? 'rgba(0, 0, 0, 0.3)' : 'rgba(0, 0, 0, 0.2)' }]} />
 
-      {/* Content - 프리미엄 사용자는 배너 광고 높이만큼 추가 패딩 */}
-      <View style={[styles.content, premiumContentPadding > 0 && { paddingBottom: premiumContentPadding }]}>
+      <View style={styles.content}>
         {/* Photo centered */}
         <View style={styles.polaroidContainer}>
           {/* Top section: line + user icon/names (line matches names width) */}
           <View style={styles.frameTopSection}>
             {/* Top line - hidden */}
-            <View ref={topLineRef} style={styles.frameTopLine} />
+            <View style={styles.frameTopLine} />
 
             {/* User icon and couple names */}
             <View style={styles.frameUserIconRow}>
@@ -1977,9 +1862,6 @@ export default function HomeScreen() {
               <Pressable onPress={openAnniversaryModal} style={styles.frameIconSpacing}>
                 <Calendar color="#fff" size={polaroidScale(22)} strokeWidth={1.8} />
               </Pressable>
-              <Pressable onPress={handleSharePress} style={styles.frameIconSpacing}>
-                <Send color="#fff" size={polaroidScale(22)} strokeWidth={1.8} />
-              </Pressable>
             </View>
             <Pressable
               ref={imageButtonRef}
@@ -1989,6 +1871,44 @@ export default function HomeScreen() {
               <ImageIcon color="#fff" size={polaroidScale(22)} strokeWidth={1.8} />
             </Pressable>
           </View>
+
+          {/* Nearest anniversary alert */}
+          {anniversaries.length > 0 && (
+            <View
+              style={[styles.anniversaryAlert, { backgroundColor: anniversaries[0].bgColor }]}
+            >
+              <View style={styles.anniversaryAlertLeft}>
+                <Text style={styles.anniversaryAlertIcon}>{anniversaries[0].icon}</Text>
+                <View style={styles.anniversaryAlertLabelWrap}>
+                  <Text style={styles.anniversaryAlertLabel} numberOfLines={1}>{anniversaries[0].label}</Text>
+                  <Text style={styles.anniversaryAlertDate}>{anniversaries[0].date}</Text>
+                </View>
+              </View>
+              <View style={styles.anniversaryAlertRight}>
+                <LinearGradient
+                  colors={anniversaries[0].gradientColors}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.anniversaryAlertBadge}
+                >
+                  <Text style={styles.anniversaryAlertDDayText}>{anniversaries[0].dDay}</Text>
+                </LinearGradient>
+                {isKoreaUser ? (
+                  <Pressable style={styles.anniversaryGiftButton} onPress={() => WebBrowser.openBrowserAsync('https://link.inpock.co.kr/daydate')} hitSlop={12}>
+                    <Animated.View style={giftShakeStyle}>
+                      <Text style={styles.anniversaryGiftEmoji}>🎁</Text>
+                    </Animated.View>
+                  </Pressable>
+                ) : (
+                  <View style={styles.anniversaryGiftButton}>
+                    <Animated.View style={giftShakeStyle}>
+                      <Text style={styles.anniversaryGiftEmoji}>🎁</Text>
+                    </Animated.View>
+                  </View>
+                )}
+              </View>
+            </View>
+          )}
 
           {/* Section between frame and bottom line */}
           <View style={styles.frameDDaySection}>
@@ -2007,12 +1927,9 @@ export default function HomeScreen() {
           </View>
 
           {/* Bottom line */}
-          <View ref={bottomLineRef} style={styles.frameBottomLine} />
+          <View style={styles.frameBottomLine} />
         </View>
       </View>
-
-      {/* Banner Ad - positioned above tab bar */}
-      <BannerAdView placement="home" style={[styles.bannerAd, { bottom: bannerAdBottom }]} />
 
       {/* Anniversary Modal with Blur - Single modal with step-based content */}
       <Modal
@@ -2166,45 +2083,6 @@ export default function HomeScreen() {
         </Pressable>
       </Modal>
 
-      {/* Hidden branded container for share capture - rendered off-screen but within layout */}
-      {capturedContentUri && capturedContentSize && (
-        <View
-          style={styles.brandedContainerWrapper}
-          pointerEvents="none"
-          collapsable={false}
-        >
-          <View
-            ref={brandedContainerRef}
-            style={[
-              styles.brandedContainer,
-              {
-                width: capturedContentSize.width,
-                height: capturedContentSize.height,
-              },
-            ]}
-            collapsable={false}
-          >
-            {/* Captured content as background */}
-            <ExpoImage
-              source={{ uri: capturedContentUri }}
-              style={StyleSheet.absoluteFill}
-              contentFit="cover"
-              cachePolicy="memory"
-              onLoad={() => {
-                // Signal that the branded image is loaded and ready for capture
-                if (brandedImageLoadedRef.current) {
-                  brandedImageLoadedRef.current();
-                  brandedImageLoadedRef.current = null;
-                }
-              }}
-            />
-
-            {/* Bottom: handle */}
-            <Text style={styles.brandedTextBottom}>@Daydate</Text>
-          </View>
-        </View>
-      )}
-
     </View>
   );
 }
@@ -2213,12 +2091,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.black,
-  },
-  bannerAd: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    alignItems: 'center',
   },
   backgroundImage: {
     position: 'absolute',
@@ -2244,15 +2116,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: rs(SPACING.lg),
-    // Android: shift content up with negative marginTop (responsive to screen height)
-    // Tall screens (Galaxy S24 etc.): -50px, Normal Android: -35px, Compact: -25px
+    // Android: shift content with marginTop (responsive to screen height)
+    // Tall screens (Galaxy S24 etc.): -20px, Normal Android: -5px, Compact: 5px
     marginTop: Platform.OS === 'android'
       ? (SCREEN_HEIGHT < 700
-        ? rh(-25)
+        ? rh(5)
         : isTallAndroidScreen
-          ? rh(-50)  // More shift for tall screens
-          : rh(-35))
-      : 0,
+          ? rh(-20)
+          : rh(-5))
+      : rh(30),
     // Account for banner ad + tab bar at bottom - responsive padding
     // Small screens (< 700px): 100px, Medium (700-800): 110px, Large: 120px
     // Tall Android screens (Galaxy S24 etc.): 95px for more vertical space
@@ -2263,6 +2135,61 @@ const styles = StyleSheet.create({
           ? rh(95)  // Reduced for tall screens
           : SCREEN_HEIGHT < 800 ? rh(110) : rh(120))
       : SCREEN_HEIGHT < 700 ? rh(100) : SCREEN_HEIGHT < 800 ? rh(110) : rh(120),
+  },
+  anniversaryAlert: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: rs(14),
+    paddingVertical: rs(12),
+    paddingHorizontal: rs(12),
+    marginTop: rs(6),
+    marginBottom: rs(2),
+    alignSelf: 'stretch',
+  },
+  anniversaryAlertLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: rs(8),
+    flex: 1,
+    marginRight: rs(6),
+  },
+  anniversaryAlertIcon: {
+    fontSize: fp(20),
+  },
+  anniversaryAlertLabelWrap: {
+    flex: 1,
+  },
+  anniversaryAlertLabel: {
+    fontSize: fp(12),
+    fontWeight: '600',
+    color: COLORS.white,
+  },
+  anniversaryAlertDate: {
+    fontSize: fp(10),
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginTop: rs(1),
+  },
+  anniversaryAlertBadge: {
+    paddingHorizontal: rs(10),
+    paddingVertical: rs(5),
+    borderRadius: rs(14),
+  },
+  anniversaryAlertRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: rs(6),
+  },
+  anniversaryAlertDDayText: {
+    fontSize: fp(11),
+    fontWeight: '700',
+    color: COLORS.white,
+  },
+  anniversaryGiftButton: {
+    padding: rs(6),
+  },
+  anniversaryGiftEmoji: {
+    fontSize: fp(16),
   },
   anniversarySection: {
     paddingTop: Platform.OS === 'android'
@@ -2439,11 +2366,11 @@ const styles = StyleSheet.create({
     marginRight: polaroidScale(11),
     marginTop: Platform.OS === 'android'
       ? (SCREEN_HEIGHT < 700
-        ? polaroidScale(20)
+        ? polaroidScale(8)
         : isTallAndroidScreen
-          ? polaroidScale(16)  // Reduced for tall screens
-          : polaroidScale(22))
-      : polaroidScale(20),
+          ? polaroidScale(6)
+          : polaroidScale(10))
+      : polaroidScale(8),
   },
   frameDDayInline: {
     flexDirection: 'row',
@@ -3109,26 +3036,5 @@ const styles = StyleSheet.create({
     fontSize: fp(14),
     color: COLORS.white,
     fontWeight: '700',
-  },
-  // Wrapper to position branded container off-screen but still render it
-  brandedContainerWrapper: {
-    position: 'absolute',
-    top: -9999,
-    left: 0,
-    opacity: 1, // Must be visible for capture
-  },
-  // Branded container for share capture (no background, just overlay text)
-  brandedContainer: {
-    overflow: 'visible',
-  },
-  // Bottom: handle text
-  brandedTextBottom: {
-    position: 'absolute',
-    bottom: 6,
-    right: 6,
-    fontSize: 16,
-    fontFamily: 'InstrumentSerif',
-    color: 'rgba(255, 255, 255, 0.8)',
-    letterSpacing: 0.5,
   },
 });

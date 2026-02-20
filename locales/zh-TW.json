@@ -22,7 +22,8 @@
     "partner": "伴侶",
     "me": "我",
     "days": "天",
-    "daysCount": "天"
+    "daysCount": "天",
+    "comingSoon": "即將推出"
   },
   "auth": {
     "email": {
@@ -46,7 +47,6 @@
   },
   "tabs": {
     "home": "首頁",
-    "mission": "任務",
     "calendar": "日曆",
     "memories": "回憶",
     "more": "更多",
@@ -96,162 +96,6 @@
     },
     "shareError": "分享時發生錯誤。"
   },
-  "mission": {
-    "title": "今日任務",
-    "subtitle": "今天要一起創造什麼樣的時刻呢？",
-    "emptyState": {
-      "line1": "準備好開始",
-      "line2": "今日任務了嗎？",
-      "button": "開始"
-    },
-    "generate": "獲取今日任務",
-    "generating": "生成中...",
-    "generatingMessage": "正在生成任務",
-    "pleaseWait": "請稍候",
-    "start": "開始",
-    "completed": "已完成",
-    "view": "查看",
-    "kept": "已收藏",
-    "keep": "收藏",
-    "anotherInProgress": "其他任務進行中",
-    "questions": {
-      "canMeetToday": "今天可以見面嗎？",
-      "yesMeet": "可以見面",
-      "noMeet": "無法見面",
-      "availableTime": "今天有多少時間可以一起度過？",
-      "todayMood": "今天想要什麼樣的氛圍？（可多選）"
-    },
-    "timeOptions": {
-      "30min": "30分鐘",
-      "1hour": "1小時",
-      "2hour": "2小時以上",
-      "allday": "一整天"
-    },
-    "moodOptions": {
-      "cozy": "宅家約會",
-      "foodie": "美食探店",
-      "active": "活力・動態",
-      "healing": "休息・療癒",
-      "culture": "文藝・感性",
-      "adventure": "新挑戰",
-      "romantic": "浪漫"
-    },
-    "alerts": {
-      "locationRequired": "需要位置權限",
-      "locationRequiredMessage": "生成任務需要位置權限。\n請允許位置權限。",
-      "allowPermission": "允許權限",
-      "locationDenied": "位置權限被拒絕",
-      "locationDeniedMessage": "位置權限被拒絕。請在設定中允許位置權限。",
-      "goToSettings": "前往設定",
-      "cannotKeep": "無法收藏",
-      "alreadyCompletedKeep": "已完成的任務無法收藏。",
-      "keepMission": "收藏任務",
-      "keepMissionConfirm": "要將「{{title}}」任務加入收藏嗎？",
-      "keepLimit": "收藏限制",
-      "keepLimitMessage": "最多只能收藏5個任務。\n請刪除已收藏的任務後再試。",
-      "cannotStart": "無法開始任務",
-      "anotherInProgressMessage": "已有其他任務進行中。\n請先完成進行中的任務！",
-      "dailyLimitMessage": "今天可完成的任務已全部完成。\n明天再來挑戰吧！",
-      "offlineTitle": "需要網路連線",
-      "offlineMessage": "生成任務需要網路連線。\n請檢查網路連線後再試一次。"
-    },
-    "refresh": {
-      "questionLine1": "沒有找到",
-      "questionLine2": "喜歡的任務嗎？",
-      "button": "獲取新任務",
-      "hint": "觀看廣告後\n可獲得新任務",
-      "modalTitle": "新任務",
-      "modalButton": "獲取新任務",
-      "partnerGenerating": "請稍等",
-      "partnerGeneratingMessage": "您的伴侶正在生成新任務。請稍後再試。",
-      "adLoadingFailed": "廣告載入失敗",
-      "adLoadingFailedMessage": "廣告載入失敗。\n請稍後再試。",
-      "devModeTitle": "開發模式",
-      "devModeMessage": "廣告僅在正式版本中顯示。刷新任務需要觀看廣告。",
-      "generating": "正在生成新任務...",
-      "loadingAd": "正在準備廣告...",
-      "adNotCompleted": "廣告觀看未完成",
-      "adNotCompletedMessage": "請觀看完整廣告以刷新任務。"
-    },
-    "partnerWatchingAd": "對方正在觀看廣告...",
-    "partnerWatchingAdWithName": "{{name}}正在\n觀看廣告",
-    "timeError": {
-      "title": "時間設定錯誤",
-      "message": "您的裝置時間與伺服器不一致。\n\n為確保任務服務正常運作，請在裝置設定中啟用「自動設定日期與時間」。",
-      "confirm": "確認",
-      "minutes": "{{count}}分鐘",
-      "hours": "{{count}}小時"
-    }
-  },
-  "missionDetail": {
-    "headerTitle": "任務詳情",
-    "linkButton": {
-      "reserve": "前往預約",
-      "book": "前往訂票",
-      "purchase": "前往購買"
-    },
-    "notFound": {
-      "title": "找不到任務",
-      "description": "此任務已無法使用。"
-    },
-    "camera": {
-      "title": "拍照",
-      "confirmTitle": "確認照片",
-      "permissionRequired": "需要相機權限",
-      "permissionMessage": "拍照需要相機權限。",
-      "photoError": "拍照失敗，請重試。",
-      "usePhoto": "使用這張",
-      "retake": "重新拍攝",
-      "pinchToZoom": "雙指縮放"
-    },
-    "location": {
-      "noInfo": "無位置資訊"
-    },
-    "steps": {
-      "photo": {
-        "title": "拍照記錄",
-        "description": "用照片記錄兩人的特別時刻。",
-        "hint": "將此刻的心動和幸福拍成照片留作回憶。"
-      },
-      "message": {
-        "title": "寫下給對方的話",
-        "description": "寫下此刻想對對方說的心意。真誠的訊息能創造更特別的回憶。",
-        "written": "已完成",
-        "notWritten": "未完成"
-      },
-      "complete": "完成"
-    },
-    "status": {
-      "anotherInProgress": "其他任務進行中",
-      "waitingPartner": "等待對方中...",
-      "waitingPhoto": "等待照片中...",
-      "writeMessage": "寫下給對方的話",
-      "takePhoto": "拍照"
-    },
-    "modal": {
-      "title": "給對方的話",
-      "placeholder": "寫下想對對方說的話"
-    },
-    "defaultPartnerMessage": "有你在身邊真幸福 💕",
-    "completed": "已完成",
-    "completeButton": "完成任務！🎉",
-    "writeMessage": "撰寫訊息",
-    "messagePlaceholder": "一起記錄今天的任務吧",
-    "submitMission": "完成任務",
-    "partnerMessage": "對方的訊息",
-    "myMessage": "我的訊息",
-    "waitingPartner": "正在等待對方的訊息",
-    "viewMemory": "查看回憶"
-  },
-  "bookmark": {
-    "title": "收藏夾",
-    "empty": "沒有收藏的任務",
-    "emptyHint": "試著收藏喜歡的任務吧",
-    "deleteMission": "刪除任務",
-    "deleteConfirm": "確定要刪除「{{title}}」任務嗎？",
-    "cannotDelete": "無法刪除",
-    "missionInProgressMessage": "無法刪除進行中的任務。請先完成或取消任務後再刪除。"
-  },
   "calendar": {
     "title": "日曆",
     "subtitle": "記錄我們的時光",
@@ -281,7 +125,16 @@
       "deleteConfirmTitle": "刪除待辦事項",
       "deleteConfirmMessage": "確定要刪除這個待辦事項嗎？",
       "deleteConfirmCancel": "取消",
-      "deleteConfirmOk": "刪除"
+      "deleteConfirmOk": "刪除",
+      "calendar": "待辦清單",
+      "calendarDesc": "按日期管理您的待辦事項"
+    },
+    "photos": {
+      "title": "照片",
+      "countUnit": "張"
+    },
+    "plans": {
+      "title": "行程"
     },
     "period": {
       "title": "生理期資訊",
@@ -325,11 +178,13 @@
   "memories": {
     "title": "回憶",
     "subtitle": "我們一起度過的時刻",
-    "empty": "沒有已完成的任務",
-    "emptyHint": "請完成任務！",
+    "empty": "點擊以新增照片",
+    "emptyHint": "",
     "viewAll": "查看全部",
     "togetherMoment": "一起的時刻",
     "itemCount": "{{count}}個項目",
+    "dateCount": "{{count}}次約會",
+    "totalSpending": "總花費 : {{amount}}",
     "monthNames": [
       "1月",
       "2月",
@@ -360,11 +215,8 @@
       "fontStyleDesc": "選擇相簿標題使用的字體風格",
       "basicFont": "字體",
       "basicFontDesc": "簡潔風格",
-      "ransomStyle": "剪報風格",
       "basicFontHint": "套用簡潔字體",
-      "ransomFontHint": "每個字母都有特別的風格",
       "namePlaceholder": "輸入相簿名稱...",
-      "ransomPlaceholder": "僅限英文輸入 (A-Z, 0-9)",
       "selectPhoto": "選擇照片",
       "dragHint": "拖曳文字調整位置",
       "coverEditHint": "選擇照片後拖曳文字調整位置",
@@ -387,7 +239,23 @@
       "deleteSingleConfirm": "確定要刪除這張照片嗎？",
       "save": "儲存照片",
       "tapToFlip": "點擊查看背面",
-      "tapToView": "點擊查看照片"
+      "tapToView": "點擊查看照片",
+      "uploading": "上傳中 ({{current}}/{{total}})",
+      "permissionDenied": "需要存取相簿的權限。",
+      "uploadError": "上傳照片時發生錯誤。",
+      "tapToEdit": "點擊編輯",
+      "addMessage": "留下訊息",
+      "editMessage": "編輯訊息",
+      "messagePlaceholder": "為這個瞬間留下訊息...",
+      "addRecord": "記錄你的約會",
+      "editRecord": "記錄",
+      "recordTitle": "標題",
+      "recordTitlePlaceholder": "輸入約會標題",
+      "recordLocation": "位置",
+      "recordLocationPlaceholder": "輸入地點",
+      "recordMessage": "訊息",
+      "spending": "支出",
+      "spendingPlaceholder": "輸入金額"
     },
     "permission": {
       "required": "需要權限",
@@ -408,15 +276,16 @@
       "developer": "開發者"
     },
     "menu": {
+      "profile": "個人檔案",
       "myProfile": "我的資料",
       "coupleProfile": "情侶資料",
       "settings": "設定",
       "announcements": "公告",
       "customerService": "客服中心",
       "onboardingReset": "重置引導",
-      "missionReset": "重置任務",
       "fullReset": "完全重置",
-      "logout": "登出"
+      "logout": "登出",
+      "ourPlans": "我們的行程"
     },
     "announcements": {
       "title": "公告",
@@ -442,10 +311,6 @@
     "alerts": {
       "devReset": "開發者重置",
       "devResetMessage": "確定要初始化引導狀態並重新開始嗎？",
-      "missionReset": "重置任務",
-      "missionResetMessage": "確定要重置今日任務和完成狀態嗎？",
-      "missionResetComplete": "重置完成",
-      "missionResetCompleteMessage": "任務已重置。請前往任務頁面生成新任務。",
       "fullReset": "⚠️ 完全重置",
       "fullResetMessage": "將初始化所有資料。\n\n• 引導資料\n• 配對資訊\n• 情侶同步資料\n• 任務資料\n• 所有本地儲存\n\n確定要初始化嗎？",
       "fullResetComplete": "初始化完成",
@@ -498,7 +363,7 @@
     "couple": {
       "title": "情侶資料",
       "anniversary": "紀念日",
-      "accountInfo": "帳戶資訊",
+      "accountInfo": "配對帳戶資訊",
       "myAccountInfo": "{{nickname}}的帳戶資訊",
       "myAccount": "我的帳戶",
       "partnerAccountInfo": "{{nickname}}的帳戶資訊",
@@ -540,8 +405,6 @@
     "notifications": {
       "push": "推播通知",
       "pushDesc": "接收所有通知",
-      "mission": "任務通知",
-      "missionDesc": "生成新任務時通知",
       "message": "訊息未填寫通知",
       "messageDesc": "未填寫給對方的話時通知"
     },
@@ -587,13 +450,13 @@
       "checkTitle": "解除連結前請確認",
       "daysTogether": "在一起的時間",
       "daysUnit": "天",
-      "completedMissions": "一起完成的任務",
-      "missionsUnit": "個",
+      "dateRecords": "一起記錄的約會",
+      "recordsUnit": "個",
       "recoveryPeriod": "可恢復期間",
       "recoveryHint": "最多可在30天內恢復",
       "warningsTitle": "注意事項",
       "warning1": "將向對方發送解除配對通知",
-      "warning2": "任務記錄將保存在個人帳戶中",
+      "warning2": "約會記錄將保存在個人帳戶中",
       "warning3": "30天內可與同一伴侶重新連結",
       "confirmPrompt": "請在下方輸入「解除配對」以繼續",
       "confirmText": "解除配對",
@@ -617,7 +480,7 @@
       "warningText": "刪除帳戶後所有資料將被",
       "permanentDelete": "永久刪除",
       "warningEnd": "。",
-      "dataList": "將刪除的資料：個人資料、情侶連結資訊、已完成任務記錄、相簿和照片、所有設定",
+      "dataList": "將刪除的資料：個人資料、情侶連結資訊、相簿和照片、所有設定",
       "confirmPrompt": "請在下方輸入「刪除帳戶」以繼續",
       "confirmText": "刪除帳戶",
       "button": "刪除帳戶",
@@ -639,7 +502,7 @@
     "licenses": "開源授權"
   },
   "onboarding": {
-    "tagline": "每天，\n新的\n約會任務。",
+    "tagline": "我們的\n約會回憶\n累積之處,\n\nDaydate.",
     "welcome": "歡迎",
     "welcomeTitle": "歡迎來到\nDaydate",
     "welcomeSubtitle": "一起記錄和分享\n兩人的特別時刻吧",
@@ -951,9 +814,6 @@
       "manage": "管理Premium方案"
     },
     "limits": {
-      "generationReached": "今天的任務生成次數已用完",
-      "completionReached": "今天的任務完成次數已用完",
-      "bookmarkReached": "任務收藏已滿（最多5個）",
       "albumReached": "無法創建更多相簿（最多5個）",
       "albumReadOnly": "此相簿為唯讀",
       "upgradeToPremium": "升級到Premium可無限制使用",
@@ -961,7 +821,6 @@
     },
     "limitReached": {
       "title": "已達每日限制",
-      "completion": "您已達到今日任務完成上限。升級到Premium可完成更多任務！",
       "photoStorage": "已達照片儲存上限（100張）。升級至Premium可無限儲存！"
     },
     "deleteWarning": {
@@ -978,13 +837,16 @@
     "cancel": "稍後"
   },
   "feed": {
+    "title": "動態",
+    "subtitle": "探索屬於你們的特別約會",
     "category": {
       "all": "全部",
       "festival": "節慶",
-      "performance": "演出",
+      "show": "演出",
       "restaurant": "美食",
       "activity": "活動",
-      "spot": "景點"
+      "spot": "景點",
+      "pet": "寵物"
     },
     "save": "收藏",
     "saved": "已收藏",
@@ -994,7 +856,21 @@
       "free": "免費"
     },
     "eventPeriod": "期間",
-    "loading": "載入中..."
+    "loading": "載入中...",
+    "viewMore": "立即訂票",
+    "openLink": "打開訂票連結",
+    "photoBy": "Photo by {{name}} on Unsplash",
+    "detail": {
+      "date": "日期",
+      "location": "地點"
+    },
+    "locationRequired": "需要位置權限",
+    "locationRequiredDesc": "請開啟位置權限以探索附近的約會景點。",
+    "enableLocation": "開啟位置權限",
+    "goToSettings": "前往設定",
+    "getDirections": "導航",
+    "anniversaryToday": "就是今天！",
+    "anniversaryHint": "送這樣的禮物給另一半如何？"
   },
   "errors": {
     "networkError": "發生網路錯誤",
@@ -1002,5 +878,56 @@
     "somethingWrong": "發生問題",
     "sessionExpired": "工作階段已過期",
     "unauthorized": "沒有權限"
+  },
+  "plans": {
+    "title": "我們的行程",
+    "tabs": {
+      "interested": "收藏清單",
+      "booked": "已預訂"
+    },
+    "bookNow": "立即預訂",
+    "emptyInterested": "還沒有行程\n從動態牆添加喜歡的活動吧！",
+    "emptyBooked": "還沒有已預訂的行程",
+    "expiredSection": "過去",
+    "monthlyLimit": "本月已使用 {{current}}/{{max}}",
+    "premiumRequired": "需要高級版",
+    "adding": "添加中...",
+    "upgradeToPremium": "升級到高級版",
+    "addToPlan": "加入行程 ✓"
+  },
+  "planDetail": {
+    "title": "行程詳情",
+    "notFound": "找不到行程",
+    "status": {
+      "interested": "收藏",
+      "booked": "已預訂",
+      "completed": "已完成"
+    },
+    "memo": "備註",
+    "memoPlaceholder": "輸入備註",
+    "cancelled": "已取消的行程",
+    "bookingCta": "立即預訂",
+    "navigateCta": "導航前往",
+    "editMemo": "編輯備註",
+    "cancelBooking": "取消預訂",
+    "moveToWishlist": "移回願望清單",
+    "deletePlan": "刪除",
+    "deleteConfirm": {
+      "title": "刪除行程",
+      "message": "要刪除這個行程嗎？"
+    },
+    "getDetails": "查看詳情",
+    "bookingConfirm": {
+      "title": "您完成預訂了嗎？",
+      "desc": "如果您完成了預訂，我們將更新您的行程狀態",
+      "yes": "是的，已預訂",
+      "notYet": "還沒"
+    },
+    "cancelSheet": {
+      "title": "您想怎麼做？",
+      "reasonPlaceholder": "原因（選填）",
+      "revertToInterested": "移回收藏清單",
+      "fullCancel": "刪除行程"
+    }
   }
 }

@@ -4,7 +4,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform, Linking } from 'react-native';
 import Constants from 'expo-constants';
 import { supabase } from '@/lib/supabase';
-import { getTodayInTimezone } from './timezoneStore';
 
 // Check if we're running in Expo Go (not a development build)
 const isExpoGo = Constants.appOwnership === 'expo';
@@ -54,35 +53,19 @@ export const PRODUCT_IDS = {
 // Subscription limits
 export const SUBSCRIPTION_LIMITS = {
   free: {
-    maxGenerationsPerDay: 1,
-    maxCompletionsPerDay: 1,
-    maxBookmarks: 5,
-    maxAlbums: 5,
-    maxPhotos: 100, // Maximum photos in monthly album for free users
-    missionsPerGeneration: 3,
     showAds: true,
     homeFrameOptions: ['polaroid'] as const,
+    maxPlansPerMonth: 5,
   },
   premium: {
-    maxGenerationsPerDay: Infinity,
-    maxCompletionsPerDay: Infinity,
-    maxBookmarks: Infinity,
-    maxAlbums: Infinity,
-    maxPhotos: Infinity, // Unlimited photos for premium users
-    missionsPerGeneration: 5,
     showAds: false,
     homeFrameOptions: ['polaroid', 'calendar'] as const,
+    maxPlansPerMonth: Infinity,
   },
 } as const;
 
 export type SubscriptionPlan = 'free' | 'monthly' | 'annual';
 export type HomeFrameOption = 'polaroid' | 'calendar';
-
-interface DailyUsage {
-  generationCount: number;
-  completionCount: number;
-  usageDate: string; // YYYY-MM-DD format
-}
 
 interface SubscriptionState {
   // Subscription status
@@ -97,9 +80,6 @@ interface SubscriptionState {
   // RevenueCat data
   offerings: PurchasesOfferings | null;
   customerInfo: CustomerInfo | null;
-
-  // Daily usage tracking
-  dailyUsage: DailyUsage | null;
 
   // Partner premium status (for couple premium check)
   partnerIsPremium: boolean;
@@ -121,21 +101,8 @@ interface SubscriptionActions {
   openSubscriptionManagement: () => void;
 
   // Feature checks
-  canGenerateMissions: (coupleId: string) => Promise<boolean>;
-  canCompleteMission: (coupleId: string) => Promise<boolean>;
-  canBookmarkMission: (currentBookmarkCount: number) => boolean;
-  canCreateAlbum: (currentAlbumCount: number) => boolean;
-  canSavePhoto: (currentPhotoCount: number) => boolean;
-  canEditAlbum: (albumIndex: number, totalAlbums: number) => boolean;
-  isAlbumReadOnly: (albumIndex: number, totalAlbums: number) => boolean;
   shouldShowAds: () => boolean;
   getAvailableFrameOptions: () => HomeFrameOption[];
-
-  // Usage tracking
-  incrementGenerationCount: (coupleId: string) => Promise<boolean>;
-  incrementCompletionCount: (coupleId: string) => Promise<boolean>;
-  loadDailyUsage: (coupleId: string) => Promise<void>;
-  resetDailyUsage: (coupleId: string) => Promise<void>;
 
   // Partner premium sync
   setPartnerIsPremium: (isPremium: boolean) => void;
@@ -160,20 +127,8 @@ const initialState: SubscriptionState = {
   error: null,
   offerings: null,
   customerInfo: null,
-  dailyUsage: null,
   partnerIsPremium: false,
   _hasHydrated: false,
-};
-
-// Helper: Get today's date string in YYYY-MM-DD format (using couple's shared timezone)
-const getTodayString = (): string => {
-  // Use couple's shared timezone for consistent usage tracking
-  return getTodayInTimezone();
-};
-
-// Helper: Check if date string is today (in couple's timezone)
-const isToday = (dateString: string): boolean => {
-  return dateString === getTodayString();
 };
 
 export const useSubscriptionStore = create<SubscriptionState & SubscriptionActions>()(
@@ -613,101 +568,6 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
       },
 
       // Feature checks - considers couple premium status
-      canGenerateMissions: async (coupleId: string) => {
-        const state = get();
-        const isCouplePremium = state.isPremium || state.partnerIsPremium;
-        const limits = isCouplePremium ? SUBSCRIPTION_LIMITS.premium : SUBSCRIPTION_LIMITS.free;
-
-        // Load daily usage if needed
-        await state.loadDailyUsage(coupleId);
-        const usage = get().dailyUsage;
-
-        if (!usage || !isToday(usage.usageDate)) {
-          return true; // No usage today, can generate
-        }
-
-        return usage.generationCount < limits.maxGenerationsPerDay;
-      },
-
-      canCompleteMission: async (coupleId: string) => {
-        const state = get();
-        const isCouplePremium = state.isPremium || state.partnerIsPremium;
-        const limits = isCouplePremium ? SUBSCRIPTION_LIMITS.premium : SUBSCRIPTION_LIMITS.free;
-
-        await state.loadDailyUsage(coupleId);
-        const usage = get().dailyUsage;
-
-        if (!usage || !isToday(usage.usageDate)) {
-          return true;
-        }
-
-        return usage.completionCount < limits.maxCompletionsPerDay;
-      },
-
-      canBookmarkMission: (currentBookmarkCount: number) => {
-        const state = get();
-        const isCouplePremium = state.isPremium || state.partnerIsPremium;
-        const limits = isCouplePremium ? SUBSCRIPTION_LIMITS.premium : SUBSCRIPTION_LIMITS.free;
-
-        return currentBookmarkCount < limits.maxBookmarks;
-      },
-
-      canCreateAlbum: (currentAlbumCount: number) => {
-        const state = get();
-        const isCouplePremium = state.isPremium || state.partnerIsPremium;
-        const limits = isCouplePremium ? SUBSCRIPTION_LIMITS.premium : SUBSCRIPTION_LIMITS.free;
-
-        return currentAlbumCount < limits.maxAlbums;
-      },
-
-      canSavePhoto: (currentPhotoCount: number) => {
-        const state = get();
-        const isCouplePremium = state.isPremium || state.partnerIsPremium;
-        const limits = isCouplePremium ? SUBSCRIPTION_LIMITS.premium : SUBSCRIPTION_LIMITS.free;
-
-        return currentPhotoCount < limits.maxPhotos;
-      },
-
-      canEditAlbum: (albumIndex: number, totalAlbums: number) => {
-        const state = get();
-        const isCouplePremium = state.isPremium || state.partnerIsPremium;
-
-        if (isCouplePremium) {
-          return true; // Premium can edit all albums
-        }
-
-        // Free users can only edit the first 5 created albums (oldest 5)
-        // Albums are sorted newest first, so oldest albums have higher indices
-        // If totalAlbums <= 5, all albums are editable
-        if (totalAlbums <= SUBSCRIPTION_LIMITS.free.maxAlbums) {
-          return true;
-        }
-
-        // First 5 created albums are at the end of the array (highest indices)
-        // oldestEditableIndex marks where editable albums start
-        const oldestEditableIndex = totalAlbums - SUBSCRIPTION_LIMITS.free.maxAlbums;
-        return albumIndex >= oldestEditableIndex;
-      },
-
-      // Check if an album is read-only (for UI display)
-      isAlbumReadOnly: (albumIndex: number, totalAlbums: number) => {
-        const state = get();
-        const isCouplePremium = state.isPremium || state.partnerIsPremium;
-
-        if (isCouplePremium) {
-          return false; // Premium users: no albums are read-only
-        }
-
-        if (totalAlbums <= SUBSCRIPTION_LIMITS.free.maxAlbums) {
-          return false; // 5 or fewer albums: none are read-only
-        }
-
-        // Albums at indices 0 to (totalAlbums - 6) are read-only
-        // Only the oldest 5 (first 5 created) are editable
-        const oldestEditableIndex = totalAlbums - SUBSCRIPTION_LIMITS.free.maxAlbums;
-        return albumIndex < oldestEditableIndex;
-      },
-
       shouldShowAds: () => {
         // Show ads for free users on both platforms
         const state = get();
@@ -720,141 +580,6 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
         const isCouplePremium = state.isPremium || state.partnerIsPremium;
         const limits = isCouplePremium ? SUBSCRIPTION_LIMITS.premium : SUBSCRIPTION_LIMITS.free;
         return [...limits.homeFrameOptions];
-      },
-
-      // Usage tracking
-      incrementGenerationCount: async (coupleId: string) => {
-        try {
-          if (!supabase) return false;
-
-          const { data, error } = await supabase.rpc('increment_generation_count', {
-            p_couple_id: coupleId,
-          });
-
-          if (error) {
-            console.error('[Subscription] Increment generation error:', error);
-            return false;
-          }
-
-          // Update local state
-          const today = getTodayString();
-          const currentUsage = get().dailyUsage;
-
-          set({
-            dailyUsage: {
-              generationCount: data,
-              completionCount: currentUsage?.usageDate === today ? currentUsage.completionCount : 0,
-              usageDate: today,
-            },
-          });
-
-          return true;
-        } catch (error) {
-          console.error('[Subscription] Increment generation error:', error);
-          return false;
-        }
-      },
-
-      incrementCompletionCount: async (coupleId: string) => {
-        try {
-          if (!supabase) return false;
-
-          const { data, error } = await supabase.rpc('increment_completion_count', {
-            p_couple_id: coupleId,
-          });
-
-          if (error) {
-            console.error('[Subscription] Increment completion error:', error);
-            return false;
-          }
-
-          // Update local state
-          const today = getTodayString();
-          const currentUsage = get().dailyUsage;
-
-          set({
-            dailyUsage: {
-              generationCount: currentUsage?.usageDate === today ? currentUsage.generationCount : 0,
-              completionCount: data,
-              usageDate: today,
-            },
-          });
-
-          return true;
-        } catch (error) {
-          console.error('[Subscription] Increment completion error:', error);
-          return false;
-        }
-      },
-
-      loadDailyUsage: async (coupleId: string) => {
-        try {
-          if (!supabase) return;
-
-          const today = getTodayString();
-          const currentUsage = get().dailyUsage;
-
-          // Skip if already loaded for today
-          if (currentUsage && currentUsage.usageDate === today) {
-            return;
-          }
-
-          const { data, error } = await supabase
-            .from('daily_usage')
-            .select('*')
-            .eq('couple_id', coupleId)
-            .eq('usage_date', today)
-            .maybeSingle();
-
-          if (error) {
-            console.error('[Subscription] Load daily usage error:', error);
-            return;
-          }
-
-          set({
-            dailyUsage: data
-              ? {
-                generationCount: data.generation_count,
-                completionCount: data.completion_count,
-                usageDate: data.usage_date,
-              }
-              : {
-                generationCount: 0,
-                completionCount: 0,
-                usageDate: today,
-              },
-          });
-        } catch (error) {
-          console.error('[Subscription] Load daily usage error:', error);
-        }
-      },
-
-      resetDailyUsage: async (coupleId: string) => {
-        try {
-          if (!supabase) return;
-
-          const today = getTodayString();
-
-          // Delete today's usage record from database
-          await supabase
-            .from('daily_usage')
-            .delete()
-            .eq('couple_id', coupleId)
-            .eq('usage_date', today);
-
-          // Reset local state
-          set({
-            dailyUsage: {
-              generationCount: 0,
-              completionCount: 0,
-              usageDate: today,
-            },
-          });
-
-          console.log('[Subscription] Daily usage reset successfully');
-        } catch (error) {
-          console.error('[Subscription] Reset daily usage error:', error);
-        }
       },
 
       setPartnerIsPremium: (isPremium: boolean) => {
@@ -1180,24 +905,5 @@ export const useSubscriptionStore = create<SubscriptionState & SubscriptionActio
     }
   )
 );
-
-// Helper hook for premium feature checks
-export const usePremiumFeature = () => {
-  const store = useSubscriptionStore();
-
-  return {
-    isPremium: store.isPremium || store.partnerIsPremium,
-    plan: store.plan,
-    shouldShowAds: store.shouldShowAds(),
-    canBookmark: (count: number) => store.canBookmarkMission(count),
-    canCreateAlbum: (count: number) => store.canCreateAlbum(count),
-    canEditAlbum: (index: number, total: number) => store.canEditAlbum(index, total),
-    isAlbumReadOnly: (index: number, total: number) => store.isAlbumReadOnly(index, total),
-    frameOptions: store.getAvailableFrameOptions(),
-    limits: store.isPremium || store.partnerIsPremium
-      ? SUBSCRIPTION_LIMITS.premium
-      : SUBSCRIPTION_LIMITS.free,
-  };
-};
 
 export default useSubscriptionStore;

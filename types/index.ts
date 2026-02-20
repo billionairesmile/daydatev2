@@ -107,24 +107,20 @@ export interface AuthState {
   error: string | null;
 }
 
-// Legacy Memory Types (kept for Phase 2 album migration — completed_missions table still exists)
-export type MissionCategory = 'home' | 'outdoor' | 'food' | 'creative' | 'adventure' | 'romantic';
-
-export interface Mission {
-  id: string;
-  title: string;
-  description: string;
-  category: MissionCategory;
-  tags: string[];
-  imageUrl: string;
-  isPremium: boolean;
-}
-
-export interface CompletedMission {
+// Date Record Types (legacy memories stored in local AsyncStorage)
+export interface DateRecord {
   id: string;
   coupleId: string;
   missionId: string;
-  mission: Mission;
+  mission: {
+    id: string;
+    title: string;
+    description: string;
+    category: string;
+    tags: string[];
+    imageUrl: string;
+    isPremium: boolean;
+  };
   photoUrl: string;
   user1Message: string;
   user2Message: string;
@@ -133,14 +129,14 @@ export interface CompletedMission {
 }
 
 export interface MemoryState {
-  memories: CompletedMission[];
-  selectedMemory: CompletedMission | null;
+  memories: DateRecord[];
+  selectedMemory: DateRecord | null;
   isLoading: boolean;
   error: string | null;
 }
 
 // Feed Types
-export type FeedCategory = 'all' | 'festival' | 'performance' | 'restaurant' | 'activity' | 'spot';
+export type FeedCategory = 'all' | 'festival' | 'show' | 'restaurant' | 'activity' | 'spot' | 'pet';
 
 export interface FeedPost {
   id: string;
@@ -150,6 +146,7 @@ export interface FeedPost {
   caption: string;
   sourceType: string;
   images: string[];
+  sourceId?: string;
   locationName?: string;
   latitude?: number;
   longitude?: number;
@@ -171,6 +168,74 @@ export interface FeedSave {
   userId: string;
   feedPostId: string;
   createdAt: string;
+}
+
+// Plan Types
+export type PlanStatus = 'interested' | 'booked' | 'completed' | 'cancelled';
+
+export interface Plan {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  coupleId: string;
+  addedBy: string;
+  feedPostId: string | null;
+  title: string;
+  description: string | null;
+  imageUrl: string | null;
+  locationName: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  eventDate: string;
+  ticketOpenDate: string | null;
+  externalLink: string | null;
+  affiliateLink: string | null;
+  price: string | null;
+  status: PlanStatus;
+  cancelledAt: string | null;
+  cancelledBy: string | null;
+  cancelReason: string | null;
+  memo: string | null;
+}
+
+export interface PlanNotification {
+  id: string;
+  planId: string;
+  type: string;
+  scheduledAt: string;
+  sentAt: string | null;
+  includeAffiliateLink: boolean;
+  messageTitle: string | null;
+  messageBody: string | null;
+  isCancelled: boolean;
+}
+
+// DB row (snake_case) to App type (camelCase) converters
+export function planFromRow(row: Record<string, unknown>): Plan {
+  return {
+    id: row.id as string,
+    createdAt: row.created_at as string,
+    updatedAt: row.updated_at as string,
+    coupleId: row.couple_id as string,
+    addedBy: row.added_by as string,
+    feedPostId: (row.feed_post_id as string) || null,
+    title: row.title as string,
+    description: (row.description as string) || null,
+    imageUrl: (row.image_url as string) || null,
+    locationName: (row.location_name as string) || null,
+    latitude: (row.latitude as number) || null,
+    longitude: (row.longitude as number) || null,
+    eventDate: row.event_date as string,
+    ticketOpenDate: (row.ticket_open_date as string) || null,
+    externalLink: (row.external_link as string) || null,
+    affiliateLink: (row.affiliate_link as string) || null,
+    price: (row.price as string) || null,
+    status: row.status as PlanStatus,
+    cancelledAt: (row.cancelled_at as string) || null,
+    cancelledBy: (row.cancelled_by as string) || null,
+    cancelReason: (row.cancel_reason as string) || null,
+    memo: (row.memo as string) || null,
+  };
 }
 
 // Utility Types

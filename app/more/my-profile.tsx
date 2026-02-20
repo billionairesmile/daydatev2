@@ -19,49 +19,62 @@ import {
   ChevronRight,
   User,
   Calendar,
-  Sliders,
+  Mail,
+  Clock,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { COLORS, SPACING, RADIUS, IS_TABLET, scale, scaleFont } from '@/constants/design';
 import { useOnboardingStore, useAuthStore } from '@/stores';
-import {
-  MBTI_OPTIONS,
-  ACTIVITY_TYPE_OPTIONS,
-  CONSTRAINT_OPTIONS,
-  DATE_WORRY_OPTIONS,
-  type ActivityType,
-  type Constraint,
-  type DateWorry,
-  type CalendarType,
-} from '@/stores/onboardingStore';
+import type { CalendarType, RelationshipType } from '@/stores/onboardingStore';
 import { db, isDemoMode } from '@/lib/supabase';
 import { formatDateToLocal } from '@/lib/dateUtils';
 
 const { width } = Dimensions.get('window');
 
-type EditMode = 'nickname' | 'birthday' | 'preferences-view' | 'preferences-edit' | null;
+type EditMode = 'nickname' | 'birthday' | 'anniversary' | 'my-account' | 'partner-account' | null;
 
 export default function MyProfileScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const { data, updateData } = useOnboardingStore();
-  const { user, updateNickname } = useAuthStore();
+  const { user, partner, couple, updateNickname, updateAnniversary } = useAuthStore();
 
   const [editMode, setEditMode] = useState<EditMode>(null);
+
+  // Nickname state
   const [tempNickname, setTempNickname] = useState(data.nickname);
+
+  // Birthday state
   const [tempBirthday, setTempBirthday] = useState<Date | null>(data.birthDate ? new Date(data.birthDate) : null);
   const [tempCalendarType, setTempCalendarType] = useState<CalendarType>(data.birthDateCalendarType || 'solar');
   const [showDatePicker, setShowDatePicker] = useState(false);
+
+  // Anniversary state
+  const syncedRelationshipType: RelationshipType = couple?.relationshipType || data.relationshipType || 'dating';
+  const syncedAnniversaryDate = couple?.datingStartDate
+    ? new Date(couple.datingStartDate)
+    : data.anniversaryDate
+      ? new Date(data.anniversaryDate)
+      : null;
+  const [tempRelationshipType, setTempRelationshipType] = useState<RelationshipType>(syncedRelationshipType);
+  const [tempAnniversaryDate, setTempAnniversaryDate] = useState<Date | null>(syncedAnniversaryDate);
+  const [showAnniversaryDatePicker, setShowAnniversaryDatePicker] = useState(false);
+
+  // Nicknames
+  const myNickname = data.nickname || user?.nickname || t('profile.me');
+  const partnerNickname = partner?.nickname || t('profile.partner');
 
   // DatePicker animation
   const { height } = Dimensions.get('window');
   const datePickerSlideAnim = useRef(new Animated.Value(height)).current;
   const datePickerBackdropAnim = useRef(new Animated.Value(0)).current;
 
+  const isDatePickerVisible = showDatePicker || showAnniversaryDatePicker;
+
   useEffect(() => {
-    if (showDatePicker) {
+    if (isDatePickerVisible) {
       Animated.parallel([
         Animated.spring(datePickerSlideAnim, {
           toValue: 0,
@@ -76,7 +89,7 @@ export default function MyProfileScreen() {
         }),
       ]).start();
     }
-  }, [showDatePicker]);
+  }, [isDatePickerVisible]);
 
   const closeDatePicker = () => {
     Animated.parallel([
@@ -92,23 +105,19 @@ export default function MyProfileScreen() {
       }),
     ]).start(() => {
       setShowDatePicker(false);
+      setShowAnniversaryDatePicker(false);
       datePickerSlideAnim.setValue(height);
       datePickerBackdropAnim.setValue(0);
     });
   };
 
-  // Preferences state
-  const [tempMbti, setTempMbti] = useState(data.mbti);
-  const [tempActivityTypes, setTempActivityTypes] = useState<ActivityType[]>(data.activityTypes);
-  const [tempDateWorries, setTempDateWorries] = useState<DateWorry[]>(data.dateWorries);
-  const [tempConstraints, setTempConstraints] = useState<Constraint[]>(data.constraints);
+  // --- Save handlers ---
 
   const handleSaveNickname = async () => {
     if (tempNickname.trim()) {
       updateData({ nickname: tempNickname.trim() });
       updateNickname(tempNickname.trim());
 
-      // Save to database
       if (!isDemoMode && user?.id) {
         try {
           await db.profiles.update(user.id, {
@@ -127,7 +136,6 @@ export default function MyProfileScreen() {
     if (tempBirthday) {
       updateData({ birthDate: tempBirthday, birthDateCalendarType: tempCalendarType });
 
-      // Also update authStore user for immediate UI update
       if (user) {
         const updatedUser = {
           ...user,
@@ -137,10 +145,8 @@ export default function MyProfileScreen() {
         useAuthStore.getState().setUser(updatedUser);
       }
 
-      // Save to database
       if (!isDemoMode && user?.id) {
         try {
-          // birthDateCalendarType is stored as a separate column, not in preferences
           const preferences = {
             mbti: data.mbti,
             gender: data.gender,
@@ -163,77 +169,67 @@ export default function MyProfileScreen() {
     setEditMode(null);
   };
 
-  const handleSavePreferences = async () => {
+  const handleSaveAnniversary = async () => {
     updateData({
-      mbti: tempMbti,
-      activityTypes: tempActivityTypes,
-      dateWorries: tempDateWorries,
-      constraints: tempConstraints,
+      relationshipType: tempRelationshipType,
+      anniversaryDate: tempAnniversaryDate,
     });
 
-    // Save to database
-    if (!isDemoMode && user?.id) {
-      try {
-        // birthDateCalendarType is stored as a separate column, not in preferences
-        const preferences = {
-          mbti: tempMbti,
-          gender: data.gender,
-          activityTypes: tempActivityTypes,
-          dateWorries: tempDateWorries,
-          constraints: tempConstraints,
-          relationshipType: data.relationshipType,
-        };
+    if (tempAnniversaryDate && couple) {
+      const typeLabel = tempRelationshipType === 'dating' ? t('profile.couple.editAnniversary.datingStart') : t('profile.couple.editAnniversary.marriedAnniversary');
+      updateAnniversary(tempAnniversaryDate, typeLabel);
 
-        await db.profiles.update(user.id, {
-          preferences,
-        });
-      } catch (error) {
-        console.error('Error updating preferences:', error);
+      const updatedCouple = {
+        ...couple,
+        datingStartDate: tempAnniversaryDate,
+        weddingDate: tempRelationshipType === 'married' ? tempAnniversaryDate : undefined,
+        relationshipType: tempRelationshipType as 'dating' | 'married',
+      };
+      useAuthStore.getState().setCouple(updatedCouple);
+
+      if (!isDemoMode && couple.id) {
+        try {
+          await db.couples.update(couple.id, {
+            relationship_type: tempRelationshipType,
+            dating_start_date: formatDateToLocal(tempAnniversaryDate),
+            wedding_date: tempRelationshipType === 'married' ? formatDateToLocal(tempAnniversaryDate) : null,
+          });
+        } catch (error) {
+          console.error('Error updating anniversary:', error);
+        }
       }
     }
-
     setEditMode(null);
   };
 
-  const toggleDateWorry = (worry: DateWorry) => {
-    if (tempDateWorries.includes(worry)) {
-      setTempDateWorries(tempDateWorries.filter((w) => w !== worry));
-    } else {
-      setTempDateWorries([...tempDateWorries, worry]);
-    }
-  };
+  // --- Formatters ---
 
-  const toggleActivity = (type: ActivityType) => {
-    if (tempActivityTypes.includes(type)) {
-      setTempActivityTypes(tempActivityTypes.filter((t) => t !== type));
-    } else {
-      setTempActivityTypes([...tempActivityTypes, type]);
-    }
-  };
-
-  const toggleConstraint = (con: Constraint) => {
-    if (con === 'none') {
-      if (tempConstraints.includes('none')) {
-        setTempConstraints([]);
-      } else {
-        setTempConstraints(['none']);
-      }
-    } else {
-      if (tempConstraints.includes(con)) {
-        setTempConstraints(tempConstraints.filter((c) => c !== con));
-      } else {
-        setTempConstraints([...tempConstraints.filter((c) => c !== 'none'), con]);
-      }
-    }
-  };
-
-  const formatDate = (date: Date | null) => {
+  const formatDate = (date: Date | string | null) => {
     if (!date) return t('profile.notSet');
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
+    const d = date instanceof Date ? date : new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
     return t('profile.dateFormat', { year, month, day });
   };
+
+  const getRelationshipLabel = (type: RelationshipType) => {
+    switch (type) {
+      case 'dating': return t('profile.couple.datingType');
+      case 'married': return t('profile.couple.marriedType');
+      default: return t('profile.couple.datingType');
+    }
+  };
+
+  const getDateLabel = (type: RelationshipType) => {
+    switch (type) {
+      case 'dating': return t('profile.couple.datingLabel');
+      case 'married': return t('profile.couple.marriedLabel');
+      default: return t('profile.couple.datingLabel');
+    }
+  };
+
+  // --- Render sections ---
 
   const renderMainContent = () => (
     <ScrollView
@@ -241,6 +237,9 @@ export default function MyProfileScreen() {
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}
     >
+      {/* My Profile Section */}
+      <Text style={styles.sectionTitle}>{t('more.menu.myProfile')}</Text>
+
       {/* Nickname Section */}
       <Pressable
         style={styles.menuItem}
@@ -285,22 +284,57 @@ export default function MyProfileScreen() {
         <ChevronRight color="#999" size={scale(20)} />
       </Pressable>
 
-      {/* Preferences Section */}
+      {/* Anniversary Section */}
+      <Text style={styles.sectionTitle}>{t('profile.couple.anniversary')}</Text>
       <Pressable
         style={styles.menuItem}
-        onPress={() => setEditMode('preferences-view')}
+        onPress={() => {
+          setTempRelationshipType(syncedRelationshipType);
+          setTempAnniversaryDate(syncedAnniversaryDate);
+          setEditMode('anniversary');
+        }}
       >
         <View style={styles.menuItemLeft}>
           <View style={styles.iconWrapper}>
-            <Sliders color={COLORS.black} size={scale(20)} />
+            <Calendar color={COLORS.black} size={scale(20)} />
           </View>
           <View style={styles.menuItemContent}>
-            <Text style={styles.menuItemLabel}>{t('profile.preferences')}</Text>
-            <Text style={styles.menuItemValue}>
-              {data.mbti ? `${data.mbti}` : ''}
-              {data.activityTypes.length > 0 ? ` · ${t('profile.activitiesCount', { count: data.activityTypes.length })}` : ''}
-              {!data.mbti && data.activityTypes.length === 0 ? t('profile.notSet') : ''}
-            </Text>
+            <Text style={styles.menuItemLabel}>{getDateLabel(syncedRelationshipType)}</Text>
+            <Text style={styles.menuItemValue}>{formatDate(syncedAnniversaryDate)}</Text>
+          </View>
+        </View>
+        <ChevronRight color="#999" size={scale(20)} />
+      </Pressable>
+
+      {/* Account Info Section */}
+      <Text style={styles.sectionTitle}>{t('profile.couple.accountInfo')}</Text>
+      <Pressable
+        style={styles.menuItem}
+        onPress={() => setEditMode('my-account')}
+      >
+        <View style={styles.menuItemLeft}>
+          <View style={[styles.iconWrapper, { backgroundColor: '#e8f5e9' }]}>
+            <User color="#4caf50" size={scale(20)} />
+          </View>
+          <View style={styles.menuItemContent}>
+            <Text style={styles.menuItemLabel}>{t('profile.couple.myAccountInfo', { nickname: myNickname })}</Text>
+            <Text style={styles.menuItemValue}>{t('profile.couple.myAccount')}</Text>
+          </View>
+        </View>
+        <ChevronRight color="#999" size={scale(20)} />
+      </Pressable>
+
+      <Pressable
+        style={styles.menuItem}
+        onPress={() => setEditMode('partner-account')}
+      >
+        <View style={styles.menuItemLeft}>
+          <View style={[styles.iconWrapper, { backgroundColor: '#fce4ec' }]}>
+            <User color="#e91e63" size={scale(20)} />
+          </View>
+          <View style={styles.menuItemContent}>
+            <Text style={styles.menuItemLabel}>{t('profile.couple.myAccountInfo', { nickname: partnerNickname })}</Text>
+            <Text style={styles.menuItemValue}>{t('profile.couple.partnerAccount')}</Text>
           </View>
         </View>
         <ChevronRight color="#999" size={scale(20)} />
@@ -440,195 +474,175 @@ export default function MyProfileScreen() {
     </View>
   );
 
-  const renderPreferencesView = () => {
-    const hasAnyPreference = data.mbti || data.activityTypes.length > 0 ||
-      data.dateWorries.length > 0 || data.constraints.length > 0;
+  const renderAnniversaryEdit = () => (
+    <View style={styles.editContainer}>
+      <Text style={styles.editTitle}>{t('profile.couple.editAnniversary.title')}</Text>
+      <Text style={styles.editDescription}>{t('profile.couple.editAnniversary.description')}</Text>
+
+      {/* Relationship Type */}
+      <Text style={styles.fieldLabel}>{t('profile.couple.editAnniversary.relationshipLabel')}</Text>
+      <View style={styles.relationshipRow}>
+        {(['dating', 'married'] as RelationshipType[]).map((type) => (
+          <Pressable
+            key={type}
+            style={[styles.relationshipButton, tempRelationshipType === type && styles.relationshipButtonActive]}
+            onPress={() => setTempRelationshipType(type)}
+          >
+            <Text style={[styles.relationshipButtonText, tempRelationshipType === type && styles.relationshipButtonTextActive]}>
+              {getRelationshipLabel(type)}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
+      {/* Date Picker */}
+      <Text style={styles.fieldLabel}>{getDateLabel(tempRelationshipType)}</Text>
+      <Pressable
+        style={styles.datePickerButton}
+        onPress={() => setShowAnniversaryDatePicker(true)}
+      >
+        <Calendar color="#666" size={scale(20)} />
+        <Text style={[styles.datePickerText, tempAnniversaryDate && styles.datePickerTextSelected]}>
+          {tempAnniversaryDate ? formatDate(tempAnniversaryDate) : t('profile.couple.editAnniversary.selectDate')}
+        </Text>
+      </Pressable>
+
+      {Platform.OS === 'ios' && (
+        <Modal visible={showAnniversaryDatePicker} transparent animationType="none" onRequestClose={closeDatePicker}>
+          <View style={styles.datePickerModal}>
+            <Animated.View
+              style={[
+                StyleSheet.absoluteFill,
+                { backgroundColor: 'rgba(0, 0, 0, 0.5)', opacity: datePickerBackdropAnim }
+              ]}
+            >
+              <Pressable style={StyleSheet.absoluteFill} onPress={closeDatePicker} />
+            </Animated.View>
+            <Animated.View
+              style={[
+                styles.datePickerModalContent,
+                { transform: [{ translateY: datePickerSlideAnim }] }
+              ]}
+            >
+              <View style={styles.datePickerHeader}>
+                <Pressable onPress={closeDatePicker}>
+                  <Text style={styles.datePickerCancel}>{t('common.cancel')}</Text>
+                </Pressable>
+                <Pressable onPress={closeDatePicker}>
+                  <Text style={styles.datePickerConfirm}>{t('common.confirm')}</Text>
+                </Pressable>
+              </View>
+              <DateTimePicker
+                value={tempAnniversaryDate || new Date()}
+                mode="date"
+                display="spinner"
+                onChange={(_, date) => date && setTempAnniversaryDate(date)}
+                maximumDate={new Date()}
+                textColor={COLORS.black}
+                themeVariant="light"
+                style={styles.datePicker}
+              />
+            </Animated.View>
+          </View>
+        </Modal>
+      )}
+
+      {Platform.OS === 'android' && showAnniversaryDatePicker && (
+        <DateTimePicker
+          value={tempAnniversaryDate || new Date()}
+          mode="date"
+          display="default"
+          onChange={(_, date) => {
+            setShowAnniversaryDatePicker(false);
+            if (date) setTempAnniversaryDate(date);
+          }}
+          maximumDate={new Date()}
+        />
+      )}
+
+      <View style={[styles.buttonRow, { marginTop: 'auto' }]}>
+        <Pressable style={styles.cancelButton} onPress={() => setEditMode(null)}>
+          <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
+        </Pressable>
+        <Pressable style={styles.saveButton} onPress={handleSaveAnniversary}>
+          <Text style={styles.saveButtonText}>{t('common.save')}</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+
+  const renderAccountInfo = (isMe: boolean) => {
+    const nickname = isMe ? myNickname : partnerNickname;
+    const email = isMe ? (user?.email || 'email@example.com') : (partner?.email || t('profile.couple.accountDetail.defaultPartnerEmail'));
+    const createdAt = isMe ? user?.createdAt : partner?.createdAt;
 
     return (
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.preferencesViewContent}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {!hasAnyPreference ? (
-          <View style={styles.emptyPreferences}>
-            <Text style={styles.emptyPreferencesText}>{t('profile.noPreferences')}</Text>
+        {/* Profile Avatar */}
+        <View style={styles.profileHeader}>
+          <View style={[styles.largeAvatar, !isMe && { backgroundColor: '#fce4ec' }]}>
+            <Text style={[styles.largeAvatarText, !isMe && { color: '#e91e63' }]}>
+              {nickname.charAt(0)}
+            </Text>
           </View>
-        ) : (
-          <>
-            {/* MBTI */}
-            {data.mbti && (
-              <View style={styles.preferenceViewSection}>
-                <Text style={styles.preferenceViewLabel}>MBTI</Text>
-                <View style={styles.hashtagContainer}>
-                  <View style={styles.hashtag}>
-                    <Text style={styles.hashtagText}>#{data.mbti}</Text>
-                  </View>
-                </View>
-              </View>
-            )}
+          <Text style={styles.profileName}>{nickname}</Text>
+          <View style={styles.relationshipBadge}>
+            <Text style={styles.relationshipBadgeText}>
+              {isMe ? t('profile.couple.accountDetail.me') : t('profile.couple.accountDetail.partner')}
+            </Text>
+          </View>
+        </View>
 
-            {/* Activity Types */}
-            {data.activityTypes.length > 0 && (
-              <View style={styles.preferenceViewSection}>
-                <Text style={styles.preferenceViewLabel}>{t('profile.preferredActivities')}</Text>
-                <View style={styles.hashtagContainer}>
-                  {data.activityTypes.map((type) => {
-                    const option = ACTIVITY_TYPE_OPTIONS.find((o) => o.id === type);
-                    return option ? (
-                      <View key={type} style={styles.hashtag}>
-                        <Text style={styles.hashtagText}>#{t(option.labelKey)}</Text>
-                      </View>
-                    ) : null;
-                  })}
-                </View>
-              </View>
-            )}
+        {/* Info Items */}
+        <View style={styles.infoCard}>
+          <View style={styles.infoItem}>
+            <View style={styles.infoItemLeft}>
+              <User color="#666" size={scale(18)} />
+              <Text style={styles.infoLabel}>{t('profile.couple.accountDetail.nickname')}</Text>
+            </View>
+            <Text style={styles.infoValue}>{nickname}</Text>
+          </View>
 
-            {/* Date Worries */}
-            {data.dateWorries.length > 0 && (
-              <View style={styles.preferenceViewSection}>
-                <Text style={styles.preferenceViewLabel}>{t('profile.dateConcerns')}</Text>
-                <View style={styles.hashtagContainer}>
-                  {data.dateWorries.map((worry) => {
-                    const option = DATE_WORRY_OPTIONS.find((o) => o.id === worry);
-                    return option ? (
-                      <View key={worry} style={styles.hashtag}>
-                        <Text style={styles.hashtagText}>#{t(option.labelKey)}</Text>
-                      </View>
-                    ) : null;
-                  })}
-                </View>
-              </View>
-            )}
+          <View style={styles.infoDivider} />
 
-            {/* Constraints */}
-            {data.constraints.length > 0 && data.constraints[0] !== 'none' && (
-              <View style={styles.preferenceViewSection}>
-                <Text style={styles.preferenceViewLabel}>{t('profile.constraints')}</Text>
-                <View style={styles.hashtagContainer}>
-                  {data.constraints.map((con) => {
-                    const option = CONSTRAINT_OPTIONS.find((o) => o.id === con);
-                    return option ? (
-                      <View key={con} style={styles.hashtag}>
-                        <Text style={styles.hashtagText}>#{t(option.labelKey)}</Text>
-                      </View>
-                    ) : null;
-                  })}
-                </View>
-              </View>
-            )}
-          </>
-        )}
+          <View style={styles.infoItem}>
+            <View style={styles.infoItemLeft}>
+              <Mail color="#666" size={scale(18)} />
+              <Text style={styles.infoLabel}>{t('profile.couple.accountDetail.email')}</Text>
+            </View>
+            <Text style={styles.infoValue}>{email}</Text>
+          </View>
 
-        {/* Edit Button */}
-        <Pressable
-          style={styles.editPreferencesButton}
-          onPress={() => {
-            setTempMbti(data.mbti);
-            setTempActivityTypes(data.activityTypes);
-            setTempDateWorries(data.dateWorries);
-            setTempConstraints(data.constraints);
-            setEditMode('preferences-edit');
-          }}
-        >
-          <Text style={styles.editPreferencesButtonText}>{t('profile.editPreferences.button')}</Text>
-        </Pressable>
+          <View style={styles.infoDivider} />
+
+          <View style={styles.infoItem}>
+            <View style={styles.infoItemLeft}>
+              <Clock color="#666" size={scale(18)} />
+              <Text style={styles.infoLabel}>{t('profile.couple.accountDetail.joinDate')}</Text>
+            </View>
+            <Text style={styles.infoValue}>
+              {createdAt ? formatDate(new Date(createdAt)) : t('profile.couple.accountDetail.noInfo')}
+            </Text>
+          </View>
+        </View>
       </ScrollView>
     );
   };
 
-  const renderPreferencesEdit = () => (
-    <ScrollView
-      style={styles.scrollView}
-      contentContainerStyle={styles.preferencesContent}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* MBTI */}
-      <View style={styles.preferenceSection}>
-        <Text style={styles.preferenceSectionTitle}>MBTI</Text>
-        <View style={styles.mbtiGrid}>
-          {MBTI_OPTIONS.map((option) => (
-            <Pressable
-              key={option}
-              style={[styles.mbtiButton, tempMbti === option && styles.mbtiButtonActive]}
-              onPress={() => setTempMbti(option)}
-            >
-              <Text style={[styles.mbtiButtonText, tempMbti === option && styles.mbtiButtonTextActive]}>
-                {option}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      </View>
-
-      {/* Activity Types */}
-      <View style={styles.preferenceSection}>
-        <Text style={styles.preferenceSectionTitle}>{t('profile.preferredActivities')}</Text>
-        <View style={styles.activityGrid}>
-          {ACTIVITY_TYPE_OPTIONS.map((option) => (
-            <Pressable
-              key={option.id}
-              style={[styles.activityButton, tempActivityTypes.includes(option.id) && styles.activityButtonActive]}
-              onPress={() => toggleActivity(option.id)}
-            >
-              <Text style={styles.activityIcon}>{option.icon}</Text>
-              <Text style={[styles.activityButtonText, tempActivityTypes.includes(option.id) && styles.activityButtonTextActive]}>
-                {t(option.labelKey)}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      </View>
-
-      {/* Date Worries */}
-      <View style={styles.preferenceSection}>
-        <Text style={styles.preferenceSectionTitle}>{t('profile.dateConcerns')}</Text>
-        <View style={styles.dateWorryList}>
-          {DATE_WORRY_OPTIONS.map((option) => (
-            <Pressable
-              key={option.id}
-              style={[styles.dateWorryButton, tempDateWorries.includes(option.id) && styles.dateWorryButtonActive]}
-              onPress={() => toggleDateWorry(option.id)}
-            >
-              <Text style={styles.dateWorryIcon}>{option.icon}</Text>
-              <Text style={[styles.dateWorryButtonText, tempDateWorries.includes(option.id) && styles.dateWorryButtonTextActive]}>
-                {t(option.labelKey)}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      </View>
-
-      {/* Constraints */}
-      <View style={styles.preferenceSection}>
-        <Text style={styles.preferenceSectionTitle}>{t('profile.constraints')}</Text>
-        <View style={styles.constraintGrid}>
-          {CONSTRAINT_OPTIONS.map((option) => (
-            <Pressable
-              key={option.id}
-              style={[styles.constraintButton, tempConstraints.includes(option.id) && styles.constraintButtonActive]}
-              onPress={() => toggleConstraint(option.id)}
-            >
-              <Text style={styles.constraintIcon}>{option.icon}</Text>
-              <Text style={[styles.constraintButtonText, tempConstraints.includes(option.id) && styles.constraintButtonTextActive]}>
-                {t(option.labelKey)}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      </View>
-
-      <View style={[styles.buttonRow, { marginTop: SPACING.xl, marginBottom: SPACING.xxxl }]}>
-        <Pressable style={styles.cancelButton} onPress={() => setEditMode(null)}>
-          <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
-        </Pressable>
-        <Pressable style={styles.saveButton} onPress={handleSavePreferences}>
-          <Text style={styles.saveButtonText}>{t('common.save')}</Text>
-        </Pressable>
-      </View>
-    </ScrollView>
-  );
+  const getHeaderTitle = () => {
+    switch (editMode) {
+      case 'nickname': return t('profile.editNickname.title');
+      case 'birthday': return t('profile.editBirthday.title');
+      case 'anniversary': return t('profile.couple.editAnniversary.title');
+      case 'my-account': return t('profile.couple.myAccountInfo', { nickname: myNickname });
+      case 'partner-account': return t('profile.couple.myAccountInfo', { nickname: partnerNickname });
+      default: return t('more.menu.profile');
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -642,12 +656,7 @@ export default function MyProfileScreen() {
         >
           <ChevronLeft color={COLORS.black} size={scale(24)} />
         </Pressable>
-        <Text style={styles.headerTitle}>
-          {editMode === 'nickname' ? t('profile.editNickname.title') :
-           editMode === 'birthday' ? t('profile.editBirthday.title') :
-           editMode === 'preferences-view' ? t('profile.editPreferences.title') :
-           editMode === 'preferences-edit' ? t('profile.editPreferences.editTitle') : t('profile.myProfile')}
-        </Text>
+        <Text style={styles.headerTitle}>{getHeaderTitle()}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -655,8 +664,9 @@ export default function MyProfileScreen() {
       {editMode === null && renderMainContent()}
       {editMode === 'nickname' && renderNicknameEdit()}
       {editMode === 'birthday' && renderBirthdayEdit()}
-      {editMode === 'preferences-view' && renderPreferencesView()}
-      {editMode === 'preferences-edit' && renderPreferencesEdit()}
+      {editMode === 'anniversary' && renderAnniversaryEdit()}
+      {editMode === 'my-account' && renderAccountInfo(true)}
+      {editMode === 'partner-account' && renderAccountInfo(false)}
     </SafeAreaView>
   );
 }
@@ -694,6 +704,16 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingVertical: scale(SPACING.lg),
+  },
+  sectionTitle: {
+    fontSize: scaleFont(13),
+    fontWeight: '600',
+    color: '#999',
+    marginLeft: scale(SPACING.lg),
+    marginTop: scale(SPACING.lg),
+    marginBottom: scale(SPACING.sm),
+    textTransform: 'uppercase',
+    letterSpacing: scale(0.5),
   },
   menuItem: {
     flexDirection: 'row',
@@ -837,223 +857,6 @@ const styles = StyleSheet.create({
   datePicker: {
     height: scale(200),
   },
-  preferencesContent: {
-    padding: scale(SPACING.lg),
-    paddingBottom: scale(100),
-  },
-  preferenceSection: {
-    marginBottom: scale(SPACING.xl),
-  },
-  preferenceSectionTitle: {
-    fontSize: scaleFont(16),
-    fontWeight: '600',
-    color: COLORS.black,
-    marginBottom: scale(SPACING.md),
-  },
-  mbtiGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: scale(8),
-  },
-  mbtiButton: {
-    width: (width - scale(SPACING.lg) * 2 - scale(24)) / 4,
-    height: scale(44),
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f5f5f5',
-    borderRadius: scale(RADIUS.sm),
-  },
-  mbtiButtonActive: {
-    backgroundColor: COLORS.black,
-  },
-  mbtiButtonText: {
-    fontSize: scaleFont(13),
-    fontWeight: '600',
-    color: '#666',
-  },
-  mbtiButtonTextActive: {
-    color: COLORS.white,
-  },
-  toggleRow: {
-    flexDirection: 'row',
-    gap: scale(12),
-  },
-  toggleButton: {
-    flex: 1,
-    height: scale(48),
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f5f5f5',
-    borderRadius: scale(RADIUS.full),
-  },
-  toggleButtonActive: {
-    backgroundColor: COLORS.black,
-  },
-  toggleButtonText: {
-    fontSize: scaleFont(15),
-    fontWeight: '600',
-    color: '#666',
-  },
-  toggleButtonTextActive: {
-    color: COLORS.white,
-  },
-  activityGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: scale(10),
-  },
-  activityButton: {
-    width: (width - scale(SPACING.lg) * 2 - scale(10)) / 2,
-    paddingVertical: scale(16),
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f5f5f5',
-    borderRadius: scale(RADIUS.sm),
-    gap: scale(6),
-  },
-  activityButtonActive: {
-    backgroundColor: COLORS.black,
-  },
-  activityIcon: {
-    fontSize: scaleFont(24),
-  },
-  activityButtonText: {
-    fontSize: scaleFont(13),
-    fontWeight: '500',
-    color: '#666',
-  },
-  activityButtonTextActive: {
-    color: COLORS.white,
-  },
-  situationList: {
-    gap: scale(10),
-  },
-  situationButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: scale(14),
-    paddingHorizontal: scale(SPACING.lg),
-    backgroundColor: '#f5f5f5',
-    borderRadius: scale(RADIUS.sm),
-  },
-  situationButtonActive: {
-    backgroundColor: COLORS.black,
-  },
-  situationButtonText: {
-    fontSize: scaleFont(15),
-    fontWeight: '500',
-    color: '#666',
-  },
-  situationButtonTextActive: {
-    color: COLORS.white,
-  },
-  constraintGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: scale(10),
-  },
-  constraintButton: {
-    width: (width - scale(SPACING.lg) * 2 - scale(10)) / 2,
-    paddingVertical: scale(16),
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f5f5f5',
-    borderRadius: scale(RADIUS.sm),
-    gap: scale(6),
-  },
-  constraintButtonActive: {
-    backgroundColor: COLORS.black,
-  },
-  constraintIcon: {
-    fontSize: scaleFont(24),
-  },
-  constraintButtonText: {
-    fontSize: scaleFont(13),
-    fontWeight: '500',
-    color: '#666',
-  },
-  constraintButtonTextActive: {
-    color: COLORS.white,
-  },
-  // Date Worries styles
-  dateWorryList: {
-    gap: scale(SPACING.sm),
-  },
-  dateWorryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: scale(SPACING.md),
-    paddingHorizontal: scale(SPACING.lg),
-    backgroundColor: '#f5f5f5',
-    borderRadius: scale(RADIUS.lg),
-    gap: scale(SPACING.sm),
-  },
-  dateWorryButtonActive: {
-    backgroundColor: COLORS.black,
-  },
-  dateWorryIcon: {
-    fontSize: scaleFont(18),
-  },
-  dateWorryButtonText: {
-    fontSize: scaleFont(14),
-    fontWeight: '500',
-    color: '#666',
-    flex: 1,
-  },
-  dateWorryButtonTextActive: {
-    color: COLORS.white,
-  },
-  // Preferences View styles
-  preferencesViewContent: {
-    padding: scale(SPACING.lg),
-    paddingBottom: scale(SPACING.xxxl),
-  },
-  emptyPreferences: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: scale(SPACING.xxxl),
-  },
-  emptyPreferencesText: {
-    fontSize: scaleFont(14),
-    color: '#999',
-  },
-  preferenceViewSection: {
-    marginBottom: scale(SPACING.xl),
-  },
-  preferenceViewLabel: {
-    fontSize: scaleFont(14),
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: scale(SPACING.sm),
-  },
-  hashtagContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: scale(SPACING.xs),
-  },
-  hashtag: {
-    backgroundColor: '#f0f0f0',
-    paddingHorizontal: scale(SPACING.md),
-    paddingVertical: scale(SPACING.xs),
-    borderRadius: scale(RADIUS.full),
-  },
-  hashtagText: {
-    fontSize: scaleFont(13),
-    color: '#666',
-  },
-  editPreferencesButton: {
-    backgroundColor: COLORS.black,
-    paddingVertical: scale(SPACING.md),
-    borderRadius: scale(RADIUS.lg),
-    alignItems: 'center',
-    marginTop: scale(SPACING.xl),
-  },
-  editPreferencesButtonText: {
-    fontSize: scaleFont(15),
-    fontWeight: '600',
-    color: COLORS.white,
-  },
   // Calendar Type Toggle
   calendarTypeToggle: {
     flexDirection: 'row',
@@ -1078,5 +881,105 @@ const styles = StyleSheet.create({
   },
   calendarTypeButtonTextActive: {
     color: COLORS.white,
+  },
+  // Anniversary edit
+  fieldLabel: {
+    fontSize: scaleFont(14),
+    fontWeight: '600',
+    color: COLORS.black,
+    marginBottom: scale(SPACING.sm),
+    height: scale(20),
+  },
+  relationshipRow: {
+    flexDirection: 'row',
+    gap: scale(12),
+    marginBottom: scale(SPACING.xl),
+  },
+  relationshipButton: {
+    flex: 1,
+    height: scale(48),
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f5f5f5',
+    borderRadius: scale(RADIUS.full),
+  },
+  relationshipButtonActive: {
+    backgroundColor: COLORS.black,
+  },
+  relationshipButtonText: {
+    fontSize: scaleFont(15),
+    fontWeight: '600',
+    color: '#666',
+  },
+  relationshipButtonTextActive: {
+    color: COLORS.white,
+  },
+  // Account info
+  profileHeader: {
+    alignItems: 'center',
+    paddingVertical: scale(SPACING.xl),
+  },
+  largeAvatar: {
+    width: scale(80),
+    height: scale(80),
+    borderRadius: scale(40),
+    backgroundColor: '#e8f5e9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: scale(SPACING.md),
+  },
+  largeAvatarText: {
+    fontSize: scaleFont(32),
+    fontWeight: '700',
+    color: '#4caf50',
+  },
+  profileName: {
+    fontSize: scaleFont(22),
+    fontWeight: '700',
+    color: COLORS.black,
+    marginBottom: scale(SPACING.sm),
+  },
+  relationshipBadge: {
+    paddingHorizontal: scale(SPACING.md),
+    paddingVertical: scale(SPACING.xs),
+    backgroundColor: '#f5f5f5',
+    borderRadius: scale(RADIUS.full),
+  },
+  relationshipBadgeText: {
+    fontSize: scaleFont(13),
+    fontWeight: '600',
+    color: '#666',
+  },
+  infoCard: {
+    marginHorizontal: scale(SPACING.lg),
+    backgroundColor: '#f8f8f8',
+    borderRadius: scale(RADIUS.md),
+    overflow: 'hidden',
+  },
+  infoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: scale(SPACING.lg),
+    paddingVertical: scale(SPACING.lg),
+  },
+  infoItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scale(SPACING.sm),
+  },
+  infoLabel: {
+    fontSize: scaleFont(15),
+    color: '#666',
+  },
+  infoValue: {
+    fontSize: scaleFont(15),
+    fontWeight: '500',
+    color: COLORS.black,
+  },
+  infoDivider: {
+    height: 1,
+    backgroundColor: '#e0e0e0',
+    marginHorizontal: scale(SPACING.lg),
   },
 });

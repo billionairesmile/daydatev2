@@ -22,7 +22,8 @@
     "partner": "Partner",
     "me": "Me",
     "days": "days",
-    "daysCount": "days"
+    "daysCount": "days",
+    "comingSoon": "Coming soon"
   },
   "auth": {
     "email": {
@@ -46,7 +47,6 @@
   },
   "tabs": {
     "home": "Home",
-    "mission": "Mission",
     "calendar": "Calendar",
     "memories": "Memories",
     "more": "More",
@@ -96,165 +96,6 @@
     },
     "shareError": "An error occurred while sharing."
   },
-  "mission": {
-    "title": "Mission",
-    "subtitle": "What moments will you share today?",
-    "emptyState": {
-      "line1": "Ready for today's",
-      "line2": "mission?",
-      "button": "Get Started"
-    },
-    "generate": "Get Missions",
-    "generating": "Generating...",
-    "generatingMessage": "Creating your mission",
-    "pleaseWait": "Please wait a moment",
-    "start": "Start",
-    "completed": "Completed",
-    "view": "View",
-    "kept": "Saved",
-    "keep": "Keep",
-    "anotherInProgress": "In progress",
-    "questions": {
-      "canMeetToday": "Can you meet each other today?",
-      "yesMeet": "Yeah, we can",
-      "noMeet": "Nope",
-      "availableTime": "How much time do you have together today?",
-      "todayMood": "What mood are you in today? (Select all)"
-    },
-    "timeOptions": {
-      "30min": "30 min",
-      "1hour": "1 hour",
-      "2hour": "2+ hours",
-      "allday": "All day"
-    },
-    "moodOptions": {
-      "cozy": "Cozy Home Date",
-      "foodie": "Foodie",
-      "active": "Active",
-      "healing": "Relax",
-      "culture": "Culture",
-      "adventure": "New Challenge",
-      "romantic": "Romantic"
-    },
-    "alerts": {
-      "locationRequired": "Location Required",
-      "locationRequiredMessage": "Location permission is needed to generate missions.\nPlease allow location access.",
-      "allowPermission": "Allow",
-      "locationDenied": "Location Denied",
-      "locationDeniedMessage": "Location permission was denied. Please enable it in settings.",
-      "goToSettings": "Go to Settings",
-      "partnerLocationRequired": "Partner Location Required",
-      "partnerLocationRequiredMessage": "Your partner also needs to enable location permission to generate missions.\nPlease ask your partner to allow location access.",
-      "cannotKeep": "Cannot Save",
-      "alreadyCompletedKeep": "Completed missions cannot be saved.",
-      "keepMission": "Save Mission",
-      "keepMissionConfirm": "Save '{{title}}' to your collection?",
-      "keepLimit": "Save Limit",
-      "keepLimitMessage": "You can save up to 5 missions.\nPlease remove some before adding more.",
-      "cannotStart": "Cannot Start Mission",
-      "anotherInProgressMessage": "Another mission is already in progress.",
-      "dailyLimitMessage": "You've completed today's mission.\nCome back tomorrow!",
-      "offlineTitle": "Internet Connection Required",
-      "offlineMessage": "An internet connection is required to generate missions.\nPlease check your network connection and try again."
-    },
-    "refresh": {
-      "questionLine1": "Can't find the",
-      "questionLine2": "right mission?",
-      "button": "Get New Missions",
-      "hint": "Watch an ad to\nreceive new missions",
-      "modalTitle": "New Missions",
-      "modalButton": "Get New Missions",
-      "partnerGenerating": "Please wait",
-      "partnerGeneratingMessage": "Your partner is generating new missions. Please try again later.",
-      "adLoadingFailed": "Ad Loading Failed",
-      "adLoadingFailedMessage": "Failed to load the ad.\nPlease try again later.",
-      "devModeTitle": "Development Mode",
-      "devModeMessage": "Ads are only available in production builds. Mission refresh requires watching an ad.",
-      "generating": "Generating new missions...",
-      "loadingAd": "Loading ad...",
-      "adNotCompleted": "Ad Not Completed",
-      "adNotCompletedMessage": "Please watch the complete ad to refresh missions."
-    },
-    "partnerWatchingAd": "Partner is watching an ad...",
-    "partnerWatchingAdWithName": "{{name}} is watching\nan ad",
-    "timeError": {
-      "title": "Time Setting Error",
-      "message": "Your device time differs from the server.\n\nPlease enable 'Automatic Date & Time' in your device settings for accurate mission service.",
-      "confirm": "OK",
-      "minutes": "{{count}} min",
-      "hours": "{{count}} hours"
-    }
-  },
-  "missionDetail": {
-    "headerTitle": "Mission Details",
-    "linkButton": {
-      "reserve": "Make a Reservation",
-      "book": "Book Now",
-      "purchase": "Purchase Now"
-    },
-    "notFound": {
-      "title": "Mission not found",
-      "description": "This mission is no longer available."
-    },
-    "camera": {
-      "title": "Take Photo",
-      "confirmTitle": "Confirm Photo",
-      "permissionRequired": "Camera Permission Required",
-      "permissionMessage": "Camera permission is required to take photos.",
-      "photoError": "Failed to take photo. Please try again.",
-      "usePhoto": "Use Photo",
-      "retake": "Retake",
-      "pinchToZoom": "Pinch to zoom",
-      "error": "Unable to start camera"
-    },
-    "location": {
-      "noInfo": "Location not available"
-    },
-    "steps": {
-      "photo": {
-        "title": "Take a Photo",
-        "description": "Capture your special moment together.",
-        "hint": "Capture the excitement and happiness of this moment and turn it into a memory."
-      },
-      "message": {
-        "title": "Write a Message to Each Other",
-        "description": "Leave a heartfelt message for your partner. A sincere message creates\nmore special memories.",
-        "written": "Written",
-        "notWritten": "Not written"
-      },
-      "complete": "Done"
-    },
-    "status": {
-      "anotherInProgress": "In progress",
-      "waitingPartner": "Waiting for partner...",
-      "waitingPhoto": "Waiting for photo...",
-      "writeMessage": "Write a message",
-      "takePhoto": "Take Photo"
-    },
-    "modal": {
-      "title": "Message to Each Other",
-      "placeholder": "Write what you want to say to your partner"
-    },
-    "defaultPartnerMessage": "I'm happy to be with you 💕",
-    "completed": "Completed",
-    "completeButton": "Mission Complete! 🎉",
-    "writeMessage": "Write Message",
-    "messagePlaceholder": "Record today's mission together",
-    "submitMission": "Complete Mission",
-    "partnerMessage": "Partner's Message",
-    "myMessage": "My Message",
-    "waitingPartner": "Waiting for partner's message",
-    "viewMemory": "View Memory"
-  },
-  "bookmark": {
-    "title": "Saved Missions",
-    "empty": "No saved missions",
-    "emptyHint": "Keep missions you like",
-    "deleteMission": "Delete Mission",
-    "deleteConfirm": "Delete '{{title}}'?",
-    "cannotDelete": "Cannot Delete",
-    "missionInProgressMessage": "You cannot delete a mission in progress. Please complete or cancel the mission first."
-  },
   "calendar": {
     "title": "Calendar",
     "subtitle": "Record our time together",
@@ -284,7 +125,16 @@
       "deleteConfirmTitle": "Delete Task",
       "deleteConfirmMessage": "Are you sure you want to delete this task?",
       "deleteConfirmCancel": "Cancel",
-      "deleteConfirmOk": "Delete"
+      "deleteConfirmOk": "Delete",
+      "calendar": "To-Do List",
+      "calendarDesc": "Manage your tasks by date"
+    },
+    "photos": {
+      "title": "Photos",
+      "countUnit": " photos"
+    },
+    "plans": {
+      "title": "Schedule"
     },
     "period": {
       "title": "Period Info",
@@ -328,11 +178,13 @@
   "memories": {
     "title": "Memories",
     "subtitle": "Moments we shared together",
-    "empty": "No completed missions",
-    "emptyHint": "Complete a mission to see your memories!",
+    "empty": "Tap to add photos",
+    "emptyHint": "",
     "viewAll": "View All",
     "togetherMoment": "Moment together",
     "itemCount": "{{count}} items",
+    "dateCount": "{{count}} dates",
+    "totalSpending": "Total spending : {{amount}}",
     "monthNames": [
       "Jan",
       "Feb",
@@ -363,11 +215,8 @@
       "fontStyleDesc": "Select a font style for your album title",
       "basicFont": "Font",
       "basicFontDesc": "Clean style",
-      "ransomStyle": "Ransom Note",
       "basicFontHint": "A clean font will be applied",
-      "ransomFontHint": "Each character will have a unique style",
       "namePlaceholder": "Enter album name...",
-      "ransomPlaceholder": "English only (A-Z, 0-9)",
       "selectPhoto": "Select Photo",
       "dragHint": "Drag to adjust text position",
       "coverEditHint": "Select a photo and drag to adjust text position",
@@ -390,7 +239,23 @@
       "deleteSingleConfirm": "Are you sure you want to delete this photo?",
       "save": "Save Photo",
       "tapToFlip": "Tap to see back",
-      "tapToView": "Tap to view photo"
+      "tapToView": "Tap to view photo",
+      "uploading": "Uploading ({{current}}/{{total}})",
+      "permissionDenied": "Photo library access is required.",
+      "uploadError": "An error occurred while uploading photos.",
+      "tapToEdit": "Tap to edit",
+      "addMessage": "Add a message",
+      "editMessage": "Edit Message",
+      "messagePlaceholder": "Leave a message about this moment...",
+      "addRecord": "Record your date",
+      "editRecord": "Record",
+      "recordTitle": "Title",
+      "recordTitlePlaceholder": "Enter a title for your date",
+      "recordLocation": "Location",
+      "recordLocationPlaceholder": "Enter a location",
+      "recordMessage": "Message",
+      "spending": "Spending",
+      "spendingPlaceholder": "Enter amount"
     },
     "permission": {
       "required": "Permission Required",
@@ -411,15 +276,16 @@
       "developer": "Developer"
     },
     "menu": {
+      "profile": "Profile",
       "myProfile": "My Profile",
       "coupleProfile": "Couple Profile",
       "settings": "Settings",
       "announcements": "Announcements",
       "customerService": "Customer Service",
       "onboardingReset": "Reset Onboarding",
-      "missionReset": "Reset Missions",
       "fullReset": "Full Reset",
-      "logout": "Logout"
+      "logout": "Logout",
+      "ourPlans": "Our Schedule"
     },
     "announcements": {
       "title": "Announcements",
@@ -445,10 +311,6 @@
     "alerts": {
       "devReset": "Developer Reset",
       "devResetMessage": "Reset onboarding and start from the beginning?",
-      "missionReset": "Reset Missions",
-      "missionResetMessage": "Reset all today's missions and completion status?",
-      "missionResetComplete": "Reset Complete",
-      "missionResetCompleteMessage": "Missions have been reset. Go to the Mission tab to create new missions.",
       "fullReset": "⚠️ Full Reset",
       "fullResetMessage": "This will reset all data:\n\n• Onboarding data\n• Pairing info\n• Couple sync data\n• Mission data\n• All local storage\n\nAre you sure?",
       "fullResetComplete": "Reset Complete",
@@ -501,7 +363,7 @@
     "couple": {
       "title": "Couple Profile",
       "anniversary": "Anniversary",
-      "accountInfo": "Account Info",
+      "accountInfo": "Paired Account Info",
       "myAccountInfo": "{{nickname}}'s Account Info",
       "myAccount": "My Account",
       "partnerAccountInfo": "{{nickname}}'s Account Info",
@@ -543,8 +405,6 @@
     "notifications": {
       "push": "Push Notifications",
       "pushDesc": "Receive all notifications",
-      "mission": "Mission Notifications",
-      "missionDesc": "Get notified when new missions arrive",
       "message": "Message Reminder",
       "messageDesc": "Get notified if you haven't written a message"
     },
@@ -592,13 +452,13 @@
       "checkTitle": "Please check before disconnecting",
       "daysTogether": "Days Together",
       "daysUnit": " days",
-      "completedMissions": "Completed Missions",
-      "missionsUnit": "",
+      "dateRecords": "Dates Recorded Together",
+      "recordsUnit": "",
       "recoveryPeriod": "Recovery Period",
       "recoveryHint": "Data can be recovered within 30 days",
       "warningsTitle": "Warnings",
       "warning1": "Your partner will be notified of the disconnection",
-      "warning2": "Mission history is kept in individual accounts",
+      "warning2": "Date records are kept in individual accounts",
       "warning3": "You can reconnect with the same partner within 30 days",
       "confirmPrompt": "To continue, please type 'Unpair' below",
       "confirmText": "Unpair",
@@ -622,7 +482,7 @@
       "warningText": "Deleting your account will\n",
       "permanentDelete": "permanently delete",
       "warningEnd": " all data.",
-      "dataList": "Data to be deleted: Profile information, Couple connection info, Completed mission records, Albums and photos, All settings",
+      "dataList": "Data to be deleted: Profile information, Couple connection info, Albums and photos, All settings",
       "confirmPrompt": "To continue, please type 'Delete' below",
       "confirmText": "Delete",
       "button": "Delete Account",
@@ -644,7 +504,7 @@
     "licenses": "Open Source Licenses"
   },
   "onboarding": {
-    "tagline": "Every day,\nnew date ideas\nfor couples.",
+    "tagline": "Where\nour dates\ncome together,\n\nDaydate.",
     "welcome": "Welcome",
     "welcomeTitle": "Welcome to\nDaydate",
     "welcomeSubtitle": "Record and share your special moments\ntogether as a couple",
@@ -954,9 +814,6 @@
       "manage": "Manage Premium"
     },
     "limits": {
-      "generationReached": "You've used all mission generations for today",
-      "completionReached": "You've used all mission completions for today",
-      "bookmarkReached": "Mission keep is full (max 5)",
       "albumReached": "Cannot create more albums (max 5)",
       "albumReadOnly": "This album is read-only",
       "upgradeToPremium": "Upgrade to Premium for unlimited access",
@@ -964,7 +821,6 @@
     },
     "limitReached": {
       "title": "Daily Limit Reached",
-      "completion": "You've reached your daily mission completion limit. Upgrade to Premium to complete more missions!",
       "photoStorage": "You've reached the photo storage limit (100 photos). Upgrade to Premium for unlimited storage!"
     },
     "deleteWarning": {
@@ -981,13 +837,16 @@
     "cancel": "Later"
   },
   "feed": {
+    "title": "Feed",
+    "subtitle": "Discover special date ideas for two",
     "category": {
       "all": "All",
       "festival": "Festival",
-      "performance": "Show",
+      "show": "Show",
       "restaurant": "Food",
       "activity": "Activity",
-      "spot": "Spot"
+      "spot": "Spot",
+      "pet": "Pet"
     },
     "save": "Save",
     "saved": "Saved",
@@ -997,7 +856,21 @@
       "free": "Free"
     },
     "eventPeriod": "Period",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "viewMore": "Book Now",
+    "openLink": "Open booking link",
+    "photoBy": "Photo by {{name}} on Unsplash",
+    "detail": {
+      "date": "Date",
+      "location": "Location"
+    },
+    "anniversaryToday": "It's today!",
+    "anniversaryHint": "How about a gift like this for your love?",
+    "locationRequired": "Location Required",
+    "locationRequiredDesc": "Please enable location to discover date spots nearby.",
+    "enableLocation": "Enable Location",
+    "goToSettings": "Go to Settings",
+    "getDirections": "Directions"
   },
   "errors": {
     "networkError": "Network error occurred",
@@ -1005,5 +878,56 @@
     "somethingWrong": "Something went wrong",
     "sessionExpired": "Session expired",
     "unauthorized": "Unauthorized"
+  },
+  "plans": {
+    "title": "Our Schedule",
+    "tabs": {
+      "interested": "Wishlist",
+      "booked": "Booked"
+    },
+    "bookNow": "Book Now",
+    "emptyInterested": "No schedule added yet\nAdd events you like from the feed!",
+    "emptyBooked": "No booked schedule yet",
+    "expiredSection": "Past",
+    "monthlyLimit": "{{current}}/{{max}} used this month",
+    "premiumRequired": "Premium required",
+    "adding": "Adding...",
+    "upgradeToPremium": "Upgrade to Premium",
+    "addToPlan": "Add to Schedule ✓"
+  },
+  "planDetail": {
+    "title": "Schedule Details",
+    "notFound": "Schedule not found",
+    "status": {
+      "interested": "Interested",
+      "booked": "Booked",
+      "completed": "Done"
+    },
+    "memo": "Memo",
+    "memoPlaceholder": "Enter a memo",
+    "cancelled": "Cancelled Schedule",
+    "bookingCta": "Book Now",
+    "navigateCta": "Get Directions",
+    "editMemo": "Edit Memo",
+    "cancelBooking": "Cancel Booking",
+    "moveToWishlist": "Move Back to Wishlist",
+    "deletePlan": "Delete",
+    "deleteConfirm": {
+      "title": "Delete Schedule",
+      "message": "Delete this schedule?"
+    },
+    "getDetails": "Get Details",
+    "bookingConfirm": {
+      "title": "Did you complete your booking?",
+      "desc": "If you completed your booking, we'll update your schedule status",
+      "yes": "Yes, I booked it",
+      "notYet": "Not yet"
+    },
+    "cancelSheet": {
+      "title": "What would you like to do?",
+      "reasonPlaceholder": "Reason (optional)",
+      "revertToInterested": "Move back to Wishlist",
+      "fullCancel": "Delete Schedule"
+    }
   }
 }

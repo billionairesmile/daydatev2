@@ -11,10 +11,10 @@ export {
 } from './timezoneStore';
 export {
   useSubscriptionStore,
-  usePremiumFeature,
   SUBSCRIPTION_LIMITS,
   PRODUCT_IDS,
 } from './subscriptionStore';
+export { usePlanStore } from './planStore';
 export type { SupportedLanguage, CountryCode } from './languageStore';
 export type { TimezoneId } from './timezoneStore';
 export type { SubscriptionPlan, HomeFrameOption } from './subscriptionStore';

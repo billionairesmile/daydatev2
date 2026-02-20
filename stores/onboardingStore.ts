@@ -80,11 +80,6 @@ export type OnboardingStep =
   | 'basic_info'
   | 'pairing'
   | 'couple_info'
-  | 'preferences_intro'
-  | 'mbti'
-  | 'activity_type'
-  | 'date_worries'
-  | 'constraints'
   | 'complete';
 
 interface OnboardingState {
@@ -135,24 +130,14 @@ const initialState: OnboardingState = {
 };
 
 // Step order for navigation
-const stepOrderA: OnboardingStep[] = [
+const allSteps: OnboardingStep[] = [
   'welcome',
   'login',
   'pairing',
   'basic_info',
   'couple_info',
-  'preferences_intro',
-];
-
-const stepOrderB: OnboardingStep[] = [
-  'mbti',
-  'activity_type',
-  'date_worries',
-  'constraints',
   'complete',
 ];
-
-const allSteps = [...stepOrderA, ...stepOrderB];
 
 export const useOnboardingStore = create<OnboardingState & OnboardingActions>()(
   persist(
@@ -187,6 +172,7 @@ export const useOnboardingStore = create<OnboardingState & OnboardingActions>()(
       }),
 
       skipPreferences: () => {
+        // Legacy: preferences removed from onboarding, directly go to complete
         set({ currentStep: 'complete' });
       },
 

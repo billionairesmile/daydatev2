@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { File as ExpoFile } from 'expo-file-system';
 import { decode } from 'base64-arraybuffer';
-import { formatDateToLocal } from './dateUtils';
+
 import * as ImageManipulator from 'expo-image-manipulator';
 
 
@@ -846,11 +846,15 @@ export const db = {
 
     subscribeToAnniversaries(
       coupleId: string,
-      callback: (payload: { eventType: string; anniversary: unknown }) => void
+      callback: (payload: { eventType: string; anniversary: unknown }) => void,
+      subscriberId?: string
     ) {
       const client = getSupabase();
+      const channelName = subscriberId
+        ? `anniversaries:${coupleId}:${subscriberId}`
+        : `anniversaries:${coupleId}:${Date.now()}`;
       const channel = client
-        .channel(`anniversaries:${coupleId}`)
+        .channel(channelName)
         .on(
           'postgres_changes',
           {
@@ -946,10 +950,13 @@ export const db = {
   feedPosts: {
     async getPublished(options?: { category?: string; limit?: number; offset?: number }) {
       const client = getSupabase();
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+
       let query = client
         .from('feed_posts')
         .select('*')
         .eq('is_published', true)
+        .or(`event_end_date.is.null,event_end_date.gte.${today}`)
         .order('priority', { ascending: false })
         .order('publish_date', { ascending: false });
 
@@ -964,6 +971,24 @@ export const db = {
       }
 
       const { data, error } = await query;
+      return { data, error };
+    },
+
+    async getPersonalized(options: {
+      userId: string;
+      coupleId: string;
+      category?: string;
+      limit?: number;
+      offset?: number;
+    }) {
+      const client = getSupabase();
+      const { data, error } = await client.rpc('get_personalized_feed', {
+        p_user_id: options.userId,
+        p_couple_id: options.coupleId,
+        p_category: options.category && options.category !== 'all' ? options.category : null,
+        p_limit: options.limit || 20,
+        p_offset: options.offset || 0,
+      });
       return { data, error };
     },
 
@@ -1048,23 +1073,182 @@ export const db = {
     },
   },
 
-  // Legacy: completed_missions (read-only for memories tab, Phase 2 will migrate to albums)
-  completedMissions: {
-    async getAll(coupleId: string) {
+  // Plans
+  plans: {
+    async add(planData: {
+      couple_id: string;
+      added_by: string;
+      feed_post_id?: string;
+      title: string;
+      description?: string;
+      image_url?: string;
+      location_name?: string;
+      latitude?: number;
+      longitude?: number;
+      event_date: string;
+      ticket_open_date?: string;
+      external_link?: string;
+      affiliate_link?: string;
+      price?: string;
+      memo?: string;
+    }) {
       const client = getSupabase();
       return client
-        .from('completed_missions')
-        .select('*')
-        .eq('couple_id', coupleId)
-        .order('completed_at', { ascending: false });
+        .from('plans')
+        .insert(planData)
+        .select()
+        .single();
     },
 
-    async delete(memoryId: string) {
+    async update(planId: string, data: Record<string, unknown>) {
       const client = getSupabase();
       return client
-        .from('completed_missions')
+        .from('plans')
+        .update(data)
+        .eq('id', planId);
+    },
+
+    async updateStatus(planId: string, status: string, extra?: Record<string, unknown>) {
+      const client = getSupabase();
+      return client
+        .from('plans')
+        .update({ status, ...extra })
+        .eq('id', planId);
+    },
+
+    async getByCoupleId(coupleId: string) {
+      const client = getSupabase();
+      return client
+        .from('plans')
+        .select('*')
+        .eq('couple_id', coupleId)
+        .neq('status', 'cancelled')
+        .order('event_date', { ascending: true });
+    },
+
+    async getForCalendar(coupleId: string, startDate: string, endDate: string) {
+      const client = getSupabase();
+      return client
+        .from('plans')
+        .select('id, title, image_url, event_date, status, location_name')
+        .eq('couple_id', coupleId)
+        .in('status', ['booked', 'completed'])
+        .gte('event_date', startDate)
+        .lte('event_date', endDate);
+    },
+
+    async getInterested(coupleId: string) {
+      const client = getSupabase();
+      const today = new Date().toISOString().split('T')[0];
+
+      const [activeResult, expiredResult] = await Promise.all([
+        client
+          .from('plans')
+          .select('*')
+          .eq('couple_id', coupleId)
+          .eq('status', 'interested')
+          .gte('event_date', today)
+          .order('event_date', { ascending: true }),
+        client
+          .from('plans')
+          .select('*')
+          .eq('couple_id', coupleId)
+          .eq('status', 'interested')
+          .lt('event_date', today)
+          .order('event_date', { ascending: false })
+          .limit(10),
+      ]);
+
+      return {
+        active: activeResult.data || [],
+        expired: expiredResult.data || [],
+      };
+    },
+
+    async getBooked(coupleId: string) {
+      const client = getSupabase();
+      return client
+        .from('plans')
+        .select('*')
+        .eq('couple_id', coupleId)
+        .eq('status', 'booked')
+        .order('event_date', { ascending: true });
+    },
+
+    async isAlreadyAdded(coupleId: string, feedPostId: string) {
+      const client = getSupabase();
+      const { data } = await client
+        .from('plans')
+        .select('id')
+        .eq('couple_id', coupleId)
+        .eq('feed_post_id', feedPostId)
+        .neq('status', 'cancelled')
+        .maybeSingle();
+      return !!data;
+    },
+
+    async delete(planId: string) {
+      const client = getSupabase();
+      return client
+        .from('plans')
         .delete()
-        .eq('id', memoryId);
+        .eq('id', planId);
+    },
+  },
+
+  // Plan Notifications
+  planNotifications: {
+    async createBatch(notifications: {
+      plan_id: string;
+      type: string;
+      scheduled_at: string;
+      include_affiliate_link?: boolean;
+      message_title?: string;
+      message_body?: string;
+    }[]) {
+      const client = getSupabase();
+      return client
+        .from('plan_notifications')
+        .insert(notifications);
+    },
+
+    async cancelAllForPlan(planId: string) {
+      const client = getSupabase();
+      return client
+        .from('plan_notifications')
+        .update({ is_cancelled: true })
+        .eq('plan_id', planId)
+        .is('sent_at', null);
+    },
+
+    async cancelByTypes(planId: string, types: string[]) {
+      const client = getSupabase();
+      return client
+        .from('plan_notifications')
+        .update({ is_cancelled: true })
+        .eq('plan_id', planId)
+        .in('type', types)
+        .is('sent_at', null);
+    },
+
+    async removeAffiliateLinks(planId: string) {
+      const client = getSupabase();
+      return client
+        .from('plan_notifications')
+        .update({ include_affiliate_link: false })
+        .eq('plan_id', planId)
+        .is('sent_at', null);
+    },
+
+    async restoreForPlan(planId: string) {
+      const client = getSupabase();
+      const now = new Date().toISOString();
+      return client
+        .from('plan_notifications')
+        .update({ is_cancelled: false, include_affiliate_link: true })
+        .eq('plan_id', planId)
+        .is('sent_at', null)
+        .gt('scheduled_at', now);
     },
   },
 
@@ -1345,6 +1529,7 @@ export const db = {
       coupleId: string,
       settings: {
         background_image_url?: string | null;
+        todo_enabled?: boolean;
       },
       userId: string
     ) {
@@ -1385,7 +1570,7 @@ export const db = {
 
     subscribeToSettings(
       coupleId: string,
-      callback: (payload: { background_image_url: string | null }) => void
+      callback: (payload: { background_image_url: string | null; todo_enabled: boolean }) => void
     ) {
       const client = getSupabase();
       const channel = client
@@ -1399,8 +1584,8 @@ export const db = {
             filter: `couple_id=eq.${coupleId}`,
           },
           (payload) => {
-            const record = payload.new as { background_image_url: string | null };
-            callback({ background_image_url: record.background_image_url });
+            const record = payload.new as { background_image_url: string | null; todo_enabled: boolean };
+            callback({ background_image_url: record.background_image_url, todo_enabled: record.todo_enabled });
           }
         )
         .subscribe();
@@ -1413,366 +1598,12 @@ export const db = {
     },
   },
 
-  // Mission Progress (real-time mission sync with both user messages)
-  missionProgress: {
-    // Get all mission progress records for today (supports multiple missions per day)
-    async getTodayAll(coupleId: string) {
-      const client = getSupabase();
-      const today = formatDateToLocal(new Date());
-      const { data, error } = await client
-        .from('mission_progress')
-        .select('*')
-        .eq('couple_id', coupleId)
-        .eq('date', today)
-        .order('started_at', { ascending: true });
-      return { data: data || [], error };
-    },
-
-    // Get the locked mission for today (the one where first message was written)
-    async getLockedMission(coupleId: string) {
-      const client = getSupabase();
-      const today = formatDateToLocal(new Date());
-      const { data, error } = await client
-        .from('mission_progress')
-        .select('*')
-        .eq('couple_id', coupleId)
-        .eq('date', today)
-        .eq('is_message_locked', true)
-        .maybeSingle();
-      return { data, error };
-    },
-
-    // Get progress for a specific mission today
-    async getByMissionIdToday(coupleId: string, missionId: string) {
-      const client = getSupabase();
-      const today = formatDateToLocal(new Date());
-      const { data, error } = await client
-        .from('mission_progress')
-        .select('*')
-        .eq('couple_id', coupleId)
-        .eq('date', today)
-        .eq('mission_id', missionId)
-        .maybeSingle();
-      return { data, error };
-    },
-
-    // Legacy: Get single mission (first one or locked one) - for backwards compatibility
-    async getToday(coupleId: string) {
-      const client = getSupabase();
-      const today = formatDateToLocal(new Date());
-      // First try to get locked mission
-      const { data: locked, error: lockedError } = await client
-        .from('mission_progress')
-        .select('*')
-        .eq('couple_id', coupleId)
-        .eq('date', today)
-        .eq('is_message_locked', true)
-        .maybeSingle();
-
-      if (locked) return { data: locked, error: null };
-
-      // If no locked mission, get any mission progress
-      const { data, error } = await client
-        .from('mission_progress')
-        .select('*')
-        .eq('couple_id', coupleId)
-        .eq('date', today)
-        .order('started_at', { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      return { data, error: lockedError || error };
-    },
-
-    async getById(progressId: string) {
-      const client = getSupabase();
-      const { data, error } = await client
-        .from('mission_progress')
-        .select('*')
-        .eq('id', progressId)
-        .single();
-      return { data, error };
-    },
-
-    async start(
-      coupleId: string,
-      missionId: string,
-      missionData: unknown,
-      userId: string
-    ) {
-      const client = getSupabase();
-      const today = formatDateToLocal(new Date());
-      const { data, error } = await client
-        .from('mission_progress')
-        .insert({
-          couple_id: coupleId,
-          mission_id: missionId,
-          mission_data: missionData,
-          user1_id: userId,
-          started_by: userId,
-          date: today,
-          status: 'photo_pending',
-        })
-        .select()
-        .single();
-      return { data, error };
-    },
-
-    async uploadPhoto(progressId: string, photoUrl: string) {
-      const client = getSupabase();
-      const { data, error } = await client
-        .from('mission_progress')
-        .update({
-          photo_url: photoUrl,
-          status: 'message_pending',
-        })
-        .eq('id', progressId)
-        .select()
-        .single();
-      return { data, error };
-    },
-
-    async submitMessage(
-      progressId: string,
-      userId: string,
-      message: string,
-      isUser1: boolean
-    ) {
-      const client = getSupabase();
-      const now = new Date().toISOString();
-
-      const updateData: Record<string, unknown> = isUser1
-        ? { user1_message: message, user1_message_at: now }
-        : { user2_id: userId, user2_message: message, user2_message_at: now };
-
-      // First get current state to check if both messages are now complete
-      const { data: current } = await client
-        .from('mission_progress')
-        .select('user1_message, user2_message, status, couple_id, date, is_message_locked')
-        .eq('id', progressId)
-        .single();
-
-      // Determine new status and lock state
-      if (current) {
-        const hasUser1Message = isUser1 ? true : !!current.user1_message;
-        const hasUser2Message = isUser1 ? !!current.user2_message : true;
-
-        if (hasUser1Message && hasUser2Message) {
-          updateData.status = 'completed';
-          updateData.completed_at = now;
-        } else {
-          updateData.status = 'waiting_partner';
-        }
-
-        // If this is the first message for this mission and no other mission is locked,
-        // lock this mission for the day
-        if (!current.is_message_locked) {
-          // Check if any other mission is already locked for today
-          const { data: existingLocked } = await client
-            .from('mission_progress')
-            .select('id')
-            .eq('couple_id', current.couple_id)
-            .eq('date', current.date)
-            .eq('is_message_locked', true)
-            .maybeSingle();
-
-          if (!existingLocked) {
-            // No other mission is locked, so lock this one
-            updateData.is_message_locked = true;
-          }
-        }
-      }
-
-      const { data, error } = await client
-        .from('mission_progress')
-        .update(updateData)
-        .eq('id', progressId)
-        .select()
-        .single();
-      return { data, error };
-    },
-
-    async updateLocation(progressId: string, location: string) {
-      const client = getSupabase();
-      const { data, error } = await client
-        .from('mission_progress')
-        .update({ location })
-        .eq('id', progressId)
-        .select()
-        .single();
-      return { data, error };
-    },
-
-    async delete(progressId: string) {
-      const client = getSupabase();
-      const { error } = await client
-        .from('mission_progress')
-        .delete()
-        .eq('id', progressId);
-      return { error };
-    },
-
-    // Delete all mission progress for today (for reset)
-    async deleteToday(coupleId: string) {
-      const client = getSupabase();
-      const today = formatDateToLocal(new Date());
-      const { error } = await client
-        .from('mission_progress')
-        .delete()
-        .eq('couple_id', coupleId)
-        .eq('date', today);
-      return { error };
-    },
-
-    // Delete all non-locked missions for today (cleanup after locked mission completes)
-    // Also deletes associated photos from storage to prevent orphaned files
-    async deleteNonLockedMissions(coupleId: string) {
-      const client = getSupabase();
-      const today = formatDateToLocal(new Date());
-
-      // First, get all non-locked missions to retrieve their photo URLs
-      const { data: nonLockedMissions, error: fetchError } = await client
-        .from('mission_progress')
-        .select('id, photo_url')
-        .eq('couple_id', coupleId)
-        .eq('date', today)
-        .eq('is_message_locked', false);
-
-      if (fetchError) {
-        console.error('[MissionProgress] Error fetching non-locked missions:', fetchError);
-        return { error: fetchError };
-      }
-
-      // Delete photos from storage if they exist
-      if (nonLockedMissions && nonLockedMissions.length > 0) {
-        const photoUrls = nonLockedMissions
-          .map(m => m.photo_url)
-          .filter((url): url is string => !!url);
-
-        if (photoUrls.length > 0) {
-          // Extract storage paths from URLs and delete
-          const storagePaths = photoUrls
-            .map(url => extractStoragePathFromUrl(url))
-            .filter((path): path is string => !!path);
-
-          if (storagePaths.length > 0) {
-            const { error: storageError } = await client.storage
-              .from('memories')
-              .remove(storagePaths);
-
-            if (storageError) {
-              console.warn('[MissionProgress] Error deleting photos from storage:', storageError);
-              // Continue with DB deletion even if storage deletion fails
-            } else {
-              console.log('[MissionProgress] Deleted', storagePaths.length, 'orphaned photos from storage');
-            }
-          }
-        }
-      }
-
-      // Delete the mission progress records
-      const { error } = await client
-        .from('mission_progress')
-        .delete()
-        .eq('couple_id', coupleId)
-        .eq('date', today)
-        .eq('is_message_locked', false);
-
-      return { error };
-    },
-
-    // Delete all expired (past date) mission progress that wasn't completed
-    // Also deletes associated photos from storage to prevent orphaned files
-    async deleteExpiredIncomplete(coupleId: string) {
-      const client = getSupabase();
-      const today = formatDateToLocal(new Date());
-
-      // First, get all incomplete missions from past dates to retrieve their photo URLs
-      const { data: expiredMissions, error: fetchError } = await client
-        .from('mission_progress')
-        .select('id, photo_url')
-        .eq('couple_id', coupleId)
-        .lt('date', today)
-        .neq('status', 'completed');
-
-      if (fetchError) {
-        console.error('[MissionProgress] Error fetching expired incomplete missions:', fetchError);
-        return { error: fetchError };
-      }
-
-      // Delete photos from storage if they exist
-      if (expiredMissions && expiredMissions.length > 0) {
-        const photoUrls = expiredMissions
-          .map(m => m.photo_url)
-          .filter((url): url is string => !!url);
-
-        if (photoUrls.length > 0) {
-          const storagePaths = photoUrls
-            .map(url => extractStoragePathFromUrl(url))
-            .filter((path): path is string => !!path);
-
-          if (storagePaths.length > 0) {
-            const { error: storageError } = await client.storage
-              .from('memories')
-              .remove(storagePaths);
-
-            if (storageError) {
-              console.warn('[MissionProgress] Error deleting expired photos from storage:', storageError);
-            } else {
-              console.log('[MissionProgress] Deleted', storagePaths.length, 'expired mission photos from storage');
-            }
-          }
-        }
-      }
-
-      // Delete the expired incomplete mission progress records
-      const { error } = await client
-        .from('mission_progress')
-        .delete()
-        .eq('couple_id', coupleId)
-        .lt('date', today)
-        .neq('status', 'completed');
-
-      return { error };
-    },
-
-    subscribeToProgress(
-      coupleId: string,
-      callback: (payload: { eventType: string; progress: unknown }) => void
-    ) {
-      const client = getSupabase();
-      const channel = client
-        .channel(`mission_progress:${coupleId}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'mission_progress',
-            filter: `couple_id=eq.${coupleId}`,
-          },
-          (payload) => {
-            callback({
-              eventType: payload.eventType,
-              progress: payload.eventType === 'DELETE' ? payload.old : payload.new,
-            });
-          }
-        )
-        .subscribe();
-      return channel;
-    },
-
-    unsubscribe(channel: ReturnType<SupabaseClient['channel']>) {
-      const client = getSupabase();
-      client.removeChannel(channel);
-    },
-  },
-
-  // Couple Albums (user-created albums sync)
-  coupleAlbums: {
+  // Albums (Phase 2 — direct photo albums)
+  albums: {
     async getAll(coupleId: string) {
       const client = getSupabase();
       const { data, error } = await client
-        .from('couple_albums')
+        .from('albums')
         .select('*')
         .eq('couple_id', coupleId)
         .order('created_at', { ascending: false });
@@ -1782,7 +1613,7 @@ export const db = {
     async getById(albumId: string) {
       const client = getSupabase();
       const { data, error } = await client
-        .from('couple_albums')
+        .from('albums')
         .select('*')
         .eq('id', albumId)
         .single();
@@ -1792,23 +1623,16 @@ export const db = {
     async create(
       coupleId: string,
       album: {
-        name: string;
-        cover_photo_url?: string;
-        name_position?: { x: number; y: number };
-        text_scale?: number;
-        font_style?: string;
-        ransom_seed?: number;
-        title_color?: string;
-      },
-      userId: string
+        title: string;
+        cover_image_url?: string;
+      }
     ) {
       const client = getSupabase();
       const { data, error } = await client
-        .from('couple_albums')
+        .from('albums')
         .insert({
           couple_id: coupleId,
           ...album,
-          created_by: userId,
         })
         .select()
         .single();
@@ -1818,29 +1642,23 @@ export const db = {
     async update(
       albumId: string,
       updates: {
-        name?: string;
-        cover_photo_url?: string | null;
-        name_position?: { x: number; y: number };
-        text_scale?: number;
-        font_style?: string;
-        ransom_seed?: number;
-        title_color?: string;
+        title?: string;
+        cover_image_url?: string | null;
+        total_spending?: number;
       }
     ) {
       const client = getSupabase();
 
-      // Auto-cleanup: Delete old cover image from storage if changing
-      if (updates.cover_photo_url !== undefined) {
+      if (updates.cover_image_url !== undefined) {
         const { data: currentAlbum } = await client
-          .from('couple_albums')
-          .select('cover_photo_url')
+          .from('albums')
+          .select('cover_image_url')
           .eq('id', albumId)
           .single();
 
-        const oldUrl = currentAlbum?.cover_photo_url;
-        const newUrl = updates.cover_photo_url;
+        const oldUrl = currentAlbum?.cover_image_url;
+        const newUrl = updates.cover_image_url;
 
-        // Delete old file if URL is changing (new upload or removal)
         if (oldUrl && oldUrl !== newUrl) {
           const oldPath = extractStoragePathFromUrl(oldUrl);
           await deleteFromStorage(oldPath);
@@ -1848,8 +1666,8 @@ export const db = {
       }
 
       const { data, error } = await client
-        .from('couple_albums')
-        .update(updates)
+        .from('albums')
+        .update({ ...updates, updated_at: new Date().toISOString() })
         .eq('id', albumId)
         .select()
         .single();
@@ -1858,56 +1676,42 @@ export const db = {
 
     async delete(albumId: string) {
       const client = getSupabase();
-      console.log('[Album Delete] Starting deletion for album:', albumId);
 
-      // Auto-cleanup: Get album data first to delete cover from storage
-      const { data: album, error: fetchError } = await client
-        .from('couple_albums')
-        .select('cover_photo_url')
+      const { data: album } = await client
+        .from('albums')
+        .select('cover_image_url')
         .eq('id', albumId)
         .single();
 
-      if (fetchError) {
-        console.warn('[Album Delete] Failed to fetch album data:', fetchError.message);
-      } else {
-        console.log('[Album Delete] Album cover URL:', album?.cover_photo_url);
-      }
-
-      // Store cover URL before deletion (in case we need it after DB delete)
-      const coverUrl = album?.cover_photo_url;
+      const coverUrl = album?.cover_image_url;
       const coverPath = coverUrl ? extractStoragePathFromUrl(coverUrl) : null;
-      console.log('[Album Delete] Will delete storage path:', coverPath);
 
-      // Delete album record from database
+      // Delete all photo files from storage
+      const { data: photos } = await client
+        .from('photos')
+        .select('image_url')
+        .eq('album_id', albumId);
+
       const { error } = await client
-        .from('couple_albums')
+        .from('albums')
         .delete()
         .eq('id', albumId);
 
-      if (error) {
-        console.error('[Album Delete] DB delete error:', error.message);
-        return { error };
-      }
-
-      console.log('[Album Delete] DB record deleted successfully');
-
-      // Delete cover image from storage if exists (after successful DB delete)
-      if (coverPath) {
-        try {
-          const { error: storageError } = await client.storage
-            .from('memories')
-            .remove([coverPath]);
-
-          if (storageError) {
-            console.error('[Album Delete] Storage delete FAILED:', storageError.message, 'Path:', coverPath);
-          } else {
-            console.log('[Album Delete] Storage file deleted successfully:', coverPath);
+      if (!error) {
+        // Cleanup storage files
+        const paths: string[] = [];
+        if (coverPath) paths.push(coverPath);
+        if (photos) {
+          for (const p of photos) {
+            if (p.image_url) {
+              const path = extractStoragePathFromUrl(p.image_url);
+              if (path) paths.push(path);
+            }
           }
-        } catch (e) {
-          console.error('[Album Delete] Storage delete exception:', e, 'Path:', coverPath);
         }
-      } else {
-        console.log('[Album Delete] No cover photo to delete (no valid path)');
+        if (paths.length > 0) {
+          await client.storage.from('memories').remove(paths).catch(() => {});
+        }
       }
 
       return { error };
@@ -1919,13 +1723,13 @@ export const db = {
     ) {
       const client = getSupabase();
       const channel = client
-        .channel(`couple_albums:${coupleId}`)
+        .channel(`albums:${coupleId}`)
         .on(
           'postgres_changes',
           {
             event: '*',
             schema: 'public',
-            table: 'couple_albums',
+            table: 'albums',
             filter: `couple_id=eq.${coupleId}`,
           },
           (payload) => {
@@ -1945,219 +1749,294 @@ export const db = {
     },
   },
 
-  // Album Photos (junction table for album-photo relationships)
-  albumPhotos: {
+  // Photos (direct photo storage in albums)
+  photos: {
     async getByAlbum(albumId: string) {
       const client = getSupabase();
       const { data, error } = await client
-        .from('album_photos')
-        .select('*, memory:completed_missions(*)')
+        .from('photos')
+        .select('*')
         .eq('album_id', albumId)
-        .order('added_at', { ascending: false });
+        .order('taken_at', { ascending: false, nullsFirst: false });
       return { data, error };
     },
 
-    async add(albumId: string, memoryId: string, userId: string) {
+    async getByCouple(coupleId: string, options?: { limit?: number; offset?: number }) {
       const client = getSupabase();
-      console.log('[db.albumPhotos.add] Inserting:', { albumId, memoryId, userId });
+      let query = client
+        .from('photos')
+        .select('*')
+        .eq('couple_id', coupleId)
+        .order('taken_at', { ascending: false, nullsFirst: false });
+      if (options?.limit) query = query.limit(options.limit);
+      if (options?.offset) query = query.range(options.offset, options.offset + (options?.limit || 20) - 1);
+      const { data, error } = await query;
+      return { data, error };
+    },
 
-      // First verify the memory exists in completed_missions
-      const { data: memoryCheck, error: memoryCheckError } = await client
-        .from('completed_missions')
-        .select('id')
-        .eq('id', memoryId)
-        .single();
-
-      if (memoryCheckError || !memoryCheck) {
-        console.error('[db.albumPhotos.add] Memory not found in completed_missions:', memoryId);
-        console.error('[db.albumPhotos.add] Error:', memoryCheckError);
-        return { data: null, error: memoryCheckError || new Error('Memory not found in database') };
-      }
-
-      console.log('[db.albumPhotos.add] Memory exists, proceeding with insert');
-
+    async add(photo: {
+      album_id: string;
+      couple_id: string;
+      uploaded_by: string;
+      image_url: string;
+      taken_at?: string | null;
+      taken_location_name?: string | null;
+      taken_latitude?: number | null;
+      taken_longitude?: number | null;
+    }) {
+      const client = getSupabase();
       const { data, error } = await client
-        .from('album_photos')
-        .insert({
-          album_id: albumId,
-          memory_id: memoryId,
-          added_by: userId,
-        })
+        .from('photos')
+        .insert(photo)
         .select()
         .single();
 
-      // Handle duplicate key error (23505) - photo already exists in album
-      if (error && error.code === '23505') {
-        console.log('[db.albumPhotos.add] Photo already exists in album, fetching existing record');
-        // Fetch the existing record instead - treat as success
-        const { data: existingData, error: fetchError } = await client
-          .from('album_photos')
-          .select()
-          .eq('album_id', albumId)
-          .eq('memory_id', memoryId)
-          .single();
-
-        if (fetchError) {
-          console.error('[db.albumPhotos.add] Failed to fetch existing record:', fetchError);
-          return { data: null, error: fetchError };
+      if (!error && data) {
+        // Update album photo_count and cover
+        try {
+          await client.rpc('update_album_stats', { p_album_id: photo.album_id });
+        } catch {
+          // Fallback: manual update
+          await client
+            .from('albums')
+            .update({ updated_at: new Date().toISOString() })
+            .eq('id', photo.album_id);
         }
-
-        console.log('[db.albumPhotos.add] Returning existing record:', existingData);
-        return { data: existingData, error: null };
-      }
-
-      if (error) {
-        console.error('[db.albumPhotos.add] Insert error:', error);
-        console.error('[db.albumPhotos.add] Error details:', JSON.stringify(error, null, 2));
-      } else {
-        console.log('[db.albumPhotos.add] Insert successful:', data);
-
-        // Touch the album's updated_at to trigger real-time sync for partners
-        // This is necessary because album_photos table doesn't have couple_id,
-        // so we use the album update event (which has couple_id filter) to notify partners
-        const { error: touchError } = await client
-          .from('couple_albums')
+        // Touch album for realtime sync
+        await client
+          .from('albums')
           .update({ updated_at: new Date().toISOString() })
-          .eq('id', albumId);
-
-        if (touchError) {
-          console.warn('[db.albumPhotos.add] Failed to touch album updated_at:', touchError);
-        } else {
-          console.log('[db.albumPhotos.add] Album updated_at touched for sync');
-        }
+          .eq('id', photo.album_id);
       }
 
       return { data, error };
     },
 
-    async addBatch(albumId: string, memoryIds: string[], userId: string) {
+    async addBatch(photos: {
+      album_id: string;
+      couple_id: string;
+      uploaded_by: string;
+      image_url: string;
+      taken_at?: string | null;
+      taken_location_name?: string | null;
+      taken_latitude?: number | null;
+      taken_longitude?: number | null;
+    }[]) {
       const client = getSupabase();
-      console.log('[db.albumPhotos.addBatch] Inserting batch:', { albumId, count: memoryIds.length });
-
-      const rows = memoryIds.map(memoryId => ({
-        album_id: albumId,
-        memory_id: memoryId,
-        added_by: userId,
-      }));
-
       const { data, error } = await client
-        .from('album_photos')
-        .upsert(rows, { onConflict: 'album_id,memory_id', ignoreDuplicates: true })
+        .from('photos')
+        .insert(photos)
         .select();
 
-      if (error) {
-        console.error('[db.albumPhotos.addBatch] Batch insert error:', error);
-      } else {
-        console.log('[db.albumPhotos.addBatch] Batch insert successful:', data?.length, 'photos');
-        // Touch album updated_at ONCE for real-time sync
-        const { error: touchError } = await client
-          .from('couple_albums')
-          .update({ updated_at: new Date().toISOString() })
+      if (!error && photos.length > 0) {
+        const albumId = photos[0].album_id;
+        // Update count
+        const { count } = await client
+          .from('photos')
+          .select('*', { count: 'exact', head: true })
+          .eq('album_id', albumId);
+        await client
+          .from('albums')
+          .update({
+            photo_count: count || 0,
+            updated_at: new Date().toISOString(),
+          })
           .eq('id', albumId);
-        if (touchError) {
-          console.warn('[db.albumPhotos.addBatch] Failed to touch album updated_at:', touchError);
-        }
       }
 
       return { data, error };
     },
 
-    async removeBatch(albumId: string, memoryIds: string[]) {
-      const client = getSupabase();
-      console.log('[db.albumPhotos.removeBatch] Deleting batch:', { albumId, count: memoryIds.length });
-
-      const { error } = await client
-        .from('album_photos')
-        .delete()
-        .eq('album_id', albumId)
-        .in('memory_id', memoryIds);
-
-      if (error) {
-        console.error('[db.albumPhotos.removeBatch] Batch delete error:', error);
-      } else {
-        console.log('[db.albumPhotos.removeBatch] Batch delete successful');
-        // Touch album updated_at ONCE for real-time sync
-        const { error: touchError } = await client
-          .from('couple_albums')
-          .update({ updated_at: new Date().toISOString() })
-          .eq('id', albumId);
-        if (touchError) {
-          console.warn('[db.albumPhotos.removeBatch] Failed to touch album updated_at:', touchError);
-        }
-      }
-
-      return { error };
-    },
-
-    async remove(albumId: string, memoryId: string) {
-      const client = getSupabase();
-      console.log('[db.albumPhotos.remove] Deleting:', { albumId, memoryId });
-
-      const { error } = await client
-        .from('album_photos')
-        .delete()
-        .eq('album_id', albumId)
-        .eq('memory_id', memoryId);
-
-      if (error) {
-        console.error('[db.albumPhotos.remove] Delete error:', error);
-      } else {
-        console.log('[db.albumPhotos.remove] Delete successful');
-
-        // Touch the album's updated_at to trigger real-time sync for partners
-        const { error: touchError } = await client
-          .from('couple_albums')
-          .update({ updated_at: new Date().toISOString() })
-          .eq('id', albumId);
-
-        if (touchError) {
-          console.warn('[db.albumPhotos.remove] Failed to touch album updated_at:', touchError);
-        } else {
-          console.log('[db.albumPhotos.remove] Album updated_at touched for sync');
-        }
-      }
-
-      return { error };
-    },
-
-    async getAlbumsForMemory(memoryId: string) {
+    async updateMessage(photoId: string, message: string) {
       const client = getSupabase();
       const { data, error } = await client
-        .from('album_photos')
-        .select('album_id')
-        .eq('memory_id', memoryId);
+        .from('photos')
+        .update({ message, message_updated_at: new Date().toISOString() })
+        .eq('id', photoId)
+        .select()
+        .single();
       return { data, error };
     },
 
-    subscribeToAlbumPhotos(
+    async updateSpending(photoId: string, spendingAmount: number) {
+      const client = getSupabase();
+      const { data, error } = await client
+        .from('photos')
+        .update({ spending_amount: spendingAmount })
+        .eq('id', photoId)
+        .select()
+        .single();
+
+      if (!error && data) {
+        // Recalculate album total_spending
+        const { data: albumPhotos } = await client
+          .from('photos')
+          .select('spending_amount')
+          .eq('album_id', data.album_id);
+        const total = (albumPhotos || []).reduce((sum: number, p: any) => sum + (p.spending_amount || 0), 0);
+        await client
+          .from('albums')
+          .update({ total_spending: total })
+          .eq('id', data.album_id);
+      }
+
+      return { data, error };
+    },
+
+    async updateRecord(photoId: string, record: { title?: string; location?: string; message?: string; spending?: number; messageSlot?: 'message' | 'message2'; userId?: string }) {
+      const client = getSupabase();
+      const updates: Record<string, any> = {};
+      if (record.title !== undefined) updates.title = record.title;
+      if (record.location !== undefined) updates.taken_location_name = record.location;
+      if (record.message !== undefined) {
+        const slot = record.messageSlot || 'message';
+        if (slot === 'message2') {
+          updates.message2 = record.message;
+          updates.message2_by = record.userId || null;
+          updates.message2_updated_at = new Date().toISOString();
+        } else {
+          updates.message = record.message;
+          updates.message_by = record.userId || null;
+          updates.message_updated_at = new Date().toISOString();
+        }
+      }
+      if (record.spending !== undefined) updates.spending_amount = record.spending;
+
+      const { data, error } = await client
+        .from('photos')
+        .update(updates)
+        .eq('id', photoId)
+        .select()
+        .single();
+
+      // Recalculate album total_spending if spending changed
+      if (!error && data && record.spending !== undefined) {
+        const { data: albumPhotos } = await client
+          .from('photos')
+          .select('spending_amount')
+          .eq('album_id', data.album_id);
+        const total = (albumPhotos || []).reduce((sum: number, p: any) => sum + (p.spending_amount || 0), 0);
+        await client
+          .from('albums')
+          .update({ total_spending: total })
+          .eq('id', data.album_id);
+      }
+
+      return { data, error };
+    },
+
+    async remove(photoId: string) {
+      const client = getSupabase();
+
+      // Get photo data first for cleanup
+      const { data: photo } = await client
+        .from('photos')
+        .select('image_url, album_id')
+        .eq('id', photoId)
+        .single();
+
+      const { error } = await client
+        .from('photos')
+        .delete()
+        .eq('id', photoId);
+
+      if (!error && photo) {
+        // Delete from storage
+        const path = extractStoragePathFromUrl(photo.image_url);
+        if (path) {
+          await client.storage.from('memories').remove([path]).catch(() => {});
+        }
+        // Update album stats
+        const { count } = await client
+          .from('photos')
+          .select('*', { count: 'exact', head: true })
+          .eq('album_id', photo.album_id);
+        const { data: albumPhotos } = await client
+          .from('photos')
+          .select('spending_amount')
+          .eq('album_id', photo.album_id);
+        const totalSpending = (albumPhotos || []).reduce((sum: number, p: any) => sum + (p.spending_amount || 0), 0);
+        await client
+          .from('albums')
+          .update({
+            photo_count: count || 0,
+            total_spending: totalSpending,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', photo.album_id);
+      }
+
+      return { error };
+    },
+
+    async removeBatch(photoIds: string[]) {
+      const client = getSupabase();
+
+      // Get photos for cleanup
+      const { data: photos } = await client
+        .from('photos')
+        .select('id, image_url, album_id')
+        .in('id', photoIds);
+
+      const { error } = await client
+        .from('photos')
+        .delete()
+        .in('id', photoIds);
+
+      if (!error && photos && photos.length > 0) {
+        const paths = photos.map(p => extractStoragePathFromUrl(p.image_url)).filter(Boolean);
+        if (paths.length > 0) {
+          await client.storage.from('memories').remove(paths as string[]).catch(() => {});
+        }
+        // Update album stats for affected albums
+        const albumIds = [...new Set(photos.map(p => p.album_id))];
+        for (const albumId of albumIds) {
+          const { count } = await client
+            .from('photos')
+            .select('*', { count: 'exact', head: true })
+            .eq('album_id', albumId);
+          const { data: albumPhotos } = await client
+            .from('photos')
+            .select('spending_amount')
+            .eq('album_id', albumId);
+          const totalSpending = (albumPhotos || []).reduce((sum: number, p: any) => sum + (p.spending_amount || 0), 0);
+          await client
+            .from('albums')
+            .update({
+              photo_count: count || 0,
+              total_spending: totalSpending,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', albumId);
+        }
+      }
+
+      return { error };
+    },
+
+    subscribeToPhotos(
       coupleId: string,
-      callback: (payload: { eventType: string; albumPhoto: unknown }) => void
+      callback: (payload: { eventType: string; photo: unknown }) => void
     ) {
       const client = getSupabase();
-      console.log('[db.albumPhotos.subscribeToAlbumPhotos] Setting up subscription for couple:', coupleId);
-      // Subscribe to all album_photos changes for albums belonging to this couple
-      // Note: Filtered at application level since we can't filter by couple_id directly
       const channel = client
-        .channel(`album_photos:${coupleId}`)
+        .channel(`photos:${coupleId}`)
         .on(
           'postgres_changes',
           {
             event: '*',
             schema: 'public',
-            table: 'album_photos',
+            table: 'photos',
+            filter: `couple_id=eq.${coupleId}`,
           },
           (payload) => {
-            console.log('[db.albumPhotos.subscribeToAlbumPhotos] Received realtime event:', payload.eventType);
-            console.log('[db.albumPhotos.subscribeToAlbumPhotos] Payload:', JSON.stringify(payload.new || payload.old, null, 2));
             callback({
               eventType: payload.eventType,
-              albumPhoto: payload.eventType === 'DELETE' ? payload.old : payload.new,
+              photo: payload.eventType === 'DELETE' ? payload.old : payload.new,
             });
           }
         )
-        .subscribe((status) => {
-          console.log('[db.albumPhotos.subscribeToAlbumPhotos] Subscription status:', status);
-        });
+        .subscribe();
       return channel;
     },
 
@@ -2169,49 +2048,6 @@ export const db = {
 
   // Storage
   storage: {
-    async uploadPhoto(coupleId: string, uri: string, previousPhotoUrl?: string): Promise<string | null> {
-      try {
-        const client = getSupabase();
-
-        // Delete previous photo if exists (prevents orphan files when retaking photos)
-        if (previousPhotoUrl && previousPhotoUrl.startsWith('http')) {
-          const previousPath = extractStoragePathFromUrl(previousPhotoUrl);
-          if (previousPath) {
-            console.log('[Storage] Deleting previous photo before upload:', previousPath);
-            await deleteFromStorage(previousPath);
-          }
-        }
-
-        // Photo is already processed locally in mission/[id].tsx (1500px, 0.85 quality)
-        // No additional compression needed - upload as-is to preserve quality
-        // This avoids double compression which degrades image quality significantly
-        const file = new ExpoFile(uri);
-        const base64 = await file.base64();
-
-        const fileName = `${coupleId}/${Date.now()}.jpg`;
-
-        const { data, error } = await client.storage
-          .from('memories')
-          .upload(fileName, decode(base64), {
-            contentType: 'image/jpeg',
-          });
-
-        if (error) {
-          console.error('Upload error:', error);
-          return null;
-        }
-
-        const { data: urlData } = client.storage
-          .from('memories')
-          .getPublicUrl(data.path);
-
-        return urlData.publicUrl;
-      } catch (error) {
-        console.error('Upload error:', error);
-        return null;
-      }
-    },
-
     async uploadBackground(coupleId: string, uri: string): Promise<string | null> {
       try {
         const client = getSupabase();
@@ -2221,7 +2057,7 @@ export const db = {
         const manipulatedImage = await ImageManipulator.manipulateAsync(
           uri,
           [{ resize: { width: 1080 } }], // Resize to 1080px width, height auto-calculated
-          { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+          { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
         );
 
         // Read resized file as base64
@@ -2253,25 +2089,30 @@ export const db = {
       }
     },
 
-    async uploadAlbumCover(coupleId: string, uri: string): Promise<string | null> {
+    async uploadAlbumPhoto(coupleId: string, uri: string): Promise<string | null> {
       try {
         const client = getSupabase();
 
-        // Read file as base64 using new expo-file-system API
-        const file = new ExpoFile(uri);
+        // Resize to max 1500px width for good quality + reasonable file size
+        const manipulatedImage = await ImageManipulator.manipulateAsync(
+          uri,
+          [{ resize: { width: 1500 } }],
+          { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
+        );
+
+        const file = new ExpoFile(manipulatedImage.uri);
         const base64 = await file.base64();
 
-        const fileName = `album-covers/${coupleId}/${Date.now()}.jpg`;
+        const fileName = `album-photos/${coupleId}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.jpg`;
 
         const { data, error } = await client.storage
           .from('memories')
           .upload(fileName, decode(base64), {
             contentType: 'image/jpeg',
-            upsert: true,
           });
 
         if (error) {
-          console.error('Album cover upload error:', error);
+          console.error('Album photo upload error:', error);
           return null;
         }
 
@@ -2281,7 +2122,7 @@ export const db = {
 
         return urlData.publicUrl;
       } catch (error) {
-        console.error('Album cover upload error:', error);
+        console.error('Album photo upload error:', error);
         return null;
       }
     },
@@ -2303,34 +2144,48 @@ export const db = {
         const accessToken = sessionData?.session?.access_token;
         console.log('[Account Delete] Starting deletion, has session:', !!accessToken);
 
-        // 1. Delete mission completions (depends on daily_missions)
+        // 1. Delete plan notifications (depends on plans)
         if (coupleId) {
-          const { error: mcError } = await client
-            .from('mission_completions')
-            .delete()
-            .eq('user_id', userId);
-          if (mcError) errors.push(`mission_completions: ${mcError.message}`);
+          const { data: planIds } = await client
+            .from('plans')
+            .select('id')
+            .eq('couple_id', coupleId);
+          if (planIds && planIds.length > 0) {
+            const ids = planIds.map(p => p.id);
+            const { error: pnError } = await client
+              .from('plan_notifications')
+              .delete()
+              .in('plan_id', ids);
+            if (pnError) errors.push(`plan_notifications: ${pnError.message}`);
+          }
         }
 
-        // 2. Delete daily missions for the couple
+        // 2. Delete plans for the couple
         if (coupleId) {
-          const { error: dmError } = await client
-            .from('daily_missions')
+          const { error: planError } = await client
+            .from('plans')
             .delete()
             .eq('couple_id', coupleId);
-          if (dmError) errors.push(`daily_missions: ${dmError.message}`);
+          if (planError) errors.push(`plans: ${planError.message}`);
         }
 
-        // 3. Delete completed missions for the couple
+        // 3. Delete feed saves for the user
+        const { error: fsError } = await client
+          .from('feed_saves')
+          .delete()
+          .eq('user_id', userId);
+        if (fsError) errors.push(`feed_saves: ${fsError.message}`);
+
+        // 4. Delete couple_todos for the couple
         if (coupleId) {
-          const { error: cmError } = await client
-            .from('completed_missions')
+          const { error: todoError } = await client
+            .from('couple_todos')
             .delete()
             .eq('couple_id', coupleId);
-          if (cmError) errors.push(`completed_missions: ${cmError.message}`);
+          if (todoError) errors.push(`couple_todos: ${todoError.message}`);
         }
 
-        // 4. Delete anniversaries for the couple
+        // 5. Delete anniversaries for the couple
         if (coupleId) {
           const { error: annError } = await client
             .from('anniversaries')
@@ -2339,55 +2194,49 @@ export const db = {
           if (annError) errors.push(`anniversaries: ${annError.message}`);
         }
 
-        // 5. Delete todos for the couple
+        // 6. Delete menstrual_settings for the couple
         if (coupleId) {
-          const { error: todoError } = await client
-            .from('todos')
+          const { error: msError } = await client
+            .from('menstrual_settings')
             .delete()
             .eq('couple_id', coupleId);
-          if (todoError) errors.push(`todos: ${todoError.message}`);
+          if (msError) errors.push(`menstrual_settings: ${msError.message}`);
         }
 
-        // 6. Delete albums and album photos for the couple
+        // 7. Delete couple_settings for the couple
         if (coupleId) {
-          // First delete album photos
-          const { data: albums } = await client
-            .from('couple_albums')
-            .select('id')
+          const { error: csError } = await client
+            .from('couple_settings')
+            .delete()
             .eq('couple_id', coupleId);
+          if (csError) errors.push(`couple_settings: ${csError.message}`);
+        }
 
-          if (albums && albums.length > 0) {
-            const albumIds = albums.map(a => a.id);
-            const { error: photoError } = await client
-              .from('album_photos')
-              .delete()
-              .in('album_id', albumIds);
-            if (photoError) errors.push(`album_photos: ${photoError.message}`);
-          }
-
-          // Then delete albums
+        // 8. Delete albums and photos for the couple (cascade handles photos)
+        if (coupleId) {
+          // Photos are cascade-deleted when albums are deleted
           const { error: albumError } = await client
-            .from('couple_albums')
+            .from('albums')
             .delete()
             .eq('couple_id', coupleId);
-          if (albumError) errors.push(`couple_albums: ${albumError.message}`);
+          if (albumError) errors.push(`albums: ${albumError.message}`);
         }
 
-        // 7. Delete pairing codes created by this user
+        // 9. Delete pairing codes created by this user
         const { error: pcError } = await client
           .from('pairing_codes')
           .delete()
           .eq('creator_id', userId);
         if (pcError) errors.push(`pairing_codes: ${pcError.message}`);
 
-        // 8. Delete onboarding answers
+        // 10. Delete onboarding answers
         const { error: oaError } = await client
           .from('onboarding_answers')
           .delete()
           .eq('user_id', userId);
         if (oaError) errors.push(`onboarding_answers: ${oaError.message}`);
 
-        // 9. Delete the couple record
+        // 11. Delete the couple record
         if (coupleId) {
           const { error: coupleError } = await client
             .from('couples')
@@ -2396,18 +2245,18 @@ export const db = {
           if (coupleError) errors.push(`couples: ${coupleError.message}`);
         }
 
-        // 10. Delete user profile
+        // 12. Delete user profile
         const { error: profileError } = await client
           .from('profiles')
           .delete()
           .eq('id', userId);
         if (profileError) errors.push(`profiles: ${profileError.message}`);
 
-        // 11. Delete from auth.users via Edge Function (AFTER all public data is deleted)
+        // 13. Delete from auth.users via Edge Function (AFTER all public data is deleted)
         // This must be done while session is still valid
         if (accessToken) {
           try {
-            console.log('[Account Delete] Step 11: Deleting from auth.users (after public data cleanup)');
+            console.log('[Account Delete] Step 13: Deleting from auth.users (after public data cleanup)');
             const edgeFunctionUrl = `${supabaseUrl}/functions/v1/delete-user-account`;
 
             const response = await fetch(edgeFunctionUrl, {
@@ -2437,7 +2286,7 @@ export const db = {
           errors.push('auth.users: No session available for deletion');
         }
 
-        // 12. Delete storage files (photos, backgrounds, etc.)
+        // 14. Delete storage files (photos, backgrounds, etc.)
         if (coupleId) {
           try {
             // Delete memories folder
@@ -2472,7 +2321,7 @@ export const db = {
           }
         }
 
-        // 13. Sign out from Supabase Auth
+        // 15. Sign out from Supabase Auth
         const { error: signOutError } = await client.auth.signOut();
         if (signOutError) errors.push(`auth.signOut: ${signOutError.message}`);
 

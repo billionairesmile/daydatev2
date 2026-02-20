@@ -53,10 +53,6 @@ import { useTimezoneStore } from '@/stores/timezoneStore';
 import {
   useOnboardingStore,
   generatePairingCode,
-  MBTI_OPTIONS,
-  ACTIVITY_TYPE_OPTIONS,
-  DATE_WORRY_OPTIONS,
-  CONSTRAINT_OPTIONS,
   type RelationshipType,
   type ActivityType,
   type DateWorry,
@@ -118,7 +114,6 @@ const parseDateAsLocal = (dateString: string): Date => {
 
 // Step configuration for progress bar
 const STEP_A = ['pairing', 'basic_info', 'couple_info'];
-const STEP_B = ['mbti', 'activity_type', 'date_worries', 'constraints'];
 
 export default function OnboardingScreen() {
   const router = useRouter();
@@ -138,12 +133,11 @@ export default function OnboardingScreen() {
 
   // Local state
   const [generatedCode, setGeneratedCode] = useState(() => generatePairingCode());
-  const [hasExistingPreferences, setHasExistingPreferences] = useState(false);
   const [isRedirectingToHome, setIsRedirectingToHome] = useState(false);
   const [isExistingUser, setIsExistingUser] = useState(false);
 
   // Steps that require authentication - used for both synchronous check and useEffect
-  const stepsRequiringAuth = ['pairing', 'basic_info', 'couple_info', 'preferences_intro', 'mbti', 'activity_type', 'date_worries', 'constraints', 'complete'];
+  const stepsRequiringAuth = ['pairing', 'basic_info', 'couple_info', 'complete'];
 
   // Both stores must be hydrated before we can determine the correct step
   const isFullyHydrated = _hasHydrated && onboardingHydrated;
@@ -219,22 +213,6 @@ export default function OnboardingScreen() {
       setStep('basic_info');
     }
   }, [couple?.user1Id, couple?.user2Id, couple?.status, currentStep, setStep, isRedirectingToHome, isOnboardingComplete, data.isPairingConnected]);
-
-  // Check if user has existing onboarding answers (for conditional preference skipping)
-  useEffect(() => {
-    const checkExistingPreferences = async () => {
-      if (!isInTestMode() && currentUser?.id) {
-        try {
-          const hasAnswers = await db.onboardingAnswers.hasAnswers(currentUser.id);
-          setHasExistingPreferences(hasAnswers);
-          console.log('[Onboarding] User has existing preferences:', hasAnswers);
-        } catch (error) {
-          console.error('[Onboarding] Error checking existing preferences:', error);
-        }
-      }
-    };
-    checkExistingPreferences();
-  }, [currentUser?.id]);
 
   // Check if user has existing profile (for pairing back button behavior)
   useEffect(() => {
@@ -518,17 +496,12 @@ export default function OnboardingScreen() {
 
             // Check if profile is complete (has birthDate and preferences)
             const hasCompleteBirthDate = !!existingProfile?.birth_date;
-            const hasCompletePreferences = existingProfile?.preferences &&
-              Object.keys(existingProfile.preferences).length > 0 &&
-              existingProfile.preferences.mbti; // Check for at least mbti as indicator of completed preferences
-            const isProfileComplete = hasCompleteBirthDate && hasCompletePreferences;
+            const isProfileComplete = hasCompleteBirthDate;
 
             console.log('[Onboarding] Profile completeness check:', {
               hasCompleteBirthDate,
-              hasCompletePreferences,
               isProfileComplete,
               birth_date: existingProfile?.birth_date,
-              preferences: existingProfile?.preferences
             });
 
             // Set couple in auth store (needed for both complete and incomplete profiles)
@@ -768,10 +741,7 @@ export default function OnboardingScreen() {
           console.log('[Onboarding] Email user already paired');
 
           const hasCompleteBirthDate = !!existingProfile?.birth_date;
-          const hasCompletePreferences = existingProfile?.preferences &&
-            Object.keys(existingProfile.preferences).length > 0 &&
-            existingProfile.preferences.mbti;
-          const isProfileComplete = hasCompleteBirthDate && hasCompletePreferences;
+          const isProfileComplete = hasCompleteBirthDate;
 
           setCouple({
             id: existingCouple.id,
@@ -1018,14 +988,7 @@ export default function OnboardingScreen() {
 
     const stepAIndex = STEP_A.indexOf(effectiveStep);
     if (stepAIndex !== -1) {
-      return (stepAIndex + 1) / STEP_A.length * 0.5;
-    }
-
-    if (effectiveStep === 'preferences_intro') return 0.5;
-
-    const stepBIndex = STEP_B.indexOf(effectiveStep);
-    if (stepBIndex !== -1) {
-      return 0.5 + ((stepBIndex + 1) / STEP_B.length * 0.5);
+      return (stepAIndex + 1) / STEP_A.length;
     }
 
     return 0;
@@ -1202,19 +1165,10 @@ export default function OnboardingScreen() {
                 // Save profile data immediately to trigger realtime sync with partner
                 await saveProfileDataImmediately();
 
-                // Creator (isCreatingCode): Skip couple_info, go directly to preferences_intro
+                // Creator (isCreatingCode): Skip couple_info, go directly to complete
                 // Joiner (!isCreatingCode): Go to couple_info to enter anniversary date
                 if (data.isCreatingCode) {
-                  // If user already has preference data, skip to complete
-                  if (hasExistingPreferences) {
-                    Alert.alert(
-                      t('onboarding.dataRecovery.title'),
-                      t('onboarding.dataRecovery.message'),
-                      [{ text: t('onboarding.confirm'), onPress: () => animateTransition(() => setStep('complete')) }]
-                    );
-                  } else {
-                    animateTransition(() => setStep('preferences_intro'));
-                  }
+                  animateTransition(() => setStep('complete'));
                 } else {
                   handleNext(); // Goes to couple_info
                 }
@@ -1233,56 +1187,8 @@ export default function OnboardingScreen() {
                 // This prevents the sync issue where creator sees wrong date before joiner completes onboarding
                 await saveAnniversaryDateImmediately();
 
-                // If user already has preference data, skip to complete
-                if (hasExistingPreferences) {
-                  Alert.alert(
-                    t('onboarding.dataRecovery.title'),
-                    t('onboarding.dataRecovery.message'),
-                    [{ text: t('onboarding.confirm'), onPress: () => animateTransition(() => setStep('complete')) }]
-                  );
-                } else {
-                  handleNext(); // Goes to preferences_intro
-                }
+                animateTransition(() => setStep('complete'));
               }}
-              onBack={handleBack}
-            />
-          )}
-          {effectiveStep === 'preferences_intro' && (
-            <PreferencesIntroStep
-              onNext={handleNext}
-              onBack={handleBack}
-              bottomInset={insets.bottom}
-            />
-          )}
-          {effectiveStep === 'mbti' && (
-            <MBTIStep
-              mbti={data.mbti}
-              setMbti={(mbti) => updateData({ mbti })}
-              onNext={handleNext}
-              onBack={handleBack}
-            />
-          )}
-          {effectiveStep === 'activity_type' && (
-            <ActivityTypeStep
-              activityTypes={data.activityTypes}
-              setActivityTypes={(types) => updateData({ activityTypes: types })}
-              onNext={handleNext}
-              onBack={handleBack}
-            />
-          )}
-          {effectiveStep === 'date_worries' && (
-            <DateWorriesStep
-              dateWorries={data.dateWorries || []}
-              setDateWorries={(worries) => updateData({ dateWorries: worries })}
-              onNext={handleNext}
-              onBack={handleBack}
-            />
-          )}
-          {effectiveStep === 'constraints' && (
-            <ConstraintsStep
-              constraints={data.constraints}
-              setConstraints={(cons) => updateData({ constraints: cons })}
-              onNext={() => animateTransition(() => setStep('complete'))}
               onBack={handleBack}
             />
           )}
@@ -1360,7 +1266,7 @@ function WelcomeStep({ onSocialLogin, onEmailLogin }: {
       return { font: 'ChironGoRoundTC', letterSpacing: 0, lineHeight: rh(42), fontSize: rh(30), fontWeight: '400' as const };
     }
     // Korean default
-    return { font: TYPOGRAPHY.fontFamily.display, letterSpacing: -1, lineHeight: rh(58), fontSize: rh(42), fontWeight: '400' as const };
+    return { font: 'DoHyeon', letterSpacing: -1, lineHeight: rh(58), fontSize: rh(42), fontWeight: '400' as const };
   };
   const taglineStyle = getTaglineStyle();
 
@@ -3627,14 +3533,10 @@ function PairingStep({
 
               // Check if joiner's profile is complete
               const hasCompleteBirthDate = !!joinerProfile.birth_date;
-              const hasCompletePreferences = joinerProfile.preferences &&
-                Object.keys(joinerProfile.preferences).length > 0 &&
-                joinerProfile.preferences.mbti;
-              const isProfileComplete = hasCompleteBirthDate && hasCompletePreferences;
+              const isProfileComplete = hasCompleteBirthDate;
 
               console.log('[PairingStep] Joiner (30-day restore) profile completeness:', {
                 hasCompleteBirthDate,
-                hasCompletePreferences,
                 isProfileComplete
               });
 
@@ -3846,14 +3748,10 @@ function PairingStep({
         // Fetch joiner's profile to check completeness
         const { data: joinerProfile } = await db.profiles.get(joinerId);
         const hasCompleteBirthDate = !!joinerProfile?.birth_date;
-        const hasCompletePreferences = joinerProfile?.preferences &&
-          Object.keys(joinerProfile.preferences).length > 0 &&
-          joinerProfile.preferences.mbti;
-        const isProfileComplete = hasCompleteBirthDate && hasCompletePreferences;
+        const isProfileComplete = hasCompleteBirthDate;
 
         console.log('[PairingStep] Joiner (disconnect_reason) profile completeness:', {
           hasCompleteBirthDate,
-          hasCompletePreferences,
           isProfileComplete
         });
 
@@ -3924,14 +3822,10 @@ function PairingStep({
         if (userId && !isInTestMode()) {
           const { data: profile } = await db.profiles.get(userId);
           const hasCompleteBirthDate = !!profile?.birth_date;
-          const hasCompletePreferences = profile?.preferences &&
-            Object.keys(profile.preferences).length > 0 &&
-            profile.preferences.mbti; // Check for at least mbti as indicator of completed preferences
-          const isProfileComplete = hasCompleteBirthDate && hasCompletePreferences;
+          const isProfileComplete = hasCompleteBirthDate;
 
           console.log('[PairingStep] Creator profile completeness check:', {
             hasCompleteBirthDate,
-            hasCompletePreferences,
             isProfileComplete
           });
 
@@ -4326,345 +4220,6 @@ function CoupleInfoStep({
   );
 }
 
-// Preferences Intro Step
-function PreferencesIntroStep({
-  onNext,
-  onBack,
-  bottomInset = 0,
-}: {
-  onNext: () => void;
-  onBack: () => void;
-  bottomInset?: number;
-}) {
-  const { t } = useTranslation();
-  // Use consistent padding from styles
-  const bottomPadding = Platform.OS === 'android'
-    ? ANDROID_BOTTOM_PADDING + ANDROID_ONBOARDING_EXTRA_PADDING
-    : rh(SPACING.lg);
-
-  return (
-    <View style={styles.centeredStepContainer}>
-      {/* Title fixed at top */}
-      <View style={[styles.nicknameTitleContainer, { paddingTop: rh(SPACING.xxxl + 60) }]}>
-        <Text style={styles.stepTitle}>
-          {t('onboarding.preferencesIntro.title')}
-        </Text>
-        <Text style={styles.stepDescription}>
-          {t('onboarding.preferencesIntro.subtitle')}
-        </Text>
-      </View>
-
-      {/* Centered content */}
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', width: '100%', paddingHorizontal: SPACING.xl }}>
-        <View style={[styles.preferencesInfoBoxInline, { alignItems: 'center' }]}>
-          <Text style={[styles.preferencesInfoText, { textAlign: 'center' }]}>
-            {t('onboarding.preferencesIntro.hint')}
-          </Text>
-        </View>
-      </View>
-
-      {/* Bottom button - consistent position with other steps */}
-      <View style={{ width: '100%', paddingBottom: bottomPadding }}>
-        <Pressable style={[styles.primaryButton, styles.primaryButtonFullWidth]} onPress={onNext}>
-          <Text style={styles.primaryButtonText}>{t('onboarding.preferencesIntro.startAnalysis')}</Text>
-        </Pressable>
-      </View>
-    </View>
-  );
-}
-
-// MBTI Step
-function MBTIStep({
-  mbti,
-  setMbti,
-  onNext,
-  onBack,
-}: {
-  mbti: string;
-  setMbti: (mbti: string) => void;
-  onNext: () => void;
-  onBack: () => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <View style={styles.centeredStepContainer}>
-      {/* Title at top */}
-      <View style={{ width: '100%', paddingHorizontal: SPACING.xl, paddingTop: rh(SPACING.xxxl + 40), alignItems: 'center' }}>
-        <Text style={styles.stepTitle}>{t('onboarding.mbti.title')}</Text>
-      </View>
-
-      {/* Centered content - moved up */}
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-start', paddingTop: rh(110), width: '100%' }}>
-        <View style={styles.mbtiGrid}>
-          {MBTI_OPTIONS.map((option) => (
-            <Pressable
-              key={option}
-              style={[styles.mbtiButton, mbti === option && styles.mbtiButtonActive]}
-              onPress={() => setMbti(option)}
-            >
-              <Text style={[styles.mbtiButtonText, mbti === option && styles.mbtiButtonTextActive]}>
-                {option}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      </View>
-
-      {/* Bottom button - consistent position */}
-      <View style={{ width: '100%', paddingBottom: rh(SPACING.lg) }}>
-        <View style={styles.buttonRow}>
-          <Pressable style={styles.secondaryButton} onPress={onBack}>
-            <Text style={styles.secondaryButtonText}>{t('onboarding.previous')}</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.primaryButton, styles.buttonFlex, !mbti && styles.buttonDisabled]}
-            onPress={mbti ? onNext : undefined}
-            disabled={!mbti}
-          >
-            <Text style={[styles.primaryButtonText, !mbti && styles.buttonTextDisabled]}>{t('onboarding.next')}</Text>
-          </Pressable>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-// Activity Type Step
-function ActivityTypeStep({
-  activityTypes,
-  setActivityTypes,
-  onNext,
-  onBack,
-}: {
-  activityTypes: ActivityType[];
-  setActivityTypes: (types: ActivityType[]) => void;
-  onNext: () => void;
-  onBack: () => void;
-}) {
-  const { t } = useTranslation();
-  const toggleActivity = (type: ActivityType) => {
-    if (activityTypes.includes(type)) {
-      setActivityTypes(activityTypes.filter((t) => t !== type));
-    } else {
-      setActivityTypes([...activityTypes, type]);
-    }
-  };
-
-  const isValid = activityTypes.length > 0;
-
-  return (
-    <View style={styles.centeredStepContainer}>
-      {/* Title at top */}
-      <View style={{ width: '100%', paddingHorizontal: SPACING.xl, paddingTop: rh(SPACING.xxxl + 40), alignItems: 'center' }}>
-        <Text style={styles.stepTitle}>{t('onboarding.preferences.title')}</Text>
-        <Text style={styles.stepDescription}>
-          {t('onboarding.preferences.subtitle')}
-        </Text>
-      </View>
-
-      {/* Centered content */}
-      <View style={styles.topCenteredContent}>
-        <ScrollView
-          style={{ width: '100%' }}
-          contentContainerStyle={{ alignItems: 'center', paddingBottom: rh(SPACING.md) }}
-          showsVerticalScrollIndicator={false}
-          nestedScrollEnabled={true}
-          bounces={false}
-        >
-          <View style={styles.activityGrid3Col}>
-            {ACTIVITY_TYPE_OPTIONS.map((option) => (
-              <Pressable
-                key={option.id}
-                style={[styles.activityButtonSmall, activityTypes.includes(option.id) && styles.activityButtonActive]}
-                onPress={() => toggleActivity(option.id)}
-              >
-                <Text style={styles.activityIconSmall}>{option.icon}</Text>
-                <Text style={[styles.activityButtonTextSmall, activityTypes.includes(option.id) && styles.activityButtonTextActive]}>
-                  {t(option.labelKey)}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </ScrollView>
-      </View>
-
-      {/* Bottom button - consistent position */}
-      <View style={{ width: '100%', paddingBottom: rh(SPACING.lg) }}>
-        <View style={styles.buttonRow}>
-          <Pressable style={styles.secondaryButton} onPress={onBack}>
-            <Text style={styles.secondaryButtonText}>{t('onboarding.previous')}</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.primaryButton, styles.buttonFlex, !isValid && styles.buttonDisabled]}
-            onPress={isValid ? onNext : undefined}
-            disabled={!isValid}
-          >
-            <Text style={[styles.primaryButtonText, !isValid && styles.buttonTextDisabled]}>{t('onboarding.next')}</Text>
-          </Pressable>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-// Date Worries Step - Multiple Selection
-function DateWorriesStep({
-  dateWorries,
-  setDateWorries,
-  onNext,
-  onBack,
-}: {
-  dateWorries: DateWorry[];
-  setDateWorries: (worries: DateWorry[]) => void;
-  onNext: () => void;
-  onBack: () => void;
-}) {
-  const { t } = useTranslation();
-  const worries = dateWorries || [];
-
-  const toggleWorry = (worry: DateWorry) => {
-    if (worries.includes(worry)) {
-      setDateWorries(worries.filter((w) => w !== worry));
-    } else {
-      setDateWorries([...worries, worry]);
-    }
-  };
-
-  const isValid = worries.length > 0;
-
-  return (
-    <View style={styles.centeredStepContainer}>
-      {/* Title at top */}
-      <View style={{ width: '100%', paddingHorizontal: SPACING.xl, paddingTop: rh(SPACING.xxxl + 40), alignItems: 'center' }}>
-        <Text style={styles.stepTitle}>
-          {t('onboarding.concerns.title')}
-        </Text>
-        <Text style={styles.stepDescription}>
-          {t('onboarding.concerns.subtitle')}
-        </Text>
-      </View>
-
-      <View style={[styles.topCenteredContent, { paddingTop: rh(SPACING.lg) }]}>
-        <ScrollView
-          style={styles.dateWorryList}
-          contentContainerStyle={styles.dateWorryContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {DATE_WORRY_OPTIONS.map((option) => (
-            <Pressable
-              key={option.id}
-              style={[styles.dateWorryButton, worries.includes(option.id) && styles.dateWorryButtonActive]}
-              onPress={() => toggleWorry(option.id)}
-            >
-              <View style={styles.dateWorryLeft}>
-                <Text style={styles.dateWorryIcon}>{option.icon}</Text>
-                <Text style={[styles.dateWorryButtonText, worries.includes(option.id) && styles.dateWorryButtonTextActive]}>
-                  {t(option.labelKey)}
-                </Text>
-              </View>
-              <View style={styles.checkIconPlaceholder}>
-                {worries.includes(option.id) && <Check color={COLORS.black} size={20} />}
-              </View>
-            </Pressable>
-          ))}
-        </ScrollView>
-      </View>
-
-      <View style={styles.bottomButtonArea}>
-        <View style={styles.buttonRow}>
-          <Pressable style={styles.secondaryButton} onPress={onBack}>
-            <Text style={styles.secondaryButtonText}>{t('onboarding.previous')}</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.primaryButton, styles.buttonFlex, !isValid && styles.buttonDisabled]}
-            onPress={isValid ? onNext : undefined}
-            disabled={!isValid}
-          >
-            <Text style={[styles.primaryButtonText, !isValid && styles.buttonTextDisabled]}>{t('onboarding.next')}</Text>
-          </Pressable>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-// Constraints Step
-function ConstraintsStep({
-  constraints,
-  setConstraints,
-  onNext,
-  onBack,
-}: {
-  constraints: Constraint[];
-  setConstraints: (cons: Constraint[]) => void;
-  onNext: () => void;
-  onBack: () => void;
-}) {
-  const { t } = useTranslation();
-  const toggleConstraint = (con: Constraint) => {
-    if (con === 'none') {
-      // If "없음" is selected, clear all others and select only "없음"
-      if (constraints.includes('none')) {
-        setConstraints([]);
-      } else {
-        setConstraints(['none']);
-      }
-    } else {
-      // If other option is selected, remove "없음" if present
-      if (constraints.includes(con)) {
-        setConstraints(constraints.filter((c) => c !== con));
-      } else {
-        setConstraints([...constraints.filter((c) => c !== 'none'), con]);
-      }
-    }
-  };
-
-  const isValid = constraints.length > 0;
-
-  return (
-    <View style={styles.centeredStepContainer}>
-      {/* Title at top */}
-      <View style={{ width: '100%', paddingHorizontal: SPACING.xl, paddingTop: rh(SPACING.xxxl + 40), alignItems: 'center' }}>
-        <Text style={styles.stepTitle}>{t('onboarding.constraints.title')}</Text>
-        <Text style={styles.stepDescription}>
-          {t('onboarding.constraints.subtitle')}
-        </Text>
-      </View>
-
-      <View style={[styles.topCenteredContent, { paddingTop: rh(SPACING.lg) }]}>
-        <View style={styles.constraintGrid}>
-          {CONSTRAINT_OPTIONS.map((option) => (
-            <Pressable
-              key={option.id}
-              style={[styles.constraintButton, constraints.includes(option.id) && styles.constraintButtonActive]}
-              onPress={() => toggleConstraint(option.id)}
-            >
-              <Text style={styles.constraintIcon}>{option.icon}</Text>
-              <Text style={[styles.constraintButtonText, constraints.includes(option.id) && styles.constraintButtonTextActive]}>
-                {t(option.labelKey)}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.bottomButtonArea}>
-        <View style={styles.buttonRow}>
-          <Pressable style={styles.secondaryButton} onPress={onBack}>
-            <Text style={styles.secondaryButtonText}>{t('onboarding.previous')}</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.primaryButton, styles.buttonFlex, !isValid && styles.buttonDisabled]}
-            onPress={isValid ? onNext : undefined}
-            disabled={!isValid}
-          >
-            <Text style={[styles.primaryButtonText, !isValid && styles.buttonTextDisabled]}>{t('onboarding.complete')}</Text>
-          </Pressable>
-        </View>
-      </View>
-    </View>
-  );
-}
 
 // Complete Step
 function CompleteStep({
@@ -4831,7 +4386,7 @@ const styles = StyleSheet.create({
   welcomeTaglineContainer: {
     width: '100%',
     paddingHorizontal: '7.5%', // Match social login button left margin (85% width centered)
-    paddingTop: rh(84), // ~10% of base height (844)
+    paddingTop: rh(48), // ~5.7% of base height (844)
     alignItems: 'flex-start',
   },
   welcomeTagline: {

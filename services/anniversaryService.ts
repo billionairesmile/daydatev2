@@ -446,7 +446,8 @@ export const anniversaryService = {
   // Subscribe to real-time updates
   subscribe(
     coupleId: string,
-    onUpdate: (anniversaries: Anniversary[]) => void
+    onUpdate: (anniversaries: Anniversary[]) => void,
+    subscriberId?: string
   ): (() => void) | null {
     if (isInTestMode() || !supabase) {
       return null;
@@ -456,7 +457,7 @@ export const anniversaryService = {
       // Reload from DB when changes occur
       const anniversaries = await this.load(coupleId);
       onUpdate(anniversaries);
-    });
+    }, subscriberId);
 
     // Return unsubscribe function
     return () => {

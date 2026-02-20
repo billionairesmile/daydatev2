@@ -2,7 +2,6 @@ import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { db, supabase, isDemoMode } from './supabase';
-import { useTimezoneStore } from '@/stores/timezoneStore';
 
 // Check if running in Expo Go (push notifications don't work in Expo Go as of SDK 53)
 const isExpoGo = Constants.appOwnership === 'expo';
@@ -273,13 +272,11 @@ export async function getPartnerPushToken(partnerId: string): Promise<string | n
 }
 
 export type NotificationType =
-  | 'mission_generated'
-  | 'mission_reminder'
-  | 'partner_message_waiting'
   | 'partner_message_written'
-  | 'hourly_reminder'
-  | 'photo_uploaded'
-  | 'couple_unpaired';
+  | 'couple_unpaired'
+  | 'new_plan'
+  | 'plan_booked'
+  | 'plan_cancelled';
 
 export interface SendNotificationParams {
   targetUserId: string;
@@ -291,77 +288,6 @@ export interface SendNotificationParams {
 
 // Notification message translations
 const notificationMessages = {
-  missionGenerated: {
-    ko: {
-      title: '오늘의 미션이 도착했어요!',
-      body: (nickname: string) => `${nickname}님이 오늘의 미션을 생성했어요. 확인해보세요!`,
-    },
-    en: {
-      title: "Today's mission has arrived!",
-      body: (nickname: string) => `${nickname} has created today's mission. Check it out!`,
-    },
-    es: {
-      title: '¡La misión de hoy ha llegado!',
-      body: (nickname: string) => `${nickname} ha creado la misión de hoy. ¡Échale un vistazo!`,
-    },
-    'zh-TW': {
-      title: '今日任務來了！',
-      body: (nickname: string) => `${nickname}建立了今天的任務，快來看看吧！`,
-    },
-    ja: {
-      title: '今日のミッションが届きました！',
-      body: (nickname: string) => `${nickname}さんが今日のミッションを作成しました。確認してみてね！`,
-    },
-  },
-  missionReminder: {
-    ko: {
-      title: '미션 완료까지 한 걸음!',
-      bodyWithPartner: (nickname: string) => `${nickname}님이 메시지를 남겼어요. 당신의 메시지도 작성해주세요!`,
-      bodyWithoutPartner: '서로에게 한마디를 작성해야 미션이 완료돼요!',
-    },
-    en: {
-      title: 'One step to complete the mission!',
-      bodyWithPartner: (nickname: string) => `${nickname} left a message. Please write your message too!`,
-      bodyWithoutPartner: 'Write a message to each other to complete the mission!',
-    },
-    es: {
-      title: '¡Un paso más para completar la misión!',
-      bodyWithPartner: (nickname: string) => `${nickname} dejó un mensaje. ¡Escribe el tuyo también!`,
-      bodyWithoutPartner: '¡Escríbanse un mensaje para completar la misión!',
-    },
-    'zh-TW': {
-      title: '任務完成只差一步！',
-      bodyWithPartner: (nickname: string) => `${nickname}留了訊息給你，也寫下你的訊息吧！`,
-      bodyWithoutPartner: '互相寫下給對方的話就能完成任務！',
-    },
-    ja: {
-      title: 'ミッション完了まであと少し！',
-      bodyWithPartner: (nickname: string) => `${nickname}さんがメッセージを残しました。あなたのメッセージも書いてね！`,
-      bodyWithoutPartner: 'お互いにひとことを書いてミッションを完了しよう！',
-    },
-  },
-  scheduledReminder: {
-    ko: {
-      title: '오늘의 미션을 완료해보세요!',
-      body: '아직 완료하지 않은 미션이 있어요. 연인과 함께 특별한 추억을 만들어보세요 💕',
-    },
-    en: {
-      title: "Complete today's mission!",
-      body: "You have an incomplete mission. Create special memories with your partner 💕",
-    },
-    es: {
-      title: '¡Completa la misión de hoy!',
-      body: 'Tienes una misión sin completar. Crea recuerdos especiales con tu pareja 💕',
-    },
-    'zh-TW': {
-      title: '來完成今天的任務吧！',
-      body: '還有未完成的任務喔，和另一半一起創造特別的回憶吧 💕',
-    },
-    ja: {
-      title: '今日のミッションを完了しよう！',
-      body: 'まだ完了していないミッションがあるよ。恋人と一緒に特別な思い出を作ろう 💕',
-    },
-  },
   partnerMessageWritten: {
     ko: {
       title: '💌 서로에게 한마디가 도착했어요!',
@@ -382,50 +308,6 @@ const notificationMessages = {
     ja: {
       title: '💌 お互いへのひとことが届きました！',
       body: (nickname: string) => `${nickname}さんがメッセージを残しました。今すぐ確認してね！`,
-    },
-  },
-  hourlyReminder: {
-    ko: {
-      title: '⏰ 아직 미션이 기다리고 있어요!',
-      body: (nickname: string) => `${nickname}님에게 한마디를 작성해주세요 😘`,
-    },
-    en: {
-      title: "⏰ Your mission is waiting!",
-      body: (nickname: string) => `Write a message for ${nickname} 😘`,
-    },
-    es: {
-      title: '⏰ ¡Tu misión te está esperando!',
-      body: (nickname: string) => `Escribe un mensaje para ${nickname} 😘`,
-    },
-    'zh-TW': {
-      title: '⏰ 任務還在等你喔！',
-      body: (nickname: string) => `寫一段話給${nickname}吧 😘`,
-    },
-    ja: {
-      title: '⏰ まだミッションが待ってるよ！',
-      body: (nickname: string) => `${nickname}さんにひとことを書いてね 😘`,
-    },
-  },
-  photoUploaded: {
-    ko: {
-      title: '📸 미션 사진이 업로드됐어요!',
-      body: (nickname: string) => `${nickname}님이 사진을 올렸어요. 서로에게 한마디를 남겨주세요!`,
-    },
-    en: {
-      title: '📸 Mission photo uploaded!',
-      body: (nickname: string) => `${nickname} uploaded a photo. Leave a message for each other!`,
-    },
-    es: {
-      title: '📸 ¡Foto de la misión subida!',
-      body: (nickname: string) => `${nickname} subió una foto. ¡Déjense un mensaje!`,
-    },
-    'zh-TW': {
-      title: '📸 任務照片已上傳！',
-      body: (nickname: string) => `${nickname}上傳了照片，互相留下訊息吧！`,
-    },
-    ja: {
-      title: '📸 ミッション写真がアップロードされました！',
-      body: (nickname: string) => `${nickname}さんが写真をアップしました。お互いにひとことを残してね！`,
     },
   },
   coupleUnpaired: {
@@ -521,77 +403,6 @@ export async function sendPushNotification(params: SendNotificationParams): Prom
   }
 }
 
-/**
- * Send mission generated notification to partner
- * Uses the recipient's language preference from the database
- */
-export async function notifyPartnerMissionGenerated(
-  partnerId: string,
-  generatorNickname: string,
-  _language?: SupportedLanguage // Deprecated: language is now fetched from recipient's profile
-): Promise<boolean> {
-  console.log('[Push] notifyPartnerMissionGenerated: Sending to partner:', partnerId);
-  // Fetch the recipient's language preference
-  const recipientLanguage = await getUserLanguage(partnerId);
-  console.log('[Push] notifyPartnerMissionGenerated: Recipient language:', recipientLanguage);
-  const messages = notificationMessages.missionGenerated[recipientLanguage];
-  console.log('[Push] notifyPartnerMissionGenerated: Title:', messages.title);
-  return sendPushNotification({
-    targetUserId: partnerId,
-    type: 'mission_generated',
-    title: messages.title,
-    body: messages.body(generatorNickname),
-    data: { screen: 'mission' },
-  });
-}
-
-/**
- * Send mission reminder notification
- * Uses the recipient's language preference from the database
- */
-export async function notifyMissionReminder(
-  userId: string,
-  partnerNickname: string,
-  hasPartnerWritten: boolean,
-  _language?: SupportedLanguage // Deprecated: language is now fetched from recipient's profile
-): Promise<boolean> {
-  // Fetch the recipient's language preference
-  const recipientLanguage = await getUserLanguage(userId);
-  const messages = notificationMessages.missionReminder[recipientLanguage];
-  const body = hasPartnerWritten
-    ? messages.bodyWithPartner(partnerNickname)
-    : messages.bodyWithoutPartner;
-
-  return sendPushNotification({
-    targetUserId: userId,
-    type: 'mission_reminder',
-    title: messages.title,
-    body,
-    data: { screen: 'mission' },
-  });
-}
-
-/**
- * Send photo uploaded notification to partner
- * Uses the recipient's language preference from the database
- */
-export async function notifyPartnerPhotoUploaded(
-  partnerId: string,
-  uploaderNickname: string,
-  _language?: SupportedLanguage, // Deprecated: language is now fetched from recipient's profile
-  missionId?: string
-): Promise<boolean> {
-  // Fetch the recipient's language preference
-  const recipientLanguage = await getUserLanguage(partnerId);
-  const messages = notificationMessages.photoUploaded[recipientLanguage];
-  return sendPushNotification({
-    targetUserId: partnerId,
-    type: 'photo_uploaded',
-    title: messages.title,
-    body: messages.body(uploaderNickname),
-    data: { screen: 'mission', missionId: missionId || '' },
-  });
-}
 
 /**
  * Send unpair notification to partner
@@ -615,27 +426,6 @@ export async function notifyPartnerUnpaired(
   });
 }
 
-/**
- * Send notification when partner writes their message (한마디)
- * Uses the recipient's language preference from the database
- */
-export async function notifyPartnerMessageWritten(
-  partnerId: string,
-  writerNickname: string,
-  _language?: SupportedLanguage, // Deprecated: language is now fetched from recipient's profile
-  missionId?: string
-): Promise<boolean> {
-  // Fetch the recipient's language preference
-  const recipientLanguage = await getUserLanguage(partnerId);
-  const messages = notificationMessages.partnerMessageWritten[recipientLanguage];
-  return sendPushNotification({
-    targetUserId: partnerId,
-    type: 'partner_message_written',
-    title: messages.title,
-    body: messages.body(writerNickname),
-    data: { screen: 'mission', missionId: missionId || '' },
-  });
-}
 
 // Subscription type for when Notifications is available
 type NotificationSubscription = { remove: () => void } | null;
@@ -694,170 +484,10 @@ export async function clearAllNotifications(): Promise<void> {
   await setBadgeCount(0);
 }
 
-// Scheduled notification identifiers
-const MISSION_REMINDER_NOTIFICATION_ID = 'mission-reminder-scheduled';
-
-/**
- * Schedule a local notification for mission reminder at a specific hour
- * Default: 8 PM (20:00)
- */
-export async function scheduleMissionReminderNotification(
-  hour: number = 20,
-  language: SupportedLanguage = 'ko'
-): Promise<string | null> {
-  if (!Notifications) {
-    console.log('[Push] Notifications not available - skipping scheduled notification');
-    return null;
-  }
-
-  if (isDemoMode) {
-    console.log('[Push] Demo mode - skipping scheduled notification');
-    return null;
-  }
-
-  try {
-    // Cancel any existing scheduled reminder first
-    await cancelMissionReminderNotification();
-
-    // Calculate trigger time for today at the specified hour
-    const now = new Date();
-    const triggerDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, 0, 0);
-
-    // If the time has already passed today, don't schedule
-    if (triggerDate <= now) {
-      console.log('[Push] Scheduled time has already passed for today - skipping');
-      return null;
-    }
-
-    console.log('[Push] scheduleMissionReminderNotification: Scheduling with language:', language);
-    const messages = notificationMessages.scheduledReminder[language];
-    const identifier = await Notifications.scheduleNotificationAsync({
-      content: {
-        title: messages.title,
-        body: messages.body,
-        data: { screen: 'mission', type: 'mission_incomplete_reminder' },
-        sound: 'default',
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date: triggerDate,
-      },
-      identifier: MISSION_REMINDER_NOTIFICATION_ID,
-    });
-
-    console.log('[Push] Mission reminder scheduled for', triggerDate.toLocaleTimeString(), 'ID:', identifier);
-    return identifier;
-  } catch (error) {
-    console.error('[Push] Error scheduling mission reminder:', error);
-    return null;
-  }
-}
-
-/**
- * Cancel scheduled mission reminder notification
- */
-export async function cancelMissionReminderNotification(): Promise<void> {
-  if (!Notifications) return;
-  try {
-    await Notifications.cancelScheduledNotificationAsync(MISSION_REMINDER_NOTIFICATION_ID);
-    console.log('[Push] Cancelled scheduled mission reminder');
-  } catch (error) {
-    // Ignore errors - notification might not exist
-  }
-}
 
 // Hourly reminder notification identifiers
 const HOURLY_REMINDER_PREFIX = 'hourly-reminder-';
 const MAX_HOURLY_REMINDERS = 12; // Limit to 12 hours of reminders
-
-/**
- * Schedule hourly reminder notifications after photo upload
- * Schedules notifications for the next several hours until midnight
- * @param partnerNickname - Partner's nickname to include in the notification message
- * @param language - Language for the notification
- */
-export async function scheduleHourlyReminders(
-  partnerNickname: string,
-  language: SupportedLanguage = 'ko'
-): Promise<string[]> {
-  if (!Notifications) {
-    console.log('[Push] Notifications not available - skipping hourly reminders');
-    return [];
-  }
-
-  if (isDemoMode) {
-    console.log('[Push] Demo mode - skipping hourly reminders');
-    return [];
-  }
-
-  try {
-    // Cancel any existing hourly reminders first
-    await cancelHourlyReminders();
-
-    const now = new Date();
-    const currentDeviceHour = now.getHours();
-    const scheduledIds: string[] = [];
-
-    const messages = notificationMessages.hourlyReminder[language];
-
-    // Get effective timezone for quiet hours check
-    const effectiveTimezone = useTimezoneStore.getState().getEffectiveTimezone();
-
-    // Schedule reminders for the next several hours
-    // Start from the next hour, end before midnight (23:00 device local)
-    // Skip if the effective timezone hour is in quiet period (0:00-8:59)
-    for (let i = 1; i <= MAX_HOURLY_REMINDERS; i++) {
-      const deviceHour = currentDeviceHour + i;
-
-      // Don't schedule past 23:00 (11 PM) device local time
-      if (deviceHour >= 23) break;
-
-      // Calculate trigger time in device local time
-      const triggerDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), deviceHour, 0, 0);
-
-      // Check what hour this is in the effective timezone
-      const hourInEffectiveTimezone = parseInt(
-        new Intl.DateTimeFormat('en-US', {
-          timeZone: effectiveTimezone,
-          hour: 'numeric',
-          hour12: false,
-        }).format(triggerDate),
-        10
-      );
-
-      // Skip midnight to 9 AM (0:00-8:59) in effective timezone - quiet hours
-      if (hourInEffectiveTimezone < 9) {
-        console.log('[Push] Skipping reminder at', triggerDate.toLocaleTimeString(), '- quiet hours in', effectiveTimezone);
-        continue;
-      }
-
-      const identifier = `${HOURLY_REMINDER_PREFIX}${i}`;
-
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: messages.title,
-          body: messages.body(partnerNickname),
-          data: { screen: 'mission', type: 'hourly_reminder' },
-          sound: 'default',
-        },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.DATE,
-          date: triggerDate,
-        },
-        identifier,
-      });
-
-      scheduledIds.push(identifier);
-      console.log('[Push] Hourly reminder scheduled for', triggerDate.toLocaleTimeString(), '(', hourInEffectiveTimezone, ':00 in', effectiveTimezone, ')');
-    }
-
-    console.log('[Push] Scheduled', scheduledIds.length, 'hourly reminders');
-    return scheduledIds;
-  } catch (error) {
-    console.error('[Push] Error scheduling hourly reminders:', error);
-    return [];
-  }
-}
 
 /**
  * Cancel all hourly reminder notifications

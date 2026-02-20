@@ -20,6 +20,10 @@ export default function MoreLayout() {
       <Stack.Screen name="unpair" />
       <Stack.Screen name="others" />
       <Stack.Screen name="help" />
+      <Stack.Screen name="plans" />
+      <Stack.Screen name="plan-detail" />
+      <Stack.Screen name="gift-shop" />
+      <Stack.Screen name="web-viewer" />
     </Stack>
   );
 }

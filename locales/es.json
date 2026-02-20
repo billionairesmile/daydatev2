@@ -22,7 +22,8 @@
     "partner": "Pareja",
     "me": "Yo",
     "days": "días",
-    "daysCount": "días"
+    "daysCount": "días",
+    "comingSoon": "Próximamente"
   },
   "auth": {
     "email": {
@@ -46,7 +47,6 @@
   },
   "tabs": {
     "home": "Inicio",
-    "mission": "Misión",
     "calendar": "Calendario",
     "memories": "Recuerdos",
     "more": "Más",
@@ -96,162 +96,6 @@
     },
     "shareError": "Ocurrió un error al compartir."
   },
-  "mission": {
-    "title": "Misión",
-    "subtitle": "¿Qué momentos compartirán hoy?",
-    "emptyState": {
-      "line1": "¿Listo para la",
-      "line2": "misión de hoy?",
-      "button": "Empezar"
-    },
-    "generate": "Obtener Misiones",
-    "generating": "Generando...",
-    "generatingMessage": "Creando tu misión",
-    "pleaseWait": "Espera un momento",
-    "start": "Empezar",
-    "completed": "Completada",
-    "view": "Ver",
-    "kept": "Guardada",
-    "keep": "Guardar",
-    "anotherInProgress": "En progreso",
-    "questions": {
-      "canMeetToday": "¿Pueden verse hoy?",
-      "yesMeet": "Sí, podemos",
-      "noMeet": "No",
-      "availableTime": "¿Cuánto tiempo tienen juntos hoy?",
-      "todayMood": "¿Cómo se sienten hoy? (Selecciona todos)"
-    },
-    "timeOptions": {
-      "30min": "30 min",
-      "1hour": "1 hora",
-      "2hour": "2+ horas",
-      "allday": "Todo el día"
-    },
-    "moodOptions": {
-      "cozy": "Cita en Casa",
-      "foodie": "Gastronomía",
-      "active": "Activo",
-      "healing": "Relajarme",
-      "culture": "Cultura",
-      "adventure": "Nuevo Reto",
-      "romantic": "Romántico"
-    },
-    "alerts": {
-      "locationRequired": "Ubicación Necesaria",
-      "locationRequiredMessage": "Se necesita permiso de ubicación para generar misiones.\nPor favor, permite el acceso.",
-      "allowPermission": "Permitir",
-      "locationDenied": "Ubicación Denegada",
-      "locationDeniedMessage": "El permiso de ubicación fue denegado. Por favor, actívalo en ajustes.",
-      "goToSettings": "Ir a Ajustes",
-      "cannotKeep": "No Se Puede Guardar",
-      "alreadyCompletedKeep": "Las misiones completadas no se pueden guardar.",
-      "keepMission": "Guardar Misión",
-      "keepMissionConfirm": "¿Guardar '{{title}}' en tu colección?",
-      "keepLimit": "Límite de Guardado",
-      "keepLimitMessage": "Puedes guardar hasta 5 misiones.\nElimina alguna antes de añadir más.",
-      "cannotStart": "No Se Puede Iniciar",
-      "anotherInProgressMessage": "Ya hay otra misión en progreso.",
-      "dailyLimitMessage": "Ya completaste la misión de hoy.\n¡Vuelve mañana!",
-      "offlineTitle": "Se requiere conexión a Internet",
-      "offlineMessage": "Se necesita conexión a Internet para generar misiones.\nVerifica tu conexión de red e inténtalo de nuevo."
-    },
-    "refresh": {
-      "questionLine1": "¿No encuentras",
-      "questionLine2": "la misión ideal?",
-      "button": "Nuevas Misiones",
-      "hint": "Ve un anuncio para\nrecibir nuevas misiones",
-      "modalTitle": "Nuevas Misiones",
-      "modalButton": "Nuevas Misiones",
-      "partnerGenerating": "Por favor espera",
-      "partnerGeneratingMessage": "Tu pareja está generando nuevas misiones. Por favor, inténtalo más tarde.",
-      "adLoadingFailed": "Error al Cargar Anuncio",
-      "adLoadingFailedMessage": "Error al cargar el anuncio.\nPor favor, inténtalo más tarde.",
-      "devModeTitle": "Modo de Desarrollo",
-      "devModeMessage": "Los anuncios solo están disponibles en compilaciones de producción. La actualización de misiones requiere ver un anuncio.",
-      "generating": "Generando nuevas misiones...",
-      "loadingAd": "Cargando anuncio...",
-      "adNotCompleted": "Anuncio No Completado",
-      "adNotCompletedMessage": "Por favor, mira el anuncio completo para actualizar las misiones."
-    },
-    "partnerWatchingAd": "Tu pareja está viendo un anuncio...",
-    "partnerWatchingAdWithName": "{{name}} está viendo\nun anuncio",
-    "timeError": {
-      "title": "Error de hora",
-      "message": "La hora de tu dispositivo difiere del servidor.\n\nPor favor, activa 'Fecha y hora automáticas' en la configuración de tu dispositivo para un servicio de misiones preciso.",
-      "confirm": "Aceptar",
-      "minutes": "{{count}} min",
-      "hours": "{{count}} horas"
-    }
-  },
-  "missionDetail": {
-    "headerTitle": "Detalles de Misión",
-    "linkButton": {
-      "reserve": "Hacer una reserva",
-      "book": "Reservar entradas",
-      "purchase": "Comprar ahora"
-    },
-    "notFound": {
-      "title": "Misión no encontrada",
-      "description": "Esta misión ya no está disponible."
-    },
-    "camera": {
-      "title": "Tomar Foto",
-      "confirmTitle": "Confirmar Foto",
-      "permissionRequired": "Permiso de Cámara Necesario",
-      "permissionMessage": "Se necesita permiso de cámara para tomar fotos.",
-      "photoError": "Error al tomar la foto. Inténtalo de nuevo.",
-      "usePhoto": "Usar Foto",
-      "retake": "Repetir",
-      "pinchToZoom": "Pellizcar para zoom"
-    },
-    "location": {
-      "noInfo": "Ubicación no disponible"
-    },
-    "steps": {
-      "photo": {
-        "title": "Toma una Foto",
-        "description": "Captura tu momento especial juntos.",
-        "hint": "Captura la emoción y felicidad de este momento y conviértelo en un recuerdo."
-      },
-      "message": {
-        "title": "Escríbanse un Mensaje",
-        "description": "Deja un mensaje sincero para tu pareja. Un mensaje de corazón crea\nrecuerdos más especiales.",
-        "written": "Escrito",
-        "notWritten": "No escrito"
-      },
-      "complete": "Listo"
-    },
-    "status": {
-      "anotherInProgress": "En progreso",
-      "waitingPartner": "Esperando a tu pareja...",
-      "waitingPhoto": "Esperando foto...",
-      "writeMessage": "Escribe un mensaje",
-      "takePhoto": "Tomar Foto"
-    },
-    "modal": {
-      "title": "Mensaje para tu Pareja",
-      "placeholder": "Escribe lo que quieras decirle a tu pareja"
-    },
-    "defaultPartnerMessage": "Soy feliz a tu lado 💕",
-    "completed": "Completada",
-    "completeButton": "¡Misión Completada! 🎉",
-    "writeMessage": "Escribir Mensaje",
-    "messagePlaceholder": "Registra la misión de hoy juntos",
-    "submitMission": "Completar Misión",
-    "partnerMessage": "Mensaje de tu Pareja",
-    "myMessage": "Mi Mensaje",
-    "waitingPartner": "Esperando mensaje de tu pareja",
-    "viewMemory": "Ver Recuerdo"
-  },
-  "bookmark": {
-    "title": "Misiones Guardadas",
-    "empty": "No hay misiones guardadas",
-    "emptyHint": "Guarda las misiones que te gusten",
-    "deleteMission": "Eliminar Misión",
-    "deleteConfirm": "¿Eliminar '{{title}}'?",
-    "cannotDelete": "No se puede eliminar",
-    "missionInProgressMessage": "No puedes eliminar una misión en progreso. Por favor, completa o cancela la misión primero."
-  },
   "calendar": {
     "title": "Calendario",
     "subtitle": "Registra nuestro tiempo juntos",
@@ -281,7 +125,16 @@
       "deleteConfirmTitle": "Eliminar Tarea",
       "deleteConfirmMessage": "¿Estás seguro de que quieres eliminar esta tarea?",
       "deleteConfirmCancel": "Cancelar",
-      "deleteConfirmOk": "Eliminar"
+      "deleteConfirmOk": "Eliminar",
+      "calendar": "Lista de Tareas",
+      "calendarDesc": "Gestiona tus tareas por fecha"
+    },
+    "photos": {
+      "title": "Fotos",
+      "countUnit": " fotos"
+    },
+    "plans": {
+      "title": "Agenda"
     },
     "period": {
       "title": "Info del Período",
@@ -325,11 +178,13 @@
   "memories": {
     "title": "Recuerdos",
     "subtitle": "Momentos que compartimos juntos",
-    "empty": "No hay misiones completadas",
-    "emptyHint": "¡Completa una misión para ver tus recuerdos!",
+    "empty": "Toca para añadir fotos",
+    "emptyHint": "",
     "viewAll": "Ver Todo",
     "togetherMoment": "Momento juntos",
     "itemCount": "{{count}} elementos",
+    "dateCount": "{{count}} citas",
+    "totalSpending": "Gasto total : {{amount}}",
     "monthNames": [
       "Ene",
       "Feb",
@@ -360,11 +215,8 @@
       "fontStyleDesc": "Selecciona un estilo de fuente para el título",
       "basicFont": "Fuente",
       "basicFontDesc": "Estilo limpio",
-      "ransomStyle": "Estilo Recorte",
       "basicFontHint": "Se aplicará una fuente limpia",
-      "ransomFontHint": "Cada letra tendrá un estilo único",
       "namePlaceholder": "Nombre del álbum...",
-      "ransomPlaceholder": "Solo inglés (A-Z, 0-9)",
       "selectPhoto": "Seleccionar Foto",
       "dragHint": "Arrastra para ajustar la posición del texto",
       "coverEditHint": "Selecciona una foto y arrastra para ajustar el texto",
@@ -387,7 +239,23 @@
       "deleteSingleConfirm": "¿Estás seguro de eliminar esta foto?",
       "save": "Guardar Foto",
       "tapToFlip": "Toca para ver el reverso",
-      "tapToView": "Toca para ver la foto"
+      "tapToView": "Toca para ver la foto",
+      "uploading": "Subiendo ({{current}}/{{total}})",
+      "permissionDenied": "Se necesita acceso a la galería de fotos.",
+      "uploadError": "Ocurrió un error al subir las fotos.",
+      "tapToEdit": "Toca para editar",
+      "addMessage": "Dejar un mensaje",
+      "editMessage": "Editar Mensaje",
+      "messagePlaceholder": "Deja un mensaje sobre este momento...",
+      "addRecord": "Registra tu cita",
+      "editRecord": "Registrar",
+      "recordTitle": "Título",
+      "recordTitlePlaceholder": "Ingresa un título para tu cita",
+      "recordLocation": "Ubicación",
+      "recordLocationPlaceholder": "Ingresa una ubicación",
+      "recordMessage": "Mensaje",
+      "spending": "Gastos",
+      "spendingPlaceholder": "Ingresa el monto"
     },
     "permission": {
       "required": "Permiso Requerido",
@@ -408,15 +276,16 @@
       "developer": "Desarrollador"
     },
     "menu": {
+      "profile": "Perfil",
       "myProfile": "Mi Perfil",
       "coupleProfile": "Perfil de Pareja",
       "settings": "Ajustes",
       "announcements": "Anuncios",
       "customerService": "Atención al Cliente",
       "onboardingReset": "Reiniciar Configuración",
-      "missionReset": "Reiniciar Misiones",
       "fullReset": "Reinicio Completo",
-      "logout": "Cerrar Sesión"
+      "logout": "Cerrar Sesión",
+      "ourPlans": "Nuestra Agenda"
     },
     "announcements": {
       "title": "Anuncios",
@@ -442,10 +311,6 @@
     "alerts": {
       "devReset": "Reinicio de Desarrollador",
       "devResetMessage": "¿Reiniciar configuración inicial y empezar de nuevo?",
-      "missionReset": "Reiniciar Misiones",
-      "missionResetMessage": "¿Reiniciar todas las misiones de hoy y su estado?",
-      "missionResetComplete": "Reinicio Completado",
-      "missionResetCompleteMessage": "Las misiones se reiniciaron. Ve a la pestaña Misión para crear nuevas.",
       "fullReset": "⚠️ Reinicio Completo",
       "fullResetMessage": "Esto eliminará todos los datos:\n\n• Datos de configuración\n• Info de pareja\n• Datos sincronizados\n• Datos de misiones\n• Todo el almacenamiento local\n\n¿Estás seguro?",
       "fullResetComplete": "Reinicio Completado",
@@ -498,7 +363,7 @@
     "couple": {
       "title": "Perfil de Pareja",
       "anniversary": "Aniversario",
-      "accountInfo": "Info de Cuenta",
+      "accountInfo": "Info de Cuenta Emparejada",
       "myAccountInfo": "Info de cuenta de {{nickname}}",
       "myAccount": "Mi Cuenta",
       "partnerAccountInfo": "Info de cuenta de {{nickname}}",
@@ -540,8 +405,6 @@
     "notifications": {
       "push": "Notificaciones Push",
       "pushDesc": "Recibir todas las notificaciones",
-      "mission": "Notificaciones de Misión",
-      "missionDesc": "Recibe alertas cuando lleguen nuevas misiones",
       "message": "Recordatorio de Mensaje",
       "messageDesc": "Recibe alertas si no has escrito un mensaje"
     },
@@ -587,13 +450,13 @@
       "checkTitle": "Por favor revisa antes de desconectarte",
       "daysTogether": "Días Juntos",
       "daysUnit": " días",
-      "completedMissions": "Misiones Completadas",
-      "missionsUnit": "",
+      "dateRecords": "Citas Registradas Juntos",
+      "recordsUnit": "",
       "recoveryPeriod": "Período de Recuperación",
       "recoveryHint": "Los datos pueden recuperarse en 30 días",
       "warningsTitle": "Advertencias",
       "warning1": "Tu pareja será notificada de la desconexión",
-      "warning2": "El historial de misiones se guarda en cuentas individuales",
+      "warning2": "Los registros de citas se guardan en cuentas individuales",
       "warning3": "Puedes reconectarte con la misma pareja en 30 días",
       "confirmPrompt": "Para continuar, escribe 'Desemparejar' abajo",
       "confirmText": "Desemparejar",
@@ -617,7 +480,7 @@
       "warningText": "Eliminar tu cuenta\n",
       "permanentDelete": "eliminará permanentemente",
       "warningEnd": " todos los datos.",
-      "dataList": "Datos a eliminar: Información de perfil, Info de conexión de pareja, Registros de misiones completadas, Álbumes y fotos, Todos los ajustes",
+      "dataList": "Datos a eliminar: Información de perfil, Info de conexión de pareja, Álbumes y fotos, Todos los ajustes",
       "confirmPrompt": "Para continuar, escribe 'Eliminar' abajo",
       "confirmText": "Eliminar",
       "button": "Eliminar Cuenta",
@@ -639,7 +502,7 @@
     "licenses": "Licencias de Código Abierto"
   },
   "onboarding": {
-    "tagline": "Cada día,\nnuevas misiones de cita.",
+    "tagline": "Donde\nnuestras citas\nse acumulan,\n\nDaydate.",
     "welcome": "Bienvenido",
     "welcomeTitle": "Bienvenido a\nDaydate",
     "welcomeSubtitle": "Registra y comparte tus momentos especiales\njuntos como pareja",
@@ -949,9 +812,6 @@
       "manage": "Gestionar Premium"
     },
     "limits": {
-      "generationReached": "Has usado todas las generaciones de misión de hoy",
-      "completionReached": "Has usado todas las completaciones de misión de hoy",
-      "bookmarkReached": "El guardado de misiones está lleno (máx 5)",
       "albumReached": "No puedes crear más álbumes (máx 5)",
       "albumReadOnly": "Este álbum es de solo lectura",
       "upgradeToPremium": "Actualiza a Premium para acceso ilimitado",
@@ -959,7 +819,6 @@
     },
     "limitReached": {
       "title": "Límite Diario Alcanzado",
-      "completion": "¡Has alcanzado tu límite diario de completar misiones. Actualiza a Premium para completar más misiones!",
       "photoStorage": "¡Has alcanzado el límite de almacenamiento de fotos (100 fotos). Actualiza a Premium para almacenamiento ilimitado!"
     },
     "deleteWarning": {
@@ -976,13 +835,16 @@
     "cancel": "Más Tarde"
   },
   "feed": {
+    "title": "Feed",
+    "subtitle": "Descubre ideas especiales para una cita",
     "category": {
       "all": "Todo",
       "festival": "Festival",
-      "performance": "Espectáculo",
+      "show": "Espectáculo",
       "restaurant": "Comida",
       "activity": "Actividad",
-      "spot": "Lugar"
+      "spot": "Lugar",
+      "pet": "Mascota"
     },
     "save": "Guardar",
     "saved": "Guardado",
@@ -992,7 +854,21 @@
       "free": "Gratis"
     },
     "eventPeriod": "Período",
-    "loading": "Cargando..."
+    "loading": "Cargando...",
+    "viewMore": "Reservar",
+    "openLink": "Abrir enlace de reserva",
+    "photoBy": "Photo by {{name}} on Unsplash",
+    "detail": {
+      "date": "Fecha",
+      "location": "Ubicación"
+    },
+    "locationRequired": "Se Requiere Ubicación",
+    "locationRequiredDesc": "Habilita la ubicación para descubrir lugares de cita cercanos.",
+    "enableLocation": "Habilitar Ubicación",
+    "goToSettings": "Ir a Ajustes",
+    "getDirections": "Cómo llegar",
+    "anniversaryToday": "¡Es hoy!",
+    "anniversaryHint": "¿Qué tal un regalo así para tu pareja?"
   },
   "errors": {
     "networkError": "Error de red",
@@ -1000,5 +876,56 @@
     "somethingWrong": "Algo salió mal",
     "sessionExpired": "Sesión expirada",
     "unauthorized": "No autorizado"
+  },
+  "plans": {
+    "title": "Nuestra Agenda",
+    "tabs": {
+      "interested": "Lista de deseos",
+      "booked": "Reservados"
+    },
+    "bookNow": "Reservar",
+    "emptyInterested": "Aún no hay agenda\n¡Agrega eventos del feed!",
+    "emptyBooked": "Aún no hay agenda reservada",
+    "expiredSection": "Pasados",
+    "monthlyLimit": "{{current}}/{{max}} usados este mes",
+    "premiumRequired": "Se requiere Premium",
+    "adding": "Agregando...",
+    "upgradeToPremium": "Actualizar a Premium",
+    "addToPlan": "Agregar a Agenda ✓"
+  },
+  "planDetail": {
+    "title": "Detalle de Agenda",
+    "notFound": "Agenda no encontrada",
+    "status": {
+      "interested": "Interesado",
+      "booked": "Reservado",
+      "completed": "Completado"
+    },
+    "memo": "Nota",
+    "memoPlaceholder": "Escribe una nota",
+    "cancelled": "Agenda Cancelada",
+    "bookingCta": "Reservar Ahora",
+    "navigateCta": "Cómo Llegar",
+    "editMemo": "Editar Nota",
+    "cancelBooking": "Cancelar Reserva",
+    "moveToWishlist": "Mover a Lista de Deseos",
+    "deletePlan": "Eliminar",
+    "deleteConfirm": {
+      "title": "Eliminar Agenda",
+      "message": "¿Eliminar esta agenda?"
+    },
+    "getDetails": "Ver Detalles",
+    "bookingConfirm": {
+      "title": "¿Completaste la reserva?",
+      "desc": "Si completaste tu reserva, actualizaremos el estado de tu agenda",
+      "yes": "Sí, lo reservé",
+      "notYet": "Aún no"
+    },
+    "cancelSheet": {
+      "title": "¿Qué deseas hacer?",
+      "reasonPlaceholder": "Motivo (opcional)",
+      "revertToInterested": "Mover a Lista de deseos",
+      "fullCancel": "Eliminar Agenda"
+    }
   }
 }

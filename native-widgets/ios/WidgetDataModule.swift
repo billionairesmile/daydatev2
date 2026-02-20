@@ -10,22 +10,22 @@ import WidgetKit
 
 // Data structure for parsing incoming JSON
 private struct IncomingWidgetData: Codable {
-    let completedMissions: [IncomingMission]
+    let dateRecords: [IncomingDateEntry]
     let isLoggedIn: Bool
 }
 
-private struct IncomingMission: Codable {
+private struct IncomingDateEntry: Codable {
     let date: String
     let photoUrl: String?
 }
 
 // Data structure for storing in widget
 private struct StoredWidgetData: Codable {
-    let completedMissions: [StoredMission]
+    let dateRecords: [StoredDateEntry]
     let isLoggedIn: Bool
 }
 
-private struct StoredMission: Codable {
+private struct StoredDateEntry: Codable {
     let date: String
     let localImagePath: String?
 }
@@ -104,30 +104,30 @@ class WidgetDataModule: NSObject {
             return
         }
 
-        print("[WidgetDataModule] Processing \(incomingData.completedMissions.count) missions")
+        print("[WidgetDataModule] Processing \(incomingData.dateRecords.count) date records")
 
         let dispatchGroup = DispatchGroup()
-        var storedMissions: [StoredMission] = []
-        let missionsLock = NSLock()
+        var storedEntries: [StoredDateEntry] = []
+        let entriesLock = NSLock()
 
-        for mission in incomingData.completedMissions {
-            if let photoUrl = mission.photoUrl, !photoUrl.isEmpty {
+        for entry in incomingData.dateRecords {
+            if let photoUrl = entry.photoUrl, !photoUrl.isEmpty {
                 dispatchGroup.enter()
-                cacheImage(from: photoUrl, forDate: mission.date) { localPath in
-                    missionsLock.lock()
-                    storedMissions.append(StoredMission(date: mission.date, localImagePath: localPath))
-                    missionsLock.unlock()
+                cacheImage(from: photoUrl, forDate: entry.date) { localPath in
+                    entriesLock.lock()
+                    storedEntries.append(StoredDateEntry(date: entry.date, localImagePath: localPath))
+                    entriesLock.unlock()
                     dispatchGroup.leave()
                 }
             } else {
-                missionsLock.lock()
-                storedMissions.append(StoredMission(date: mission.date, localImagePath: nil))
-                missionsLock.unlock()
+                entriesLock.lock()
+                storedEntries.append(StoredDateEntry(date: entry.date, localImagePath: nil))
+                entriesLock.unlock()
             }
         }
 
         dispatchGroup.notify(queue: .main) {
-            let storedData = StoredWidgetData(completedMissions: storedMissions, isLoggedIn: incomingData.isLoggedIn)
+            let storedData = StoredWidgetData(dateRecords: storedEntries, isLoggedIn: incomingData.isLoggedIn)
 
             guard let encodedData = try? JSONEncoder().encode(storedData) else {
                 print("[WidgetDataModule] ERROR: Failed to encode stored data")
@@ -138,7 +138,7 @@ class WidgetDataModule: NSObject {
             sharedDefaults.set(encodedData, forKey: "widgetData")
             sharedDefaults.synchronize()
 
-            print("[WidgetDataModule] Data saved with \(storedMissions.count) missions")
+            print("[WidgetDataModule] Data saved with \(storedEntries.count) date records")
 
             // Refresh widget timeline
             if #available(iOS 14.0, *) {

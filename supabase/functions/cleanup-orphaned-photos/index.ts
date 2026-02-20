@@ -117,40 +117,40 @@ Deno.serve(async (req: Request) => {
 
         result.total_files = storageFiles.length;
 
-        // Step 2: Get all completed mission photo URLs for this couple
-        const { data: completedMissions, error: missionsError } = await supabase
-          .from("completed_missions")
-          .select("photo_url")
+        // Step 2: Get all photo URLs from the photos table for this couple
+        const { data: couplePhotos, error: photosError } = await supabase
+          .from("photos")
+          .select("image_url")
           .eq("couple_id", coupleId);
 
-        if (missionsError) {
-          result.errors.push(`Missions query error: ${missionsError.message}`);
+        if (photosError) {
+          result.errors.push(`Photos query error: ${photosError.message}`);
           results.push(result);
           continue;
         }
 
-        // Extract file names from completed mission URLs
-        const completedPhotoNames = new Set<string>();
-        if (completedMissions) {
-          for (const mission of completedMissions) {
-            if (mission.photo_url) {
+        // Extract file names from photo URLs
+        const activePhotoNames = new Set<string>();
+        if (couplePhotos) {
+          for (const photo of couplePhotos) {
+            if (photo.image_url) {
               // Extract filename from URL: .../memories/{coupleId}/{filename}.jpg
-              const match = mission.photo_url.match(/\/memories\/[^/]+\/([^/]+)$/);
+              const match = photo.image_url.match(/\/memories\/[^/]+\/([^/]+)$/);
               if (match) {
-                completedPhotoNames.add(match[1]);
+                activePhotoNames.add(match[1]);
               }
             }
           }
         }
 
-        result.completed_photos = completedPhotoNames.size;
+        result.completed_photos = activePhotoNames.size;
 
-        // Step 3: Find orphaned files (in storage but not in completed_missions)
+        // Step 3: Find orphaned files (in storage but not in photos table)
         const orphanedFiles: string[] = [];
 
         for (const file of storageFiles) {
-          // Skip if file is referenced in completed_missions
-          if (completedPhotoNames.has(file.name)) {
+          // Skip if file is referenced in photos table
+          if (activePhotoNames.has(file.name)) {
             continue;
           }
 

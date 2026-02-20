@@ -22,7 +22,8 @@
     "partner": "パートナー",
     "me": "私",
     "days": "日",
-    "daysCount": "日目"
+    "daysCount": "日目",
+    "comingSoon": "準備中です"
   },
   "auth": {
     "email": {
@@ -46,7 +47,6 @@
   },
   "tabs": {
     "home": "ホーム",
-    "mission": "ミッション",
     "calendar": "カレンダー",
     "memories": "思い出",
     "more": "もっと見る",
@@ -96,165 +96,6 @@
     },
     "shareError": "共有中にエラーが発生しました。"
   },
-  "mission": {
-    "title": "今日のミッション",
-    "subtitle": "今日はどんな時間を一緒に過ごす？",
-    "emptyState": {
-      "line1": "今日のミッションを",
-      "line2": "始めましょう",
-      "button": "始める"
-    },
-    "generate": "今日のミッションを受け取る",
-    "generating": "生成中...",
-    "generatingMessage": "ミッションを作成しています",
-    "pleaseWait": "少々お待ちください",
-    "start": "始める",
-    "completed": "完了",
-    "view": "見る",
-    "kept": "保存済み",
-    "keep": "Keep",
-    "anotherInProgress": "別のミッション進行中",
-    "questions": {
-      "canMeetToday": "今日会える？",
-      "yesMeet": "はい、会います",
-      "noMeet": "いいえ",
-      "availableTime": "今日一緒に過ごせる時間は？",
-      "todayMood": "今日の気分は？（複数選択可）"
-    },
-    "timeOptions": {
-      "30min": "30分",
-      "1hour": "1時間",
-      "2hour": "2時間以上",
-      "allday": "一日中"
-    },
-    "moodOptions": {
-      "cozy": "おうちデート",
-      "foodie": "グルメ",
-      "active": "アクティブに",
-      "healing": "癒やし・リラックス",
-      "culture": "カルチャー・感性",
-      "adventure": "新しい挑戦",
-      "romantic": "ロマンチック"
-    },
-    "alerts": {
-      "locationRequired": "位置情報の許可が必要",
-      "locationRequiredMessage": "ミッションを作成するには位置情報の許可が必要です。\n位置情報を許可してください。",
-      "allowPermission": "許可する",
-      "locationDenied": "位置情報が拒否されました",
-      "locationDeniedMessage": "位置情報が拒否されました。設定から位置情報を許可してください。",
-      "goToSettings": "設定へ移動",
-      "partnerLocationRequired": "パートナーの位置情報が必要",
-      "partnerLocationRequiredMessage": "ミッションを作成するにはパートナーも位置情報を許可する必要があります。\nパートナーに位置情報の許可をお願いしてください。",
-      "cannotKeep": "保存できません",
-      "alreadyCompletedKeep": "完了済みのミッションは保存できません。",
-      "keepMission": "ミッションを保存",
-      "keepMissionConfirm": "「{{title}}」を保存しますか？",
-      "keepLimit": "保存上限",
-      "keepLimitMessage": "ミッションは最大5つまで保存できます。\n保存済みのミッションを削除してから再度お試しください。",
-      "cannotStart": "ミッションを開始できません",
-      "anotherInProgressMessage": "すでに別のミッションが進行中です。\n進行中のミッションを完了してください！",
-      "dailyLimitMessage": "今日のミッションはすべて完了しました。\nまた明日チャレンジしましょう！",
-      "offlineTitle": "インターネット接続が必要です",
-      "offlineMessage": "ミッションを生成するにはインターネット接続が必要です。\nネットワーク接続を確認してから再度お試しください。"
-    },
-    "refresh": {
-      "questionLine1": "お気に入りの",
-      "questionLine2": "ミッションがない？",
-      "button": "新しいミッションを取得",
-      "hint": "広告を見て\n新しいミッションを受け取れます",
-      "modalTitle": "新しいミッション",
-      "modalButton": "新しいミッションを取得",
-      "partnerGenerating": "少々お待ちください",
-      "partnerGeneratingMessage": "パートナーが新しいミッションを生成中です。しばらくしてからもう一度お試しください。",
-      "adLoadingFailed": "広告の読み込み失敗",
-      "adLoadingFailedMessage": "広告の読み込みに失敗しました。\n後でもう一度お試しください。",
-      "devModeTitle": "開発モード",
-      "devModeMessage": "広告はプロダクションビルドでのみ表示されます。ミッションの更新には広告視聴が必要です。",
-      "generating": "新しいミッションを生成中...",
-      "loadingAd": "広告を準備中...",
-      "adNotCompleted": "広告視聴未完了",
-      "adNotCompletedMessage": "ミッションを更新するには広告を最後まで視聴してください。"
-    },
-    "partnerWatchingAd": "パートナーが広告を視聴中です...",
-    "partnerWatchingAdWithName": "{{name}}さんが\n広告を視聴中です",
-    "timeError": {
-      "title": "時刻設定エラー",
-      "message": "端末の時刻がサーバーとずれています。\n\n正確なミッションサービスをご利用いただくため、端末の「日付と時刻の自動設定」を有効にしてください。",
-      "confirm": "確認",
-      "minutes": "{{count}}分",
-      "hours": "{{count}}時間"
-    }
-  },
-  "missionDetail": {
-    "headerTitle": "ミッション詳細",
-    "linkButton": {
-      "reserve": "予約する",
-      "book": "チケットを予約",
-      "purchase": "購入する"
-    },
-    "notFound": {
-      "title": "ミッションが見つかりません",
-      "description": "このミッションは利用できません。"
-    },
-    "camera": {
-      "title": "写真を撮る",
-      "confirmTitle": "写真の確認",
-      "permissionRequired": "カメラの許可が必要",
-      "permissionMessage": "写真を撮るにはカメラの許可が必要です。",
-      "photoError": "写真の撮影に失敗しました。もう一度お試しください。",
-      "usePhoto": "使用する",
-      "retake": "撮り直す",
-      "pinchToZoom": "ピンチでズーム",
-      "error": "カメラを起動できません"
-    },
-    "location": {
-      "noInfo": "位置情報なし"
-    },
-    "steps": {
-      "photo": {
-        "title": "写真を撮ろう",
-        "description": "二人の特別な瞬間を写真に残しましょう。",
-        "hint": "この瞬間のときめきと幸せを写真に残して思い出にしよう。"
-      },
-      "message": {
-        "title": "お互いへのひとこと",
-        "description": "この瞬間、相手に伝えたい気持ちを言葉にしてみましょう。心のこもったメッセージがより特別な思い出を作ります。",
-        "written": "記入済み",
-        "notWritten": "未記入"
-      },
-      "complete": "完了"
-    },
-    "status": {
-      "anotherInProgress": "別のミッション進行中",
-      "waitingPartner": "相手を待っています...",
-      "waitingPhoto": "写真を待っています...",
-      "writeMessage": "お互いへのひとことを書く",
-      "takePhoto": "写真を撮る"
-    },
-    "modal": {
-      "title": "お互いへのひとこと",
-      "placeholder": "相手に伝えたいことを書いてください"
-    },
-    "defaultPartnerMessage": "君と一緒で幸せ",
-    "completed": "完了",
-    "completeButton": "ミッション完了！",
-    "writeMessage": "メッセージを書く",
-    "messagePlaceholder": "今日のミッションを一緒に記録しよう",
-    "submitMission": "ミッションを完了する",
-    "partnerMessage": "相手のメッセージ",
-    "myMessage": "私のメッセージ",
-    "waitingPartner": "相手のメッセージを待っています",
-    "viewMemory": "思い出を見る"
-  },
-  "bookmark": {
-    "title": "保存済み",
-    "empty": "保存したミッションがありません",
-    "emptyHint": "気に入ったミッションをKeepしてみよう",
-    "deleteMission": "ミッションを削除",
-    "deleteConfirm": "「{{title}}」を削除しますか？",
-    "cannotDelete": "削除できません",
-    "missionInProgressMessage": "進行中のミッションは削除できません。ミッションを完了またはキャンセルしてから削除してください。"
-  },
   "calendar": {
     "title": "カレンダー",
     "subtitle": "二人の時間を記録しよう",
@@ -284,7 +125,16 @@
       "deleteConfirmTitle": "やることを削除",
       "deleteConfirmMessage": "このやることを削除しますか？",
       "deleteConfirmCancel": "キャンセル",
-      "deleteConfirmOk": "削除"
+      "deleteConfirmOk": "削除",
+      "calendar": "ToDoリスト",
+      "calendarDesc": "日付ごとにやることを管理できます"
+    },
+    "photos": {
+      "title": "写真",
+      "countUnit": "枚"
+    },
+    "plans": {
+      "title": "スケジュール"
     },
     "period": {
       "title": "生理情報",
@@ -328,11 +178,13 @@
   "memories": {
     "title": "思い出",
     "subtitle": "二人で過ごした瞬間",
-    "empty": "完了したミッションがありません",
-    "emptyHint": "ミッションを完了してください！",
+    "empty": "タップして写真を追加",
+    "emptyHint": "",
     "viewAll": "すべて見る",
     "togetherMoment": "一緒に過ごした瞬間",
     "itemCount": "{{count}}件",
+    "dateCount": "{{count}}回のデート",
+    "totalSpending": "合計支出 : {{amount}}",
     "monthNames": [
       "1月",
       "2月",
@@ -363,11 +215,8 @@
       "fontStyleDesc": "アルバムタイトルに使用するフォントを選択",
       "basicFont": "フォント",
       "basicFontDesc": "シンプル",
-      "ransomStyle": "ランサムノートスタイル",
       "basicFontHint": "シンプルなフォントが適用されます",
-      "ransomFontHint": "入力した文字に特別なスタイルが適用されます",
       "namePlaceholder": "アルバム名を入力...",
-      "ransomPlaceholder": "英語のみ入力可能（A-Z、0-9）",
       "selectPhoto": "写真を選択",
       "dragHint": "テキストをドラッグして位置を調整",
       "coverEditHint": "写真を選択してテキストの位置をドラッグで調整",
@@ -390,7 +239,23 @@
       "deleteSingleConfirm": "この写真を削除しますか？",
       "save": "写真を保存",
       "tapToFlip": "タップして裏面を確認",
-      "tapToView": "タップして写真を見る"
+      "tapToView": "タップして写真を見る",
+      "uploading": "アップロード中 ({{current}}/{{total}})",
+      "permissionDenied": "写真ライブラリへのアクセス許可が必要です。",
+      "uploadError": "写真のアップロード中にエラーが発生しました。",
+      "tapToEdit": "タップして編集",
+      "addMessage": "メッセージを残す",
+      "editMessage": "メッセージ編集",
+      "messagePlaceholder": "この瞬間についてメッセージを残しましょう...",
+      "addRecord": "デートを記録してください",
+      "editRecord": "記録する",
+      "recordTitle": "タイトル",
+      "recordTitlePlaceholder": "デートのタイトルを入力してください",
+      "recordLocation": "場所",
+      "recordLocationPlaceholder": "場所を入力してください",
+      "recordMessage": "メッセージ",
+      "spending": "支出",
+      "spendingPlaceholder": "金額を入力してください"
     },
     "permission": {
       "required": "許可が必要",
@@ -411,15 +276,16 @@
       "developer": "開発者"
     },
     "menu": {
+      "profile": "プロフィール",
       "myProfile": "マイプロフィール",
       "coupleProfile": "カップルプロフィール",
       "settings": "設定",
       "announcements": "お知らせ",
       "customerService": "カスタマーサービス",
       "onboardingReset": "オンボーディングリセット",
-      "missionReset": "ミッションリセット",
       "fullReset": "完全リセット",
-      "logout": "ログアウト"
+      "logout": "ログアウト",
+      "ourPlans": "ふたりのスケジュール"
     },
     "announcements": {
       "title": "お知らせ",
@@ -445,10 +311,6 @@
     "alerts": {
       "devReset": "開発者リセット",
       "devResetMessage": "オンボーディング状態をリセットして最初からやり直しますか？",
-      "missionReset": "ミッションリセット",
-      "missionResetMessage": "今日のミッションと完了状態をすべてリセットしますか？",
-      "missionResetComplete": "リセット完了",
-      "missionResetCompleteMessage": "ミッションがリセットされました。ミッションタブで新しいミッションを作成してください。",
       "fullReset": "完全リセット",
       "fullResetMessage": "すべてのデータをリセットします。\n\n・オンボーディングデータ\n・ペアリング情報\n・カップル同期データ\n・ミッションデータ\n・すべてのローカルストレージ\n\n本当にリセットしますか？",
       "fullResetComplete": "リセット完了",
@@ -501,7 +363,7 @@
     "couple": {
       "title": "カップルプロフィール",
       "anniversary": "記念日",
-      "accountInfo": "アカウント情報",
+      "accountInfo": "ペアリングアカウント情報",
       "myAccountInfo": "{{nickname}}のアカウント情報",
       "myAccount": "私のアカウント",
       "partnerAccountInfo": "{{nickname}}のアカウント情報",
@@ -543,8 +405,6 @@
     "notifications": {
       "push": "プッシュ通知",
       "pushDesc": "すべての通知を受け取る",
-      "mission": "ミッション通知",
-      "missionDesc": "新しいミッションが作成されたら通知",
       "message": "ひとこと未記入通知",
       "messageDesc": "ひとことを書いていない場合に通知"
     },
@@ -590,13 +450,13 @@
       "checkTitle": "解除前にご確認ください",
       "daysTogether": "一緒に過ごした期間",
       "daysUnit": "日",
-      "completedMissions": "一緒に完了したミッション",
-      "missionsUnit": "個",
+      "dateRecords": "一緒に記録したデート",
+      "recordsUnit": "個",
       "recoveryPeriod": "復旧可能な期間",
       "recoveryHint": "最大30日間復旧可能です",
       "warningsTitle": "注意事項",
       "warning1": "相手にペアリング解除の通知が送信されます",
-      "warning2": "ミッション履歴は個別のアカウントに保存されます",
+      "warning2": "デート記録は個別のアカウントに保存されます",
       "warning3": "30日以内に同じパートナーと再接続可能です",
       "confirmPrompt": "続けるには下に「ペアリング解除」と\n正確に入力してください",
       "confirmText": "ペアリング解除",
@@ -620,7 +480,7 @@
       "warningText": "アカウントを削除するとすべてのデータが\n",
       "permanentDelete": "完全に削除",
       "warningEnd": "されます。",
-      "dataList": "削除されるデータ：プロフィール情報、カップル接続情報、完了したミッション記録、アルバムと写真、すべての設定",
+      "dataList": "削除されるデータ：プロフィール情報、カップル接続情報、アルバムと写真、すべての設定",
       "confirmPrompt": "続けるには下に「アカウント削除」と入力してください",
       "confirmText": "アカウント削除",
       "button": "アカウント削除",
@@ -642,7 +502,7 @@
     "licenses": "オープンソースライセンス"
   },
   "onboarding": {
-    "tagline": "毎日、\n新しい\nデートミッション。",
+    "tagline": "ふたりの\nデートが\n重なる場所,\n\nDaydate.",
     "welcome": "ようこそ",
     "welcomeTitle": "Daydateへ\nようこそ",
     "welcomeSubtitle": "二人の特別な瞬間を\n一緒に記録して共有しよう",
@@ -952,9 +812,6 @@
       "manage": "プレミアムプランを管理"
     },
     "limits": {
-      "generationReached": "今日のミッション生成回数を使い切りました",
-      "completionReached": "今日のミッション完了回数を使い切りました",
-      "bookmarkReached": "ミッション保存がいっぱいです（最大5個）",
       "albumReached": "アルバムをこれ以上作成できません（最大5個）",
       "albumReadOnly": "このアルバムは読み取り専用です",
       "upgradeToPremium": "プレミアムにアップグレードすると制限なく利用できます",
@@ -962,7 +819,6 @@
     },
     "limitReached": {
       "title": "1日の上限に達しました",
-      "completion": "今日のミッション完了上限に達しました。プレミアムにアップグレードしてもっと多くのミッションを完了しよう！",
       "photoStorage": "写真保存上限（100枚）に達しました。プレミアムにアップグレードで無制限に保存できます！"
     },
     "deleteWarning": {
@@ -979,13 +835,16 @@
     "cancel": "後で"
   },
   "feed": {
+    "title": "フィード",
+    "subtitle": "二人だけの特別なデートを見つけよう",
     "category": {
       "all": "すべて",
       "festival": "祭り",
-      "performance": "公演",
+      "show": "公演",
       "restaurant": "グルメ",
       "activity": "アクティビティ",
-      "spot": "スポット"
+      "spot": "スポット",
+      "pet": "ペット"
     },
     "save": "保存",
     "saved": "保存済み",
@@ -995,7 +854,21 @@
       "free": "無料"
     },
     "eventPeriod": "期間",
-    "loading": "読み込み中..."
+    "loading": "読み込み中...",
+    "viewMore": "予約サイトへ",
+    "openLink": "予約リンクを開く",
+    "photoBy": "Photo by {{name}} on Unsplash",
+    "detail": {
+      "date": "日程",
+      "location": "場所"
+    },
+    "locationRequired": "位置情報の許可が必要",
+    "locationRequiredDesc": "近くのデートスポットを見るには位置情報を許可してください。",
+    "enableLocation": "位置情報を許可する",
+    "goToSettings": "設定へ移動",
+    "getDirections": "経路案内",
+    "anniversaryToday": "今日です！",
+    "anniversaryHint": "恋人にこんなプレゼントはいかがですか？"
   },
   "errors": {
     "networkError": "ネットワークエラーが発生しました",
@@ -1003,5 +876,56 @@
     "somethingWrong": "問題が発生しました",
     "sessionExpired": "セッションが期限切れです",
     "unauthorized": "権限がありません"
+  },
+  "plans": {
+    "title": "ふたりのスケジュール",
+    "tabs": {
+      "interested": "気になるリスト",
+      "booked": "予約済み"
+    },
+    "bookNow": "予約する",
+    "emptyInterested": "まだスケジュールがありません\nフィードからイベントを追加しましょう！",
+    "emptyBooked": "予約済みのスケジュールはまだありません",
+    "expiredSection": "過去",
+    "monthlyLimit": "今月 {{current}}/{{max}} 使用済み",
+    "premiumRequired": "プレミアム必要",
+    "adding": "追加中...",
+    "upgradeToPremium": "プレミアムにアップグレード",
+    "addToPlan": "スケジュールに追加 ✓"
+  },
+  "planDetail": {
+    "title": "スケジュール詳細",
+    "notFound": "スケジュールが見つかりません",
+    "status": {
+      "interested": "気になる",
+      "booked": "予約済み",
+      "completed": "完了"
+    },
+    "memo": "メモ",
+    "memoPlaceholder": "メモを入力",
+    "cancelled": "キャンセルされたスケジュール",
+    "bookingCta": "今すぐ予約",
+    "navigateCta": "ルート案内",
+    "editMemo": "メモを編集",
+    "cancelBooking": "予約キャンセル",
+    "moveToWishlist": "ウィッシュリストに戻す",
+    "deletePlan": "削除",
+    "deleteConfirm": {
+      "title": "スケジュールを削除",
+      "message": "このスケジュールを削除しますか？"
+    },
+    "getDetails": "詳細を見る",
+    "bookingConfirm": {
+      "title": "予約は完了しましたか？",
+      "desc": "予約が完了したら、スケジュールのステータスを更新します",
+      "yes": "はい、予約しました",
+      "notYet": "まだです"
+    },
+    "cancelSheet": {
+      "title": "どうしますか？",
+      "reasonPlaceholder": "理由（任意）",
+      "revertToInterested": "気になるリストに戻す",
+      "fullCancel": "スケジュールを削除"
+    }
   }
 }

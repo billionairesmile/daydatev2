@@ -6,6 +6,7 @@ import {
   Pressable,
   Platform,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Image as ExpoImage } from 'expo-image';
@@ -25,9 +26,6 @@ import { useRouter } from 'expo-router';
 import { COLORS, SPACING, rs, fp } from '@/constants/design';
 import { useBackground } from '@/contexts';
 import { useSubscriptionStore } from '@/stores';
-import { PremiumSubscriptionModal } from '@/components/premium';
-import { BannerAdView } from '@/components/ads';
-import { useBannerAdBottom } from '@/hooks/useConsistentBottomInset';
 
 
 type MenuItemType = {
@@ -45,13 +43,10 @@ export default function MoreScreen() {
   const { t } = useTranslation();
   const { backgroundImage } = useBackground();
   const router = useRouter();
-  const bannerAdBottom = useBannerAdBottom();
   const { isPremium, partnerIsPremium, plan } = useSubscriptionStore();
   // Combined premium status - user has premium benefits if they OR their partner has premium
   const hasPremiumAccess = isPremium || partnerIsPremium;
 
-  // Premium modal state
-  const [showPremiumModal, setShowPremiumModal] = React.useState(false);
 
   // Helper function to navigate with requestAnimationFrame on Android
   const navigateTo = (path: string) => {
@@ -68,8 +63,7 @@ export default function MoreScreen() {
     {
       title: t('more.sections.profile'),
       items: [
-        { icon: User, label: t('more.menu.myProfile'), onPress: () => navigateTo('/more/my-profile') },
-        { icon: Heart, label: t('more.menu.coupleProfile'), onPress: () => navigateTo('/more/couple-profile') },
+        { icon: User, label: t('more.menu.profile'), onPress: () => navigateTo('/more/my-profile') },
       ],
     },
     {
@@ -162,7 +156,7 @@ export default function MoreScreen() {
                 <Text style={styles.sectionTitle}>{t('settings.sections.premium')}</Text>
                 <Pressable
                   style={[styles.premiumCard, hasPremiumAccess && styles.premiumCardActive]}
-                  onPress={() => setShowPremiumModal(true)}
+                  onPress={() => Alert.alert(t('common.comingSoon', { defaultValue: '준비중입니다' }))}
                 >
                   <View style={styles.premiumCardLeft}>
                     <View style={[styles.premiumIconWrapper, hasPremiumAccess && styles.premiumIconWrapperActive]}>
@@ -191,15 +185,6 @@ export default function MoreScreen() {
         ))}
 
       </ScrollView>
-
-      {/* Premium Subscription Modal */}
-      <PremiumSubscriptionModal
-        visible={showPremiumModal}
-        onClose={() => setShowPremiumModal(false)}
-      />
-
-      {/* Banner Ad - positioned above tab bar */}
-      <BannerAdView placement="more" style={[styles.bannerAd, { bottom: bannerAdBottom }]} />
 
     </View>
   );
@@ -337,11 +322,5 @@ const styles = StyleSheet.create({
   premiumDescription: {
     fontSize: fp(13),
     color: '#666',
-  },
-  bannerAd: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    alignItems: 'center',
   },
 });

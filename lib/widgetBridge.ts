@@ -2,7 +2,7 @@
  * Widget Bridge Module
  *
  * Provides interface to sync app data with iOS widget via App Groups.
- * The widget displays a calendar with completed mission photos.
+ * The widget displays a calendar with date record photos.
  */
 
 import { NativeModules, Platform } from 'react-native';
@@ -12,13 +12,13 @@ interface WidgetDataModule {
   reloadWidget(): Promise<boolean>;
 }
 
-interface CompletedMission {
+interface DateEntry {
   date: string; // "YYYY-MM-DD" format
   photoUrl: string | null;
 }
 
 interface WidgetData {
-  completedMissions: CompletedMission[];
+  dateRecords: DateEntry[];
   isLoggedIn: boolean;
 }
 
@@ -34,17 +34,17 @@ if (Platform.OS === 'ios') {
 }
 
 /**
- * Update widget with completed mission data
- * @param completedMissions Array of completed missions with photo URLs and dates
+ * Update widget with date record data
+ * @param dateRecords Array of date records with photo URLs and dates
  * @param isLoggedIn Whether the user is logged in
  */
 export async function updateWidgetData(
-  completedMissions: CompletedMission[],
+  dateRecords: DateEntry[],
   isLoggedIn: boolean
 ): Promise<boolean> {
   console.log('[WidgetBridge] updateWidgetData called');
   console.log('[WidgetBridge] isLoggedIn:', isLoggedIn);
-  console.log('[WidgetBridge] completedMissions count:', completedMissions.length);
+  console.log('[WidgetBridge] dateRecords count:', dateRecords.length);
 
   if (!WidgetModule) {
     console.log('[WidgetBridge] WidgetModule not available - skipping update');
@@ -53,7 +53,7 @@ export async function updateWidgetData(
 
   try {
     const widgetData: WidgetData = {
-      completedMissions,
+      dateRecords,
       isLoggedIn,
     };
 

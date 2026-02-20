@@ -8,7 +8,7 @@ const corsHeaders = {
 
 interface PushNotificationRequest {
   target_user_id: string;
-  type: "mission_generated" | "mission_reminder" | "partner_message_waiting";
+  type: "partner_message_written" | "couple_unpaired";
   title: string;
   body: string;
   data?: Record<string, unknown>;

@@ -1,13 +1,15 @@
 import React, { useCallback, useRef } from 'react';
 import {
-  FlatList,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { COLORS, FS, SP, RD, SZ } from '@/constants/design';
+import { COLORS, FS, SP, RD } from '@/constants/design';
 import type { FeedCategory } from '@/types';
 
 interface CategoryFilterProps {
@@ -18,23 +20,43 @@ interface CategoryFilterProps {
 const CATEGORIES: FeedCategory[] = [
   'all',
   'festival',
-  'performance',
+  'show',
   'restaurant',
   'activity',
   'spot',
+  'pet',
 ];
 
-export function CategoryFilter({ selected, onSelect }: CategoryFilterProps) {
+export const CategoryFilter = React.memo(function CategoryFilter({ selected, onSelect }: CategoryFilterProps) {
   const { t } = useTranslation();
-  const flatListRef = useRef<FlatList<FeedCategory>>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  const scrollOffsetRef = useRef(0);
 
-  const renderItem = useCallback(
-    ({ item }: { item: FeedCategory }) => {
+  const handleScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    scrollOffsetRef.current = e.nativeEvent.contentOffset.x;
+  }, []);
+
+  const handleSelect = useCallback(
+    (item: FeedCategory) => {
+      // Capture scroll position before state update triggers re-render
+      const offsetToRestore = scrollOffsetRef.current;
+      onSelect(item);
+      // Restore scroll position with multiple attempts for reliability across platforms
+      const restore = () => scrollRef.current?.scrollTo({ x: offsetToRestore, animated: false });
+      requestAnimationFrame(restore);
+      setTimeout(restore, 50);
+    },
+    [onSelect],
+  );
+
+  const renderChip = useCallback(
+    (item: FeedCategory) => {
       const isSelected = item === selected;
 
       return (
         <Pressable
-          onPress={() => onSelect(item)}
+          key={item}
+          onPress={() => handleSelect(item)}
           style={[
             styles.chip,
             isSelected ? styles.chipSelected : styles.chipDefault,
@@ -55,34 +77,39 @@ export function CategoryFilter({ selected, onSelect }: CategoryFilterProps) {
         </Pressable>
       );
     },
-    [selected, onSelect, t],
+    [selected, handleSelect, t],
   );
-
-  const keyExtractor = useCallback((item: FeedCategory) => item, []);
 
   return (
     <View style={styles.container}>
-      <FlatList
-        ref={flatListRef}
-        data={CATEGORIES}
-        renderItem={renderItem}
-        keyExtractor={keyExtractor}
+      <ScrollView
+        ref={scrollRef}
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={styles.scrollContent}
         bounces={false}
-      />
+        overScrollMode="never"
+        decelerationRate="fast"
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+      >
+        {CATEGORIES.map(renderChip)}
+      </ScrollView>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: SP.md,
+    backgroundColor: 'transparent',
+    marginTop: SP.md,
+    paddingVertical: SP.sm,
   },
-  listContent: {
-    paddingHorizontal: SP.lg,
+  scrollContent: {
+    paddingLeft: 0,
+    paddingRight: SP.lg,
     gap: SP.sm,
+    alignItems: 'center',
   },
   chip: {
     paddingHorizontal: SP.lg,
@@ -93,12 +120,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   chipSelected: {
-    backgroundColor: COLORS.accent,
-    borderColor: COLORS.accent,
+    backgroundColor: '#FF4B6E',
+    borderColor: '#FF4B6E',
   },
   chipDefault: {
-    backgroundColor: COLORS.glass.white08,
-    borderColor: COLORS.border,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   chipText: {
     fontSize: FS.md,
@@ -108,6 +135,6 @@ const styles = StyleSheet.create({
     color: COLORS.foreground,
   },
   chipTextDefault: {
-    color: COLORS.glass.white60,
+    color: 'rgba(255,255,255,0.85)',
   },
 });

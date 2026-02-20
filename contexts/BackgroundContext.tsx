@@ -93,8 +93,8 @@ export function BackgroundProvider({ children }: { children: ReactNode }) {
       // 1. Album cover photos (for memories tab - custom albums)
       if (coupleAlbums && coupleAlbums.length > 0) {
         coupleAlbums.forEach(album => {
-          if (album.cover_photo_url && isValidRemoteUrl(album.cover_photo_url)) {
-            imagesToPrefetch.push(album.cover_photo_url);
+          if (album.cover_image_url && isValidRemoteUrl(album.cover_image_url)) {
+            imagesToPrefetch.push(album.cover_image_url);
           }
         });
       }

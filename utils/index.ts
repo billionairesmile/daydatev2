@@ -1,14 +1,3 @@
-export {
-  CHARACTER_ASSETS,
-  seededRandom,
-  getCharacterImage,
-  getRandomRotation,
-  getRandomYOffset,
-  isCharacterSupported,
-  preloadCharacterAssets,
-  areCharacterAssetsPreloaded,
-} from './characterAssets';
-
 // Responsive design utilities
 export {
   SCREEN_WIDTH,

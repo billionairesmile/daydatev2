@@ -33,19 +33,21 @@ import {
   Info,
   ChevronRight,
   ChevronLeft,
+  ListChecks,
 } from 'lucide-react-native';
+import Svg, { Path } from 'react-native-svg';
 
 import { useTranslation } from 'react-i18next';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { COLORS, SPACING, RADIUS, rs, fp, ANDROID_BOTTOM_PADDING, SCREEN_WIDTH, SCREEN_HEIGHT } from '@/constants/design';
 import { useBackground } from '@/contexts';
-import { useMemoryStore, SAMPLE_MEMORIES } from '@/stores/memoryStore';
+// memoryStore removed - calendar now uses photos.taken_at for date indicators
 import { useAuthStore } from '@/stores/authStore';
 import { useCoupleSyncStore, type SyncedTodo } from '@/stores/coupleSyncStore';
+import { usePlanStore } from '@/stores/planStore';
 import { useTimezoneStore, formatDateInTimezone } from '@/stores/timezoneStore';
-import { isDemoMode } from '@/lib/supabase';
-import { BannerAdView } from '@/components/ads';
-import { useBannerAdBottom } from '@/hooks/useConsistentBottomInset';
+import { supabase, isDemoMode } from '@/lib/supabase';
+import type { Plan } from '@/types';
 
 // Use responsive screen dimensions
 const width = SCREEN_WIDTH;
@@ -101,6 +103,14 @@ interface LocalTodo {
 
 // Union type to support both local and synced todos
 type Todo = LocalTodo | SyncedTodo;
+
+// Photo type for calendar display
+interface CalendarPhoto {
+  id: string;
+  image_url: string;
+  taken_at: string | null;
+  created_at: string;
+}
 
 // Swipeable Todo Item Component
 function SwipeableTodoItem({
@@ -351,12 +361,11 @@ function SwipeableTodoItem({
 }
 
 export default function CalendarScreen() {
+  const router = useRouter();
   const { t, i18n } = useTranslation();
   const { backgroundImage } = useBackground();
-  const { memories, loadFromDB } = useMemoryStore();
   const { couple } = useAuthStore();
   const { getEffectiveTimezone } = useTimezoneStore();
-  const bannerAdBottom = useBannerAdBottom();
 
   // Track if navigation/interaction is complete for deferred operations
   const [isInteractionComplete, setIsInteractionComplete] = useState(false);
@@ -375,6 +384,8 @@ export default function CalendarScreen() {
   const [localTodos, setLocalTodos] = useState<LocalTodo[]>([]); // Fallback for non-synced mode
   const [scrollEnabled, setScrollEnabled] = useState(true); // For disabling scroll during swipe
   const [swipeResetKey, setSwipeResetKey] = useState(0); // For resetting swipe state on screen focus
+  const [calendarPhotos, setCalendarPhotos] = useState<Record<string, CalendarPhoto[]>>({}); // Photos grouped by date
+  const photoCacheRef = useRef<Record<string, Record<string, CalendarPhoto[]>>>({}); // Cache photos by month key
   const [isAddTodoOpen, setIsAddTodoOpen] = useState(false);
   const [todoText, setTodoText] = useState('');
   const [isAddingTodo, setIsAddingTodo] = useState(false);
@@ -382,6 +393,7 @@ export default function CalendarScreen() {
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
   const [editTodoText, setEditTodoText] = useState('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [tempTodoEnabled, setTempTodoEnabled] = useState(false);
   const [tempMenstrualEnabled, setTempMenstrualEnabled] = useState(false);
   const [isPeriodSettingsOpen, setIsPeriodSettingsOpen] = useState(false);
   const [periodModalStep, setPeriodModalStep] = useState<'settings' | 'datePicker'>('settings');
@@ -393,19 +405,46 @@ export default function CalendarScreen() {
   const {
     sharedTodos,
     menstrualSettings,
+    coupleSettings,
     isInitialized: isSyncInitialized,
     addTodo,
     toggleTodo,
     updateTodo,
     deleteTodo: deleteSyncedTodo,
     updateMenstrualSettings,
+    updateTodoEnabled,
   } = useCoupleSyncStore();
+
+  const todoEnabled = coupleSettings?.todo_enabled ?? true;
+
+  // Plan data for calendar
+  const { plans } = usePlanStore();
+  const calendarPlans = React.useMemo(() => {
+    // Only show booked plans on calendar
+    return plans.filter((p) => p.status === 'booked');
+  }, [plans]);
+
+  const getPlansForDate = (day: number): Plan[] => {
+    const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    return calendarPlans.filter((p) => p.eventDate === dateKey);
+  };
+
+  const getSelectedDatePlans = (): Plan[] => {
+    if (selectedDate) {
+      const dateKey = `${selectedDate.year}-${String(selectedDate.month + 1).padStart(2, '0')}-${String(selectedDate.day).padStart(2, '0')}`;
+      return calendarPlans.filter((p) => p.eventDate === dateKey);
+    }
+    const today = getTodayInTimezone();
+    const dateKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    return calendarPlans.filter((p) => p.eventDate === dateKey);
+  };
 
   // Derived menstrual state from sync
   const menstrualTrackingEnabled = menstrualSettings?.enabled ?? false;
   const lastPeriodDate = menstrualSettings?.last_period_date ? parseDateAsLocal(menstrualSettings.last_period_date) : null;
   const cycleLength = menstrualSettings?.cycle_length ?? 30;
   const hasPeriodData = !!menstrualSettings?.last_period_date;
+
 
   // Keyboard animation for modals
   const keyboardOffset = useRef(new Animated.Value(0)).current;
@@ -419,6 +458,7 @@ export default function CalendarScreen() {
 
   const openSettingsModal = () => {
     setTempMenstrualEnabled(menstrualTrackingEnabled);
+    setTempTodoEnabled(todoEnabled);
     // Android: Skip animation
     if (Platform.OS === 'android') {
       settingsOpacity.setValue(1);
@@ -435,11 +475,15 @@ export default function CalendarScreen() {
   };
 
   const closeSettingsModal = async (saveChanges = false) => {
-    // Android: Close immediately
-    if (Platform.OS === 'android') {
+    const saveTodoAndMenstrual = async () => {
       if (saveChanges) {
         await updateMenstrualSettings({ enabled: tempMenstrualEnabled });
+        await updateTodoEnabled(tempTodoEnabled);
       }
+    };
+    // Android: Close immediately
+    if (Platform.OS === 'android') {
+      await saveTodoAndMenstrual();
       setIsSettingsOpen(false);
       return;
     }
@@ -448,10 +492,7 @@ export default function CalendarScreen() {
       duration: 150,
       useNativeDriver: true,
     }).start(async () => {
-      if (saveChanges) {
-        // Update via sync store
-        await updateMenstrualSettings({ enabled: tempMenstrualEnabled });
-      }
+      await saveTodoAndMenstrual();
       setIsSettingsOpen(false);
     });
   };
@@ -610,28 +651,111 @@ export default function CalendarScreen() {
     setPeriodModalStep('settings');
   };
 
-  // Load memories from DB when couple is available
-  useEffect(() => {
-    if (!isDemoMode && couple?.id) {
-      loadFromDB(couple.id);
-    }
-  }, [couple?.id, loadFromDB]);
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
 
-  // Reset calendar to today, swipe state, and reload memories when screen comes into focus
+  // Helper to fetch photos for a specific year/month
+  const fetchPhotosForMonth = useCallback(async (targetYear: number, targetMonth: number): Promise<Record<string, CalendarPhoto[]>> => {
+    if (isDemoMode || !couple?.id || !supabase) {
+      return {};
+    }
+
+    const startDate = new Date(targetYear, targetMonth, 1);
+    const endDate = new Date(targetYear, targetMonth + 1, 0, 23, 59, 59);
+
+    // Query 1: photos with taken_at in range
+    const { data: withTakenAt } = await supabase
+      .from('photos')
+      .select('id, image_url, taken_at, created_at')
+      .eq('couple_id', couple.id)
+      .not('taken_at', 'is', null)
+      .gte('taken_at', startDate.toISOString())
+      .lte('taken_at', endDate.toISOString());
+
+    // Query 2: photos without taken_at, using created_at as fallback
+    const { data: withoutTakenAt } = await supabase
+      .from('photos')
+      .select('id, image_url, taken_at, created_at')
+      .eq('couple_id', couple.id)
+      .is('taken_at', null)
+      .gte('created_at', startDate.toISOString())
+      .lte('created_at', endDate.toISOString());
+
+    const data = [...(withTakenAt || []), ...(withoutTakenAt || [])];
+
+    // Group photos by local date key (use taken_at, fallback to created_at)
+    const grouped: Record<string, CalendarPhoto[]> = {};
+    for (const photo of data) {
+      const effectiveDateStr = photo.taken_at || photo.created_at;
+      if (!effectiveDateStr) continue;
+      const localDate = parseDateAsLocal(effectiveDateStr);
+      const dateKey = `${localDate.getFullYear()}-${String(localDate.getMonth() + 1).padStart(2, '0')}-${String(localDate.getDate()).padStart(2, '0')}`;
+      if (!grouped[dateKey]) grouped[dateKey] = [];
+      grouped[dateKey].push(photo as CalendarPhoto);
+    }
+    return grouped;
+  }, [couple?.id]);
+
+  // Fetch photos for the current month from Supabase (with caching)
+  const fetchMonthPhotos = useCallback(async () => {
+    const cacheKey = `${year}-${month}`;
+    const grouped = await fetchPhotosForMonth(year, month);
+    photoCacheRef.current[cacheKey] = grouped;
+    setCalendarPhotos(grouped);
+  }, [year, month, fetchPhotosForMonth]);
+
+  // When month changes, immediately set photos from cache (or empty) to prevent flickering
+  useEffect(() => {
+    const cacheKey = `${year}-${month}`;
+    setCalendarPhotos(photoCacheRef.current[cacheKey] || {});
+  }, [year, month]);
+
+  // Fetch photos when month changes or interaction completes
+  useEffect(() => {
+    if (isInteractionComplete) {
+      fetchMonthPhotos();
+    }
+  }, [isInteractionComplete, fetchMonthPhotos]);
+
+  // Prefetch adjacent months in background for smooth navigation
+  useEffect(() => {
+    if (!isInteractionComplete || isDemoMode || !couple?.id || !supabase) return;
+
+    const prevMonth = month === 0 ? 11 : month - 1;
+    const prevYear = month === 0 ? year - 1 : year;
+    const nextMonth = month === 11 ? 0 : month + 1;
+    const nextYear = month === 11 ? year + 1 : year;
+
+    const prefetch = async (y: number, m: number) => {
+      const key = `${y}-${m}`;
+      if (photoCacheRef.current[key]) return;
+      const grouped = await fetchPhotosForMonth(y, m);
+      photoCacheRef.current[key] = grouped;
+    };
+
+    prefetch(prevYear, prevMonth);
+    prefetch(nextYear, nextMonth);
+  }, [year, month, isInteractionComplete, fetchPhotosForMonth]);
+
+  // Reset swipe state and refresh photos when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      // Reset calendar to current date when returning to screen
-      setCurrentDate(new Date());
-      setSelectedDate(null);
-      // Increment key to force SwipeableTodoItem components to reset
+      // Restore cached photos immediately to avoid blank state
+      const y = currentDate.getFullYear();
+      const m = currentDate.getMonth();
+      const key = `${y}-${m}`;
+      setCalendarPhotos(photoCacheRef.current[key] || {});
       setSwipeResetKey((prev) => prev + 1);
-      // Also ensure scroll is enabled
       setScrollEnabled(true);
-      // Reload memories from database to ensure sync between paired devices
-      if (!isDemoMode && couple?.id) {
-        loadFromDB(couple.id);
+
+      // Re-fetch from DB to pick up newly added photos
+      if (!isDemoMode && couple?.id && supabase) {
+        fetchPhotosForMonth(y, m).then((grouped) => {
+          photoCacheRef.current[key] = grouped;
+          setCalendarPhotos(grouped);
+        });
       }
-    }, [couple?.id, loadFromDB])
+    }, [currentDate, couple?.id, fetchPhotosForMonth])
   );
 
   useEffect(() => {
@@ -659,9 +783,6 @@ export default function CalendarScreen() {
       keyboardHideListener.remove();
     };
   }, [keyboardOffset]);
-
-  const year = currentDate.getFullYear();
-  const month = currentDate.getMonth();
 
   const firstDayOfMonth = new Date(year, month, 1);
   const lastDayOfMonth = new Date(year, month + 1, 0);
@@ -876,6 +997,21 @@ export default function CalendarScreen() {
     return todos.filter((todo) => todo.date === dateKey);
   };
 
+  const getPhotosForDate = (day: number): CalendarPhoto[] => {
+    const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    return calendarPhotos[dateKey] || [];
+  };
+
+  const getSelectedDatePhotos = (): CalendarPhoto[] => {
+    if (selectedDate) {
+      const dateKey = `${selectedDate.year}-${String(selectedDate.month + 1).padStart(2, '0')}-${String(selectedDate.day).padStart(2, '0')}`;
+      return calendarPhotos[dateKey] || [];
+    }
+    const today = getTodayInTimezone();
+    const dateKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    return calendarPhotos[dateKey] || [];
+  };
+
   const getCurrentDateTodos = () => {
     const today = getTodayInTimezone();
     if (selectedDate) {
@@ -1065,7 +1201,10 @@ export default function CalendarScreen() {
           <Pressable
             style={styles.monthNavButton}
             onPress={() => {
-              setCurrentDate(new Date(year, month - 1, 1));
+              const newDate = new Date(year, month - 1, 1);
+              const key = `${newDate.getFullYear()}-${newDate.getMonth()}`;
+              setCalendarPhotos(photoCacheRef.current[key] || {});
+              setCurrentDate(newDate);
             }}
           >
             <ChevronLeft color={COLORS.white} size={rs(20)} strokeWidth={2} />
@@ -1076,7 +1215,10 @@ export default function CalendarScreen() {
           <Pressable
             style={styles.monthNavButton}
             onPress={() => {
-              setCurrentDate(new Date(year, month + 1, 1));
+              const newDate = new Date(year, month + 1, 1);
+              const key = `${newDate.getFullYear()}-${newDate.getMonth()}`;
+              setCalendarPhotos(photoCacheRef.current[key] || {});
+              setCurrentDate(newDate);
             }}
           >
             <ChevronRight color={COLORS.white} size={rs(20)} strokeWidth={2} />
@@ -1112,7 +1254,10 @@ export default function CalendarScreen() {
               selectedDate.year === year &&
               selectedDate.month === month &&
               selectedDate.day === day;
-            const hasTodos = getTodosForDate(day).length > 0;
+            const hasTodos = todoEnabled && getTodosForDate(day).length > 0;
+            const photosForDay = getPhotosForDate(day);
+            const hasPhotos = photosForDay.length > 0;
+            const hasPlans = getPlansForDate(day).length > 0;
 
             const showPeriod = isPeriodDay(day);
             const showOvulation = isOvulationDay(day);
@@ -1120,15 +1265,27 @@ export default function CalendarScreen() {
 
             return (
               <View key={day} style={styles.dayCell}>
+                {hasPlans && <View style={styles.planStar}><Svg width="100%" height="100%" viewBox="0 0 44 44"><Path d="M21 2 C32 0, 43 10, 42 22 C41 35, 30 44, 18 43 C6 42, -1 31, 1 19 C3 8, 11 2, 21 2 Z" fill="none" stroke="#FF4B6E" strokeWidth={1.2} strokeLinecap="round" opacity={0.9} /><Path d="M25 4 C34 6, 40 15, 39 25 C38 35, 28 41, 18 40 C8 38, 2 28, 4 18 C6 8, 16 3, 25 4 Z" fill="none" stroke="#FF4B6E" strokeWidth={1.4} strokeLinecap="round" /><Path d="M20 5 C29 2, 41 11, 40 23 C39 33, 31 42, 21 41 C10 40, 3 32, 3 21 C2 10, 11 5, 20 5 Z" fill="none" stroke="#FF4B6E" strokeWidth={1.2} strokeLinecap="round" opacity={0.85} /></Svg></View>}
                 {isTodayDay ? (
                   <Pressable
                     onPress={() => handleDateClick(day)}
                     style={[styles.dayCellInner, styles.todayCell]}
                   >
+                    {hasPhotos && (
+                      <ExpoImage
+                        source={{ uri: photosForDay[0].image_url }}
+                        style={[styles.photoCellBackground, { opacity: 0.4 }]}
+                        contentFit="cover"
+                        cachePolicy="memory-disk"
+                        transition={0}
+                      />
+                    )}
+                    {hasTodos && <View style={styles.todoDot} />}
                     <Text
                       style={[
                         styles.todayDayText,
                         isRedDay && styles.redDayText,
+                        hasPhotos && styles.photoOverlayDayText,
                       ]}
                     >
                       {day}
@@ -1139,10 +1296,21 @@ export default function CalendarScreen() {
                     onPress={() => handleDateClick(day)}
                     style={[styles.dayCellInner, styles.selectedCell]}
                   >
+                    {hasPhotos && (
+                      <ExpoImage
+                        source={{ uri: photosForDay[0].image_url }}
+                        style={[styles.photoCellBackground, { opacity: 0.4 }]}
+                        contentFit="cover"
+                        cachePolicy="memory-disk"
+                        transition={0}
+                      />
+                    )}
+                    {hasTodos && <View style={styles.todoDot} />}
                     <Text
                       style={[
                         styles.selectedDayText,
                         isRedDay && styles.redDayText,
+                        hasPhotos && styles.photoOverlayDayText,
                       ]}
                     >
                       {day}
@@ -1151,29 +1319,84 @@ export default function CalendarScreen() {
                 ) : (
                   <Pressable
                     onPress={() => handleDateClick(day)}
-                    style={styles.dayCellInner}
+                    style={[styles.dayCellInner]}
                   >
                     {/* Period indicators */}
                     {showPeriod && <View style={styles.periodDot} />}
                     {showOvulation && <View style={styles.ovulationDot} />}
                     {showFertile && <View style={styles.fertileDot} />}
+                    {hasPhotos && (
+                      <ExpoImage
+                        source={{ uri: photosForDay[0].image_url }}
+                        style={styles.photoCellBackground}
+                        contentFit="cover"
+                        cachePolicy="memory-disk"
+                        transition={0}
+                      />
+                    )}
+                    {hasTodos && !hasPhotos && <View style={styles.todoDot} />}
                     <Text
                       style={[
                         styles.normalDayText,
                         isRedDay && styles.redDayText,
+                        hasPhotos && styles.photoOverlayDayText,
                       ]}
                     >
                       {day}
                     </Text>
                   </Pressable>
                 )}
-                {hasTodos && <View style={styles.todoDot} />}
               </View>
             );
           })}
         </View>
 
-        {/* Today Section */}
+        {/* Plan Cards for Selected Date (Schedule) */}
+        {getSelectedDatePlans().length > 0 && (
+          <View style={styles.planSection}>
+            <View style={styles.planSectionHeader}>
+              <Text style={styles.planSectionTitle}>{t('calendar.plans.title')}</Text>
+            </View>
+            <View style={styles.divider} />
+            {getSelectedDatePlans().map((plan) => (
+              <Pressable
+                key={plan.id}
+                style={styles.planCard}
+                onPress={() => router.push({ pathname: '/more/plan-detail', params: { id: plan.id } } as any)}
+              >
+                {plan.imageUrl ? (
+                  <View style={styles.planCardImageWrap}>
+                    <ExpoImage
+                      source={{ uri: plan.imageUrl }}
+                      style={styles.planCardImage}
+                      contentFit="cover"
+                      cachePolicy="memory-disk"
+                      transition={200}
+                    />
+                  </View>
+                ) : null}
+                <View style={styles.planCardInfo}>
+                  <Text style={styles.planCardTitle} numberOfLines={1}>{plan.title}</Text>
+                  {plan.locationName ? (
+                    <Text style={styles.planCardLocation} numberOfLines={1}>{plan.locationName}</Text>
+                  ) : null}
+                  <View style={[styles.planCardBadge, plan.status === 'interested' && styles.planCardBadgeInterested]}>
+                    <Text style={[styles.planCardBadgeText, plan.status === 'interested' && styles.planCardBadgeTextInterested]}>
+                      {plan.status === 'interested'
+                        ? t('planDetail.status.interested', { defaultValue: '관심' })
+                        : plan.status === 'booked'
+                          ? t('planDetail.status.booked')
+                          : t('planDetail.status.completed')}
+                    </Text>
+                  </View>
+                </View>
+              </Pressable>
+            ))}
+          </View>
+        )}
+
+        {/* Today Section (Todo) */}
+        {todoEnabled && (
         <View style={styles.todaySection}>
           <View style={styles.todaySectionHeader}>
             <Text style={styles.todaySectionTitle}>
@@ -1220,6 +1443,37 @@ export default function CalendarScreen() {
             )}
           </View>
         </View>
+        )}
+
+        {/* Photo Cards for Selected Date */}
+        {getSelectedDatePhotos().length > 0 && (
+          <View style={styles.photoSection}>
+            <View style={styles.photoSectionHeader}>
+              <Text style={styles.photoSectionTitle}>{t('calendar.photos.title')}</Text>
+              <Text style={styles.photoSectionCount}>
+                {getSelectedDatePhotos().length}{t('calendar.photos.countUnit')}
+              </Text>
+            </View>
+            <View style={styles.divider} />
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.photoCardListContent}
+            >
+              {getSelectedDatePhotos().map((photo) => (
+                <View key={photo.id} style={styles.photoCard}>
+                  <ExpoImage
+                    source={{ uri: photo.image_url }}
+                    style={styles.photoCardImage}
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
+                    transition={200}
+                  />
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
         {/* Menstrual Information Section */}
         {menstrualTrackingEnabled && (
@@ -1325,9 +1579,6 @@ export default function CalendarScreen() {
 
       </ScrollView>
 
-      {/* Banner Ad - positioned above tab bar */}
-      <BannerAdView placement="calendar" style={[styles.bannerAd, { bottom: bannerAdBottom }]} />
-
       {/* Settings Modal */}
       <Modal
         visible={isSettingsOpen}
@@ -1355,6 +1606,31 @@ export default function CalendarScreen() {
 
               <View style={styles.modalBody}>
                 <Text style={styles.modalDescription}>{t('calendar.settings.description')}</Text>
+
+                <Pressable
+                  style={[
+                    styles.featureCard,
+                    tempTodoEnabled && styles.featureCardActive,
+                  ]}
+                  onPress={() => setTempTodoEnabled(!tempTodoEnabled)}
+                >
+                  <View style={[styles.featureIconRound, { backgroundColor: '#1a1a1a' }]}>
+                    <ListChecks color={COLORS.white} size={rs(24)} strokeWidth={2} />
+                  </View>
+                  <View style={styles.featureInfo}>
+                    <Text style={styles.featureTitle}>{t('calendar.todo.calendar')}</Text>
+                    <Text style={styles.featureDescription}>
+                      {t('calendar.todo.calendarDesc')}
+                    </Text>
+                  </View>
+                  {tempTodoEnabled ? (
+                    <View style={styles.checkCircleActive}>
+                      <Check color={COLORS.black} size={rs(16)} strokeWidth={3} />
+                    </View>
+                  ) : (
+                    <Circle color="rgba(255,255,255,0.4)" size={rs(24)} strokeWidth={2} />
+                  )}
+                </Pressable>
 
                 <Pressable
                   style={[
@@ -1735,12 +2011,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.black,
   },
-  bannerAd: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-  },
   inlineBannerContainer: {
     alignItems: 'center',
     paddingVertical: rs(8),
@@ -1874,6 +2144,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: rs(RADIUS.full),
     position: 'relative',
+    overflow: 'hidden',
   },
 
   todayBorder: {
@@ -1930,8 +2201,8 @@ const styles = StyleSheet.create({
   },
   periodDot: {
     position: 'absolute',
-    top: rs(4),
-    right: rs(4),
+    top: rs(6),
+    right: rs(7),
     width: rs(6),
     height: rs(6),
     borderRadius: rs(3),
@@ -1939,8 +2210,8 @@ const styles = StyleSheet.create({
   },
   ovulationDot: {
     position: 'absolute',
-    top: rs(4),
-    right: rs(4),
+    top: rs(6),
+    right: rs(7),
     width: rs(6),
     height: rs(6),
     borderRadius: rs(3),
@@ -1948,8 +2219,8 @@ const styles = StyleSheet.create({
   },
   fertileDot: {
     position: 'absolute',
-    top: rs(4),
-    right: rs(4),
+    top: rs(6),
+    right: rs(7),
     width: rs(6),
     height: rs(6),
     borderRadius: rs(3),
@@ -1962,6 +2233,131 @@ const styles = StyleSheet.create({
     height: rs(3),
     borderRadius: rs(2),
     backgroundColor: '#E8DCC4',
+  },
+  planStar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Photo as full circular background inside day cell
+  photoCellBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  // Day text overlay on photo background
+  photoOverlayDayText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  // Photo section below todo section
+  photoSection: {
+    marginTop: rs(SPACING.lg),
+    paddingBottom: rs(SPACING.lg),
+  },
+  photoSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: rs(SPACING.sm),
+  },
+  photoSectionTitle: {
+    fontSize: fp(24),
+    color: COLORS.white,
+    fontWeight: '600',
+  },
+  photoSectionCount: {
+    fontSize: fp(14),
+    color: COLORS.mutedForeground,
+    fontWeight: '400',
+  },
+  photoCardListContent: {
+    gap: rs(12),
+  },
+  photoCard: {
+    width: rs(140),
+    height: rs(180),
+    borderRadius: rs(16),
+    overflow: 'hidden',
+    borderWidth: rs(1),
+    borderColor: COLORS.border,
+  },
+  photoCardImage: {
+    width: '100%',
+    height: '100%',
+  },
+  // Plan section styles
+  planSection: {
+    marginTop: rs(SPACING.lg),
+    paddingBottom: rs(SPACING.lg),
+  },
+  planSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: rs(SPACING.sm),
+  },
+  planSectionTitle: {
+    fontSize: fp(24),
+    color: COLORS.white,
+    fontWeight: '600',
+  },
+  planCard: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: rs(14),
+    overflow: 'hidden',
+    marginTop: rs(8),
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  planCardImageWrap: {
+    width: rs(72),
+  },
+  planCardImage: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  planCardInfo: {
+    flex: 1,
+    padding: rs(10),
+    justifyContent: 'center',
+    gap: rs(2),
+  },
+  planCardTitle: {
+    fontSize: fp(14),
+    fontWeight: '600',
+    color: COLORS.white,
+  },
+  planCardLocation: {
+    fontSize: fp(12),
+    color: 'rgba(255,255,255,0.6)',
+  },
+  planCardBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#FF4B6E',
+    borderRadius: rs(8),
+    paddingHorizontal: rs(8),
+    paddingVertical: rs(2),
+    marginTop: rs(2),
+  },
+  planCardBadgeText: {
+    fontSize: fp(10),
+    fontWeight: '600',
+    color: '#fff',
+  },
+  planCardBadgeInterested: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  planCardBadgeTextInterested: {
+    color: 'rgba(255,255,255,0.8)',
   },
   todaySection: {
     marginTop: rs(SPACING.lg),

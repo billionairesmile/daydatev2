@@ -294,9 +294,9 @@ export default function UnpairScreen() {
               <View style={[styles.infoCardIconWrapper, { backgroundColor: '#e8f5e9' }]}>
                 <CheckCircle color="#4caf50" size={18} />
               </View>
-              <Text style={styles.infoCardLabel}>{t('settings.unpair.completedMissions')}</Text>
+              <Text style={styles.infoCardLabel}>{t('settings.unpair.dateRecords')}</Text>
             </View>
-            <Text style={styles.infoCardValue}>{memories.length}{t('settings.unpair.missionsUnit')}</Text>
+            <Text style={styles.infoCardValue}>{memories.length}{t('settings.unpair.recordsUnit')}</Text>
           </View>
 
           <View style={styles.infoCard}>

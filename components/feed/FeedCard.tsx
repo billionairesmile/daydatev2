@@ -1,269 +1,110 @@
-import React, { useCallback, useMemo } from 'react';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
-import { BlurView } from 'expo-blur';
+import React from 'react';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MapPin, Calendar, Tag, ExternalLink } from 'lucide-react-native';
-import { useTranslation } from 'react-i18next';
-import { COLORS, FS, SP, RD, SZ, SCREEN_WIDTH } from '@/constants/design';
+import { COLORS, FS, SP, SCREEN_WIDTH } from '@/constants/design';
 import type { FeedPost } from '@/types';
-import { ImageCarousel } from './ImageCarousel';
-import { FeedSaveButton } from './FeedSaveButton';
 
 interface FeedCardProps {
   post: FeedPost;
   isSaved: boolean;
-  onToggleSave: () => void;
+  onPress: () => void;
 }
 
-const CARD_WIDTH = SCREEN_WIDTH - SP.lg * 2;
+const GAP = 10;
+const PADDING = 12;
+const CARD_WIDTH = (SCREEN_WIDTH - PADDING * 2 - GAP) / 2;
+const CARD_IMAGE_HEIGHT = CARD_WIDTH * 1.25;
 
-function formatDateRange(startDate?: string, endDate?: string): string | null {
-  if (!startDate) return null;
-
-  const formatDate = (iso: string): string => {
-    const d = new Date(iso);
-    const month = d.getMonth() + 1;
-    const day = d.getDate();
-    return `${month}.${day}`;
-  };
-
-  const start = formatDate(startDate);
-  if (!endDate) return start;
-
-  const end = formatDate(endDate);
-  return `${start} - ${end}`;
-}
-
-export function FeedCard({ post, isSaved, onToggleSave }: FeedCardProps) {
-  const { t } = useTranslation();
-
-  const linkUrl = post.affiliateLink || post.externalLink;
-
-  const dateRange = useMemo(
-    () => formatDateRange(post.eventStartDate, post.eventEndDate),
-    [post.eventStartDate, post.eventEndDate],
-  );
-
-  const hasMetadata = !!(post.locationName || dateRange || post.price);
-
-  const handleOpenLink = useCallback(() => {
-    if (linkUrl) {
-      Linking.openURL(linkUrl);
-    }
-  }, [linkUrl]);
-
-  const handleImagePress = useCallback(() => {
-    if (linkUrl) {
-      Linking.openURL(linkUrl);
-    }
-  }, [linkUrl]);
-
+export function FeedCard({ post, isSaved, onPress }: FeedCardProps) {
   return (
-    <View style={styles.cardOuter}>
-      <BlurView
-        experimentalBlurMethod="dimezisBlurView"
-        intensity={60}
-        tint="dark"
-        style={styles.blur}
-      >
-        <View style={styles.cardInner}>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.cardShadow, pressed && styles.cardPressed]}
+    >
+      <View style={styles.cardInner}>
+        {/* Thumbnail Image */}
+        <View style={styles.imageContainer}>
+          {post.images && post.images.length > 0 ? (
+            <Image
+              source={{ uri: post.images[0] }}
+              style={styles.image}
+              contentFit="cover"
+              transition={200}
+              recyclingKey={post.id}
+            />
+          ) : (
+            <View style={[styles.image, styles.placeholder]} />
+          )}
+          {/* Bottom gradient on image */}
           <LinearGradient
-            colors={[
-              'rgba(255, 255, 255, 0.08)',
-              'rgba(255, 255, 255, 0.02)',
-              'rgba(255, 255, 255, 0)',
-            ]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.gradient}
+            colors={['transparent', 'rgba(0,0,0,0.35)']}
+            style={styles.imageGradient}
           />
-
-          {/* Image Carousel */}
-          <ImageCarousel images={post.images} onPress={handleImagePress} />
-
-          {/* Content */}
-          <View style={styles.content}>
-            {/* Title */}
-            <Text style={styles.title} numberOfLines={2}>
-              {post.title}
-            </Text>
-
-            {/* Caption */}
-            {post.caption ? (
-              <Text style={styles.caption} numberOfLines={2}>
-                {post.caption}
-              </Text>
-            ) : null}
-
-            {/* Metadata Row */}
-            {hasMetadata && (
-              <View style={styles.metadataRow}>
-                {post.locationName ? (
-                  <View style={styles.metaItem}>
-                    <MapPin
-                      size={SZ.iconXs}
-                      color={COLORS.glass.white50}
-                      strokeWidth={1.8}
-                    />
-                    <Text style={styles.metaText} numberOfLines={1}>
-                      {post.locationName}
-                    </Text>
-                  </View>
-                ) : null}
-
-                {dateRange ? (
-                  <View style={styles.metaItem}>
-                    <Calendar
-                      size={SZ.iconXs}
-                      color={COLORS.glass.white50}
-                      strokeWidth={1.8}
-                    />
-                    <Text style={styles.metaText} numberOfLines={1}>
-                      {dateRange}
-                    </Text>
-                  </View>
-                ) : null}
-
-                {post.price ? (
-                  <View style={styles.metaItem}>
-                    <Tag
-                      size={SZ.iconXs}
-                      color={COLORS.glass.white50}
-                      strokeWidth={1.8}
-                    />
-                    <Text style={styles.metaText} numberOfLines={1}>
-                      {post.price}
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
-            )}
-
-            {/* Action Row */}
-            <View style={styles.actionRow}>
-              {linkUrl ? (
-                <Pressable
-                  onPress={handleOpenLink}
-                  style={({ pressed }) => [
-                    styles.ctaButton,
-                    pressed && styles.ctaPressed,
-                  ]}
-                  accessibilityRole="link"
-                  accessibilityLabel={t('feed.openLink')}
-                >
-                  <ExternalLink
-                    size={SZ.iconSm}
-                    color={COLORS.foreground}
-                    strokeWidth={1.8}
-                  />
-                  <Text style={styles.ctaText}>
-                    {t('feed.viewMore')}
-                  </Text>
-                </Pressable>
-              ) : (
-                <View />
-              )}
-
-              <FeedSaveButton
-                isSaved={isSaved}
-                onToggle={onToggleSave}
-                saveCount={post.saveCount}
-              />
-            </View>
-          </View>
         </View>
-      </BlurView>
-    </View>
+
+        {/* Title only */}
+        <View style={styles.info}>
+          <Text style={styles.title} numberOfLines={2}>{post.title}</Text>
+        </View>
+      </View>
+    </Pressable>
   );
 }
+
+export { CARD_WIDTH, GAP, PADDING };
 
 const styles = StyleSheet.create({
-  cardOuter: {
+  cardShadow: {
     width: CARD_WIDTH,
-    alignSelf: 'center',
-    borderRadius: RD.sm,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: COLORS.glass.white10,
+    marginBottom: GAP,
+    borderRadius: 14,
+    // iOS shadow
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  blur: {
-    overflow: 'hidden',
-    borderRadius: RD.sm,
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    // Android elevation
+    elevation: 6,
   },
   cardInner: {
-    backgroundColor: COLORS.glass.white08,
+    borderRadius: 14,
     overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  cardPressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.97 }],
+  },
+  imageContainer: {
+    width: CARD_WIDTH,
+    height: CARD_IMAGE_HEIGHT,
     position: 'relative',
   },
-  gradient: {
+  image: {
+    width: '100%',
+    height: '100%',
+  },
+  imageGradient: {
     position: 'absolute',
-    top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    pointerEvents: 'none',
-    zIndex: 1,
+    height: '40%',
   },
-  content: {
-    padding: SP.lg,
-    gap: SP.sm,
+  placeholder: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  info: {
+    padding: 10,
+    gap: 4,
   },
   title: {
-    fontSize: FS.xl,
-    fontWeight: '700',
-    color: COLORS.foreground,
-    lineHeight: FS.xl * 1.3,
-  },
-  caption: {
-    fontSize: FS.md,
-    fontWeight: '400',
-    color: COLORS.glass.white70,
-    lineHeight: FS.md * 1.5,
-  },
-  metadataRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: SP.md,
-    marginTop: SP.xs,
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.xs,
-  },
-  metaText: {
-    fontSize: FS.sm,
-    fontWeight: '500',
-    color: COLORS.glass.white50,
-    maxWidth: CARD_WIDTH * 0.35,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: SP.sm,
-  },
-  ctaButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.sm,
-    backgroundColor: COLORS.accent,
-    paddingVertical: SP.sm,
-    paddingHorizontal: SP.lg,
-    borderRadius: RD.lg,
-  },
-  ctaPressed: {
-    opacity: 0.8,
-  },
-  ctaText: {
-    fontSize: FS.md,
+    fontSize: 13,
     fontWeight: '600',
-    color: COLORS.foreground,
+    color: '#fff',
+    lineHeight: 18,
   },
 });
