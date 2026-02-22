@@ -1872,7 +1872,7 @@ export default function HomeScreen() {
             </Pressable>
           </View>
 
-          {/* Nearest anniversary alert */}
+          {/* Nearest anniversary alert - above D-Day */}
           {anniversaries.length > 0 && (
             <View
               style={[styles.anniversaryAlert, { backgroundColor: anniversaries[0].bgColor }]}
